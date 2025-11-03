@@ -1,0 +1,301 @@
+import React, {useCallback, useEffect, useState} from 'react';
+import { View, TextInput, RefreshControl, FlatList, TouchableOpacity, StyleSheet } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import {Text} from '@ui-kitten/components';
+import { COLORS } from '../../../shared/constants/colors';
+import {Header} from '../../../shared/components/Header';
+import {globalStyles} from '../../../shared/styles/global';
+import {useNavigation} from '@react-navigation/native';
+import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
+import { useThemedColors } from '../../../shared/styles/theme';
+import { useTranslation } from '../../../shared/hooks/useTranslation';
+import { useThemeMode } from '../../../shared/context/ThemeContext';
+import { getListStyles } from '../../../shared/styles/list';
+import {
+  getChurchesList,
+  ChurchListItem,
+} from '../services/church.service';
+import { EditSvgIcon, DisabledSvgIcon, EnabledSvgIcon, CopySvgIcon } from '../../../shared/components/icons';
+
+export const CloneChurchScreen: React.FC = () => {
+  const navigation = useNavigation<any>();
+  const C = useThemedColors();
+  const { theme } = useThemeMode();
+  const listStyles = getListStyles(C, theme);
+  const { t } = useTranslation();
+  const [items, setItems] = useState<ChurchListItem[]>([]);
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [total, setTotal] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+  const [query, setQuery] = useState('');
+
+  const fetchData = useCallback(
+    async (targetPage: number, reset = false) => {
+      try {
+        if (loading) {return;}
+        setLoading(true);
+        const data = await getChurchesList({
+          page: targetPage,
+          limit: DEFAULT_PAGE_LIMIT,
+          sort_by: 'id',
+          sort_desc: true,
+          name: query && query.trim() ? query.trim() : undefined,
+        });
+        const nextItems = (data?.items ?? []) as ChurchListItem[];
+        setTotalPages(data?.total_pages ?? 1);
+        setTotal(data?.total ?? 0);
+        setPage(data?.page ?? targetPage);
+        setItems(reset ? nextItems : [...items, ...nextItems]);
+      } catch (e) {
+        // noop UI-level
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading, query, items],
+  );
+
+  useEffect(() => {
+    setItems([]);
+    fetchData(1, true);
+  }, [query]);
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    setItems([]);
+    await fetchData(1, true);
+    setRefreshing(false);
+  };
+
+  const goToPage = (targetPage: number) => {
+    if (targetPage < 1 || targetPage > totalPages || loading) {return;}
+    setItems([]);
+    fetchData(targetPage, true);
+  };
+
+  const renderItem = ({item}: {item: ChurchListItem}) => {
+    const name = item.name || '';
+    const initials = name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join('') || 'C';
+    const isMother = (item as any)?.is_mother_church;
+    const isMsc = (item as any)?.is_msc;
+    return (
+      <TouchableOpacity style={listStyles.itemCard as any} onPress={() => navigation.navigate('AddCloneChurch', { id: item.id })}>
+        <View style={listStyles.itemRow as any}>
+          <View style={listStyles.avatarWrap as any}>
+            <View style={listStyles.avatar as any}>
+              <Text style={listStyles.avatarText as any}>{initials}</Text>
+            </View>
+          </View>
+          <View style={styles.itemCol}>
+            <Text style={[styles.name, { color: C.textPrimary }]} numberOfLines={1}>{name}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+              {isMother ? (
+                <View style={[styles.badge, styles.badgePrimary]}>
+                  <Text style={styles.badgeTextPrimary}>{t('motherChurch') || 'Mother'}</Text>
+                </View>
+              ) : null}
+              {isMsc ? (
+                <View style={[styles.badge, styles.badgeInfo]}>
+                  <Text style={styles.badgeTextInfo}>{t('msc')}</Text>
+                </View>
+              ) : null}
+            </View>
+            <Text style={[styles.meta, { color: C.textSecondary }]} numberOfLines={1}>
+              {item.city} · {item.country_name}
+            </Text>
+          </View>
+          <View style={styles.itemColRight}>
+            <View style={styles.actionRow}>
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.copyBtn]}
+                onPress={() => navigation.navigate('AddCloneChurch', { id: item.id })}>
+                <CopySvgIcon width={18} height={18} />
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const keyExtractor = (item: ChurchListItem) => String(item.id);
+
+  const renderPagination = () => {
+    const itemsToRender: Array<{
+      label: string;
+      page: number;
+      active?: boolean;
+      disabled?: boolean;
+    }> = [];
+    itemsToRender.push({label: '<<', page: 1, disabled: page === 1});
+    for (let p = page - 2; p <= page - 1; p++) {
+      if (p >= 1) {itemsToRender.push({label: String(p), page: p});}
+    }
+    itemsToRender.push({label: String(page), page, active: true});
+    for (let p = page + 1; p <= page + 2; p++) {
+      if (p <= totalPages) {itemsToRender.push({label: String(p), page: p});}
+    }
+    itemsToRender.push({
+      label: '>>',
+      page: totalPages,
+      disabled: page === totalPages,
+    });
+    return (
+      <View style={listStyles.pageNumbersContainer as any}>
+        {itemsToRender.map(p => (
+          <TouchableOpacity
+            key={`${p.label}-${p.page}`}
+            style={[
+              listStyles.pageNumber as any,
+              p.active && (listStyles.pageNumberActive as any),
+              (p.disabled || loading) && (listStyles.pageNumberDisabled as any),
+            ]}
+            onPress={() => goToPage(p.page)}
+            disabled={!!p.disabled || loading}>
+            <Text
+              style={[
+                listStyles.pageNumberText as any,
+                p.active && (listStyles.pageNumberTextActive as any),
+              ]}>
+              {p.label}
+            </Text>
+          </TouchableOpacity>
+        ))}
+      </View>
+    );
+  };
+
+  return (
+    <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
+      <View style={[styles.container, { backgroundColor: C.background }]}>
+        <Header title={t('addNewClonedChurch')} />
+
+        {/* <View style={styles.headerRow}>
+          <Text style={styles.title}>Churches</Text>
+          <TouchableOpacity
+            style={styles.addButton}
+            onPress={() => navigation.navigate('AddChurch')}>
+            <Text style={styles.addButtonText}>+ Add New</Text>
+          </TouchableOpacity>
+        </View> */}
+
+        <View style={listStyles.searchContainer as any}>
+          <Text style={listStyles.searchIcon as any}>🔎</Text>
+          <TextInput
+            style={listStyles.searchInput as any}
+            placeholder={t('search')}
+            placeholderTextColor={C.textSecondary}
+            value={query}
+            onChangeText={setQuery}
+            returnKeyType="search"
+            onSubmitEditing={() => goToPage(1)}
+          />
+        </View>
+
+        <FlatList
+          data={items}
+          keyExtractor={keyExtractor}
+          renderItem={renderItem}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={!loading ? (
+            <Text style={[styles.empty, { color: C.textSecondary }]}>{t('noChurchesFound')}</Text>
+          ) : null}
+        />
+        <Text style={[styles.subTitle, { color: C.textSecondary }]}>{`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}</Text>
+        <View style={styles.pagination}>{renderPagination()}</View>
+      </View>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    paddingTop: 0,
+    paddingHorizontal: 16,
+  },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  title: {fontSize: 22, fontWeight: '600'},
+  subTitle: {marginTop: 6, marginBottom: 10, fontSize: 12},
+  addButton: {
+    backgroundColor: COLORS.mainColor,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 6,
+  },
+  addButtonText: {color: '#fff', fontWeight: '600'},
+  search: {
+    height: 40,
+    borderWidth: 1,
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    marginBottom: 10,
+    marginTop: 6,
+  },
+  itemRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+  },
+  itemCol: {flex: 1, paddingRight: 8},
+  itemColRight: {
+    alignItems: 'flex-end',
+    justifyContent: 'center',
+    paddingLeft: 8,
+    width: 72,
+  },
+  name: {fontSize: 16, fontWeight: '600', marginBottom: 2},
+  meta: {fontSize: 12},
+  badge: { paddingVertical: 2, paddingHorizontal: 8, borderRadius: 999 },
+  badgePrimary: { backgroundColor: COLORS.mainColor },
+  badgeInfo: { backgroundColor: '#0ea5e9' },
+  badgeTextPrimary: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  badgeTextInfo: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  actionRow: {flexDirection: 'row', gap: 6},
+  actionBtn: {
+    width: 30,
+    height: 30,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  editBtn: {
+    backgroundColor: COLORS.successColor,
+  },
+  deleteBtn: {
+    backgroundColor: COLORS.dangerColor,
+  },
+  copyBtn: {
+    backgroundColor: COLORS.mainColor,
+  },
+  empty: {textAlign: 'center', marginTop: 40},
+  pagination: {paddingVertical: 12, alignItems: 'flex-end'},
+  pageNumbersContainer: {flexDirection: 'row', alignItems: 'center'},
+  pageNumber: {
+    borderRadius: 0,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 10,
+    marginLeft: 8,
+  },
+  pageNumberActive: {
+    backgroundColor: COLORS.mainColor,
+    borderColor: COLORS.mainColor,
+  },
+  pageNumberDisabled: {opacity: 0.5},
+  pageNumberText: {fontWeight: '600'},
+  pageNumberTextActive: {color: '#fff'},
+});
+
+export default CloneChurchScreen;
