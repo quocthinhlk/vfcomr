@@ -1,4 +1,4 @@
-import React, {useState, useContext, useEffect} from 'react';
+import React, {useState, useContext, useEffect, useMemo} from 'react';
 import {View, StyleSheet, TouchableOpacity, Text, Image} from 'react-native';
 import {HamburgerMenuIcon} from './HamburgerMenuIcon';
 import {MenuPopup} from './MenuPopup';
@@ -66,6 +66,10 @@ export const Header: React.FC<HeaderProps> = ({ title }) => {
     setMenuVisible(false);
   };
 
+  const menuItems = useMemo(() => {
+    return getTranslatedMenuItems(selectedLanguage as any, userRoleId);
+  }, [selectedLanguage, userRoleId]);
+
   return (
     <View style={[styles.headerContainer, { backgroundColor: C.background }]}>
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backWrap}>
@@ -76,7 +80,7 @@ export const Header: React.FC<HeaderProps> = ({ title }) => {
       <MenuPopup
         visible={menuVisible}
         onClose={() => setMenuVisible(false)}
-        menuItems={getTranslatedMenuItems(selectedLanguage as any, userRoleId)}
+        menuItems={menuItems}
         onMenuItemPress={handleMenuItemPress}
         onLogout={handleLogout}
         onChangeLanguage={handleChangeLanguage}

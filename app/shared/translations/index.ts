@@ -160,6 +160,8 @@ export const translations = {
     credentialLocked: 'Credential Locked',
     credentialUnlocked: 'Credential Unlocked',
     pastorCredentialLocked: 'Pastor credential locked',
+    logo: 'Logo',
+    you: 'You',
     // Church Module
     churchDetail: 'Church Detail',
     churchesList: 'Churches List',
@@ -412,6 +414,8 @@ export const translations = {
     credentialLocked: 'Credencial Bloqueada',
     credentialUnlocked: 'Credencial Desbloqueada',
     pastorCredentialLocked: 'Credencial do pastor bloqueada',
+    logo: 'Logo',
+    you: 'Você',
     // Church Module
     churchDetail: 'Detalhes da Igreja',
     churchesList: 'Lista de Igrejas',
@@ -665,6 +669,8 @@ export const translations = {
     credentialLocked: 'Credencial Bloqueada',
     credentialUnlocked: 'Credencial Desbloqueada',
     pastorCredentialLocked: 'Credencial del pastor bloqueada',
+    logo: 'Logo',
+    you: 'Tú',
     // Church Module
     churchDetail: 'Detalles de la Iglesia',
     churchesList: 'Lista de Iglesias',
@@ -918,6 +924,8 @@ export const translations = {
     credentialLocked: 'Identifiants verrouillés',
     credentialUnlocked: 'Identifiants déverrouillés',
     pastorCredentialLocked: 'Identifiants du pasteur verrouillés',
+    logo: 'Logo',
+    you: 'Vous',
     // Church Module
     churchDetail: 'Détails de l\'Église',
     churchesList: 'Liste des Églises',
@@ -1171,6 +1179,8 @@ export const translations = {
     credentialLocked: '凭证已锁定',
     credentialUnlocked: '凭证已解锁',
     pastorCredentialLocked: '牧者凭证已锁定',
+    logo: '徽标',
+    you: '你',
     // Church Module
     churchDetail: '教会详情',
     churchesList: '教会列表',
@@ -1424,6 +1434,8 @@ export const translations = {
     credentialLocked: 'Kredensial Dikunci',
     credentialUnlocked: 'Kredensial Dibuka',
     pastorCredentialLocked: 'Kredensial pastor dikunci',
+    logo: 'Logo',
+    you: 'Anda',
     // Church Module
     churchDetail: 'Butiran Gereja',
     churchesList: 'Senarai Gereja',
@@ -1677,6 +1689,8 @@ export const translations = {
     credentialLocked: '資格情報はロックされています',
     credentialUnlocked: '資格情報はロック解除',
     pastorCredentialLocked: '牧師の資格情報をロック',
+    logo: 'ロゴ',
+    you: 'あなた',
     // Church Module
     churchDetail: '教会詳細',
     churchesList: '教会リスト',

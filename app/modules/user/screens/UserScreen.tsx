@@ -27,6 +27,8 @@ export const UserScreen = () => {
   const [user, setUser] = useState<UserDetailData | null>(null);
   const [avatarError, setAvatarError] = useState<boolean>(false);
   const [roleId, setRoleId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
 
   const formatPhoneDisplay = (value?: string | null) => {
     if (!value) return '';
@@ -62,11 +64,20 @@ export const UserScreen = () => {
     (async () => {
       try {
         const res = await api.get('users/me');
-        const r = res?.data?.data?.role?.id;
+        const userData = res?.data?.data;
+        const r = userData?.role?.id;
+        const currentId = userData?.id;
         if (typeof r === 'number') setRoleId(r);
+        if (typeof currentId === 'number') {
+          setCurrentUserId(currentId);
+          // Check if viewing own profile
+          if (userId === currentId) {
+            setIsOwnProfile(true);
+          }
+        }
       } catch {}
     })();
-  }, []);
+  }, [userId]);
 
   return (
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
@@ -83,7 +94,14 @@ export const UserScreen = () => {
                 onError={() => setAvatarError(true)}
               />
             </View>
-            <Text style={[styles.name, { color: C.textPrimary }]}>{user?.name || '-'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Text style={[styles.name, { color: C.textPrimary }]}>{user?.name || '-'}</Text>
+              {isOwnProfile && (
+                <View style={[styles.ownProfileBadge, { backgroundColor: COLORS.mainColor }]}>
+                  <Text style={styles.ownProfileBadgeText}>{t('you')}</Text>
+                </View>
+              )}
+            </View>
             {user?.title ? <Text style={[styles.title, { color: C.textSecondary }]}>{user.title}</Text> : null}
 
             <View style={styles.chipsRow}>
@@ -185,7 +203,7 @@ export const UserScreen = () => {
               <Text style={styles.errorText}>{error}</Text>
             </View>
           ) : null}
-          {isSuperAdmin(roleId) ? (
+          {isSuperAdmin(roleId) && !isOwnProfile ? (
           <View style={{ marginTop: 12 }}>
           <Button style={{ backgroundColor: COLORS.dangerColor, borderColor: COLORS.dangerColor }} onPress={() => navigation.navigate('DeleteUser' as any, { userId })}>
             {t('deleteUser')}
@@ -258,6 +276,19 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '700',
     marginTop: 6,
+  },
+  ownProfileBadge: {
+    backgroundColor: COLORS.mainColor,
+    borderRadius: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    marginTop: 6,
+  },
+  ownProfileBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '700',
+    textTransform: 'uppercase',
   },
   title: {
     marginTop: 2,

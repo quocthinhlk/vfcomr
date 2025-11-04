@@ -1,5 +1,5 @@
 // modules/dashboard/screens/DashboardScreen.tsx
-import React, { useContext, useState, useEffect, useRef } from 'react';
+import React, { useContext, useState, useEffect, useRef, useMemo } from 'react';
 import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Modal, Animated, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Button } from '@ui-kitten/components';
@@ -25,13 +25,16 @@ export default function DashboardScreen() {
   const { setIsAuthenticated } = useContext(AuthContext);
   const { showAllStats, visibleStats, toggleShowAllStats, icons } = useDashboardStats();
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const C = useThemedColors();
   const { t } = useTranslation();
 
   const [menuVisible, setMenuVisible] = useState(false);
   const { selectedLanguage, setLanguage } = useLanguage();
-  const translatedMenu = getTranslatedMenuItems(selectedLanguage as any);
+  const translatedMenu = useMemo(() => {
+    return getTranslatedMenuItems(selectedLanguage as any, currentUserRoleId ?? undefined);
+  }, [selectedLanguage, currentUserRoleId]);
   const [showLocalAllStats, setShowLocalAllStats] = useState(false);
   const rotation = useRef(new Animated.Value(0)).current;
   const fade = useRef(new Animated.Value(1)).current;
@@ -67,8 +70,11 @@ export default function DashboardScreen() {
       try {
         const res = await api.get('users/me');
         if (!mounted) return;
-        const r = res?.data?.data?.role?.id;
+        const userData = res?.data?.data;
+        const r = userData?.role?.id;
+        const userId = userData?.id;
         if (typeof r === 'number') setCurrentUserRoleId(r);
+        if (typeof userId === 'number') setCurrentUserId(userId);
       } catch {}
       if (mounted) setLoading(false);
     })();
@@ -143,13 +149,22 @@ export default function DashboardScreen() {
               style={{ width: 50, height: 50, borderRadius: 25, marginRight: 12 }}
               onError={() => setProfile(prev => ({ ...prev, image: BLANK_AVATAR }))}
             />
-            <View style={{ flex: 1 }}>
+            <TouchableOpacity 
+              style={{ flex: 1 }}
+              onPress={() => {
+                if (currentUserId) {
+                  navigation.navigate('User', { userId: currentUserId });
+                }
+              }}
+              activeOpacity={0.7}
+              disabled={!currentUserId}
+            >
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <Text category="h6" style={{ fontWeight: 'bold', color: C.textPrimary }}>{profile.name}</Text>
               </View>
               <Text category="s2" appearance="hint" style={{ color: C.textSecondary }}>{profile.role}</Text>
               <Text category="s2" appearance="hint" style={{ color: C.textSecondary }}>{profile.location}</Text>
-            </View>
+            </TouchableOpacity>
           </View>
           <View style={{ marginBottom: 18 }}>
             <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />

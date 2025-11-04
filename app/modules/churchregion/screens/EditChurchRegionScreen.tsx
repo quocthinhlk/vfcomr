@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, Alert, TextInput } from 'react-native';
+import { View, StyleSheet, Alert, TextInput, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@ui-kitten/components';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -11,6 +11,9 @@ import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
 import { useThemeMode } from '../../../shared/context/ThemeContext';
 import ElementDropdown, { ElementDropdownItem } from '../../../shared/components/ElementDropdown';
+import { useImagePicker } from '../../church/hooks/useImagePicker';
+import api from '../../../config/api';
+import { churchStyles } from '../../church/styles';
 
 export const EditChurchRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -20,9 +23,11 @@ export const EditChurchRegionScreen: React.FC = () => {
   const [parentId, setParentId] = useState<number | null>(null);
   const [options, setOptions] = useState<ElementDropdownItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
   const { t } = useTranslation();
   const C = useThemedColors();
   const { theme } = useThemeMode();
+  const { imagePath, handleImagePick, clearImage } = useImagePicker();
 
   useEffect(() => {
     let mounted = true;
@@ -32,6 +37,7 @@ export const EditChurchRegionScreen: React.FC = () => {
         const data = res?.data?.data || res?.data;
         setName(data?.name || '');
         setParentId(data?.parent_id ?? null);
+        setExistingLogoUrl(data?.logo_url || null);
       }).catch(() => {});
     }
     return () => { (mounted = false); };
@@ -66,7 +72,24 @@ export const EditChurchRegionScreen: React.FC = () => {
     }
     try {
       setSubmitting(true);
-      await updateChurchRegion(churchRegionId, { name: name.trim(), parent_id: parentId ?? null });
+      
+      // Upload image first if selected
+      let uploadedLogoPath: string | null = null;
+      if (imagePath) {
+        const form = new FormData();
+        const fileName = imagePath.split('/').pop() || 'logo.jpg';
+        form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
+        form.append('entity_type', 'church-regions');
+        form.append('alt_text', name.trim());
+        const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        uploadedLogoPath = uploadRes?.data?.data?.path || null;
+      }
+      
+      await updateChurchRegion(churchRegionId, { 
+        name: name.trim(), 
+        parent_id: parentId ?? null,
+        ...(uploadedLogoPath ? { logo_path: uploadedLogoPath } : {})
+      } as any);
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('edit')} ${t('success')}`);
       navigation.navigate('ChurchRegions', { reload: true });
     } catch (e) {
@@ -97,6 +120,25 @@ export const EditChurchRegionScreen: React.FC = () => {
             placeholder={t('churchParent')}
             containerStyle={{ marginBottom: 8 }}
           />
+          
+          <Text style={[styles.label, { color: C.textPrimary }]}>{t('logo')}</Text>
+          <TouchableOpacity onPress={handleImagePick} style={[churchStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: (C as any).inputBorder || C.border }] as any}>
+            {imagePath ? (
+              <>
+                <Image source={{ uri: imagePath }} style={churchStyles.avatarImage as any} resizeMode="cover" />
+                <TouchableOpacity onPress={clearImage} style={churchStyles.avatarClose as any}>
+                  <Text style={{ color: '#fff' }}>✗</Text>
+                </TouchableOpacity>
+              </>
+            ) : existingLogoUrl ? (
+              <>
+                <Image source={{ uri: existingLogoUrl }} style={churchStyles.avatarImage as any} resizeMode="cover" />
+              </>
+            ) : (
+              <Text style={[churchStyles.avatarPlus as any, { color: C.textSecondary }] as any}>+</Text>
+            )}
+          </TouchableOpacity>
+          
           <View style={styles.row}>
             <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
             <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />

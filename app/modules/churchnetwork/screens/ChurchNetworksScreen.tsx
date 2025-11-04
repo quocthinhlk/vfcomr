@@ -37,7 +37,7 @@ export const ChurchNetworksScreen: React.FC = () => {
     try {
       if (loading) return;
       setLoading(true);
-      const res = await listChurchNetworks({});
+      const res = await listChurchNetworks({ limit: 50 });
       const full = res?.data?.items ?? [];
       const filtered = query
         ? full.filter(i => i.name?.toLowerCase().includes(query.trim().toLowerCase()))

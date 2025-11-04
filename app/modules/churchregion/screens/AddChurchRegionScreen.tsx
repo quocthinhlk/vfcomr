@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, StyleSheet, Alert, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, StyleSheet, Alert, TextInput, TouchableOpacity, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
@@ -11,7 +11,9 @@ import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
 import { useThemeMode } from '../../../shared/context/ThemeContext';
 import ElementDropdown, { ElementDropdownItem } from '../../../shared/components/ElementDropdown';
-import { useEffect } from 'react';
+import { useImagePicker } from '../../church/hooks/useImagePicker';
+import api from '../../../config/api';
+import { churchStyles } from '../../church/styles';
 
 export const AddChurchRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -22,6 +24,7 @@ export const AddChurchRegionScreen: React.FC = () => {
   const { t } = useTranslation();
   const C = useThemedColors();
   const { theme } = useThemeMode();
+  const { imagePath, handleImagePick, clearImage } = useImagePicker();
 
   useEffect(() => {
     let mounted = true;
@@ -51,7 +54,20 @@ export const AddChurchRegionScreen: React.FC = () => {
     }
     try {
       setSubmitting(true);
-      await createChurchRegion({ name: name.trim(), parent_id: parentId ?? null });
+      
+      // Upload image first if selected
+      let uploadedLogoPath: string | null = null;
+      if (imagePath) {
+        const form = new FormData();
+        const fileName = imagePath.split('/').pop() || 'logo.jpg';
+        form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
+        form.append('entity_type', 'church-regions');
+        form.append('alt_text', name.trim());
+        const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+        uploadedLogoPath = uploadRes?.data?.data?.path || null;
+      }
+      
+      await createChurchRegion({ name: name.trim(), parent_id: parentId ?? null, logo_path: uploadedLogoPath ?? undefined } as any);
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('add')} ${t('success')}`);
       navigation.navigate('ChurchRegions', { reload: true });
     } catch (e: any) {
@@ -82,6 +98,21 @@ export const AddChurchRegionScreen: React.FC = () => {
             placeholder={t('churchParent')}
             containerStyle={{ marginBottom: 8 }}
           />
+          
+          <Text style={[styles.label, { color: C.textPrimary }]}>{t('logo')}</Text>
+          <TouchableOpacity onPress={handleImagePick} style={[churchStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: (C as any).inputBorder || C.border }] as any}>
+            {imagePath ? (
+              <>
+                <Image source={{ uri: imagePath }} style={churchStyles.avatarImage as any} resizeMode="cover" />
+                <TouchableOpacity onPress={clearImage} style={churchStyles.avatarClose as any}>
+                  <Text style={{ color: '#fff' }}>✗</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <Text style={[churchStyles.avatarPlus as any, { color: C.textSecondary }] as any}>+</Text>
+            )}
+          </TouchableOpacity>
+          
           <View style={styles.row}>
             <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
             <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />

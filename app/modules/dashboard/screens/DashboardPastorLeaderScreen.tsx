@@ -60,6 +60,7 @@ export default function DashboardPastorLeaderScreen() {
   const C = useThemedColors();
   const [menuVisible, setMenuVisible] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
@@ -148,6 +149,11 @@ export default function DashboardPastorLeaderScreen() {
         
         if (userData && dashboardData) {
           // Format last report date to localized "Month, yyyy" format (moved to top-level function)
+          
+          // Store user ID for navigation
+          if (typeof userData.id === 'number') {
+            setCurrentUserId(userData.id);
+          }
 
           setUserProfile({
             name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
@@ -265,7 +271,17 @@ export default function DashboardPastorLeaderScreen() {
             <Image source={require('../../../../app/assets/images/blank-avatar.png')} style={styles.profileImage} />
           )}
           <View style={styles.profileInfo}>
-            <Text style={[styles.profileName, { color: C.textPrimary }]}>{userProfile.name}</Text>
+            <TouchableOpacity
+              onPress={() => {
+                if (currentUserId) {
+                  navigation.navigate('User', { userId: currentUserId });
+                }
+              }}
+              activeOpacity={0.7}
+              disabled={!currentUserId}
+            >
+              <Text style={[styles.profileName, { color: C.textPrimary }]}>{userProfile.name}</Text>
+            </TouchableOpacity>
             <TouchableOpacity style={styles.organizationRow} onPress={() => setOrgModalVisible(true)}>
               <Text style={[styles.organizationText, { color: C.textPrimary }]}>{userProfile.organization}</Text>
               <Image source={require('../../../../app/assets/images/icon-down.png')} style={[styles.dropdownIcon, { tintColor: C.textPrimary }]} />
