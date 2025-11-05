@@ -24,10 +24,19 @@ export const EditChurchRegionScreen: React.FC = () => {
   const [options, setOptions] = useState<ElementDropdownItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
+  const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null);
+  const [imageRemoved, setImageRemoved] = useState(false);
   const { t } = useTranslation();
   const C = useThemedColors();
   const { theme } = useThemeMode();
   const { imagePath, handleImagePick, clearImage } = useImagePicker();
+  
+  // Reset imageRemoved flag when user picks a new image
+  useEffect(() => {
+    if (imagePath) {
+      setImageRemoved(false);
+    }
+  }, [imagePath]);
 
   useEffect(() => {
     let mounted = true;
@@ -37,7 +46,9 @@ export const EditChurchRegionScreen: React.FC = () => {
         const data = res?.data?.data || res?.data;
         setName(data?.name || '');
         setParentId(data?.parent_id ?? null);
-        setExistingLogoUrl(data?.logo_url || null);
+        const logoUrl = data?.logo_url || null;
+        setExistingLogoUrl(logoUrl);
+        setOriginalLogoUrl(logoUrl);
       }).catch(() => {});
     }
     return () => { (mounted = false); };
@@ -73,23 +84,32 @@ export const EditChurchRegionScreen: React.FC = () => {
     try {
       setSubmitting(true);
       
-      // Upload image first if selected
-      let uploadedLogoPath: string | null = null;
-      if (imagePath) {
-        const form = new FormData();
-        const fileName = imagePath.split('/').pop() || 'logo.jpg';
-        form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
-        form.append('entity_type', 'church-regions');
-        form.append('alt_text', name.trim());
-        const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-        uploadedLogoPath = uploadRes?.data?.data?.path || null;
-      }
-      
-      await updateChurchRegion(churchRegionId, { 
+      const updateData: any = { 
         name: name.trim(), 
-        parent_id: parentId ?? null,
-        ...(uploadedLogoPath ? { logo_path: uploadedLogoPath } : {})
-      } as any);
+        parent_id: parentId ?? null
+      };
+      
+      // Determine if image was changed
+      const imageChanged = imagePath || (imageRemoved && !existingLogoUrl);
+      
+      if (imageChanged) {
+        if (imagePath) {
+          // User uploaded a new image
+          const form = new FormData();
+          const fileName = imagePath.split('/').pop() || 'logo.jpg';
+          form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
+          form.append('entity_type', 'church-regions');
+          form.append('alt_text', name.trim());
+          const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
+          updateData.logo_path = uploadRes?.data?.data?.path || '';
+        } else if (imageRemoved && !existingLogoUrl) {
+          // User removed the image without uploading a new one
+          updateData.logo_path = '';
+        }
+      }
+      // If no image change, don't include logo_path in update
+      
+      await updateChurchRegion(churchRegionId, updateData);
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('edit')} ${t('success')}`);
       navigation.navigate('ChurchRegions', { reload: true });
     } catch (e) {
@@ -133,6 +153,15 @@ export const EditChurchRegionScreen: React.FC = () => {
             ) : existingLogoUrl ? (
               <>
                 <Image source={{ uri: existingLogoUrl }} style={churchStyles.avatarImage as any} resizeMode="cover" />
+                <TouchableOpacity 
+                  onPress={() => {
+                    setExistingLogoUrl(null);
+                    setImageRemoved(true);
+                  }} 
+                  style={churchStyles.avatarClose as any}
+                >
+                  <Text style={{ color: '#fff' }}>✗</Text>
+                </TouchableOpacity>
               </>
             ) : (
               <Text style={[churchStyles.avatarPlus as any, { color: C.textSecondary }] as any}>+</Text>
