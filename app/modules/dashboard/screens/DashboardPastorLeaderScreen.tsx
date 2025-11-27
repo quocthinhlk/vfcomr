@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
@@ -17,36 +17,84 @@ import { dashboardActions, dashboardIcons, dashboardMenuItems, dashboardStats, g
 import api from '../../../config/api';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
+// CameraRoll is provided by '@react-native-camera-roll/camera-roll' at runtime.
+// We import it via require to avoid TypeScript type issues if types are missing
+// and support both CommonJS and ES module builds.
+// eslint-disable-next-line @typescript-eslint/no-var-requires
+const CameraRollModule = require('@react-native-camera-roll/camera-roll');
+const CameraRoll = CameraRollModule.default || CameraRollModule;
+
+// Helper function to decode HTML entities (e.g., &#x20ab; -> ₫)
+const decodeHtmlEntity = (str: string): string => {
+  if (!str) return '';
+  
+  // Decode hex entities like &#x20ab;
+  const hexEntityRegex = /&#x([0-9a-fA-F]+);/g;
+  str = str.replace(hexEntityRegex, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+  
+  // Decode decimal entities like &#8363;
+  const decimalEntityRegex = /&#(\d+);/g;
+  str = str.replace(decimalEntityRegex, (match, dec) => {
+    return String.fromCharCode(parseInt(dec, 10));
+  });
+  
+  return str;
+};
+
+// Helper function to format number to millions (M) format
+// e.g., 5428000 => 5.43M, 43531000 => 43.51M
+const formatNumberToM = (num: number): string => {
+  if (num === 0) return '0';
+  if (num < 1000000) return num.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  
+  const millions = num / 1000000;
+  // Round to 2 decimal places and remove trailing zeros
+  return parseFloat(millions.toFixed(2)).toString() + 'M';
+};
 
 // Stats data will be populated from API
 const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
   if (!dashboardData?.dashboard_indicators) return [];
   
   const indicators = dashboardData.dashboard_indicators;
+  const currencySymbol = decodeHtmlEntity(indicators.currency_symbol_code || '');
+  const avgMonthlyGivingLocal = indicators.avg_monthly_giving || 0;
+  const avgMonthlyGivingUsd = indicators.avg_monthly_giving_in_usd || 0;
+  const avgMonthlyMfpGivingLocal = indicators.avg_monthly_mfp_giving || 0;
+  const avgMonthlyMfpGivingUsd = indicators.avg_monthly_mfp_giving_in_usd || 0;
+  
   return [
-    { icon: require('../../../../app/assets/images/people.png'), value: `${(indicators.avg_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('people') : 'People' },
+    { icon: require('../../../../app/assets/images/people.png'), value: `${(indicators.avg_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`, label: t ? t('people') : 'People' },
     { icon: require('../../../../app/assets/images/growth.png'), value: `${(indicators.growth || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('growth') : 'Growth' },
     { 
       icon: require('../../../../app/assets/images/giving.png'), 
-      value: `${indicators.currency_code || ''} ${(indicators.avg_monthly_giving || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`, 
+      value: `${currencySymbol} ${formatNumberToM(avgMonthlyGivingLocal)}`,
+      secondaryValue: avgMonthlyGivingUsd
+        ? `USD $${formatNumberToM(avgMonthlyGivingUsd)}`
+        : undefined,
       label: t ? t('givingTithes') : 'Giving Tithes' 
     },
-    { icon: require('../../../../app/assets/images/plant.png'), value: `${(indicators.total_church_plants || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('churchPlants') : 'Church Plants' },
+    { icon: require('../../../../app/assets/images/plant.png'), value: `${(indicators.total_church_plants || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`, label: t ? t('churchPlants') : 'Church Plants' },
     { 
-      icon: require('../../../../app/assets/images/giving.png'),
-      value: `${indicators.currency_code || ''} ${(indicators.avg_monthly_mfp_giving || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
+      value: `${currencySymbol} ${formatNumberToM(avgMonthlyMfpGivingLocal)}`,
+      secondaryValue: avgMonthlyMfpGivingUsd
+        ? `USD $${formatNumberToM(avgMonthlyMfpGivingUsd)}`
+        : undefined,
       label: t ? t('givingMfp') : 'Giving MFP'
     },
     { icon: require('../../../../app/assets/images/cellgroup.png'), value: `${(indicators.avg_cell_group_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('peopleInCgs') : 'People in CG’s' },
-    { icon: require('../../../../app/assets/images/cellgroup.png'), value: `${(indicators.avg_liw_students || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('peopleInGtLiw') : 'People in GT & LIW' },
-    { icon: require('../../../../app/assets/images/cellgroup.png'), value: `${(indicators.avg_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('newDecisions') : 'New Decisions' },
+    { icon: require('../../../../app/assets/images/icon/education.png'), value: `${(indicators.avg_liw_students || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('peopleInGtLiw') : 'People in GT & LIW' },
+    { icon: require('../../../../app/assets/images/cellgroup.png'), value: `${(indicators.avg_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`, label: t ? t('newDecisions') : 'New Decisions' },
   ];
 };
 
 const menuItems = [
   { icon: require('../../../../app/assets/images/icon/growth.png'), label: 'Monthly Data', routeName: 'WeeklyReport', disabled: true },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch', disabled: true },
-  { icon: require('../../../../app/assets/images/icon/plus.png'), label: 'Worship Services', routeName: 'EnterVisits', disabled: true },
+  { icon: require('../../../../app/assets/images/icon/reporting.png'), label: 'Worship Services', routeName: 'EnterVisits' },
   { icon: require('../../../../app/assets/images/icon/plus.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
   { icon: require('../../../../app/assets/images/icon/plus.png'), label: 'New Pastor', routeName: 'AddUser' },
   { icon: require('../../../../app/assets/images/icon/plus.png'), label: 'New Church', routeName: 'AddChurch' },
@@ -71,6 +119,8 @@ export default function DashboardPastorLeaderScreen() {
   const fade = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const [orgModalVisible, setOrgModalVisible] = useState(false);
+  const [imageModalVisible, setImageModalVisible] = useState(false);
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
 
   useEffect(() => {
     Animated.timing(rotation, {
@@ -112,10 +162,12 @@ export default function DashboardPastorLeaderScreen() {
       setLoading(true);
       setBannerError(false);
       setProfileError(false);
+      setLogoError(false);
       const res = await api.get('dashboard', { params: { church_id: church?.id } });
       const data = res?.data?.data;
       if (data) {
         // use top-level formatLastRecord
+        console.log('church_region_logo_url (selected church):', data.dashboard_info?.church_region_logo_url);
         setDashboardData(data);
         setUserProfile((prev: any) => ({
           ...(prev || {}),
@@ -163,6 +215,7 @@ export default function DashboardPastorLeaderScreen() {
             bannerImage: dashboardData.dashboard_info?.photo_url || '',
           });
           
+          console.log('church_region_logo_url:', dashboardData.dashboard_info?.church_region_logo_url);
           setDashboardData(dashboardData);
         }
       } catch (error) {
@@ -198,6 +251,30 @@ export default function DashboardPastorLeaderScreen() {
     setLanguage(lang);
   };
 
+  const handleDownloadImage = async () => {
+    if (!selectedImage) return;
+    try {
+      if (Platform.OS === 'android') {
+        // Request permission on Android if needed
+        try {
+          await PermissionsAndroid.request(
+            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+          );
+        } catch {
+          // ignore, CameraRoll will fail gracefully if no permission
+        }
+      }
+
+      // Save remote URL directly to system gallery / photos
+      await CameraRoll.save(selectedImage, { type: 'photo' });
+
+      Alert.alert(t('success'), t('imageDownloadSuccess'));
+    } catch (error) {
+      console.error('Error downloading image:', error);
+      Alert.alert(t('error'), t('imageDownloadError'));
+    }
+  };
+
   const allStats = getStatsData(dashboardData, t as any);
   const visibleStats = showAllStats ? allStats : allStats.slice(0, 4);
 
@@ -228,16 +305,27 @@ export default function DashboardPastorLeaderScreen() {
         <View style={[styles.header, { backgroundColor: C.background }]}>
           <View style={styles.logoContainer}>
             <View style={styles.logo}>
-              {dashboardData?.dashboard_info?.church_region_logo_url && !logoError ? (
+              {dashboardData?.dashboard_info?.church_region_logo_url && 
+               dashboardData.dashboard_info.church_region_logo_url.trim() !== '' && 
+               !logoError ? (
                 <Image 
                   source={{ uri: dashboardData.dashboard_info.church_region_logo_url }} 
                   style={styles.logoImage}
-                  onError={() => setLogoError(true)}
+                  resizeMode="contain"
+                  onError={(error) => {
+                    console.log('Logo image error:', error.nativeEvent.error);
+                    console.log('Failed URL:', dashboardData.dashboard_info.church_region_logo_url);
+                    setLogoError(true);
+                  }}
+                  onLoad={() => {
+                    console.log('Logo loaded successfully:', dashboardData.dashboard_info.church_region_logo_url);
+                  }}
                 />
               ) : (
                 <Image 
                   source={require('../../../../app/assets/images/logo/vfc_white.png')} 
                   style={styles.logoImage}
+                  resizeMode="contain"
                 />
               )}
             </View>
@@ -257,7 +345,19 @@ export default function DashboardPastorLeaderScreen() {
         {/* Banner Image */}
         <View style={styles.bannerContainer}>
           {userProfile.bannerImage && !bannerError ? (
-            <Image source={{ uri: userProfile.bannerImage }} style={styles.bannerImage} onError={() => setBannerError(true)} />
+            <TouchableOpacity
+              activeOpacity={0.9}
+              onPress={() => {
+                setSelectedImage(userProfile.bannerImage);
+                setImageModalVisible(true);
+              }}
+            >
+              <Image
+                source={{ uri: userProfile.bannerImage }}
+                style={styles.bannerImage}
+                onError={() => setBannerError(true)}
+              />
+            </TouchableOpacity>
           ) : (
             <Image source={require('../../../../app/assets/images/blank-cover.png')} style={styles.bannerImage} />
           )}
@@ -265,11 +365,29 @@ export default function DashboardPastorLeaderScreen() {
 
         {/* Profile Section */}
         <View style={styles.profileSection}>
-          {userProfile.profileImage && !profileError ? (
-            <Image source={{ uri: userProfile.profileImage }} style={styles.profileImage} onError={() => setProfileError(true)} />
-          ) : (
-            <Image source={require('../../../../app/assets/images/blank-avatar.png')} style={styles.profileImage} />
-          )}
+          <TouchableOpacity
+            activeOpacity={0.9}
+            disabled={!userProfile.profileImage || profileError}
+            onPress={() => {
+              if (userProfile.profileImage && !profileError) {
+                setSelectedImage(userProfile.profileImage);
+                setImageModalVisible(true);
+              }
+            }}
+          >
+            {userProfile.profileImage && !profileError ? (
+              <Image
+                source={{ uri: userProfile.profileImage }}
+                style={styles.profileImage}
+                onError={() => setProfileError(true)}
+              />
+            ) : (
+              <Image
+                source={require('../../../../app/assets/images/blank-avatar.png')}
+                style={styles.profileImage}
+              />
+            )}
+          </TouchableOpacity>
           <View style={styles.profileInfo}>
             <TouchableOpacity
               onPress={() => {
@@ -284,7 +402,7 @@ export default function DashboardPastorLeaderScreen() {
             </TouchableOpacity>
             <TouchableOpacity style={styles.organizationRow} onPress={() => setOrgModalVisible(true)}>
               <Text style={[styles.organizationText, { color: C.textPrimary }]}>{userProfile.organization}</Text>
-              <Image source={require('../../../../app/assets/images/icon-down.png')} style={[styles.dropdownIcon, { tintColor: C.textPrimary }]} />
+              <Image source={require('../../../../app/assets/images/icon/arrow-down-bold.png')} style={[styles.dropdownIcon, { tintColor: C.textPrimary }]} />
             </TouchableOpacity>
             <View style={styles.locationRow}>
               <Text style={[styles.locationText, { color: C.textSecondary }]}>{userProfile.location}</Text>
@@ -301,21 +419,60 @@ export default function DashboardPastorLeaderScreen() {
           <TouchableOpacity activeOpacity={1} style={styles.modalBackdrop} onPress={() => setOrgModalVisible(false)}>
             <View style={[styles.modalCard, { backgroundColor: C.surface }]}>
               <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t('church')}</Text>
+                <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t('yourOtherChurches')}</Text>
                 <TouchableOpacity style={styles.modalClose} onPress={() => setOrgModalVisible(false)}>
                   <Text style={[styles.modalCloseText, { color: C.textPrimary }]}>✕</Text>
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
                 {(dashboardData?.assigned_churches || []).map((ch: any) => (
-                  <TouchableOpacity key={String(ch.id)} style={[styles.modalItemRow, { borderBottomColor: C.border }]} onPress={() => handleSelectAssignedChurch(ch)} activeOpacity={0.7}>
-                    <Text style={[styles.modalItemText, { color: C.textPrimary }]} numberOfLines={1}>{ch.name}</Text>
+                  <TouchableOpacity
+                    key={String(ch.id)}
+                    style={[styles.modalItemRow, { borderBottomColor: C.border }]}
+                    onPress={() => handleSelectAssignedChurch(ch)}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={[styles.modalItemText, { color: C.textPrimary }]}>{ch.name}</Text>
                     <Text style={[styles.modalItemChevron, { color: C.textSecondary }]}>›</Text>
                   </TouchableOpacity>
                 ))}
               </ScrollView>
             </View>
           </TouchableOpacity>
+        </Modal>
+
+        {/* Fullscreen Image Modal */}
+        <Modal
+          visible={imageModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setImageModalVisible(false)}
+        >
+          <View style={styles.fullImageBackdrop}>
+            <View style={styles.fullImageHeader}>
+              <TouchableOpacity onPress={() => setImageModalVisible(false)}>
+                <Text style={styles.fullImageCloseText}>✕</Text>
+              </TouchableOpacity>
+              {selectedImage ? (
+                <TouchableOpacity style={styles.downloadButton} onPress={handleDownloadImage}>
+                  <Text style={styles.downloadButtonText}>{t('download')}</Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            <TouchableOpacity
+              style={styles.fullImageContent}
+              activeOpacity={1}
+              onPress={() => setImageModalVisible(false)}
+            >
+              {selectedImage ? (
+                <Image
+                  source={{ uri: selectedImage }}
+                  style={styles.fullImage}
+                  resizeMode="contain"
+                />
+              ) : null}
+            </TouchableOpacity>
+          </View>
         </Modal>
 
         <Animated.View style={[dashboardStyles.statCardContainer, { paddingHorizontal: 15, opacity: fade, transform: [{ translateY }] }]}>
@@ -387,15 +544,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoImage: {
+    width: 40,
     height: 40,
-    resizeMode: 'contain',
   },
   bannerContainer: {
     position: 'relative',
     height: 200,
     marginHorizontal: 16,
     marginBottom: 20,
-    borderRadius: 12,
     overflow: 'hidden',
   },
   bannerImage: {
@@ -415,7 +571,7 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 75,
     borderWidth: 3,
-    borderColor: '#fff',
+    borderColor: '#C4C4C4',
     zIndex: 10,
     marginBottom: 12,
     marginLeft: 10,
@@ -427,8 +583,8 @@ const styles = StyleSheet.create({
     marginLeft: 0,
   },
   profileName: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontSize: 14,
+    fontWeight: '500',
     color: '#000',
     marginBottom: 6,
     textAlign: 'left',
@@ -441,7 +597,7 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   organizationText: {
-    fontSize: 16,
+    fontSize: 15,
     fontWeight: 'bold',
     color: '#000',
     marginRight: 4,
@@ -460,8 +616,8 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   locationText: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: 13,
+    color: '#000',
     textAlign: 'left',
     flex: 1,
   },
@@ -470,14 +626,14 @@ const styles = StyleSheet.create({
     alignItems: 'baseline',
   },
   lastRecordLabel: {
-    fontSize: 14,
+    fontSize: 10,
     color: '#000',
     lineHeight: 14,
     includeFontPadding: false,
   },
   lastRecordValue: {
-    fontSize: 14,
-    color: COLORS.danger,
+    fontSize: 10,
+    color: '#c00000',
     lineHeight: 14,
     includeFontPadding: false,
     // fontWeight: 'bold',
@@ -597,4 +753,44 @@ const styles = StyleSheet.create({
   },
   modalItemText: { fontSize: 16, flex: 1, color: '#111' },
   modalItemChevron: { fontSize: 18, marginLeft: 8, color: '#6b7280' },
+  fullImageBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImageHeader: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 50 : 30,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  fullImageCloseText: {
+    color: '#fff',
+    fontSize: 22,
+  },
+  downloadButton: {
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+  },
+  downloadButtonText: {
+    color: '#fff',
+    fontSize: 14,
+  },
+  fullImageContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullImage: {
+    width: '100%',
+    height: '100%',
+  },
 });

@@ -31,7 +31,8 @@ export const AddCloneChurchScreen: React.FC = () => {
   const scrollToField = (key: string) => { const y = fieldY[key] ?? 0; scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true }); };
 
   const { motherChurchOptions, churchTypeOptions, churchNetworkOptions, pastorOptions, languageOptions, churchRegionOptions, geographicalRegionOptions, languageRegionOptions, countryOptions, localCurrencyOptions } = useFormOptions();
-  const { imagePath, handleImagePick, clearImage } = useImagePicker();
+  // Church photo: enforce 16:9 crop ratio (e.g. 1600x900)
+  const { imagePath, handleImagePick, clearImage } = useImagePicker({ width: 1600, height: 900 });
   const [cityOptions, setCityOptions] = useState<{ label: string; value: string }[]>([]);
   const loadCities = async (countryId: string | number) => {
     try {

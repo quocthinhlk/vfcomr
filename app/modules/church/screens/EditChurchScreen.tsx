@@ -40,7 +40,8 @@ export default function EditChurchScreen() {
     localCurrencyOptions,
   } = useFormOptions();
 
-  const { imagePath, handleImagePick, clearImage } = useImagePicker();
+  // Church photo: enforce 16:9 crop ratio (e.g. 1600x900)
+  const { imagePath, handleImagePick, clearImage } = useImagePicker({ width: 1600, height: 900 });
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const [cityOptions, setCityOptions] = useState<{ label: string; value: string }[]>([]);
   const PAGE_LIMIT = 10;

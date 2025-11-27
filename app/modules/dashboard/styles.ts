@@ -113,6 +113,12 @@ export const dashboardStyles = StyleSheet.create({
   statValue: {
     fontWeight: 'bold',
     fontSize: 16,
+    color: COLORS.mainColor,
+  },
+  statSecondaryValue: {
+    fontSize: 11,
+    color: '#888',
+    marginTop: 2,
   },
   statLabel: {
     fontSize: 12,

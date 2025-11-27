@@ -7,15 +7,29 @@ interface ImagePickerResult {
   size: number;
 }
 
-export function useImagePicker() {
+interface ImagePickerConfig {
+  /**
+   * Target width for cropping. Defaults to 300.
+   */
+  width?: number;
+  /**
+   * Target height for cropping. Defaults to 300.
+   */
+  height?: number;
+}
+
+export function useImagePicker(config?: ImagePickerConfig) {
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
   const handleImagePick = async () => {
     try {
+      const targetWidth = config?.width ?? 300;
+      const targetHeight = config?.height ?? 300;
+
       const image: ImagePickerResult = await ImagePicker.openPicker({
-        width: 300,
-        height: 300,
+        width: targetWidth,
+        height: targetHeight,
         cropping: true,
         cropperCircleOverlay: false,
         compressImageMaxWidth: 1024,

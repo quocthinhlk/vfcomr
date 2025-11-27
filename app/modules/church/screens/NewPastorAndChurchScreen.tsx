@@ -71,8 +71,17 @@ export default function NewPastorAndChurchScreen() {
   } = useFormOptions();
 
   // pickers for images (church & user)
-  const { imagePath: churchImagePath, handleImagePick: pickChurchImage, clearImage: clearChurchImage } = useImagePicker();
-  const { imagePath: userImagePath, handleImagePick: pickUserImage, clearImage: clearUserImage } = useImagePicker();
+  // Church photo: enforce 16:9 crop ratio (e.g. 1600x900)
+  const {
+    imagePath: churchImagePath,
+    handleImagePick: pickChurchImage,
+    clearImage: clearChurchImage,
+  } = useImagePicker({ width: 1600, height: 900 });
+  const {
+    imagePath: userImagePath,
+    handleImagePick: pickUserImage,
+    clearImage: clearUserImage,
+  } = useImagePicker();
 
   // dependent cities for church
   const [cityOptions, setCityOptions] = useState<{ label: string; value: string }[]>([]);
