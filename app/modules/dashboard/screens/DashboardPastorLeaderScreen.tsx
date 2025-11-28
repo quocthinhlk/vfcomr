@@ -92,12 +92,12 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
 };
 
 const menuItems = [
-  { icon: require('../../../../app/assets/images/icon/growth.png'), label: 'Monthly Data', routeName: 'WeeklyReport', disabled: true },
+  { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Monthly Data', routeName: 'WeeklyReport', disabled: true },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch', disabled: true },
-  { icon: require('../../../../app/assets/images/icon/reporting.png'), label: 'Worship Services', routeName: 'EnterVisits' },
-  { icon: require('../../../../app/assets/images/icon/plus.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
-  { icon: require('../../../../app/assets/images/icon/plus.png'), label: 'New Pastor', routeName: 'AddUser' },
-  { icon: require('../../../../app/assets/images/icon/plus.png'), label: 'New Church', routeName: 'AddChurch' },
+  { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'EnterVisits' },
+  { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
+  { icon: require('../../../../app/assets/images/icon/user.png'), label: 'New Pastor', routeName: 'AddUser' },
+  { icon: require('../../../../app/assets/images/icon/home.png'), label: 'New Church', routeName: 'AddChurch' },
 ];
 
 export default function DashboardPastorLeaderScreen() {
@@ -676,7 +676,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
   },
   viewMoreText: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
     flexDirection: 'row',
     alignItems: 'center',
@@ -697,13 +697,13 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   menuIcon: {
-    width: 20,
-    height: 20,
+    width: 17,
+    height: 17,
     marginRight: 12,
   },
   menuLabel: {
     flex: 1,
-    fontSize: 16,
+    fontSize: 14,
     color: '#000',
   },
   menuArrow: {
