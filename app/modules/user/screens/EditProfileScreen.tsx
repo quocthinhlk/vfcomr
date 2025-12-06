@@ -187,7 +187,7 @@ export default function EditProfileScreen() {
   return (
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
     <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
-    <Header title={t('editUser')} />
+    <Header title={t('editUser')} showMenu={false} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
@@ -294,31 +294,64 @@ export default function EditProfileScreen() {
                 </View>
                 <View onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('username')} <Text status="danger">*</Text></Text>
-                    <HelpIcon onPress={() => Alert.alert(t('username'), t('usernameHelp'))} size={16} offsetY={-2} />
+                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('username')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
+                    <HelpIcon
+                      title={t('username')}
+                      message={t('usernameHelp')}
+                      size={16}
+                      offsetY={-2}
+                    />
                   </View>
-                  <Input style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.username ? '#db2d2d' : C.inputBorder, color: C.inputText }]} value={values.username} autoCapitalize="none" disabled
+                  <Input
+                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.username ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                    textStyle={userStyles.inputTextStyle}
+                    value={values.username}
+                    autoCapitalize="none"
+                    disabled
                     onChangeText={t => { setFieldValue('username', t); clearInvalid('username'); }} onBlur={handleBlur('username')}
                     status={invalid.username ? 'danger' : 'basic'} />
                 </View>
 
                 <View onLayout={e => setFieldPos('first_name', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('firstName')} <Text status="danger">*</Text></Text>
-                  <Input style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.first_name ? '#db2d2d' : C.inputBorder, color: C.inputText }]} value={values.first_name} autoCapitalize="words"
-                    onChangeText={t => { setFieldValue('first_name', t); clearInvalid('first_name'); }} onBlur={handleBlur('first_name')}
-                    status={invalid.first_name ? 'danger' : 'basic'} />
+                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    {t('firstName')} <Text style={{ color: '#c00000' }}>*</Text>
+                  </Text>
+                  <Input
+                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.first_name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                    textStyle={userStyles.inputTextStyle}
+                    value={values.first_name}
+                    autoCapitalize="words"
+                    onChangeText={t => { setFieldValue('first_name', t); clearInvalid('first_name'); }}
+                    onBlur={handleBlur('first_name')}
+                    status={invalid.first_name ? 'danger' : 'basic'}
+                  />
                 </View>
 
                 <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('lastName')}</Text>
-                  <Input style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} value={values.last_name} autoCapitalize="words"
-                    onChangeText={handleChange('last_name')} onBlur={handleBlur('last_name')} />
+                  <Input
+                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                    textStyle={userStyles.inputTextStyle}
+                    value={values.last_name}
+                    autoCapitalize="words"
+                    onChangeText={handleChange('last_name')}
+                    onBlur={handleBlur('last_name')}
+                  />
                 </View>
 
                 <View onLayout={e => setFieldPos('role_id', e.nativeEvent.layout.y)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('omrStatus')} <Text status="danger">*</Text></Text>
-                    <HelpIcon onPress={() => Alert.alert(t('omrStatus'), t('helpOmrStatus'))} size={16} offsetY={-2} />
+                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('omrStatus')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
+                    <HelpIcon
+                      title={t('omrStatus')}
+                      message={t('helpOmrStatus')}
+                      size={16}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown
                     data={useMemo(() => roleOptions.map(r => ({ label: r.name, value: r.id })), [roleOptions])}
@@ -333,7 +366,12 @@ export default function EditProfileScreen() {
                 <View onLayout={e => setFieldPos('user_photo', e.nativeEvent.layout.y)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('userPhoto')}</Text>
-                    <HelpIcon onPress={() => Alert.alert(t('userPhoto'), t('helpUserPhoto'))} size={16} offsetY={-2} />
+                    <HelpIcon
+                      title={t('userPhoto')}
+                      message={t('helpUserPhoto')}
+                      size={16}
+                      offsetY={-2}
+                    />
                   </View>
                   <TouchableOpacity onPress={() => handleImagePick()} style={[userStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
                     {imagePath || (values as any).photo_url || values.user_photo ? (
@@ -364,7 +402,12 @@ export default function EditProfileScreen() {
                 <View onLayout={e => setFieldPos('sensitive_nation', e.nativeEvent.layout.y)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}</Text>
-                    <HelpIcon onPress={() => Alert.alert(t('sensitiveNation'), t('helpSensitiveNation'))} size={16} offsetY={-2} />
+                    <HelpIcon
+                      title={t('sensitiveNation')}
+                      message={t('helpSensitiveNation')}
+                      size={16}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]} value={values.sensitive_nation ? 'Yes' : 'No'}
                     onChange={v => { setFieldValue('sensitive_nation', v === 'Yes'); if (v === 'Yes') { clearInvalid('email_address'); clearInvalid('mobile_phone'); } }} placeholder={t('selectOption')} containerStyle={{ ...(userStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any} />
@@ -372,8 +415,15 @@ export default function EditProfileScreen() {
 
                 <View onLayout={e => setFieldPos('language_id', e.nativeEvent.layout.y)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('language')} <Text status="danger">*</Text></Text>
-                    <HelpIcon onPress={() => Alert.alert(t('language'), t('helpUserLanguage'))} size={16} offsetY={-2} />
+                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
+                    <HelpIcon
+                      title={t('language')}
+                      message={t('helpUserLanguage')}
+                      size={16}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown
                     data={useMemo(() => languageOptions.map(o => ({ label: o.name, value: o.id })), [languageOptions])}
@@ -386,7 +436,9 @@ export default function EditProfileScreen() {
                 </View>
 
                 <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('country')} <Text status="danger">*</Text></Text>
+                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
+                  </Text>
                   <ElementDropdown
                     data={useMemo(() => countryOptions.map(o => ({ label: o.name, value: o.id })), [countryOptions])}
                     value={values.country_id as any}
@@ -416,8 +468,15 @@ export default function EditProfileScreen() {
 
                 <View onLayout={e => setFieldPos('church_id', e.nativeEvent.layout.y)}>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('church')} <Text status="danger">*</Text></Text>
-                    <HelpIcon onPress={() => Alert.alert(t('church'), t('helpUserChurch'))} size={16} offsetY={-2} />
+                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('church')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
+                    <HelpIcon
+                      title={t('church')}
+                      message={t('helpUserChurch')}
+                      size={16}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown
                     data={useMemo(() => churchItems.map(c => ({ label: c.name, value: c.id })), [churchItems])}
@@ -436,14 +495,25 @@ export default function EditProfileScreen() {
                 </View>
 
                 <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('emailAddress')} { !values.sensitive_nation ? (<Text status="danger">*</Text>) : null }</Text>
-                  <Input style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]} value={values.email_address} keyboardType="email-address" autoCapitalize="none"
-                    onChangeText={t => { setFieldValue('email_address', t); clearInvalid('email_address'); }} onBlur={handleBlur('email_address')}
-                    status={invalid.email_address ? 'danger' : 'basic'} />
+                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    {t('emailAddress')} { !values.sensitive_nation ? (<Text style={{ color: '#c00000' }}>*</Text>) : null }
+                  </Text>
+                  <Input
+                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                    textStyle={userStyles.inputTextStyle}
+                    value={values.email_address}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    onChangeText={t => { setFieldValue('email_address', t); clearInvalid('email_address'); }}
+                    onBlur={handleBlur('email_address')}
+                    status={invalid.email_address ? 'danger' : 'basic'}
+                  />
                 </View>
 
                 <View onLayout={e => setFieldPos('mobile_phone', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('mobilePhone')} { !values.sensitive_nation ? (<Text status="danger">*</Text>) : null }</Text>
+                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    {t('mobilePhone')} { !values.sensitive_nation ? (<Text style={{ color: '#c00000' }}>*</Text>) : null }
+                  </Text>
                   <View style={[userStyles.input, { flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, borderWidth: 1, borderRadius: 6, borderColor: invalid.mobile_phone ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg }]}> 
                     <CountryPicker theme={cpTheme} countryCode={countryCode} withFlag withFilter withCallingCode withEmoji onSelect={(c: Country) => {
                       setCountryCode(c.cca2 as CountryCode);
@@ -467,14 +537,26 @@ export default function EditProfileScreen() {
 
                 <View onLayout={e => setFieldPos('credentials_number', e.nativeEvent.layout.y)}>
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsNumber')}</Text>
-                  <Input style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} value={values.credentials_number} autoCapitalize="none"
-                    onChangeText={handleChange('credentials_number')} onBlur={handleBlur('credentials_number')} />
+                  <Input
+                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                    textStyle={userStyles.inputTextStyle}
+                    value={values.credentials_number}
+                    autoCapitalize="none"
+                    onChangeText={handleChange('credentials_number')}
+                    onBlur={handleBlur('credentials_number')}
+                  />
                 </View>
 
                 <View onLayout={e => setFieldPos('credentials_form', e.nativeEvent.layout.y)}>
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsFrom')}</Text>
-                  <Input style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} value={values.credentials_form} autoCapitalize="none"
-                    onChangeText={handleChange('credentials_form')} onBlur={handleBlur('credentials_form')} />
+                  <Input
+                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                    textStyle={userStyles.inputTextStyle}
+                    value={values.credentials_form}
+                    autoCapitalize="none"
+                    onChangeText={handleChange('credentials_form')}
+                    onBlur={handleBlur('credentials_form')}
+                  />
                 </View>
 
                 <View onLayout={e => setFieldPos('credentials_expiry_date', e.nativeEvent.layout.y)}>

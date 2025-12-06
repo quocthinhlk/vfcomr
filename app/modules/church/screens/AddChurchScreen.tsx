@@ -187,7 +187,7 @@ export default function AddChurchScreen() {
   return (
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
       <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
-      <Header title={maybeParams?.id ? t('editChurch') : t('addNewChurch')} />
+      <Header title={maybeParams?.id ? t('editChurch') : t('addNewChurch')} showMenu={false} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
@@ -298,16 +298,19 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchName')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchName'), t('helpChurchName'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchName')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('churchName')} message={t('helpChurchName')} size={13} offsetY={-2} />
                     </View>
                   <Input
                     style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                    textStyle={churchStyles.inputTextStyle}
                     autoCapitalize="words"
                     value={values.name}
-                      onChangeText={t => { setFieldValue('name', t); setInvalid(prev => ({...prev, name: false})); }}
+                    onChangeText={t => { setFieldValue('name', t); setInvalid(prev => ({...prev, name: false})); }}
                     onBlur={handleBlur('name')}
-                      status={invalid?.name ? 'danger' : 'basic'}
+                    status={invalid?.name ? 'danger' : 'basic'}
                   />
                   </View>
                 </View>
@@ -316,23 +319,26 @@ export default function AddChurchScreen() {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('shortName')} [{t('only8Chars')}]</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('shortName'), t('helpShortName'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('shortName')} message={t('helpShortName')} size={13} offsetY={-2} />
                     </View>
                   <Input
                     style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                    textStyle={churchStyles.inputTextStyle}
                     autoCapitalize="none"
                     value={values.short_name}
                     onChangeText={handleChange('short_name')}
                     onBlur={handleBlur('short_name')}
-                    />
+                  />
                   </View>
                 </View>
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('msc')}? <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('msc'), t('helpIsMsc'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('msc')}? <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('msc')} message={t('helpIsMsc')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
@@ -348,8 +354,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('houseCp')}? <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('houseCp'), t('helpEnableCp'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('houseCp')}? <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('houseCp')} message={t('helpEnableCp')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
@@ -365,8 +373,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('language')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('language'), t('helpLanguage'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('language')} message={t('helpLanguage')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={langOptions}
@@ -389,7 +399,7 @@ export default function AddChurchScreen() {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('motherChurch')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('motherChurch'), t('helpMotherChurch'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('motherChurch')} message={t('helpMotherChurch')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={motherOptions}
@@ -409,8 +419,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('church_type_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchType')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchType'), t('helpChurchType'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchType')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('churchType')} message={t('helpChurchType')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={churchTypeOptions}
@@ -434,8 +446,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('pastor_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('pastorLeader')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('pastorLeader'), t('helpPastorLeader'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('pastorLeader')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('pastorLeader')} message={t('helpPastorLeader')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={pastorOpts}
@@ -456,8 +470,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('church_network_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchNetwork')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchNetwork'), t('helpChurchNetwork'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchNetwork')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('churchNetwork')} message={t('helpChurchNetwork')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={churchNetworkOptions}
@@ -481,8 +497,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('church_region_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('apostolicRegion')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('apostolicRegion'), t('helpApostolicRegion'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('apostolicRegion')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('apostolicRegion')} message={t('helpApostolicRegion')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={churchRegionOptions}
@@ -506,8 +524,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('geographical_region_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('geographicalRegion')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('geographicalRegion'), t('helpGeographicalRegion'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('geographicalRegion')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('geographicalRegion')} message={t('helpGeographicalRegion')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={geographicalRegionOptions}
@@ -523,8 +543,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('language_region_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('languageRegion')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('languageRegion'), t('helpLanguageRegion'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('languageRegion')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('languageRegion')} message={t('helpLanguageRegion')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={languageRegionOptions}
@@ -541,7 +563,7 @@ export default function AddChurchScreen() {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}?</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('sensitiveNation'), t('helpSensitiveNation'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('sensitiveNation')} message={t('helpSensitiveNation')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
@@ -555,7 +577,9 @@ export default function AddChurchScreen() {
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('country')} <Text status="danger">*</Text></Text>
+                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
                     <ElementDropdown
                       data={countryOpts}
                       value={values.country_id as any}
@@ -578,7 +602,7 @@ export default function AddChurchScreen() {
                     <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('city')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('city'), t('helpCity'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('city')} message={t('helpCity')} size={13} offsetY={-2} />
                     </View>
                       <ElementDropdown
                         data={cityOptions}
@@ -591,11 +615,13 @@ export default function AddChurchScreen() {
                   </View>
                 ) : null}
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
+                    <View style={churchStyles.row} onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('currency')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('currency'), t('helpCurrency'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('currency')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('currency')} message={t('helpCurrency')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={localCurrencyOptions}
@@ -620,7 +646,7 @@ export default function AddChurchScreen() {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchPhoto')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchPhoto'), t('helpChurchPhoto'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('churchPhoto')} message={t('helpChurchPhoto')} size={13} offsetY={-2} />
                     </View>
                     <TouchableOpacity onPress={() => handleImagePick()} style={[churchStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
                         {imagePath ? (
@@ -642,65 +668,118 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('serviceAddress')}</Text>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} value={values.service_address_street} onChangeText={handleChange('service_address_street')} onBlur={handleBlur('service_address_street')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      value={values.service_address_street}
+                      onChangeText={handleChange('service_address_street')}
+                      onBlur={handleBlur('service_address_street')}
+                    />
                   </View>
                 </View>
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('servicePostalCode')}</Text>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.service_address_postal_code} onChangeText={handleChange('service_address_postal_code')} onBlur={handleBlur('service_address_postal_code')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.service_address_postal_code}
+                      onChangeText={handleChange('service_address_postal_code')}
+                      onBlur={handleBlur('service_address_postal_code')}
+                    />
                   </View>
                 </View>
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('emailAddress')} <Text status="danger">*</Text></Text>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.email_address} onChangeText={t => { setFieldValue('email_address', t); setInvalid(prev => ({...prev, email_address: false})); }} onBlur={handleBlur('email_address')} status={invalid?.email_address ? 'danger' : 'basic'} />
+                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('emailAddress')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.email_address}
+                      onChangeText={t => { setFieldValue('email_address', t); setInvalid(prev => ({...prev, email_address: false})); }}
+                      onBlur={handleBlur('email_address')}
+                      status={invalid?.email_address ? 'danger' : 'basic'}
+                    />
                   </View>
                 </View>
 
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('website')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('website'), t('helpWebsite'))} size={13} offsetY={-2} />
+                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('website')}</Text>
+                    <HelpIcon title={t('website')} message={t('helpWebsite')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.website} onChangeText={handleChange('website')} onBlur={handleBlur('website')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.website}
+                      onChangeText={handleChange('website')}
+                      onBlur={handleBlur('website')}
+                    />
                   </View>
                 </View>
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('facebook')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('facebook'), t('helpFacebook'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('facebook')} message={t('helpFacebook')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.facebook} onChangeText={handleChange('facebook')} onBlur={handleBlur('facebook')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.facebook}
+                      onChangeText={handleChange('facebook')}
+                      onBlur={handleBlur('facebook')}
+                    />
                   </View>
                 </View>
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">Instagram</Text>
-                      <HelpIcon onPress={() => Alert.alert('Instagram', t('helpInstagram'))} size={13} offsetY={-2} />
+                      <HelpIcon title="Instagram" message={t('helpInstagram')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.instagram} onChangeText={handleChange('instagram')} onBlur={handleBlur('instagram')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.instagram}
+                      onChangeText={handleChange('instagram')}
+                      onBlur={handleBlur('instagram')}
+                    />
                   </View>
                 </View>
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">X</Text>
-                      <HelpIcon onPress={() => Alert.alert('X', t('helpX'))} size={13} offsetY={-2} />
+                      <HelpIcon title="X" message={t('helpX')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.twitter} onChangeText={handleChange('twitter')} onBlur={handleBlur('twitter')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.twitter}
+                      onChangeText={handleChange('twitter')}
+                      onBlur={handleBlur('twitter')}
+                    />
                   </View>
                 </View>
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('dob')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('dob'), t('helpDob'))} size={13} offsetY={-2} />
+                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('dob')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
+                    <HelpIcon title={t('dob')} message={t('helpDob')} size={13} offsetY={-2} />
                     </View>
                     <DateTripleDropdown
                       value={values.date_of_birth}

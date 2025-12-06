@@ -10,6 +10,9 @@ export const churchStyles = StyleSheet.create({
     input: {
         flex: 1,
     },
+    inputTextStyle: {
+        fontSize: 14,
+    },
     title: {
         marginBottom: 16,
         fontWeight: 'bold',
@@ -40,6 +43,7 @@ export const churchStyles = StyleSheet.create({
         color: '#8f9bb3',
         fontWeight: 'bold',
         marginBottom: 4,
+        fontSize: 11,
     },
     filePickerButton: {
         borderRadius: 3,

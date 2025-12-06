@@ -41,7 +41,7 @@ export const AddCountryScreen: React.FC = () => {
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
       <View style={{ flex: 1, backgroundColor: C.background }}>
         <View style={styles.container}>
-          <Header title={`${t('addNew')} ${t('country')}`} />
+          <Header title={`${t('addNew')} ${t('country')}`} showMenu={false} />
           <Text style={[styles.label, { color: C.textPrimary }]}>{t('country')}</Text>
           <TextInput
             style={[styles.input, { borderColor: (C as any).inputBorder || C.border, color: C.textPrimary, backgroundColor: (C as any).card || C.background }]}

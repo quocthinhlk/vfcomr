@@ -16,6 +16,9 @@ export const userStyles = StyleSheet.create({
         flex: 1,
         marginBottom: 15,
     },
+    inputTextStyle: {
+        fontSize: 14,
+    },
     select: {
         flex: 1,
         marginBottom: 15,
@@ -50,6 +53,7 @@ export const userStyles = StyleSheet.create({
         color: '#8f9bb3',
         fontWeight: 'bold',
         marginBottom: 4,
+        fontSize: 11,
     },
     filePickerButton: {
         borderRadius: 3,

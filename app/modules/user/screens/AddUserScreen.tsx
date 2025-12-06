@@ -203,7 +203,7 @@ export default function AddUserScreen() {
   return (
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
       <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
-      <Header title={t('addNewPastor')} />
+      <Header title={t('addNewPastor')} showMenu={false} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
@@ -347,13 +347,19 @@ export default function AddUserScreen() {
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('username')} <Text status="danger">*</Text>
+                      {t('username')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
-                    <HelpIcon onPress={() => Alert.alert(t('username'), t('usernameHelp'))} size={13} offsetY={-4} />
+                    <HelpIcon
+                      title={t('username')}
+                      message={t('usernameHelp')}
+                      size={13}
+                      offsetY={-4}
+                    />
                   </View>
                   <Input
                     style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.username ? '#db2d2d' : C.inputBorder }]}
                     value={values.username}
+                    textStyle={userStyles.inputTextStyle}
                     autoCapitalize="none"
                     onChangeText={t => {
                       setFieldValue('username', t);
@@ -371,13 +377,19 @@ export default function AddUserScreen() {
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('password')} <Text status="danger">*</Text>
+                      {t('password')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
-                    <HelpIcon onPress={() => Alert.alert(t('password'), t('passwordHelp'))} size={13} offsetY={-2} />
+                    <HelpIcon
+                      title={t('password')}
+                      message={t('passwordHelp')}
+                      size={13}
+                      offsetY={-2}
+                    />
                   </View>
                   <View style={{position: 'relative'}}>
                     <Input
                       style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.password ? '#db2d2d' : C.inputBorder }]}
+                      textStyle={userStyles.inputTextStyle}
                       secureTextEntry={!showPassword}
                       value={values.password}
                       autoCapitalize="none"
@@ -437,10 +449,11 @@ export default function AddUserScreen() {
                     setFieldPos('first_name', e.nativeEvent.layout.y)
                   }>
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                    {t('firstName')} <Text status="danger">*</Text>
+                    {t('firstName')} <Text style={{ color: '#c00000' }}>*</Text>
                   </Text>
                   <Input
                     style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.first_name ? '#db2d2d' : C.inputBorder }]}
+                    textStyle={userStyles.inputTextStyle}
                     value={values.first_name}
                     autoCapitalize="words"
                     onChangeText={t => {
@@ -462,6 +475,7 @@ export default function AddUserScreen() {
                   </Text>
                   <Input
                     style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
+                    textStyle={userStyles.inputTextStyle}
                     value={values.last_name}
                     autoCapitalize="words"
                     onChangeText={handleChange('last_name')}
@@ -476,9 +490,14 @@ export default function AddUserScreen() {
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('omrStatus')} <Text status="danger">*</Text>
+                      {t('omrStatus')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
-                    <HelpIcon onPress={() => Alert.alert(t('omrStatus'), t('helpOmrStatus'))} size={13} offsetY={-2} />
+                    <HelpIcon
+                      title={t('omrStatus')}
+                      message={t('helpOmrStatus')}
+                      size={13}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown
                     data={useMemo(
@@ -513,7 +532,12 @@ export default function AddUserScreen() {
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
                       {t('userPhoto')}
                     </Text>
-                    <HelpIcon onPress={() => Alert.alert(t('userPhoto'), t('helpUserPhoto'))} size={13} offsetY={-2} />
+                    <HelpIcon
+                      title={t('userPhoto')}
+                      message={t('helpUserPhoto')}
+                      size={13}
+                      offsetY={-2}
+                    />
                   </View>
                   <TouchableOpacity
                     onPress={() => handleImagePick()}
@@ -542,7 +566,12 @@ export default function AddUserScreen() {
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
                       {t('sensitiveNation')}
                     </Text>
-                    <HelpIcon onPress={() => Alert.alert(t('sensitiveNation'), t('helpSensitiveNation'))} size={13} offsetY={-2} />
+                    <HelpIcon
+                      title={t('sensitiveNation')}
+                      message={t('helpSensitiveNation')}
+                      size={13}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown
                     data={[
@@ -573,9 +602,14 @@ export default function AddUserScreen() {
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('language')} <Text status="danger">*</Text>
+                      {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
-                    <HelpIcon onPress={() => Alert.alert(t('language'), t('helpUserLanguage'))} size={13} offsetY={-2} />
+                    <HelpIcon
+                      title={t('language')}
+                      message={t('helpUserLanguage')}
+                      size={13}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown
                     data={useMemo(
@@ -610,7 +644,7 @@ export default function AddUserScreen() {
                     setFieldPos('country_id', e.nativeEvent.layout.y)
                   }>
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                    {t('country')} <Text status="danger">*</Text>
+                    {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
                   </Text>
                   <ElementDropdown
                     data={useMemo(
@@ -669,9 +703,14 @@ export default function AddUserScreen() {
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('church')} <Text status="danger">*</Text>
+                      {t('church')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
-                    <HelpIcon onPress={() => Alert.alert(t('church'), t('helpUserChurch'))} size={13} offsetY={-2} />
+                    <HelpIcon
+                      title={t('church')}
+                      message={t('helpUserChurch')}
+                      size={13}
+                      offsetY={-2}
+                    />
                   </View>
                   <ElementDropdown
                     data={useMemo(
@@ -722,11 +761,12 @@ export default function AddUserScreen() {
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
                     {t('emailAddress')}{' '}
                     {!values.sensitive_nation ? (
-                      <Text status="danger">*</Text>
+                      <Text style={{ color: '#c00000' }}>*</Text>
                     ) : null}
                   </Text>
                   <Input
                     style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.email_address ? '#db2d2d' : C.inputBorder }]}
+                    textStyle={userStyles.inputTextStyle}
                     value={values.email_address}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -747,7 +787,7 @@ export default function AddUserScreen() {
                   <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
                     {t('mobilePhone')}{' '}
                     {!values.sensitive_nation ? (
-                      <Text status="danger">*</Text>
+                      <Text style={{ color: '#c00000' }}>*</Text>
                     ) : null}
                   </Text>
                   <View
@@ -835,6 +875,7 @@ export default function AddUserScreen() {
                   </Text>
                   <Input
                     style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
+                    textStyle={userStyles.inputTextStyle}
                     value={values.credentials_number}
                     autoCapitalize="none"
                     onChangeText={handleChange('credentials_number')}
@@ -852,6 +893,7 @@ export default function AddUserScreen() {
                   </Text>
                   <Input
                     style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
+                    textStyle={userStyles.inputTextStyle}
                     value={values.credentials_form}
                     autoCapitalize="none"
                     onChangeText={handleChange('credentials_form')}

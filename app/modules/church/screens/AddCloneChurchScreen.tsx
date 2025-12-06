@@ -105,7 +105,7 @@ export const AddCloneChurchScreen: React.FC = () => {
   return (
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
     <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
-    <Header title={t('addNewClonedChurch')} />
+    <Header title={t('addNewClonedChurch')} showMenu={false} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
@@ -218,10 +218,20 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchName')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchName'), t('helpChurchName'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchName')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('churchName')} message={t('helpChurchName')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.name ? '#db2d2d' : C.inputBorder, color: C.inputText }]} autoCapitalize="words" value={values.name} onChangeText={t => { setFieldValue('name', t); setInvalid(prev => ({ ...prev, name: false })); }} onBlur={handleBlur('name')} status={invalid?.name ? 'danger' : 'basic'} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="words"
+                      value={values.name}
+                      onChangeText={t => { setFieldValue('name', t); setInvalid(prev => ({ ...prev, name: false })); }}
+                      onBlur={handleBlur('name')}
+                      status={invalid?.name ? 'danger' : 'basic'}
+                    />
                   </View>
                 </View>
 
@@ -229,17 +239,26 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('shortName')} [{t('only8Chars')}]</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('shortName'), t('helpShortName'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('shortName')} message={t('helpShortName')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.short_name} onChangeText={handleChange('short_name')} onBlur={handleBlur('short_name')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.short_name}
+                      onChangeText={handleChange('short_name')}
+                      onBlur={handleBlur('short_name')}
+                    />
                   </View>
                 </View>
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('msc')}? <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('msc'), t('helpIsMsc'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('msc')}? <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('msc')} message={t('helpIsMsc')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]} value={values.is_msc as any} onChange={v => { setFieldValue('is_msc', (v as string) || ''); setInvalid(prev => ({ ...prev, is_msc: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.is_msc ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.is_msc} />
                   </View>
@@ -248,8 +267,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row} onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('houseCp')}? <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('houseCp'), t('helpEnableCp'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('houseCp')}? <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('houseCp')} message={t('helpEnableCp')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]} value={values.enable_cpm as any} onChange={v => { setFieldValue('enable_cpm', (v as string) || ''); setInvalid(prev => ({ ...prev, enable_cpm: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.enable_cpm ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.enable_cpm} />
                   </View>
@@ -258,8 +279,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('language')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('language'), t('helpLanguage'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('language')} message={t('helpLanguage')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={languageOptions} value={values.language_id as any} onChange={v => { setFieldValue('language_id', v as any); setInvalid(prev => ({ ...prev, language_id: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.language_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.language_id} />
                   </View>
@@ -269,7 +292,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('motherChurch')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('motherChurch'), t('helpMotherChurch'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('motherChurch')} message={t('helpMotherChurch')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={motherChurchOptions} value={values.parent_id as any} onChange={v => setFieldValue('parent_id', v as any)} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any} />
                   </View>
@@ -278,18 +301,22 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchType')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchType'), t('helpChurchType'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchType')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('churchType')} message={t('helpChurchType')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={churchTypeOptions} value={values.church_type_id as any} onChange={v => { setFieldValue('church_type_id', v as any); setInvalid(prev => ({ ...prev, church_type_id: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.church_type_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.church_type_id} />
                   </View>
                 </View>
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('pastor_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                    <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('pastorLeader')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('pastorLeader'), t('helpPastorLeader'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('pastorLeader')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('pastorLeader')} message={t('helpPastorLeader')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={pastorOptions}
@@ -305,8 +332,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchNetwork')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchNetwork'), t('helpChurchNetwork'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchNetwork')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('churchNetwork')} message={t('helpChurchNetwork')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={churchNetworkOptions} value={values.church_network_id as any} onChange={v => { setFieldValue('church_network_id', v as any); setInvalid(prev => ({ ...prev, church_network_id: false })); }} placeholder="Select option" containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.church_network_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.church_network_id} />
                   </View>
@@ -315,8 +344,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('apostolicRegion')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('apostolicRegion'), t('helpApostolicRegion'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('apostolicRegion')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('apostolicRegion')} message={t('helpApostolicRegion')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={churchRegionOptions} value={values.church_region_id as any} onChange={v => { setFieldValue('church_region_id', v as any); setInvalid(prev => ({ ...prev, church_region_id: false })); }} placeholder="Select option" containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.church_region_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.church_region_id} />
                   </View>
@@ -325,8 +356,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('geographicalRegion')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('geographicalRegion'), t('helpGeographicalRegion'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('geographicalRegion')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('geographicalRegion')} message={t('helpGeographicalRegion')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={geographicalRegionOptions} value={values.geographical_region_id as any} onChange={v => { setFieldValue('geographical_region_id', v as any); setInvalid(prev => ({ ...prev, geographical_region_id: false })); }} placeholder="Select option" containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.geographical_region_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.geographical_region_id} />
                   </View>
@@ -335,8 +368,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('languageRegion')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('languageRegion'), t('helpLanguageRegion'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('languageRegion')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('languageRegion')} message={t('helpLanguageRegion')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={languageRegionOptions} value={values.language_region_id as any} onChange={v => { setFieldValue('language_region_id', v as any); setInvalid(prev => ({ ...prev, language_region_id: false })); }} placeholder="Select option" containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.language_region_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.language_region_id} />
                   </View>
@@ -346,7 +381,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}?</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('sensitiveNation'), t('helpSensitiveNation'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('sensitiveNation')} message={t('helpSensitiveNation')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]} value={values.sensitive_nation as any} onChange={v => setFieldValue('sensitive_nation', (v as string) || '')} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any} />
                   </View>
@@ -354,7 +389,9 @@ export const AddCloneChurchScreen: React.FC = () => {
 
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
-                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('country')} <Text status="danger">*</Text></Text>
+                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
                     <ElementDropdown data={countryOptions} value={values.country_id as any} onChange={v => { setFieldValue('country_id', v as any); setInvalid(prev => ({ ...prev, country_id: false })); const id = v as any; if (id) loadCities(id); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.country_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.country_id} />
                   </View>
                 </View>
@@ -364,7 +401,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                     <View style={churchStyles.input}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('city')}</Text>
-                        <HelpIcon onPress={() => Alert.alert(t('city'), t('helpCity'))} size={13} offsetY={-2} />
+                        <HelpIcon title={t('city')} message={t('helpCity')} size={13} offsetY={-2} />
                       </View>
                       <ElementDropdown data={cityOptions} value={values.city_id as any} onChange={v => setFieldValue('city_id', v as any)} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any} />
                     </View>
@@ -374,8 +411,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('currency')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('currency'), t('helpCurrency'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('currency')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('currency')} message={t('helpCurrency')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown data={localCurrencyOptions} value={values.currency_id as any} onChange={v => { setFieldValue('currency_id', v as any); setInvalid(prev => ({ ...prev, currency_id: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.currency_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.currency_id} />
                   </View>
@@ -385,7 +424,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchPhoto')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('churchPhoto'), t('helpChurchPhoto'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('churchPhoto')} message={t('helpChurchPhoto')} size={13} offsetY={-2} />
                     </View>
                     <TouchableOpacity onPress={() => handleImagePick()} style={[churchStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
                       {imagePath ? (
@@ -401,14 +440,32 @@ export const AddCloneChurchScreen: React.FC = () => {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('servicePostalCode')}</Text>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.service_address_postal_code} onChangeText={handleChange('service_address_postal_code')} onBlur={handleBlur('service_address_postal_code')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.service_address_postal_code}
+                      onChangeText={handleChange('service_address_postal_code')}
+                      onBlur={handleBlur('service_address_postal_code')}
+                    />
                   </View>
                 </View>
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('emailAddress')} <Text status="danger">*</Text></Text>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]} value={values.email_address} keyboardType="email-address" autoCapitalize="none" onChangeText={t => { setFieldValue('email_address', t); setInvalid(prev => ({ ...prev, email_address: false })); }} onBlur={handleBlur('email_address')} status={invalid?.email_address ? 'danger' : 'basic'} />
+                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                      {t('emailAddress')} <Text style={{ color: '#c00000' }}>*</Text>
+                    </Text>
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      value={values.email_address}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      onChangeText={t => { setFieldValue('email_address', t); setInvalid(prev => ({ ...prev, email_address: false })); }}
+                      onBlur={handleBlur('email_address')}
+                      status={invalid?.email_address ? 'danger' : 'basic'}
+                    />
                   </View>
                 </View>
 
@@ -416,9 +473,16 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('website')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('website'), t('helpWebsite'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('website')} message={t('helpWebsite')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.website} onChangeText={handleChange('website')} onBlur={handleBlur('website')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.website}
+                      onChangeText={handleChange('website')}
+                      onBlur={handleBlur('website')}
+                    />
                   </View>
                 </View>
 
@@ -426,9 +490,16 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('facebook')}</Text>
-                      <HelpIcon onPress={() => Alert.alert(t('facebook'), t('helpFacebook'))} size={13} offsetY={-2} />
+                      <HelpIcon title={t('facebook')} message={t('helpFacebook')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.facebook} onChangeText={handleChange('facebook')} onBlur={handleBlur('facebook')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.facebook}
+                      onChangeText={handleChange('facebook')}
+                      onBlur={handleBlur('facebook')}
+                    />
                   </View>
                 </View>
 
@@ -436,9 +507,16 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">Instagram</Text>
-                      <HelpIcon onPress={() => Alert.alert('Instagram', t('helpInstagram'))} size={13} offsetY={-2} />
+                      <HelpIcon title="Instagram" message={t('helpInstagram')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.instagram} onChangeText={handleChange('instagram')} onBlur={handleBlur('instagram')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.instagram}
+                      onChangeText={handleChange('instagram')}
+                      onBlur={handleBlur('instagram')}
+                    />
                   </View>
                 </View>
 
@@ -446,17 +524,26 @@ export const AddCloneChurchScreen: React.FC = () => {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">X</Text>
-                      <HelpIcon onPress={() => Alert.alert('X', t('helpX'))} size={13} offsetY={-2} />
+                      <HelpIcon title="X" message={t('helpX')} size={13} offsetY={-2} />
                     </View>
-                    <Input style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]} autoCapitalize="none" value={values.twitter} onChangeText={handleChange('twitter')} onBlur={handleBlur('twitter')} />
+                    <Input
+                      style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={churchStyles.inputTextStyle}
+                      autoCapitalize="none"
+                      value={values.twitter}
+                      onChangeText={handleChange('twitter')}
+                      onBlur={handleBlur('twitter')}
+                    />
                   </View>
                 </View>
 
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('dob')} <Text status="danger">*</Text></Text>
-                      <HelpIcon onPress={() => Alert.alert(t('dob'), t('helpDob'))} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('dob')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('dob')} message={t('helpDob')} size={13} offsetY={-2} />
                     </View>
                     <DateTripleDropdown
                       value={values.date_of_birth}

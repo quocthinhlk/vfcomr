@@ -69,14 +69,13 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         fontSize: 22,
         color: C.textSecondary,
         marginRight: 8,
-        transform: [{ rotate: '90deg' }],
       },
       clearButton: { paddingHorizontal: 0, marginRight: 8 },
       clearText: { fontSize: 20, color: C.textSecondary },
-      selectedText: { fontSize: 15, color: C.textPrimary },
+      selectedText: { fontSize: 14, color: C.textPrimary },
       placeholderText: { fontSize: 16, color: C.textSecondary },
-      itemText: { fontSize: 16, color: C.textPrimary, lineHeight: 20 },
-      itemContainer: { paddingVertical: 2, minHeight: 32, backgroundColor: C.surface },
+      itemText: { fontSize: 14, color: C.textPrimary, lineHeight: 0 },
+      itemContainer: { paddingVertical: 1, minHeight: 26, backgroundColor: C.surface },
     })
   , [C]);
   const renderRightIcon = () => {

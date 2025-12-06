@@ -18,9 +18,9 @@ import { useThemedColors } from '../styles/theme';
 
  
 
-type HeaderProps = { title?: string };
+type HeaderProps = { title?: string; showMenu?: boolean };
 
-export const Header: React.FC<HeaderProps> = ({ title }) => {
+export const Header: React.FC<HeaderProps> = ({ title, showMenu = true }) => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const route = useRoute<any>();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -75,17 +75,26 @@ export const Header: React.FC<HeaderProps> = ({ title }) => {
       <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backWrap}>
         <Image source={require('../../assets/images/icon/back.png')} style={[styles.backIcon, { tintColor: C.textPrimary }]} />
       </TouchableOpacity>
-      <Text style={[styles.title, { color: C.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">{title || route?.name || ''}</Text>
-      <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
-      <MenuPopup
-        visible={menuVisible}
-        onClose={() => setMenuVisible(false)}
-        menuItems={menuItems}
-        onMenuItemPress={handleMenuItemPress}
-        onLogout={handleLogout}
-        onChangeLanguage={handleChangeLanguage}
-        selectedLanguage={selectedLanguage}
-      />
+      <Text style={[styles.title, { color: C.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">
+        {title || route?.name || ''}
+      </Text>
+      {showMenu ? (
+        <>
+          <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
+          <MenuPopup
+            visible={menuVisible}
+            onClose={() => setMenuVisible(false)}
+            menuItems={menuItems}
+            onMenuItemPress={handleMenuItemPress}
+            onLogout={handleLogout}
+            onChangeLanguage={handleChangeLanguage}
+            selectedLanguage={selectedLanguage}
+          />
+        </>
+      ) : (
+        // keep layout spacing when menu is hidden
+        <View style={{ width: 35 }} />
+      )}
     </View>
   );
 };
@@ -120,7 +129,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '700',
     color: '#111',
   },

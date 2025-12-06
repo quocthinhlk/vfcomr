@@ -81,7 +81,7 @@ export const AddChurchRegionScreen: React.FC = () => {
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
       <View style={{ flex: 1, backgroundColor: C.background }}>
         <View style={styles.container}>
-          <Header title={`${t('addNew')} ${t('churchApostolicRegions')}`} />
+          <Header title={`${t('addNew')} ${t('churchApostolicRegions')}`} showMenu={false} />
           <Text style={[styles.label, { color: C.textPrimary }]}>{t('churchRegion') || t('churchApostolicRegions')}</Text>
           <TextInput
             style={[styles.input, { borderColor: (C as any).inputBorder || C.border, color: C.textPrimary, backgroundColor: (C as any).card || C.background }]}

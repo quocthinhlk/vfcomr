@@ -94,7 +94,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
 const menuItems = [
   { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Monthly Data', routeName: 'WeeklyReport', disabled: true },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch', disabled: true },
-  { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'EnterVisits' },
+  { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'EnterVisits', disabled: true },
   { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
   { icon: require('../../../../app/assets/images/icon/user.png'), label: 'New Pastor', routeName: 'AddUser' },
   { icon: require('../../../../app/assets/images/icon/home.png'), label: 'New Church', routeName: 'AddChurch' },
