@@ -207,7 +207,6 @@ export default function AddChurchScreen() {
                 const newInvalid: Record<string, boolean> = {};
                 newInvalid.name = !values.name;
                 newInvalid.is_msc = !values.is_msc;
-                newInvalid.enable_cpm = !values.enable_cpm;
                 newInvalid.language_id = !values.language_id;
                 newInvalid.church_type_id = !values.church_type_id;
                 newInvalid.pastor_id = !values.pastor_id;
@@ -221,7 +220,7 @@ export default function AddChurchScreen() {
                 newInvalid.date_of_birth = !values.date_of_birth;
                 setInvalid(newInvalid);
                 const firstInvalidKey = [
-                  'name','is_msc','enable_cpm','language_id','church_type_id','pastor_id','church_network_id','church_region_id','geographical_region_id','language_region_id','country_id','currency_id','email_address','date_of_birth'
+                  'name','is_msc','language_id','church_type_id','pastor_id','church_network_id','church_region_id','geographical_region_id','language_region_id','country_id','currency_id','email_address','date_of_birth'
                 ].find(k => newInvalid[k]);
                 if (firstInvalidKey) {
                   scrollToField(firstInvalidKey);
@@ -318,8 +317,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('shortName')} [{t('only8Chars')}]</Text>
-                      <HelpIcon title={t('shortName')} message={t('helpShortName')} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('shortName')}
+                        <Text style={churchStyles.subLabel}> [{t('only10Chars')}]</Text>
+                      </Text>
                     </View>
                   <Input
                     style={[churchStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
@@ -338,7 +339,6 @@ export default function AddChurchScreen() {
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
                         {t('msc')}? <Text style={{ color: '#c00000' }}>*</Text>
                       </Text>
-                      <HelpIcon title={t('msc')} message={t('helpIsMsc')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
@@ -351,21 +351,24 @@ export default function AddChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
+                {/* House C.P. field removed as requested */}
+
+                <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
-                        {t('houseCp')}? <Text style={{ color: '#c00000' }}>*</Text>
-                      </Text>
-                      <HelpIcon title={t('houseCp')} message={t('helpEnableCp')} size={13} offsetY={-2} />
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('motherChurch')}</Text>
                     </View>
                     <ElementDropdown
-                      data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
-                      value={values.enable_cpm as any}
-                      onChange={v => { setFieldValue('enable_cpm', (v as string) || ''); setInvalid(prev => ({...prev, enable_cpm: false})); }}
+                      data={motherOptions}
+                      value={values.parent_id as any}
+                      onChange={v => setFieldValue('parent_id', v as any)}
                       placeholder={t('selectOption')}
-                      containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.enable_cpm ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.enable_cpm}
+                      containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any}
+                      onSearchText={async text => {
+                        setMotherQuery(text);
+                        await loadMothers(1, text);
+                      }}
+                      onEndReached={async () => { if (motherHasNext) await loadMothers(motherPage + 1, motherQuery); }}
                     />
                   </View>
                 </View>
@@ -374,9 +377,8 @@ export default function AddChurchScreen() {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
-                        {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
+                        {t('languageUsedInTheService')} <Text style={{ color: '#c00000' }}>*</Text>
                       </Text>
-                      <HelpIcon title={t('language')} message={t('helpLanguage')} size={13} offsetY={-2} />
                     </View>
                     <ElementDropdown
                       data={langOptions}
@@ -391,27 +393,6 @@ export default function AddChurchScreen() {
                       }}
                       onEndReached={async () => { if (langHasNext) await loadLanguages(langPage + 1, langQuery); }}
                       error={!!invalid?.language_id}
-                    />
-                  </View>
-                </View>
-
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('motherChurch')}</Text>
-                      <HelpIcon title={t('motherChurch')} message={t('helpMotherChurch')} size={13} offsetY={-2} />
-                    </View>
-                    <ElementDropdown
-                      data={motherOptions}
-                      value={values.parent_id as any}
-                      onChange={v => setFieldValue('parent_id', v as any)}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any}
-                      onSearchText={async text => {
-                        setMotherQuery(text);
-                        await loadMothers(1, text);
-                      }}
-                      onEndReached={async () => { if (motherHasNext) await loadMothers(motherPage + 1, motherQuery); }}
                     />
                   </View>
                 </View>
@@ -645,7 +626,10 @@ export default function AddChurchScreen() {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('churchPhoto')}</Text>
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchPhoto')}
+                      <Text style={churchStyles.subLabel}> [{t('max5mb')}]</Text>
+                      </Text>
                       <HelpIcon title={t('churchPhoto')} message={t('helpChurchPhoto')} size={13} offsetY={-2} />
                     </View>
                     <TouchableOpacity onPress={() => handleImagePick()} style={[churchStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>

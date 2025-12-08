@@ -9,6 +9,7 @@ import { churchStyles } from '../styles';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import { Formik } from 'formik';
 import api from '../../../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
 import { useImagePicker } from '../../church/hooks/useImagePicker';
 import { DEFAULT_PAGE_LIMIT } from '../../../config/api';
@@ -39,6 +40,8 @@ type CombinedFormValues = AddChurchFormValues & {
   user_mobile_phone: string;
 };
 
+const CHURCH_DRAFT_KEY = 'new_pastor_and_church_church_draft_v1';
+
 export default function NewPastorAndChurchScreen() {
   const navigation = useNavigation<any>();
   const { t } = useTranslation();
@@ -55,6 +58,7 @@ export default function NewPastorAndChurchScreen() {
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
   const setFieldPos = (key: string, y: number) => setFieldY(prev => (prev[key] === y ? prev : { ...prev, [key]: y }));
   const scrollToField = (key: string) => { const y = fieldY[key] ?? 0; scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true }); };
+  const [showPastorSection, setShowPastorSection] = useState(false);
 
   // church dropdown options
   const {
@@ -103,6 +107,13 @@ export default function NewPastorAndChurchScreen() {
   const [credentialOptions, setCredentialOptions] = useState<string[]>([]);
   const [userCountryCode, setUserCountryCode] = useState<CountryCode>('SG');
   const [userCallingCode, setUserCallingCode] = useState<string>('65');
+  const [initialValues, setInitialValues] = useState<CombinedFormValues>({
+    // church
+    name: '', short_name: '', is_msc: '', enable_cpm: '', parent_id: '', language_id: '', church_type_id: '', pastor_id: '', church_network_id: '', church_region_id: '', geographical_region_id: '', language_region_id: '', sensitive_nation: '', country_id: '', currency_id: '', city_id: '', photo_dir: '', service_address_street: '', service_address_postal_code: '', mailing_address_postal_code: '', office_address_street: '', office_address_postal_code: '', office_phone: '', office_fax: '', email_address: '', website: '', facebook: '', instagram: '', twitter: '', date_of_birth: null,
+    // user
+    username: '', password: '', prefix: '', first_name: '', last_name: '', user_role_id: '', user_sensitive_nation: '', user_country_id: '', user_language_id: '', user_church_id: '', credentials: '', credentials_from: '', credentials_expiry_date: null, user_email_address: '', user_mobile_phone: '',
+  });
+  const [draftLoaded, setDraftLoaded] = useState(false);
 
   const formatPhoneReadable = (digits: string) => {
     if (!digits) return '';
@@ -121,6 +132,59 @@ export default function NewPastorAndChurchScreen() {
   };
 
   useEffect(() => { if (!langQuery && langPage === 1) setLangOptions(languageOptions); }, [languageOptions]);
+
+  // Load saved church draft (step 1) from storage on mount
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const raw = await AsyncStorage.getItem(CHURCH_DRAFT_KEY);
+        if (!mounted) return;
+        if (raw) {
+          const saved = JSON.parse(raw) as Partial<CombinedFormValues> & { date_of_birth?: string | null };
+          setInitialValues(prev => ({
+            ...prev,
+            // church-only fields
+            name: saved.name ?? prev.name,
+            short_name: saved.short_name ?? prev.short_name,
+            is_msc: saved.is_msc ?? prev.is_msc,
+            enable_cpm: saved.enable_cpm ?? prev.enable_cpm,
+            parent_id: saved.parent_id ?? prev.parent_id,
+            language_id: saved.language_id ?? prev.language_id,
+            church_type_id: saved.church_type_id ?? prev.church_type_id,
+            pastor_id: saved.pastor_id ?? prev.pastor_id,
+            church_network_id: saved.church_network_id ?? prev.church_network_id,
+            church_region_id: saved.church_region_id ?? prev.church_region_id,
+            geographical_region_id: saved.geographical_region_id ?? prev.geographical_region_id,
+            language_region_id: saved.language_region_id ?? prev.language_region_id,
+            sensitive_nation: saved.sensitive_nation ?? prev.sensitive_nation,
+            country_id: saved.country_id ?? prev.country_id,
+            currency_id: saved.currency_id ?? prev.currency_id,
+            city_id: saved.city_id ?? prev.city_id,
+            photo_dir: saved.photo_dir ?? prev.photo_dir,
+            service_address_street: saved.service_address_street ?? prev.service_address_street,
+            service_address_postal_code: saved.service_address_postal_code ?? prev.service_address_postal_code,
+            mailing_address_postal_code: saved.mailing_address_postal_code ?? prev.mailing_address_postal_code,
+            office_address_street: saved.office_address_street ?? prev.office_address_street,
+            office_address_postal_code: saved.office_address_postal_code ?? prev.office_address_postal_code,
+            office_phone: saved.office_phone ?? prev.office_phone,
+            office_fax: saved.office_fax ?? prev.office_fax,
+            email_address: saved.email_address ?? prev.email_address,
+            website: saved.website ?? prev.website,
+            facebook: saved.facebook ?? prev.facebook,
+            instagram: saved.instagram ?? prev.instagram,
+            twitter: saved.twitter ?? prev.twitter,
+            date_of_birth: saved.date_of_birth ? new Date(saved.date_of_birth as any) : prev.date_of_birth,
+          }));
+        }
+      } catch {
+        // ignore storage errors
+      } finally {
+        if (mounted) setDraftLoaded(true);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
   useEffect(() => {
     let mounted = true;
     api.get('/users/form-data').then(res => {
@@ -133,6 +197,94 @@ export default function NewPastorAndChurchScreen() {
     return () => { mounted = false; };
   }, []);
 
+  const handleSaveChurchAndContinue = async (values: CombinedFormValues) => {
+    const nextInvalid: Record<string, boolean> = {};
+    // validate church section only
+    nextInvalid.name = !values.name;
+    nextInvalid.is_msc = !values.is_msc;
+    nextInvalid.language_id = !values.language_id;
+    nextInvalid.church_type_id = !values.church_type_id;
+    nextInvalid.church_network_id = !values.church_network_id;
+    nextInvalid.church_region_id = !values.church_region_id;
+    nextInvalid.geographical_region_id = !values.geographical_region_id;
+    nextInvalid.language_region_id = !values.language_region_id;
+    nextInvalid.country_id = !values.country_id;
+    nextInvalid.currency_id = !values.currency_id;
+    nextInvalid.email_address = !values.email_address;
+    nextInvalid.date_of_birth = !values.date_of_birth;
+
+    setInvalid(nextInvalid);
+
+    const firstInvalidKey = [
+      'name',
+      'is_msc',
+      'language_id',
+      'church_type_id',
+      'church_network_id',
+      'church_region_id',
+      'geographical_region_id',
+      'language_region_id',
+      'country_id',
+      'currency_id',
+      'email_address',
+      'date_of_birth',
+    ].find(k => nextInvalid[k]);
+
+    if (firstInvalidKey) {
+      Alert.alert(t('validation'), t('fillRequiredFields'));
+      try {
+        setTimeout(() => scrollToField(firstInvalidKey), 0);
+      } catch {}
+      return;
+    }
+
+    try {
+      const draftToStore = {
+        name: values.name,
+        short_name: values.short_name,
+        is_msc: values.is_msc,
+        enable_cpm: values.enable_cpm,
+        parent_id: values.parent_id,
+        language_id: values.language_id,
+        church_type_id: values.church_type_id,
+        pastor_id: values.pastor_id,
+        church_network_id: values.church_network_id,
+        church_region_id: values.church_region_id,
+        geographical_region_id: values.geographical_region_id,
+        language_region_id: values.language_region_id,
+        sensitive_nation: values.sensitive_nation,
+        country_id: values.country_id,
+        currency_id: values.currency_id,
+        city_id: values.city_id,
+        photo_dir: values.photo_dir,
+        service_address_street: values.service_address_street,
+        service_address_postal_code: values.service_address_postal_code,
+        mailing_address_postal_code: values.mailing_address_postal_code,
+        office_address_street: values.office_address_street,
+        office_address_postal_code: values.office_address_postal_code,
+        office_phone: values.office_phone,
+        office_fax: values.office_fax,
+        email_address: values.email_address,
+        website: values.website,
+        facebook: values.facebook,
+        instagram: values.instagram,
+        twitter: values.twitter,
+        date_of_birth: values.date_of_birth
+          ? values.date_of_birth.toISOString()
+          : null,
+      };
+
+      await AsyncStorage.setItem(CHURCH_DRAFT_KEY, JSON.stringify(draftToStore));
+    } catch {
+      // ignore storage errors
+    }
+
+    setShowPastorSection(true);
+    try {
+      setTimeout(() => scrollToField('username'), 0);
+    } catch {}
+  };
+
   return (
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
       <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
@@ -144,24 +296,18 @@ export default function NewPastorAndChurchScreen() {
         >
           <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentInsetAdjustmentBehavior="always" style={{ backgroundColor: C.background }} contentContainerStyle={{ paddingBottom: 24 }}>
 
+          {draftLoaded && (
           <Formik<CombinedFormValues>
             enableReinitialize
-            initialValues={{
-              // church
-              name: '', short_name: '', is_msc: '', enable_cpm: '', parent_id: '', language_id: '', church_type_id: '', pastor_id: '', church_network_id: '', church_region_id: '', geographical_region_id: '', language_region_id: '', sensitive_nation: '', country_id: '', currency_id: '', city_id: '', photo_dir: '', service_address_street: '', service_address_postal_code: '', mailing_address_postal_code: '', office_address_street: '', office_address_postal_code: '', office_phone: '', office_fax: '', email_address: '', website: '', facebook: '', instagram: '', twitter: '', date_of_birth: null,
-              // user
-              username: '', password: '', prefix: '', first_name: '', last_name: '', user_role_id: '', user_sensitive_nation: '', user_country_id: '', user_language_id: '', user_church_id: '', credentials: '', credentials_from: '', credentials_expiry_date: null, user_email_address: '', user_mobile_phone: '',
-            }}
+            initialValues={initialValues}
             onSubmit={async (values) => {
               try {
                 const newInvalid: Record<string, boolean> = {};
                 // required (church)
                 newInvalid.name = !values.name;
                 newInvalid.is_msc = !values.is_msc;
-                newInvalid.enable_cpm = !values.enable_cpm;
                 newInvalid.language_id = !values.language_id;
                 newInvalid.church_type_id = !values.church_type_id;
-                newInvalid.pastor_id = !values.pastor_id;
                 newInvalid.church_network_id = !values.church_network_id;
                 newInvalid.church_region_id = !values.church_region_id;
                 newInvalid.geographical_region_id = !values.geographical_region_id;
@@ -182,8 +328,7 @@ export default function NewPastorAndChurchScreen() {
                 newInvalid.user_mobile_phone = !values.user_mobile_phone;
                 setInvalid(newInvalid);
                 const firstInvalidKey = [
-                  'name','is_msc','enable_cpm','language_id','church_type_id','church_network_id','church_region_id','geographical_region_id','language_region_id','country_id','currency_id','email_address','date_of_birth',
-                  'pastor_id',
+                  'name','is_msc','language_id','church_type_id','church_network_id','church_region_id','geographical_region_id','language_region_id','country_id','currency_id','email_address','date_of_birth',
                   'username','password','first_name','user_role_id','user_language_id','user_country_id','user_church_id','user_email_address','user_mobile_phone'
                 ].find(k => newInvalid[k]);
                 if (firstInvalidKey) {
@@ -279,16 +424,21 @@ export default function NewPastorAndChurchScreen() {
 
                 const payload = { church: churchPayload, user: userPayload };
                 await api.post('churches/with-user', payload);
+                try {
+                  await AsyncStorage.removeItem(CHURCH_DRAFT_KEY);
+                } catch {}
                 Alert.alert(t('success'), t('churchCreatedSuccess'));
                 navigation.navigate('Churches');
               } catch (e: any) {
                 Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('failedToCreateChurch'));
               }
             }}
-          >
+            >
             {({ values, handleChange, handleBlur, handleSubmit, setFieldValue }) => (
               <View>
-                <Text category="label" style={[churchStyles.title, { marginTop: 8, color: C.textPrimary }]}>{t('church')}</Text>
+                {!showPastorSection && (
+                  <>
+                <Text category="label" style={[churchStyles.title, { marginTop: 8, color: C.textPrimary }]}>{t('churchData')}</Text>
                 <View style={churchStyles.row} onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
@@ -315,7 +465,10 @@ export default function NewPastorAndChurchScreen() {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('shortName')} [{t('only8Chars')}]</Text>
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('shortName')}
+                        <Text style={churchStyles.subLabel}> [{t('only10Chars')}]</Text>
+                      </Text>
                       <HelpIcon
                         title={t('shortName')}
                         message={t('helpShortName')}
@@ -328,7 +481,7 @@ export default function NewPastorAndChurchScreen() {
                       textStyle={churchStyles.inputTextStyle}
                       autoCapitalize="none"
                       value={values.short_name}
-                      onChangeText={handleChange('short_name')}
+                      onChangeText={t => setFieldValue('short_name', (t || '').slice(0, 10))}
                       onBlur={handleBlur('short_name')}
                     />
                   </View>
@@ -338,44 +491,8 @@ export default function NewPastorAndChurchScreen() {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('msc')}? <Text status="danger">*</Text></Text>
-                      <HelpIcon
-                        title={t('msc')}
-                        message={t('helpIsMsc')}
-                        size={16}
-                        offsetY={-2}
-                      />
                     </View>
                     <ElementDropdown data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]} value={values.is_msc as any} onChange={v => { setFieldValue('is_msc', (v as string) || ''); setInvalid(prev => ({ ...prev, is_msc: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.is_msc ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.is_msc} />
-                  </View>
-                </View>
-
-                <View style={churchStyles.row} onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('houseCp')}? <Text status="danger">*</Text></Text>
-                      <HelpIcon
-                        title={t('houseCp')}
-                        message={t('helpEnableCp')}
-                        size={16}
-                        offsetY={-2}
-                      />
-                    </View>
-                    <ElementDropdown data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]} value={values.enable_cpm as any} onChange={v => { setFieldValue('enable_cpm', (v as string) || ''); setInvalid(prev => ({ ...prev, enable_cpm: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.enable_cpm ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.enable_cpm} />
-                  </View>
-                </View>
-
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('language')} <Text status="danger">*</Text></Text>
-                      <HelpIcon
-                        title={t('language')}
-                        message={t('helpLanguage')}
-                        size={16}
-                        offsetY={-2}
-                      />
-                    </View>
-                    <ElementDropdown data={langOptions} value={values.language_id as any} onChange={v => { setFieldValue('language_id', v as any); setInvalid(prev => ({ ...prev, language_id: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.language_id ? '#db2d2d' : C.inputBorder } as any} onFocus={async () => { if (langOptions.length === 0) await loadLanguages(1); }} onSearchText={async text => { setLangQuery(text); await loadLanguages(1, text); }} onEndReached={async () => { if (langHasNext) await loadLanguages(langPage + 1, langQuery); }} error={!!invalid?.language_id} />
                   </View>
                 </View>
 
@@ -383,14 +500,25 @@ export default function NewPastorAndChurchScreen() {
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('motherChurch')}</Text>
-                      <HelpIcon
-                        title={t('motherChurch')}
-                        message={t('helpMotherChurch')}
-                        size={16}
-                        offsetY={-2}
-                      />
                     </View>
                     <ElementDropdown data={motherChurchOptions} value={values.parent_id as any} onChange={v => setFieldValue('parent_id', v as any)} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any} />
+                  </View>
+                </View>
+
+                <View style={churchStyles.row}>
+                  <View style={churchStyles.input}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('languageUsedInTheService')} <Text status="danger">*</Text>
+                        </Text>
+                        <HelpIcon
+                          title={t('languageUsedInTheService')}
+                          message={t('helpLanguage')}
+                          size={16}
+                          offsetY={-2}
+                        />
+                      </View>
+                    <ElementDropdown data={langOptions} value={values.language_id as any} onChange={v => { setFieldValue('language_id', v as any); setInvalid(prev => ({ ...prev, language_id: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.language_id ? '#db2d2d' : C.inputBorder } as any} onFocus={async () => { if (langOptions.length === 0) await loadLanguages(1); }} onSearchText={async text => { setLangQuery(text); await loadLanguages(1, text); }} onEndReached={async () => { if (langHasNext) await loadLanguages(langPage + 1, langQuery); }} error={!!invalid?.language_id} />
                   </View>
                 </View>
 
@@ -409,20 +537,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('pastorLeader')} <Text status="danger">*</Text></Text>
-                      <HelpIcon
-                        title={t('pastorLeader')}
-                        message={t('helpPastorLeader')}
-                        size={16}
-                        offsetY={-2}
-                      />
-                    </View>
-                    <ElementDropdown data={pastorOptions} value={values.pastor_id as any} onChange={v => { setFieldValue('pastor_id', v as any); setInvalid(prev => ({ ...prev, pastor_id: false })); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.pastor_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.pastor_id} />
-                  </View>
-                </View>
+                {/* Pastor / Leader field removed as requested */}
 
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
@@ -501,7 +616,7 @@ export default function NewPastorAndChurchScreen() {
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('country')} <Text status="danger">*</Text></Text>
+                    <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">{t('nation')} <Text status="danger">*</Text></Text>
                     <ElementDropdown data={countryOptions} value={values.country_id as any} onChange={v => { setFieldValue('country_id', v as any); setInvalid(prev => ({...prev, country_id: false})); const id = v as any; if (id) loadCities(id); }} placeholder={t('selectOption')} containerStyle={{ ...(churchStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.country_id ? '#db2d2d' : C.inputBorder } as any} error={!!invalid?.country_id} />
                   </View>
                 </View>
@@ -541,7 +656,10 @@ export default function NewPastorAndChurchScreen() {
                 <View style={churchStyles.row}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={churchStyles.label} category="label">{t('churchPhoto')}</Text>
+                      <Text style={[churchStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('churchPhoto')}
+                        <Text style={churchStyles.subLabel}> [{t('max5mb')}]</Text>
+                      </Text>
                       <HelpIcon
                         title={t('churchPhoto')}
                         message={t('helpChurchPhoto')}
@@ -710,6 +828,17 @@ export default function NewPastorAndChurchScreen() {
                     />
                   </View>
                 </View>
+
+                <Button
+                  onPress={() => handleSaveChurchAndContinue(values)}
+                  style={[globalStyles.button, { marginTop: 16 }]}
+                >
+                  {t('saveAndContinuePastorDetails')}
+                </Button>
+                  </>
+                )}
+
+                {showPastorSection && (<>
 
                 <Text category="label" style={[churchStyles.title, { marginTop: 16, color: C.textPrimary }]}>{t('pastorLeader')}</Text>
                 <View style={churchStyles.row} onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
@@ -1026,10 +1155,25 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <Button onPress={() => handleSubmit()} style={[globalStyles.button, { marginTop: 16 }]}>{t('save')}</Button>
+                <View style={{ flexDirection: 'row', marginTop: 16 }}>
+                  <Button
+                    style={[globalStyles.button, { flex: 1, marginRight: 8 }]}
+                    onPress={() => setShowPastorSection(false)}
+                  >
+                    {t('back')}
+                  </Button>
+                  <Button
+                    style={[globalStyles.button, { flex: 1, marginLeft: 8 }]}
+                    onPress={() => handleSubmit()}
+                  >
+                    {t('save')}
+                  </Button>
+                </View>
+                </>)}
               </View>
             )}
           </Formik>
+          )}
           </ScrollView>
         </KeyboardAvoidingView>
       </Layout>

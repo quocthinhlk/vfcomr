@@ -45,6 +45,12 @@ export const churchStyles = StyleSheet.create({
         marginBottom: 4,
         fontSize: 11,
     },
+    subLabel: {
+        color: '#8f9bb3',
+        fontWeight: 'normal',
+        marginBottom: 4,
+        fontSize: 11,
+    },
     filePickerButton: {
         borderRadius: 3,
         borderColor: '#e4e9f3',
