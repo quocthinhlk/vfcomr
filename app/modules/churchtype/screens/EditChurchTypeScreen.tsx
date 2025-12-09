@@ -5,11 +5,13 @@ import { Text } from '@ui-kitten/components';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { Header } from '../../../shared/components/Header';
 import { globalStyles } from '../../../shared/styles/global';
+import { formStyles } from '../../../shared/styles/form';
 import { getChurchTypeById, updateChurchType } from '../services/churchtype.service';
 import { SaveButton, CancelButton } from '../../../shared/components/ActionButtons';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
 import { useThemeMode } from '../../../shared/context/ThemeContext';
+import { Col, Row, Grid } from 'react-native-easy-grid';
 
 export const EditChurchTypeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -54,19 +56,34 @@ export const EditChurchTypeScreen: React.FC = () => {
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
       <View style={{ flex: 1, backgroundColor: C.background }}>
         <View style={styles.container}>
-          <Header title={`${t('edit')} ${t('churchType')}`} showMenu={false} />
-          <Text style={[styles.label, { color: C.textPrimary }]}>{t('churchType')}</Text>
-          <TextInput
-            style={[styles.input, { borderColor: (C as any).inputBorder || C.border, color: C.textPrimary, backgroundColor: (C as any).card || C.background }]}
-            placeholder={t('churchType')}
-            placeholderTextColor={C.textSecondary}
-            value={name}
-            onChangeText={setName}
-          />
-          <View style={styles.row}>
-            <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
-            <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
-          </View>
+          <Grid>
+            <Row>
+              <Col>
+                <Header title={`${t('edit')} ${t('churchType')}`} showMenu={false} />
+                <Text style={[formStyles.label, { color: C.textPrimary, marginTop: 12 }]}>{t('churchType')}</Text>
+                <TextInput
+                  style={[
+                    formStyles.textField,
+                    {
+                      marginTop: 4,
+                      marginBottom: 16,
+                      borderColor: (C as any).inputBorder || C.border,
+                      color: C.textPrimary,
+                      backgroundColor: (C as any).card || C.background,
+                    },
+                  ]}
+                  placeholder={t('churchType')}
+                  placeholderTextColor={C.textSecondary}
+                  value={name}
+                  onChangeText={setName}
+                />
+                <View style={formStyles.buttonRow}>
+                  <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
+                  <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
+                </View>
+              </Col>
+            </Row>
+          </Grid>
         </View>
       </View>
     </SafeAreaView>

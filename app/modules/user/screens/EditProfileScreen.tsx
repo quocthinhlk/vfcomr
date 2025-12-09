@@ -9,7 +9,7 @@ import { globalStyles } from '../../../shared/styles/global';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
 import { resolveByCallingCodePrefix } from '../config/phone';
-import { userStyles } from '../styles';
+import { formStyles } from '../../../shared/styles/form';
 import { getChurchesList } from '../../church/services/church.service';
 import api, { DEFAULT_PAGE_LIMIT } from '../../../config/api';
 import { getUserById, updateUser } from '../services/user.service';
@@ -21,6 +21,7 @@ import { COLORS } from '../../../shared/constants/colors';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
+import { Col, Row, Grid } from 'react-native-easy-grid';
 
 export default function EditProfileScreen() {
   const route = useRoute<any>();
@@ -286,290 +287,540 @@ export default function EditProfileScreen() {
             }}
           >
             {({ values, handleChange, handleBlur, handleSubmit, setFieldValue }) => (
-              <View>
-                <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
-                  <Button size="small" appearance="outline" onPress={() => navigation.navigate('ChangePasswordForOtherUser' as any, { id: userId })}>
-                    {t('changePassword')}
-                  </Button>
-                </View>
-                <View onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('username')} <Text style={{ color: '#c00000' }}>*</Text>
-                    </Text>
-                    <HelpIcon
-                      title={t('username')}
-                      message={t('usernameHelp')}
-                      size={16}
-                      offsetY={-2}
-                    />
-                  </View>
-                  <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.username ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                    textStyle={userStyles.inputTextStyle}
-                    value={values.username}
-                    autoCapitalize="none"
-                    disabled
-                    onChangeText={t => { setFieldValue('username', t); clearInvalid('username'); }} onBlur={handleBlur('username')}
-                    status={invalid.username ? 'danger' : 'basic'} />
-                </View>
+              <Grid>
+                <Row>
+                  <Col>
+                    <View style={{ flexDirection: 'row', justifyContent: 'flex-end', marginBottom: 12 }}>
+                      <Button
+                        size="small"
+                        appearance="outline"
+                        onPress={() =>
+                          navigation.navigate('ChangePasswordForOtherUser' as any, {
+                            id: userId,
+                          })
+                        }>
+                        {t('changePassword')}
+                      </Button>
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('first_name', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                    {t('firstName')} <Text style={{ color: '#c00000' }}>*</Text>
-                  </Text>
-                  <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.first_name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                    textStyle={userStyles.inputTextStyle}
-                    value={values.first_name}
-                    autoCapitalize="words"
-                    onChangeText={t => { setFieldValue('first_name', t); clearInvalid('first_name'); }}
-                    onBlur={handleBlur('first_name')}
-                    status={invalid.first_name ? 'danger' : 'basic'}
-                  />
-                </View>
-
-                <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('lastName')}</Text>
-                  <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                    textStyle={userStyles.inputTextStyle}
-                    value={values.last_name}
-                    autoCapitalize="words"
-                    onChangeText={handleChange('last_name')}
-                    onBlur={handleBlur('last_name')}
-                  />
-                </View>
-
-                <View onLayout={e => setFieldPos('role_id', e.nativeEvent.layout.y)}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('omrStatus')} <Text style={{ color: '#c00000' }}>*</Text>
-                    </Text>
-                    <HelpIcon
-                      title={t('omrStatus')}
-                      message={t('helpOmrStatus')}
-                      size={16}
-                      offsetY={-2}
-                    />
-                  </View>
-                  <ElementDropdown
-                    data={useMemo(() => roleOptions.map(r => ({ label: r.name, value: r.id })), [roleOptions])}
-                    value={values.role_id as any}
-                    onChange={v => { setFieldValue('role_id', (typeof v === 'number' ? v : Number(v)) || null); clearInvalid('role_id'); }}
-                    placeholder={t('selectOption')}
-                    containerStyle={{ ...userStyles.input, borderColor: invalid.role_id ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg } as any}
-                    error={!!invalid.role_id}
-                  />
-                </View>
-
-                <View onLayout={e => setFieldPos('user_photo', e.nativeEvent.layout.y)}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('userPhoto')}</Text>
-                    <HelpIcon
-                      title={t('userPhoto')}
-                      message={t('helpUserPhoto')}
-                      size={16}
-                      offsetY={-2}
-                    />
-                  </View>
-                  <TouchableOpacity onPress={() => handleImagePick()} style={[userStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
-                    {imagePath || (values as any).photo_url || values.user_photo ? (
-                      <>
-                        <Image
-                          source={
-                            imagePath
-                              ? { uri: imagePath }
-                              : (values as any).photo_url
-                                ? { uri: (values as any).photo_url }
-                                : values.user_photo && values.user_photo.startsWith('http')
-                                  ? { uri: values.user_photo as any }
-                                  : undefined as any
-                          }
-                          style={userStyles.avatarImage as any}
-                          resizeMode="cover"
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('username')} <Text style={{ color: '#c00000' }}>*</Text>
+                        </Text>
+                        <HelpIcon
+                          title={t('username')}
+                          message={t('usernameHelp')}
+                          size={16}
+                          offsetY={-2}
                         />
-                        <TouchableOpacity onPress={() => { clearImage(); setFieldValue('user_photo', ''); setFieldValue('photo_url', ''); }} style={userStyles.avatarClose as any}>
-                          <Text style={{ color: '#fff' }}>✗</Text>
-                        </TouchableOpacity>
-                      </>
-                    ) : (
-                      <Image source={require('../../../../app/assets/images/blank-avatar.png')} style={userStyles.avatarImage as any} resizeMode="cover" />
-                    )}
-                  </TouchableOpacity>
-                </View>
+                      </View>
+                      <Input
+                        style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.username ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                        textStyle={formStyles.inputTextStyle}
+                        value={values.username}
+                        autoCapitalize="none"
+                        disabled
+                        onChangeText={t => {
+                          setFieldValue('username', t);
+                          clearInvalid('username');
+                        }}
+                        onBlur={handleBlur('username')}
+                        status={invalid.username ? 'danger' : 'basic'}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('sensitive_nation', e.nativeEvent.layout.y)}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}</Text>
-                    <HelpIcon
-                      title={t('sensitiveNation')}
-                      message={t('helpSensitiveNation')}
-                      size={16}
-                      offsetY={-2}
-                    />
-                  </View>
-                  <ElementDropdown data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]} value={values.sensitive_nation ? 'Yes' : 'No'}
-                    onChange={v => { setFieldValue('sensitive_nation', v === 'Yes'); if (v === 'Yes') { clearInvalid('email_address'); clearInvalid('mobile_phone'); } }} placeholder={t('selectOption')} containerStyle={{ ...(userStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any} />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('first_name', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('firstName')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <Input
+                        style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.first_name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                        textStyle={formStyles.inputTextStyle}
+                        value={values.first_name}
+                        autoCapitalize="words"
+                        onChangeText={t => {
+                          setFieldValue('first_name', t);
+                          clearInvalid('first_name');
+                        }}
+                        onBlur={handleBlur('first_name')}
+                        status={invalid.first_name ? 'danger' : 'basic'}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('language_id', e.nativeEvent.layout.y)}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
-                    </Text>
-                    <HelpIcon
-                      title={t('language')}
-                      message={t('helpUserLanguage')}
-                      size={16}
-                      offsetY={-2}
-                    />
-                  </View>
-                  <ElementDropdown
-                    data={useMemo(() => languageOptions.map(o => ({ label: o.name, value: o.id })), [languageOptions])}
-                    value={values.language_id as any}
-                    onChange={v => { setFieldValue('language_id', (typeof v === 'number' ? v : Number(v)) || null); clearInvalid('language_id'); }}
-                    placeholder={t('selectOption')}
-                    containerStyle={{ ...userStyles.input, borderColor: invalid.language_id ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg } as any}
-                    error={!!invalid.language_id}
-                  />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('lastName')}
+                      </Text>
+                      <Input
+                        style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                        textStyle={formStyles.inputTextStyle}
+                        value={values.last_name}
+                        autoCapitalize="words"
+                        onChangeText={handleChange('last_name')}
+                        onBlur={handleBlur('last_name')}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                    {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
-                  </Text>
-                  <ElementDropdown
-                    data={useMemo(() => countryOptions.map(o => ({ label: o.name, value: o.id })), [countryOptions])}
-                    value={values.country_id as any}
-                    onChange={v => {
-                      const id = (typeof v === 'number' ? v : Number(v)) || null;
-                      setFieldValue('country_id', id); clearInvalid('country_id');
-                      try {
-                        const name = countryOptions.find(o => o.id === id)?.name || '';
-                        const anyPicker: any = require('react-native-country-picker-modal');
-                        const all = anyPicker?.getAllCountries?.() || [];
-                        const found = all.find((c: any) => {
-                          const n = (c?.name?.common || c?.name || '').toString().toLowerCase();
-                          return n === name.toLowerCase() || n.includes(name.toLowerCase());
-                        });
-                        if (found) {
-                          if (found.cca2) setCountryCode(found.cca2 as CountryCode);
-                          const cc = Array.isArray(found.callingCode) ? found.callingCode[0] : found.callingCode || '';
-                          if (cc) setCallingCode(cc.toString());
-                        }
-                      } catch {}
-                    }}
-                    placeholder={t('selectOption')}
-                    containerStyle={{ ...userStyles.input, borderColor: invalid.country_id ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg } as any}
-                    error={!!invalid.country_id}
-                  />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('role_id', e.nativeEvent.layout.y)}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('omrStatus')} <Text style={{ color: '#c00000' }}>*</Text>
+                        </Text>
+                        <HelpIcon
+                          title={t('omrStatus')}
+                          message={t('helpOmrStatus')}
+                          size={16}
+                          offsetY={-2}
+                        />
+                      </View>
+                      <ElementDropdown
+                        data={useMemo(
+                          () => roleOptions.map(r => ({ label: r.name, value: r.id })),
+                          [roleOptions],
+                        )}
+                        value={values.role_id as any}
+                        onChange={v => {
+                          setFieldValue('role_id', (typeof v === 'number' ? v : Number(v)) || null);
+                          clearInvalid('role_id');
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={{
+                          ...formStyles.input,
+                          borderColor: invalid.role_id ? '#db2d2d' : C.inputBorder,
+                          backgroundColor: C.inputBg,
+                        } as any}
+                        error={!!invalid.role_id}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('church_id', e.nativeEvent.layout.y)}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('church')} <Text style={{ color: '#c00000' }}>*</Text>
-                    </Text>
-                    <HelpIcon
-                      title={t('church')}
-                      message={t('helpUserChurch')}
-                      size={16}
-                      offsetY={-2}
-                    />
-                  </View>
-                  <ElementDropdown
-                    data={useMemo(() => churchItems.map(c => ({ label: c.name, value: c.id })), [churchItems])}
-                    value={values.church_id as any}
-                    onChange={v => { setFieldValue('church_id', (typeof v === 'number' ? v : Number(v)) || null); clearInvalid('church_id'); }}
-                    placeholder={t('selectOption')}
-                    containerStyle={{ ...userStyles.input, borderColor: invalid.church_id ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg } as any}
-                    error={!!invalid.church_id}
-                    onSearchText={async text => { setChurchQuery(text); setChurchItems([]); setChurchTotal(0); setChurchPage(1); await loadChurches(1, text); }}
-                    onEndReached={async () => {
-                      const next = churchPage + 1;
-                      const maxPages = Math.max(1, Math.ceil(churchTotal / DEFAULT_PAGE_LIMIT));
-                      if (next <= maxPages) { await loadChurches(next, churchQuery); }
-                    }}
-                  />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('user_photo', e.nativeEvent.layout.y)}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('userPhoto')}
+                        </Text>
+                        <HelpIcon
+                          title={t('userPhoto')}
+                          message={t('helpUserPhoto')}
+                          size={16}
+                          offsetY={-2}
+                        />
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => handleImagePick()}
+                        style={[formStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
+                        {imagePath || (values as any).photo_url || values.user_photo ? (
+                          <>
+                            <Image
+                              source={
+                                imagePath
+                                  ? { uri: imagePath }
+                                  : (values as any).photo_url
+                                  ? { uri: (values as any).photo_url }
+                                  : values.user_photo && values.user_photo.startsWith('http')
+                                  ? ({ uri: values.user_photo } as any)
+                                  : (undefined as any)
+                              }
+                              style={formStyles.avatarImage as any}
+                              resizeMode="cover"
+                            />
+                            <TouchableOpacity
+                              onPress={() => {
+                                clearImage();
+                                setFieldValue('user_photo', '');
+                                setFieldValue('photo_url', '');
+                              }}
+                              style={formStyles.avatarClose as any}>
+                              <Text style={{ color: '#fff' }}>✗</Text>
+                            </TouchableOpacity>
+                          </>
+                        ) : (
+                          <Image
+                            source={require('../../../../app/assets/images/blank-avatar.png')}
+                            style={formStyles.avatarImage as any}
+                            resizeMode="cover"
+                          />
+                        )}
+                      </TouchableOpacity>
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                    {t('emailAddress')} { !values.sensitive_nation ? (<Text style={{ color: '#c00000' }}>*</Text>) : null }
-                  </Text>
-                  <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                    textStyle={userStyles.inputTextStyle}
-                    value={values.email_address}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    onChangeText={t => { setFieldValue('email_address', t); clearInvalid('email_address'); }}
-                    onBlur={handleBlur('email_address')}
-                    status={invalid.email_address ? 'danger' : 'basic'}
-                  />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('sensitive_nation', e.nativeEvent.layout.y)}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('sensitiveNation')}
+                        </Text>
+                        <HelpIcon
+                          title={t('sensitiveNation')}
+                          message={t('helpSensitiveNation')}
+                          size={16}
+                          offsetY={-2}
+                        />
+                      </View>
+                      <ElementDropdown
+                        data={[
+                          { label: t('yes'), value: 'Yes' },
+                          { label: t('no'), value: 'No' },
+                        ]}
+                        value={values.sensitive_nation ? 'Yes' : 'No'}
+                        onChange={v => {
+                          setFieldValue('sensitive_nation', v === 'Yes');
+                          if (v === 'Yes') {
+                            clearInvalid('email_address');
+                            clearInvalid('mobile_phone');
+                          }
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={{
+                          ...(formStyles.input as any),
+                          backgroundColor: C.inputBg,
+                          borderColor: C.inputBorder,
+                        } as any}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('mobile_phone', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
-                    {t('mobilePhone')} { !values.sensitive_nation ? (<Text style={{ color: '#c00000' }}>*</Text>) : null }
-                  </Text>
-                  <View style={[userStyles.input, { flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, borderWidth: 1, borderRadius: 6, borderColor: invalid.mobile_phone ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg }]}> 
-                    <CountryPicker theme={cpTheme} countryCode={countryCode} withFlag withFilter withCallingCode withEmoji onSelect={(c: Country) => {
-                      setCountryCode(c.cca2 as CountryCode);
-                      const cc = c.callingCode && c.callingCode[0] ? c.callingCode[0] : '';
-                      setCallingCode(cc);
-                    }} />
-                    <Text style={{ marginLeft: 8, fontSize: 16, color: C.textPrimary }}>+{callingCode}</Text>
-                    <TextInput style={{ flex: 1, marginLeft: 8, fontSize: 16, color: C.inputText }} keyboardType="number-pad" autoCapitalize="none"
-                      value={formatPhoneReadable(values.mobile_phone)}
-                      onChangeText={t => { const digits = t.replace(/\D/g, '').slice(0, 15); setFieldValue('mobile_phone', digits); clearInvalid('mobile_phone'); }}
-                      placeholder="" />
-                  </View>
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('language_id', e.nativeEvent.layout.y)}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
+                        </Text>
+                        <HelpIcon
+                          title={t('language')}
+                          message={t('helpUserLanguage')}
+                          size={16}
+                          offsetY={-2}
+                        />
+                      </View>
+                      <ElementDropdown
+                        data={useMemo(
+                          () => languageOptions.map(o => ({ label: o.name, value: o.id })),
+                          [languageOptions],
+                        )}
+                        value={values.language_id as any}
+                        onChange={v => {
+                          setFieldValue('language_id', (typeof v === 'number' ? v : Number(v)) || null);
+                          clearInvalid('language_id');
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={{
+                          ...formStyles.input,
+                          borderColor: invalid.language_id ? '#db2d2d' : C.inputBorder,
+                          backgroundColor: C.inputBg,
+                        } as any}
+                        error={!!invalid.language_id}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('credentials', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('credentials')}</Text>
-                  <ElementDropdown data={useMemo(() => credentialOptions.map(c => ({ label: c, value: c })), [credentialOptions])}
-                    value={values.credentials as any}
-                    onChange={v => { setFieldValue('credentials', (v as string) || ''); clearInvalid('credentials'); }} placeholder={t('selectOption')} containerStyle={{ ...(userStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any} />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <ElementDropdown
+                        data={useMemo(
+                          () => countryOptions.map(o => ({ label: o.name, value: o.id })),
+                          [countryOptions],
+                        )}
+                        value={values.country_id as any}
+                        onChange={v => {
+                          const id = (typeof v === 'number' ? v : Number(v)) || null;
+                          setFieldValue('country_id', id);
+                          clearInvalid('country_id');
+                          try {
+                            const name = countryOptions.find(o => o.id === id)?.name || '';
+                            const anyPicker: any = require('react-native-country-picker-modal');
+                            const all = anyPicker?.getAllCountries?.() || [];
+                            const found = all.find((c: any) => {
+                              const n = (c?.name?.common || c?.name || '')
+                                .toString()
+                                .toLowerCase();
+                              return n === name.toLowerCase() || n.includes(name.toLowerCase());
+                            });
+                            if (found) {
+                              if (found.cca2) setCountryCode(found.cca2 as CountryCode);
+                              const cc = Array.isArray(found.callingCode)
+                                ? found.callingCode[0]
+                                : found.callingCode || '';
+                              if (cc) setCallingCode(cc.toString());
+                            }
+                          } catch {}
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={{
+                          ...formStyles.input,
+                          borderColor: invalid.country_id ? '#db2d2d' : C.inputBorder,
+                          backgroundColor: C.inputBg,
+                        } as any}
+                        error={!!invalid.country_id}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('credentials_number', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsNumber')}</Text>
-                  <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                    textStyle={userStyles.inputTextStyle}
-                    value={values.credentials_number}
-                    autoCapitalize="none"
-                    onChangeText={handleChange('credentials_number')}
-                    onBlur={handleBlur('credentials_number')}
-                  />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('church_id', e.nativeEvent.layout.y)}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('church')} <Text style={{ color: '#c00000' }}>*</Text>
+                        </Text>
+                        <HelpIcon
+                          title={t('church')}
+                          message={t('helpUserChurch')}
+                          size={16}
+                          offsetY={-2}
+                        />
+                      </View>
+                      <ElementDropdown
+                        data={useMemo(
+                          () => churchItems.map(c => ({ label: c.name, value: c.id })),
+                          [churchItems],
+                        )}
+                        value={values.church_id as any}
+                        onChange={v => {
+                          setFieldValue('church_id', (typeof v === 'number' ? v : Number(v)) || null);
+                          clearInvalid('church_id');
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={{
+                          ...formStyles.input,
+                          borderColor: invalid.church_id ? '#db2d2d' : C.inputBorder,
+                          backgroundColor: C.inputBg,
+                        } as any}
+                        error={!!invalid.church_id}
+                        onSearchText={async text => {
+                          setChurchQuery(text);
+                          setChurchItems([]);
+                          setChurchTotal(0);
+                          setChurchPage(1);
+                          await loadChurches(1, text);
+                        }}
+                        onEndReached={async () => {
+                          const next = churchPage + 1;
+                          const maxPages = Math.max(
+                            1,
+                            Math.ceil(churchTotal / DEFAULT_PAGE_LIMIT),
+                          );
+                          if (next <= maxPages) {
+                            await loadChurches(next, churchQuery);
+                          }
+                        }}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('credentials_form', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsFrom')}</Text>
-                  <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                    textStyle={userStyles.inputTextStyle}
-                    value={values.credentials_form}
-                    autoCapitalize="none"
-                    onChangeText={handleChange('credentials_form')}
-                    onBlur={handleBlur('credentials_form')}
-                  />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('emailAddress')}{' '}
+                        {!values.sensitive_nation ? (
+                          <Text style={{ color: '#c00000' }}>*</Text>
+                        ) : null}
+                      </Text>
+                      <Input
+                        style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                        textStyle={formStyles.inputTextStyle}
+                        value={values.email_address}
+                        keyboardType="email-address"
+                        autoCapitalize="none"
+                        onChangeText={t => {
+                          setFieldValue('email_address', t);
+                          clearInvalid('email_address');
+                        }}
+                        onBlur={handleBlur('email_address')}
+                        status={invalid.email_address ? 'danger' : 'basic'}
+                      />
+                    </View>
+                  </Col>
+                </Row>
 
-                <View onLayout={e => setFieldPos('credentials_expiry_date', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsExpiry')}</Text>
-                  <DateTripleDropdown
-                    value={values.credentials_expiry_date}
-                    onChange={d => setFieldValue('credentials_expiry_date', d)}
-                    yearRange={50}
-                  />
-                </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('mobile_phone', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('mobilePhone')}{' '}
+                        {!values.sensitive_nation ? (
+                          <Text style={{ color: '#c00000' }}>*</Text>
+                        ) : null}
+                      </Text>
+                      <View
+                        style={[
+                          formStyles.input,
+                          {
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            height: 44,
+                            paddingHorizontal: 8,
+                            borderWidth: 1,
+                            borderRadius: 6,
+                            borderColor: invalid.mobile_phone ? '#db2d2d' : C.inputBorder,
+                            backgroundColor: C.inputBg,
+                          },
+                        ]}>
+                        <CountryPicker
+                          theme={cpTheme}
+                          countryCode={countryCode}
+                          withFlag
+                          withFilter
+                          withCallingCode
+                          withEmoji
+                          onSelect={(c: Country) => {
+                            setCountryCode(c.cca2 as CountryCode);
+                            const cc =
+                              c.callingCode && c.callingCode[0]
+                                ? c.callingCode[0]
+                                : '';
+                            setCallingCode(cc);
+                          }}
+                        />
+                        <Text
+                          style={{
+                            marginLeft: 8,
+                            fontSize: 16,
+                            color: C.textPrimary,
+                          }}>
+                          +{callingCode}
+                        </Text>
+                        <TextInput
+                          style={{
+                            flex: 1,
+                            marginLeft: 8,
+                            fontSize: 16,
+                            color: C.inputText,
+                          }}
+                          keyboardType="number-pad"
+                          autoCapitalize="none"
+                          value={formatPhoneReadable(values.mobile_phone)}
+                          onChangeText={t => {
+                            const digits = t.replace(/\D/g, '').slice(0, 15);
+                            setFieldValue('mobile_phone', digits);
+                            clearInvalid('mobile_phone');
+                          }}
+                          placeholder=""
+                        />
+                      </View>
+                    </View>
+                  </Col>
+                </Row>
 
-                <Button onPress={() => handleSubmit()} style={[globalStyles.button, { marginTop: 16 }]}>{t('save')}</Button>
-              </View>
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('credentials', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('credentials')}
+                      </Text>
+                      <ElementDropdown
+                        data={useMemo(
+                          () => credentialOptions.map(c => ({ label: c, value: c })),
+                          [credentialOptions],
+                        )}
+                        value={values.credentials as any}
+                        onChange={v => {
+                          setFieldValue('credentials', (v as string) || '');
+                          clearInvalid('credentials');
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={{
+                          ...(formStyles.input as any),
+                          backgroundColor: C.inputBg,
+                          borderColor: C.inputBorder,
+                        } as any}
+                      />
+                    </View>
+                  </Col>
+                </Row>
+
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('credentials_number', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('credentialsNumber')}
+                      </Text>
+                      <Input
+                        style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                        textStyle={formStyles.inputTextStyle}
+                        value={values.credentials_number}
+                        autoCapitalize="none"
+                        onChangeText={handleChange('credentials_number')}
+                        onBlur={handleBlur('credentials_number')}
+                      />
+                    </View>
+                  </Col>
+                </Row>
+
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('credentials_form', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('credentialsFrom')}
+                      </Text>
+                      <Input
+                        style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                        textStyle={formStyles.inputTextStyle}
+                        value={values.credentials_form}
+                        autoCapitalize="none"
+                        onChangeText={handleChange('credentials_form')}
+                        onBlur={handleBlur('credentials_form')}
+                      />
+                    </View>
+                  </Col>
+                </Row>
+
+                <Row>
+                  <Col>
+                    <View onLayout={e => setFieldPos('credentials_expiry_date', e.nativeEvent.layout.y)}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('credentialsExpiry')}
+                      </Text>
+                      <DateTripleDropdown
+                        value={values.credentials_expiry_date}
+                        onChange={d => setFieldValue('credentials_expiry_date', d)}
+                        yearRange={50}
+                      />
+                    </View>
+                  </Col>
+                </Row>
+
+                <Row>
+                  <Col>
+                    <Button onPress={() => handleSubmit()} style={globalStyles.mainButton}>
+                      {t('save')}
+                    </Button>
+                  </Col>
+                </Row>
+              </Grid>
             )}
           </Formik>
       </ScrollView>

@@ -69,6 +69,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         fontSize: 22,
         color: C.textSecondary,
         marginRight: 8,
+        marginBottom: 10,
       },
       clearButton: { paddingHorizontal: 0, marginRight: 8 },
       clearText: { fontSize: 20, color: C.textSecondary },
@@ -80,7 +81,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   , [C]);
   const renderRightIcon = () => {
     if (!value) {
-      return <RNText style={themed.downArrow}>›</RNText>;
+      return <RNText style={themed.downArrow}>⌵</RNText>;
     }
 
     return (

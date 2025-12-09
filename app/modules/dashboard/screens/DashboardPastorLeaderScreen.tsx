@@ -17,12 +17,15 @@ import { dashboardActions, dashboardIcons, dashboardMenuItems, dashboardStats, g
 import api from '../../../config/api';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
+import { Col, Row, Grid } from 'react-native-easy-grid';
+import RNFS from 'react-native-fs';
 // CameraRoll is provided by '@react-native-camera-roll/camera-roll' at runtime.
-// We import it via require to avoid TypeScript type issues if types are missing
-// and support both CommonJS and ES module builds.
+// The library exports `CameraRoll` as a named export in recent versions,
+// so we resolve it from `.CameraRoll` first, then fall back to default/CommonJS.
 // eslint-disable-next-line @typescript-eslint/no-var-requires
 const CameraRollModule = require('@react-native-camera-roll/camera-roll');
-const CameraRoll = CameraRollModule.default || CameraRollModule;
+const CameraRoll: any =
+  CameraRollModule.CameraRoll || CameraRollModule.default || CameraRollModule;
 
 // Helper function to decode HTML entities (e.g., &#x20ab; -> ₫)
 const decodeHtmlEntity = (str: string): string => {
@@ -254,6 +257,7 @@ export default function DashboardPastorLeaderScreen() {
   const handleDownloadImage = async () => {
     if (!selectedImage) return;
     try {
+      console.log('Downloading image URL:', selectedImage);
       if (Platform.OS === 'android') {
         // Request permission on Android if needed
         try {
@@ -265,8 +269,28 @@ export default function DashboardPastorLeaderScreen() {
         }
       }
 
-      // Save remote URL directly to system gallery / photos
-      await CameraRoll.save(selectedImage, { type: 'photo' });
+      // On iOS, CameraRoll works more reliably with local file paths.
+      // We download the remote image to a temporary file, then save that file.
+      let uriToSave = selectedImage;
+
+      if (Platform.OS === 'ios') {
+        const fileName = `dash-image-${Date.now()}.jpg`;
+        const localPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
+
+        const downloadRes = await RNFS.downloadFile({
+          fromUrl: selectedImage,
+          toFile: localPath,
+        }).promise;
+
+        if (downloadRes.statusCode && downloadRes.statusCode >= 200 && downloadRes.statusCode < 300) {
+          uriToSave = localPath;
+        } else {
+          console.log('Download failed with status', downloadRes.statusCode);
+          throw new Error('Failed to download image');
+        }
+      }
+
+      await CameraRoll.save(uriToSave, { type: 'photo' });
 
       Alert.alert(t('success'), t('imageDownloadSuccess'));
     } catch (error) {
@@ -405,11 +429,21 @@ export default function DashboardPastorLeaderScreen() {
               <Image source={require('../../../../app/assets/images/icon/arrow-down-bold.png')} style={[styles.dropdownIcon, { tintColor: C.textPrimary }]} />
             </TouchableOpacity>
             <View style={styles.locationRow}>
-              <Text style={[styles.locationText, { color: C.textSecondary }]}>{userProfile.location}</Text>
-              <View style={styles.lastRecordContainer}>
-                <Text style={[styles.lastRecordLabel, { color: C.textPrimary }]}>{t('lastMonthlyRecord')}: </Text>
-                <Text style={styles.lastRecordValue}>{formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}</Text>
-              </View>
+              <Grid>
+                <Row>
+                  <Col size={40}>
+                    <Text style={[styles.locationText, { color: C.textSecondary }]}>{userProfile.location}</Text>
+                  </Col>
+                  <Col size={60}>
+                    <View style={styles.lastRecordContainer}>
+                      <Text style={[styles.lastRecordLabel, { color: C.textPrimary }]}>{t('lastMonthlyRecord')}: </Text>
+                      <Text style={styles.lastRecordValue}>
+                        {formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}
+                      </Text>
+                    </View>
+                  </Col>
+                </Row>
+              </Grid>
             </View>
           </View>
         </View>
@@ -624,6 +658,7 @@ const styles = StyleSheet.create({
   lastRecordContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
+    justifyContent: 'flex-end',
   },
   lastRecordLabel: {
     fontSize: 10,

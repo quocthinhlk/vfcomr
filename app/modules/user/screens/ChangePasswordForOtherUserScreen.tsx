@@ -3,7 +3,7 @@ import { View, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Layout, Text, Input, Button } from '@ui-kitten/components';
 import { globalStyles } from '../../../shared/styles/global';
-import { userStyles } from '../styles';
+import { formStyles } from '../../../shared/styles/form';
 import { Header } from '../../../shared/components/Header';
 import { BackButton } from '../../../shared/components/BackButton';
 import { Formik } from 'formik';
@@ -12,6 +12,7 @@ import api from '../../../config/api';
 import { isSuperAdmin } from '../../../shared/utils/permissions';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
+import { Col, Row, Grid } from 'react-native-easy-grid';
 
 export default function ChangePasswordForOtherUserScreen() {
   const navigation = useNavigation<any>();
@@ -131,55 +132,77 @@ export default function ChangePasswordForOtherUserScreen() {
               }}
             >
               {({ values, handleChange, handleBlur, handleSubmit, setFieldValue }) => (
-                <View>
+                <Grid>
                   {!isSuperAdminUser && (
-                    <View onLayout={e => setFieldPos('old_password', e.nativeEvent.layout.y)}>
-                      <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('oldPassword')} <Text status="danger">*</Text></Text>
-                      <Input
-                        style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.old_password ? '#db2d2d' : C.inputBorder }]}
-                        textStyle={{ color: C.inputText }}
-                        value={values.old_password}
-                        onChangeText={t => { setFieldValue('old_password', t); clearInvalid('old_password'); }}
-                        onBlur={handleBlur('old_password')}
-                        secureTextEntry
-                        autoCapitalize="none"
-                        status={invalid.old_password ? 'danger' : 'basic'}
-                      />
-                    </View>
+                    <Row>
+                      <Col>
+                        <View onLayout={e => setFieldPos('old_password', e.nativeEvent.layout.y)}>
+                          <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                            {t('oldPassword')} <Text status="danger">*</Text>
+                          </Text>
+                          <Input
+                            style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.old_password ? '#db2d2d' : C.inputBorder }]}
+                            textStyle={{ color: C.inputText }}
+                            value={values.old_password}
+                            onChangeText={t => { setFieldValue('old_password', t); clearInvalid('old_password'); }}
+                            onBlur={handleBlur('old_password')}
+                            secureTextEntry
+                            autoCapitalize="none"
+                            status={invalid.old_password ? 'danger' : 'basic'}
+                          />
+                        </View>
+                      </Col>
+                    </Row>
                   )}
 
-                  <View onLayout={e => setFieldPos('new_password', e.nativeEvent.layout.y)}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('newPassword')} <Text status="danger">*</Text></Text>
-                    <Input
-                      style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.new_password ? '#db2d2d' : C.inputBorder }]}
-                      textStyle={{ color: C.inputText }}
-                      value={values.new_password}
-                      onChangeText={t => { setFieldValue('new_password', t); clearInvalid('new_password'); }}
-                      onBlur={handleBlur('new_password')}
-                      secureTextEntry
-                      autoCapitalize="none"
-                      status={invalid.new_password ? 'danger' : 'basic'}
-                    />
-                  </View>
+                  <Row>
+                    <Col>
+                      <View onLayout={e => setFieldPos('new_password', e.nativeEvent.layout.y)}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('newPassword')} <Text status="danger">*</Text>
+                        </Text>
+                        <Input
+                          style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.new_password ? '#db2d2d' : C.inputBorder }]}
+                          textStyle={{ color: C.inputText }}
+                          value={values.new_password}
+                          onChangeText={t => { setFieldValue('new_password', t); clearInvalid('new_password'); }}
+                          onBlur={handleBlur('new_password')}
+                          secureTextEntry
+                          autoCapitalize="none"
+                          status={invalid.new_password ? 'danger' : 'basic'}
+                        />
+                      </View>
+                    </Col>
+                  </Row>
 
-                  <View onLayout={e => setFieldPos('repeat_new_password', e.nativeEvent.layout.y)}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">{t('repeatNewPassword')} <Text status="danger">*</Text></Text>
-                    <Input
-                      style={[userStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.repeat_new_password ? '#db2d2d' : C.inputBorder }]}
-                      textStyle={{ color: C.inputText }}
-                      value={values.repeat_new_password}
-                      onChangeText={t => { setFieldValue('repeat_new_password', t); clearInvalid('repeat_new_password'); }}
-                      onBlur={handleBlur('repeat_new_password')}
-                      secureTextEntry
-                      autoCapitalize="none"
-                      status={invalid.repeat_new_password ? 'danger' : 'basic'}
-                    />
-                  </View>
+                  <Row>
+                    <Col>
+                      <View onLayout={e => setFieldPos('repeat_new_password', e.nativeEvent.layout.y)}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                          {t('repeatNewPassword')} <Text status="danger">*</Text>
+                        </Text>
+                        <Input
+                          style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.repeat_new_password ? '#db2d2d' : C.inputBorder }]}
+                          textStyle={{ color: C.inputText }}
+                          value={values.repeat_new_password}
+                          onChangeText={t => { setFieldValue('repeat_new_password', t); clearInvalid('repeat_new_password'); }}
+                          onBlur={handleBlur('repeat_new_password')}
+                          secureTextEntry
+                          autoCapitalize="none"
+                          status={invalid.repeat_new_password ? 'danger' : 'basic'}
+                        />
+                      </View>
+                    </Col>
+                  </Row>
 
-                  <Button onPress={() => handleSubmit()} style={[globalStyles.button, { marginTop: 16 }]}>
-                    {t('changePassword')}
-                  </Button>
-                </View>
+                  <Row>
+                    <Col>
+                      <Button onPress={() => handleSubmit()} style={globalStyles.mainButton}>
+                        {t('changePassword')}
+                      </Button>
+                    </Col>
+                  </Row>
+                </Grid>
               )}
             </Formik>
           </ScrollView>

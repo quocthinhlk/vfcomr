@@ -5,6 +5,7 @@ import { Text } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
 import { Header } from '../../../shared/components/Header';
 import { globalStyles } from '../../../shared/styles/global';
+import { formStyles } from '../../../shared/styles/form';
 import { createChurchRegion, getChurchRegionHierarchy } from '../services/churchregion.service';
 import { SaveButton, CancelButton } from '../../../shared/components/ActionButtons';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
@@ -13,7 +14,7 @@ import { useThemeMode } from '../../../shared/context/ThemeContext';
 import ElementDropdown, { ElementDropdownItem } from '../../../shared/components/ElementDropdown';
 import { useImagePicker } from '../../church/hooks/useImagePicker';
 import api from '../../../config/api';
-import { churchStyles } from '../../church/styles';
+import { Col, Row, Grid } from 'react-native-easy-grid';
 
 export const AddChurchRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -81,42 +82,59 @@ export const AddChurchRegionScreen: React.FC = () => {
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
       <View style={{ flex: 1, backgroundColor: C.background }}>
         <View style={styles.container}>
-          <Header title={`${t('addNew')} ${t('churchApostolicRegions')}`} showMenu={false} />
-          <Text style={[styles.label, { color: C.textPrimary }]}>{t('churchRegion') || t('churchApostolicRegions')}</Text>
-          <TextInput
-            style={[styles.input, { borderColor: (C as any).inputBorder || C.border, color: C.textPrimary, backgroundColor: (C as any).card || C.background }]}
-            placeholder={t('churchRegion') || t('churchApostolicRegions')}
-            placeholderTextColor={C.textSecondary}
-            value={name}
-            onChangeText={setName}
-          />
-          <Text style={[styles.label, { color: C.textPrimary }]}>{t('churchParent')}</Text>
-          <ElementDropdown
-            data={options}
-            value={parentId}
-            onChange={(v) => setParentId((typeof v === 'number' ? v : Number(v)) || null)}
-            placeholder={t('churchParent')}
-            containerStyle={{ marginBottom: 8 }}
-          />
-          
-          <Text style={[styles.label, { color: C.textPrimary }]}>{t('logo')}</Text>
-          <TouchableOpacity onPress={handleImagePick} style={[churchStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: (C as any).inputBorder || C.border }] as any}>
-            {imagePath ? (
-              <>
-                <Image source={{ uri: imagePath }} style={churchStyles.avatarImage as any} resizeMode="cover" />
-                <TouchableOpacity onPress={clearImage} style={churchStyles.avatarClose as any}>
-                  <Text style={{ color: '#fff' }}>✗</Text>
+          <Grid>
+            <Row>
+              <Col>
+                <Header title={`${t('addNew')} ${t('churchApostolicRegions')}`} showMenu={false} />
+                <Text style={[formStyles.label, { color: C.textPrimary, marginTop: 12 }]}>{t('churchRegion') || t('churchApostolicRegions')}</Text>
+                <TextInput
+                  style={[
+                    formStyles.textField,
+                    {
+                      marginTop: 4,
+                      marginBottom: 12,
+                      borderColor: (C as any).inputBorder || C.border,
+                      color: C.textPrimary,
+                      backgroundColor: (C as any).card || C.background,
+                    },
+                  ]}
+                  placeholder={t('churchRegion') || t('churchApostolicRegions')}
+                  placeholderTextColor={C.textSecondary}
+                  value={name}
+                  onChangeText={setName}
+                />
+                <Text style={[formStyles.label, { color: C.textPrimary }]}>{t('churchParent')}</Text>
+                <ElementDropdown
+                  data={options}
+                  value={parentId}
+                  onChange={(v) => setParentId((typeof v === 'number' ? v : Number(v)) || null)}
+                  placeholder={t('churchParent')}
+                  containerStyle={{ marginBottom: 8 }}
+                />
+                
+                <Text style={[formStyles.label, { color: C.textPrimary }]}>{t('logo')}</Text>
+                <TouchableOpacity
+                  onPress={handleImagePick}
+                  style={[formStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: (C as any).inputBorder || C.border }] as any}>
+                  {imagePath ? (
+                    <>
+                      <Image source={{ uri: imagePath }} style={formStyles.avatarImage as any} resizeMode="cover" />
+                      <TouchableOpacity onPress={clearImage} style={formStyles.avatarClose as any}>
+                        <Text style={{ color: '#fff' }}>✗</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <Text style={[formStyles.avatarPlus as any, { color: C.textSecondary }] as any}>+</Text>
+                  )}
                 </TouchableOpacity>
-              </>
-            ) : (
-              <Text style={[churchStyles.avatarPlus as any, { color: C.textSecondary }] as any}>+</Text>
-            )}
-          </TouchableOpacity>
-          
-          <View style={styles.row}>
-            <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
-            <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
-          </View>
+                
+                <View style={[formStyles.buttonRow, { marginTop: 24 }]}>
+                  <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
+                  <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
+                </View>
+              </Col>
+            </Row>
+          </Grid>
         </View>
       </View>
     </SafeAreaView>

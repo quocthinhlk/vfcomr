@@ -24,8 +24,9 @@ import {
   SelectItem,
 } from '@ui-kitten/components';
 import {Formik} from 'formik';
+import { Col, Row, Grid } from 'react-native-easy-grid';
 import {globalStyles} from '../../../shared/styles/global';
-import {userStyles} from '../styles';
+import { formStyles } from '../../../shared/styles/form';
 import {addUser, uploadImage} from '../services/user.service';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
 import {useSelectState} from '../../church/hooks/useSelectState';
@@ -339,14 +340,16 @@ export default function AddUserScreen() {
               values,
               setFieldValue,
             }) => (
-              <View>
+            <Grid>
+              <Row>
+                <Col>
                 {/* Username (required) */}
                 <View
                   onLayout={e =>
                     setFieldPos('username', e.nativeEvent.layout.y)
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                       {t('username')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
                     <HelpIcon
@@ -357,9 +360,9 @@ export default function AddUserScreen() {
                     />
                   </View>
                   <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.username ? '#db2d2d' : C.inputBorder }]}
+                    style={[formStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.username ? '#db2d2d' : C.inputBorder }]}
                     value={values.username}
-                    textStyle={userStyles.inputTextStyle}
+                    textStyle={formStyles.inputTextStyle}
                     autoCapitalize="none"
                     onChangeText={t => {
                       setFieldValue('username', t);
@@ -376,7 +379,7 @@ export default function AddUserScreen() {
                     setFieldPos('password', e.nativeEvent.layout.y)
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                       {t('password')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
                     <HelpIcon
@@ -388,8 +391,8 @@ export default function AddUserScreen() {
                   </View>
                   <View style={{position: 'relative'}}>
                     <Input
-                      style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.password ? '#db2d2d' : C.inputBorder }]}
-                      textStyle={userStyles.inputTextStyle}
+                      style={[formStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.password ? '#db2d2d' : C.inputBorder }]}
+                      textStyle={formStyles.inputTextStyle}
                       secureTextEntry={!showPassword}
                       value={values.password}
                       autoCapitalize="none"
@@ -420,11 +423,15 @@ export default function AddUserScreen() {
                     </TouchableOpacity>
                   </View>
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Prefix */}
                 <View
                   onLayout={e => setFieldPos('prefix', e.nativeEvent.layout.y)}>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('prefix')}
                   </Text>
                   <ElementDropdown
@@ -436,24 +443,28 @@ export default function AddUserScreen() {
                     onChange={v => setFieldValue('prefix', (v as string) || '')}
                     placeholder={t('selectOption')}
                     containerStyle={{
-                      ...(userStyles.input as any),
+                      ...(formStyles.input as any),
                       backgroundColor: C.inputBg,
                       borderColor: C.inputBorder,
                     } as any}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* First Name (required) */}
                 <View
                   onLayout={e =>
                     setFieldPos('first_name', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('firstName')} <Text style={{ color: '#c00000' }}>*</Text>
                   </Text>
                   <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.first_name ? '#db2d2d' : C.inputBorder }]}
-                    textStyle={userStyles.inputTextStyle}
+                    style={[formStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.first_name ? '#db2d2d' : C.inputBorder }]}
+                    textStyle={formStyles.inputTextStyle}
                     value={values.first_name}
                     autoCapitalize="words"
                     onChangeText={t => {
@@ -464,32 +475,40 @@ export default function AddUserScreen() {
                     status={invalid.first_name ? 'danger' : 'basic'}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Last Name */}
                 <View
                   onLayout={e =>
                     setFieldPos('last_name', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('lastName')}
                   </Text>
                   <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
-                    textStyle={userStyles.inputTextStyle}
+                    style={[formStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
+                    textStyle={formStyles.inputTextStyle}
                     value={values.last_name}
                     autoCapitalize="words"
                     onChangeText={handleChange('last_name')}
                     onBlur={handleBlur('last_name')}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* OMR Status (required) */}
                 <View
                   onLayout={e =>
                     setFieldPos('role_id', e.nativeEvent.layout.y)
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                       {t('omrStatus')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
                     <HelpIcon
@@ -515,21 +534,25 @@ export default function AddUserScreen() {
                     }}
                     placeholder={t('selectOption')}
                     containerStyle={{
-                      ...userStyles.input,
+                      ...formStyles.input,
                       borderColor: invalid.role_id ? '#db2d2d' : C.inputBorder,
                       backgroundColor: C.inputBg,
                     } as any}
                     error={!!invalid.role_id}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* User Photo */}
                 <View
                   onLayout={e =>
                     setFieldPos('user_photo', e.nativeEvent.layout.y)
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                       {t('userPhoto')}
                     </Text>
                     <HelpIcon
@@ -541,29 +564,33 @@ export default function AddUserScreen() {
                   </View>
                   <TouchableOpacity
                     onPress={() => handleImagePick()}
-                    style={[userStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
+                    style={[formStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
                     {imagePath ? (
                       <>
-                        <Image source={{ uri: imagePath }} style={userStyles.avatarImage as any} resizeMode="cover" />
-                        <TouchableOpacity onPress={clearImage} style={userStyles.avatarClose as any}>
+                        <Image source={{ uri: imagePath }} style={formStyles.avatarImage as any} resizeMode="cover" />
+                        <TouchableOpacity onPress={clearImage} style={formStyles.avatarClose as any}>
                           <Text style={{ color: '#fff' }}>✗</Text>
                         </TouchableOpacity>
                       </>
                     ) : (
                       <>
-                        <Text style={[userStyles.avatarPlus as any, { color: C.textSecondary } as any] as any}>+</Text>
+                        <Text style={[formStyles.avatarPlus as any, { color: C.textSecondary } as any] as any}>+</Text>
                       </>
                     )}
                   </TouchableOpacity>
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Sensitive Nation? */}
                 <View
                   onLayout={e =>
                     setFieldPos('sensitive_nation', e.nativeEvent.layout.y)
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                       {t('sensitiveNation')}
                     </Text>
                     <HelpIcon
@@ -588,20 +615,24 @@ export default function AddUserScreen() {
                     }}
                     placeholder={t('selectOption')}
                     containerStyle={{
-                      ...(userStyles.input as any),
+                      ...(formStyles.input as any),
                       backgroundColor: C.inputBg,
                       borderColor: C.inputBorder,
                     } as any}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Language (required) */}
                 <View
                   onLayout={e =>
                     setFieldPos('language_id', e.nativeEvent.layout.y)
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                       {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
                     <HelpIcon
@@ -630,20 +661,24 @@ export default function AddUserScreen() {
                     }}
                     placeholder={t('selectOption')}
                     containerStyle={{
-                      ...userStyles.input,
+                      ...formStyles.input,
                       borderColor: invalid.language_id ? '#db2d2d' : C.inputBorder,
                       backgroundColor: C.inputBg,
                     } as any}
                     error={!!invalid.language_id}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Country (required) */}
                 <View
                   onLayout={e =>
                     setFieldPos('country_id', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
                   </Text>
                   <ElementDropdown
@@ -688,21 +723,25 @@ export default function AddUserScreen() {
                     }}
                     placeholder={t('selectOption')}
                     containerStyle={{
-                      ...userStyles.input,
+                      ...formStyles.input,
                       borderColor: invalid.country_id ? '#db2d2d' : C.inputBorder,
                       backgroundColor: C.inputBg,
                     } as any}
                     error={!!invalid.country_id}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Church (required) */}
                 <View
                   onLayout={e =>
                     setFieldPos('church_id', e.nativeEvent.layout.y)
                   }>
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                       {t('church')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
                     <HelpIcon
@@ -728,7 +767,7 @@ export default function AddUserScreen() {
                     }}
                     placeholder={t('selectOption')}
                     containerStyle={{
-                      ...userStyles.input,
+                      ...formStyles.input,
                       borderColor: invalid.church_id ? '#db2d2d' : C.inputBorder,
                       backgroundColor: C.inputBg,
                     } as any}
@@ -752,21 +791,25 @@ export default function AddUserScreen() {
                     }}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Email Address */}
                 <View
                   onLayout={e =>
                     setFieldPos('email_address', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('emailAddress')}{' '}
                     {!values.sensitive_nation ? (
                       <Text style={{ color: '#c00000' }}>*</Text>
                     ) : null}
                   </Text>
                   <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.email_address ? '#db2d2d' : C.inputBorder }]}
-                    textStyle={userStyles.inputTextStyle}
+                    style={[formStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: invalid.email_address ? '#db2d2d' : C.inputBorder }]}
+                    textStyle={formStyles.inputTextStyle}
                     value={values.email_address}
                     keyboardType="email-address"
                     autoCapitalize="none"
@@ -778,13 +821,17 @@ export default function AddUserScreen() {
                     status={invalid.email_address ? 'danger' : 'basic'}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Mobile Phone */}
                 <View
                   onLayout={e =>
                     setFieldPos('mobile_phone', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('mobilePhone')}{' '}
                     {!values.sensitive_nation ? (
                       <Text style={{ color: '#c00000' }}>*</Text>
@@ -792,7 +839,7 @@ export default function AddUserScreen() {
                   </Text>
                   <View
                     style={[
-                      userStyles.input,
+                      formStyles.input,
                       {
                         flexDirection: 'row',
                         alignItems: 'center',
@@ -837,13 +884,17 @@ export default function AddUserScreen() {
                     />
                   </View>
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* I hold Credentials */}
                 <View
                   onLayout={e =>
                     setFieldPos('credentials', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('credentials')}
                   </Text>
                   <ElementDropdown
@@ -858,49 +909,61 @@ export default function AddUserScreen() {
                     }}
                     placeholder={t('selectOption')}
                     containerStyle={{
-                      ...(userStyles.input as any),
+                      ...(formStyles.input as any),
                       backgroundColor: C.inputBg,
                       borderColor: C.inputBorder,
                     } as any}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* Credentials Number */}
                 <View
                   onLayout={e =>
                     setFieldPos('credentials_number', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('credentialsNumber')}
                   </Text>
                   <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
-                    textStyle={userStyles.inputTextStyle}
+                    style={[formStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
+                    textStyle={formStyles.inputTextStyle}
                     value={values.credentials_number}
                     autoCapitalize="none"
                     onChangeText={handleChange('credentials_number')}
                     onBlur={handleBlur('credentials_number')}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* With what organisation? */}
                 <View
                   onLayout={e =>
                     setFieldPos('credentials_form', e.nativeEvent.layout.y)
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('credentialsFrom')}
                   </Text>
                   <Input
-                    style={[userStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
-                    textStyle={userStyles.inputTextStyle}
+                    style={[formStyles.input, { backgroundColor: C.inputBg, color: C.inputText, borderColor: C.inputBorder }]}
+                    textStyle={formStyles.inputTextStyle}
                     value={values.credentials_form}
                     autoCapitalize="none"
                     onChangeText={handleChange('credentials_form')}
                     onBlur={handleBlur('credentials_form')}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 {/* When do these Credentials expire? */}
                 <View
                   onLayout={e =>
@@ -909,7 +972,7 @@ export default function AddUserScreen() {
                       e.nativeEvent.layout.y,
                     )
                   }>
-                  <Text style={[userStyles.label, { color: C.textSecondary }]} category="label">
+                  <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                     {t('credentialsExpiry')}
                   </Text>
                   <DateTripleDropdown
@@ -918,13 +981,19 @@ export default function AddUserScreen() {
                     yearRange={50}
                   />
                 </View>
+                </Col>
+              </Row>
 
+              <Row>
+                <Col>
                 <Button
                   onPress={() => handleSubmit()}
-                  style={[globalStyles.button, {marginTop: 16}]}>
+                  style={globalStyles.mainButton}>
                   {t('save')}
                 </Button>
-              </View>
+                </Col>
+              </Row>
+            </Grid>
             )}
           </Formik>
         </ScrollView>

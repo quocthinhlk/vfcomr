@@ -80,16 +80,16 @@ export const Header: React.FC<HeaderProps> = ({ title, showMenu = true }) => {
       </Text>
       {showMenu ? (
         <>
-          <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
-          <MenuPopup
-            visible={menuVisible}
-            onClose={() => setMenuVisible(false)}
-            menuItems={menuItems}
-            onMenuItemPress={handleMenuItemPress}
-            onLogout={handleLogout}
-            onChangeLanguage={handleChangeLanguage}
-            selectedLanguage={selectedLanguage}
-          />
+      <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
+      <MenuPopup
+        visible={menuVisible}
+        onClose={() => setMenuVisible(false)}
+        menuItems={menuItems}
+        onMenuItemPress={handleMenuItemPress}
+        onLogout={handleLogout}
+        onChangeLanguage={handleChangeLanguage}
+        selectedLanguage={selectedLanguage}
+      />
         </>
       ) : (
         // keep layout spacing when menu is hidden

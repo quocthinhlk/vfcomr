@@ -18,6 +18,13 @@ export const globalStyles = StyleSheet.create({
     borderColor: COLORS.mainColor,
     width: '100%',
   },
+  mainButton: {
+    marginTop: 15,
+    backgroundColor: COLORS.mainColor,
+    borderRadius: 3,
+    borderColor: COLORS.mainColor,
+    width: '100%',
+  },
   safeAreaView: {
     flex: 1,
     backgroundColor: '#fff',
