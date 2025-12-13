@@ -303,8 +303,8 @@ export default function EditChurchScreen() {
                 <Row>
                   <Col>
               <View>
-                <View style={churchStyles.row} onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
-                    <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
+                    <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('churchName')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -328,8 +328,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                         {t('shortName')}
@@ -353,8 +353,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('msc')}? <Text style={{ color: '#c00000' }}>*</Text>
@@ -377,8 +377,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('houseCp')}? <Text style={{ color: '#c00000' }}>*</Text>
@@ -401,8 +401,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('language')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -431,8 +431,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">{t('motherChurch')}</Text>
                       <HelpIcon
@@ -457,8 +457,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('church_type_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('church_type_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('churchType')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -489,8 +489,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('pastor_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('pastor_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('pastorLeader')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -518,8 +518,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('church_network_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('church_network_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('churchNetwork')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -550,8 +550,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('church_region_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('church_region_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('apostolicRegion')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -582,8 +582,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('geographical_region_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('geographical_region_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('geographicalRegion')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -606,8 +606,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('language_region_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('language_region_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('languageRegion')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -630,8 +630,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">{t('sensitiveNation')}?</Text>
                       <HelpIcon
@@ -651,8 +651,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <Text style={formStyles.label} category="label">
                       {t('country')} <Text style={{ color: '#c00000' }}>*</Text>
                     </Text>
@@ -674,8 +674,8 @@ export default function EditChurchScreen() {
                 </View>
 
                 {values.country_id ? (
-                  <View style={churchStyles.row}>
-                    <View style={churchStyles.input}>
+                  <View>
+                    <View>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={formStyles.label} category="label">{t('city')}</Text>
                         <HelpIcon
@@ -696,8 +696,8 @@ export default function EditChurchScreen() {
                   </View>
                 ) : null}
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('currency')} <Text style={{ color: '#c00000' }}>*</Text>
@@ -728,8 +728,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={formStyles.label} category="label">{t('churchPhoto')}</Text>
                       <HelpIcon
@@ -760,8 +760,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <Text style={formStyles.label} category="label">{t('serviceAddress')}</Text>
                     <Input
                       style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
@@ -773,8 +773,8 @@ export default function EditChurchScreen() {
                     />
                   </View>
                 </View>
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <Text style={formStyles.label} category="label">{t('servicePostalCode')}</Text>
                     <Input
                       style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
@@ -787,11 +787,19 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
-                    <Text style={formStyles.label} category="label">
-                      {t('emailAddress')} <Text style={{ color: '#c00000' }}>*</Text>
-                    </Text>
+                <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
+                  <View>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={formStyles.label} category="label">
+                        {t('emailAddress')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                      <HelpIcon
+                        title={t('emailAddress')}
+                        message={t('infoEmailAddress')}
+                        size={13}
+                        offsetY={-2}
+                      />
+                    </View>
                     <Input
                       style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
                       textStyle={[formStyles.inputTextStyle, { color: C.inputText }]}
@@ -804,8 +812,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={formStyles.label} category="label">{t('website')}</Text>
                       <HelpIcon
@@ -825,8 +833,8 @@ export default function EditChurchScreen() {
                     />
                   </View>
                 </View>
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">Facebook</Text>
                       <HelpIcon
@@ -846,8 +854,8 @@ export default function EditChurchScreen() {
                     />
                   </View>
                 </View>
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">Instagram</Text>
                       <HelpIcon
@@ -867,8 +875,8 @@ export default function EditChurchScreen() {
                     />
                   </View>
                 </View>
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">X</Text>
                       <HelpIcon
@@ -889,8 +897,8 @@ export default function EditChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={formStyles.label} category="label">
                         {t('dob')} <Text style={{ color: '#c00000' }}>*</Text>

@@ -1,5 +1,6 @@
 export const COLORS = {
   mainColor: '#2478CE',
+  backColor: '#2478CE',
   dangerColor: '#db3545',
   successColor: '#28a745',
   white: '#FFFFFF',

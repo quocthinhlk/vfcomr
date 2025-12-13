@@ -28,11 +28,11 @@ type CombinedFormValues = AddChurchFormValues & {
   username: string;
   password: string;
   prefix: string;
+  title: string;
   first_name: string;
   last_name: string;
   user_role_id: string;
   user_sensitive_nation: string;
-  user_country_id: string;
   user_language_id: string;
   user_church_id: string;
   credentials: string;
@@ -113,7 +113,7 @@ export default function NewPastorAndChurchScreen() {
     // church
     name: '', short_name: '', is_msc: '', enable_cpm: '', parent_id: '', language_id: '', church_type_id: '', pastor_id: '', church_network_id: '', church_region_id: '', geographical_region_id: '', language_region_id: '', sensitive_nation: '', country_id: '', currency_id: '', city_id: '', photo_dir: '', service_address_street: '', service_address_postal_code: '', mailing_address_postal_code: '', office_address_street: '', office_address_postal_code: '', office_phone: '', office_fax: '', email_address: '', website: '', facebook: '', instagram: '', twitter: '', date_of_birth: null,
     // user
-    username: '', password: '', prefix: '', first_name: '', last_name: '', user_role_id: '', user_sensitive_nation: '', user_country_id: '', user_language_id: '', user_church_id: '', credentials: '', credentials_from: '', credentials_expiry_date: null, user_email_address: '', user_mobile_phone: '',
+    username: '', password: '', prefix: '', title: '', first_name: '', last_name: '', user_role_id: '', user_sensitive_nation: '', user_language_id: '', user_church_id: '', credentials: '', credentials_from: '', credentials_expiry_date: null, user_email_address: '', user_mobile_phone: '',
   });
   const [draftLoaded, setDraftLoaded] = useState(false);
 
@@ -321,17 +321,17 @@ export default function NewPastorAndChurchScreen() {
                 // required (user)
                 newInvalid.username = !values.username;
                 newInvalid.password = !values.password;
+                newInvalid.title = !values.title;
                 newInvalid.first_name = !values.first_name;
                 newInvalid.user_role_id = !values.user_role_id;
                 newInvalid.user_language_id = !values.user_language_id;
-                newInvalid.user_country_id = !values.user_country_id;
                 newInvalid.user_church_id = !values.user_church_id;
                 newInvalid.user_email_address = !values.user_email_address;
                 newInvalid.user_mobile_phone = !values.user_mobile_phone;
                 setInvalid(newInvalid);
                 const firstInvalidKey = [
                   'name','is_msc','language_id','church_type_id','church_network_id','church_region_id','geographical_region_id','language_region_id','country_id','currency_id','email_address','date_of_birth',
-                  'username','password','first_name','user_role_id','user_language_id','user_country_id','user_church_id','user_email_address','user_mobile_phone'
+                  'username','password','title','first_name','user_role_id','user_language_id','user_church_id','user_email_address','user_mobile_phone'
                 ].find(k => newInvalid[k]);
                 if (firstInvalidKey) {
                   Alert.alert(t('validation'), t('fillRequiredFields'), [
@@ -410,12 +410,12 @@ export default function NewPastorAndChurchScreen() {
                   username: values.username,
                   password: values.password,
                   prefix: values.prefix,
+                  title: values.title,
                   first_name: values.first_name,
                   last_name: values.last_name,
                   role_id: values.user_role_id ? Number(values.user_role_id) : undefined,
                   user_photo: userPhotoPath,
                   sensitive_nation: values.user_sensitive_nation === 'Yes',
-                  country_id: values.user_country_id ? Number(values.user_country_id) : null,
                   language_id: values.user_language_id ? Number(values.user_language_id) : null,
                   mobile_phone: formattedUserPhone,
                   email_address: values.user_email_address,
@@ -444,8 +444,8 @@ export default function NewPastorAndChurchScreen() {
                 {!showPastorSection && (
                   <>
                 <Text category="label" style={[churchStyles.title, { marginTop: 8, color: C.textPrimary }]}>{t('churchData')}</Text>
-                <View style={churchStyles.row} onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('churchName')} <Text status="danger">*</Text></Text>
                       <HelpIcon
@@ -467,8 +467,8 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                         {t('shortName')}
@@ -492,8 +492,8 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
+                <View onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('msc')}? <Text status="danger">*</Text></Text>
                     </View>
@@ -508,8 +508,8 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('motherChurch')}</Text>
                     </View>
@@ -523,8 +523,8 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                           {t('languageUsedInTheService')} <Text status="danger">*</Text>
@@ -550,8 +550,8 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('churchType')} <Text status="danger">*</Text></Text>
                       <HelpIcon
@@ -574,8 +574,8 @@ export default function NewPastorAndChurchScreen() {
 
                 {/* Pastor / Leader field removed as requested */}
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('churchNetwork')} <Text status="danger">*</Text></Text>
                       <HelpIcon
@@ -596,8 +596,8 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
+                <View>
+                  <View>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('apostolicRegion')} <Text status="danger">*</Text></Text>
                       <HelpIcon
@@ -618,7 +618,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('geographicalRegion')} <Text status="danger">*</Text></Text>
@@ -640,7 +640,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('languageRegion')} <Text status="danger">*</Text></Text>
@@ -662,7 +662,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}?</Text>
@@ -683,7 +683,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
+                <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('nation')} <Text status="danger">*</Text></Text>
                     <ElementDropdown
@@ -698,7 +698,7 @@ export default function NewPastorAndChurchScreen() {
                 </View>
 
                 {values.country_id ? (
-                  <View style={churchStyles.row}>
+                  <View>
                     <View style={churchStyles.input}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('city')}</Text>
@@ -720,7 +720,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 ) : null}
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
+                <View onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('currency')} <Text status="danger">*</Text></Text>
@@ -742,7 +742,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
@@ -767,7 +767,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('serviceAddress')}</Text>
                     <Input
@@ -780,7 +780,7 @@ export default function NewPastorAndChurchScreen() {
                     />
                   </View>
                 </View>
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('servicePostalCode')}</Text>
                     <Input
@@ -794,9 +794,13 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
+                <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('emailAddress')}<Text status="danger">*</Text></Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('emailAddress')}<Text status="danger">*</Text>
+                      </Text>
+                    </View>
                     <Input
                       style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
                       textStyle={formStyles.inputTextStyle}
@@ -809,7 +813,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('website')}</Text>
@@ -831,7 +835,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('facebook')}</Text>
@@ -853,7 +857,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">Instagram</Text>
@@ -875,7 +879,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">X</Text>
@@ -897,7 +901,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
+                <View onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('dob')} <Text status="danger">*</Text></Text>
@@ -930,7 +934,50 @@ export default function NewPastorAndChurchScreen() {
                 {showPastorSection && (<>
 
                 <Text category="label" style={[churchStyles.title, { marginTop: 16, color: C.textPrimary }]}>{t('pastorLeader')}</Text>
-                <View style={churchStyles.row} onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
+
+                <View>
+                  <View style={churchStyles.input}>
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">Prefix</Text>
+                    <ElementDropdown
+                      data={prefixOptions.map(p => ({ label: p, value: p }))}
+                      value={values.prefix as any}
+                      onChange={v => setFieldValue('prefix', (v as string) || '')}
+                      placeholder={t('selectOption')}
+                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any}
+                    />
+                  </View>
+                </View>
+
+                <View onLayout={e => setFieldPos('first_name', e.nativeEvent.layout.y)}>
+                  <View style={churchStyles.input}>
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('firstName')} <Text status="danger">*</Text></Text>
+                    <Input
+                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.first_name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                      textStyle={formStyles.inputTextStyle}
+                      value={values.first_name}
+                      autoCapitalize="words"
+                      onChangeText={t => { setFieldValue('first_name', t); setInvalid(prev => ({ ...prev, first_name: false })); }}
+                      onBlur={handleBlur('first_name')}
+                      status={invalid?.first_name ? 'danger' : 'basic'}
+                    />
+                  </View>
+                </View>
+
+                <View>
+                  <View style={churchStyles.input}>
+                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('lastName')}</Text>
+                    <Input
+                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                      textStyle={formStyles.inputTextStyle}
+                      value={values.last_name}
+                      autoCapitalize="words"
+                      onChangeText={handleChange('last_name')}
+                      onBlur={handleBlur('last_name')}
+                    />
+                  </View>
+                </View>
+
+                <View onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('username')} <Text status="danger">*</Text></Text>
@@ -953,7 +1000,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('password', e.nativeEvent.layout.y)}>
+                <View onLayout={e => setFieldPos('password', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('password')} <Text status="danger">*</Text></Text>
@@ -977,49 +1024,32 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View onLayout={e => setFieldPos('title', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">Prefix</Text>
-                    <ElementDropdown
-                      data={prefixOptions.map(p => ({ label: p, value: p }))}
-                      value={values.prefix as any}
-                      onChange={v => setFieldValue('prefix', (v as string) || '')}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any}
-                    />
-                  </View>
-                </View>
-
-                <View style={churchStyles.row} onLayout={e => setFieldPos('first_name', e.nativeEvent.layout.y)}>
-                  <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('firstName')} <Text status="danger">*</Text></Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('ministryTitle')} <Text status="danger">*</Text>
+                      </Text>
+                      <HelpIcon
+                        title={t('ministryTitle')}
+                        message={t('helpMinistryTitle')}
+                        size={16}
+                        offsetY={-2}
+                      />
+                    </View>
                     <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.first_name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
+                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.title ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
                       textStyle={formStyles.inputTextStyle}
-                      value={values.first_name}
+                      value={values.title}
                       autoCapitalize="words"
-                      onChangeText={t => { setFieldValue('first_name', t); setInvalid(prev => ({ ...prev, first_name: false })); }}
-                      onBlur={handleBlur('first_name')}
-                      status={invalid?.first_name ? 'danger' : 'basic'}
+                      onChangeText={t => { setFieldValue('title', t); setInvalid(prev => ({ ...prev, title: false })); }}
+                      onBlur={handleBlur('title')}
+                      status={invalid?.title ? 'danger' : 'basic'}
                     />
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('lastName')}</Text>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
-                      value={values.last_name}
-                      autoCapitalize="words"
-                      onChangeText={handleChange('last_name')}
-                      onBlur={handleBlur('last_name')}
-                    />
-                  </View>
-                </View>
-
-                <View style={churchStyles.row} onLayout={e => setFieldPos('user_role_id', e.nativeEvent.layout.y)}>
+                <View onLayout={e => setFieldPos('user_role_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('omrStatus')} <Text status="danger">*</Text></Text>
@@ -1041,10 +1071,13 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View >
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('userPhoto')}</Text>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('userPhoto')}
+                        <Text style={formStyles.subLabel}> [{t('max5mb')}]</Text>
+                      </Text>
                     <HelpIcon
                       title={t('userPhoto')}
                       message={t('helpUserPhoto')}
@@ -1063,7 +1096,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}?</Text>
@@ -1084,9 +1117,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                {/* Title removed as requested */}
-
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('language')} <Text status="danger">*</Text></Text>
@@ -1108,40 +1139,9 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
-                  <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('country')} <Text status="danger">*</Text></Text>
-                    <ElementDropdown
-                      data={countryOptions}
-                      value={values.user_country_id as any}
-                      onChange={v => {
-                        setFieldValue('user_country_id', v as any);
-                        setInvalid(prev => ({ ...prev, user_country_id: false }));
-                        try {
-                          const id = typeof v === 'number' ? v : Number(v);
-                          const name = (countryOptions.find((o: any) => String(o.value) === String(id))?.label) || '';
-                          // @ts-ignore
-                          const anyPicker: any = require('react-native-country-picker-modal');
-                          const all = anyPicker?.getAllCountries?.() || [];
-                          const found = all.find((c: any) => {
-                            const n = (c?.name?.common || c?.name || '').toString().toLowerCase();
-                            return n === name.toLowerCase() || n.includes(name.toLowerCase());
-                          });
-                          if (found) {
-                            if (found.cca2) setUserCountryCode(found.cca2 as CountryCode);
-                            const cc = Array.isArray(found.callingCode) ? found.callingCode[0] : found.callingCode || '';
-                            if (cc) setUserCallingCode(cc.toString());
-                          }
-                        } catch {}
-                      }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.user_country_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.user_country_id}
-                    />
-                  </View>
-                </View>
+                {/* User country field removed as requested */}
 
-                <View style={churchStyles.row} onLayout={e => setFieldPos('user_church_id', e.nativeEvent.layout.y)}>
+                <View onLayout={e => setFieldPos('user_church_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('church')} <Text status="danger">*</Text></Text>
@@ -1163,9 +1163,19 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('emailAddress')} <Text status="danger">*</Text></Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('emailAddress')} <Text status="danger">*</Text>
+                      </Text>
+                      <HelpIcon
+                        title={t('emailAddress')}
+                        message={t('infoEmailAddress')}
+                        size={16}
+                        offsetY={-2}
+                      />
+                    </View>
                     <Input
                       style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.user_email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
                       textStyle={formStyles.inputTextStyle}
@@ -1179,7 +1189,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('mobilePhone')} <Text status="danger">*</Text></Text>
                     <View style={[formStyles.input as any, { flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, borderWidth: 1, borderRadius: 6, borderColor: invalid.user_mobile_phone ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg }]}> 
@@ -1213,7 +1223,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentials')}</Text>
                     <ElementDropdown
@@ -1226,7 +1236,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsFrom')}</Text>
                     <Input
@@ -1240,7 +1250,7 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View style={churchStyles.row}>
+                <View>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsExpiry')}</Text>
                     <DateTripleDropdown
@@ -1252,18 +1262,22 @@ export default function NewPastorAndChurchScreen() {
                 </View>
 
                 <View style={{ flexDirection: 'row', marginTop: 16 }}>
-                  <Button
-                    style={[globalStyles.button, { flex: 1, marginRight: 8 }]}
-                    onPress={() => setShowPastorSection(false)}
-                  >
-                    {t('back')}
-                  </Button>
-                  <Button
-                    style={globalStyles.mainButton}
-                    onPress={() => handleSubmit()}
-                  >
-                    {t('save')}
-                  </Button>
+                  <View style={{ flex: 1, marginRight: 8 }}>
+                    <Button
+                      style={globalStyles.mainButton}
+                      onPress={() => setShowPastorSection(false)}
+                    >
+                      {t('back')}
+                    </Button>
+                  </View>
+                  <View style={{ flex: 1, marginLeft: 8 }}>
+                    <Button
+                      style={globalStyles.mainButton}
+                      onPress={() => handleSubmit()}
+                    >
+                      {t('save')}
+                    </Button>
+                  </View>
                 </View>
                 </>)}
               </View>

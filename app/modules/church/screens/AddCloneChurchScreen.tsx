@@ -549,9 +549,11 @@ export const AddCloneChurchScreen: React.FC = () => {
 
                 <View style={churchStyles.row} onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
-                      {t('emailAddress')} <Text style={{ color: '#c00000' }}>*</Text>
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                        {t('emailAddress')} <Text style={{ color: '#c00000' }}>*</Text>
+                      </Text>
+                    </View>
                     <Input
                       style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
                       textStyle={formStyles.inputTextStyle}

@@ -18,6 +18,13 @@ export const globalStyles = StyleSheet.create({
     borderColor: COLORS.mainColor,
     width: '100%',
   },
+  backButton: {
+    marginTop: 15,
+    backgroundColor: COLORS.gray,
+    borderRadius: 3,
+    borderColor: COLORS.mainColor,
+    width: '100%',
+  },
   mainButton: {
     marginTop: 15,
     backgroundColor: COLORS.mainColor,

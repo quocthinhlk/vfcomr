@@ -129,7 +129,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 12,
+    fontSize: 14,
     fontWeight: '700',
     color: '#111',
   },
