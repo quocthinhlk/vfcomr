@@ -1058,96 +1058,109 @@ export default function EditProfileScreen() {
                     </Col>
                   </Row>
 
-                  <Row>
-                    <Col>
-                      <View
-                        onLayout={e =>
-                          setFieldPos(
-                            'credentials_number',
-                            e.nativeEvent.layout.y,
-                          )
-                        }>
-                        <Text
-                          style={[formStyles.label, {color: C.textSecondary}]}
-                          category="label">
-                          {t('credentialsNumber')}
-                        </Text>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
-                          value={values.credentials_number}
-                          autoCapitalize="none"
-                          onChangeText={handleChange('credentials_number')}
-                          onBlur={handleBlur('credentials_number')}
-                        />
-                      </View>
-                    </Col>
-                  </Row>
+                  {!!values.credentials && (
+                    <>
+                      <Row>
+                        <Col>
+                          <View
+                            onLayout={e =>
+                              setFieldPos(
+                                'credentials_number',
+                                e.nativeEvent.layout.y,
+                              )
+                            }>
+                            <Text
+                              style={[
+                                formStyles.label,
+                                {color: C.textSecondary},
+                              ]}
+                              category="label">
+                              {t('credentialsNumber')}
+                            </Text>
+                            <Input
+                              style={[
+                                formStyles.input,
+                                {
+                                  backgroundColor: C.inputBg,
+                                  borderColor: C.inputBorder,
+                                  color: C.inputText,
+                                },
+                              ]}
+                              textStyle={formStyles.inputTextStyle}
+                              value={values.credentials_number}
+                              autoCapitalize="none"
+                              onChangeText={handleChange('credentials_number')}
+                              onBlur={handleBlur('credentials_number')}
+                            />
+                          </View>
+                        </Col>
+                      </Row>
 
-                  <Row>
-                    <Col>
-                      <View
-                        onLayout={e =>
-                          setFieldPos(
-                            'credentials_form',
-                            e.nativeEvent.layout.y,
-                          )
-                        }>
-                        <Text
-                          style={[formStyles.label, {color: C.textSecondary}]}
-                          category="label">
-                          {t('credentialsFrom')}
-                        </Text>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
-                          value={values.credentials_form}
-                          autoCapitalize="none"
-                          onChangeText={handleChange('credentials_form')}
-                          onBlur={handleBlur('credentials_form')}
-                        />
-                      </View>
-                    </Col>
-                  </Row>
+                      <Row>
+                        <Col>
+                          <View
+                            onLayout={e =>
+                              setFieldPos(
+                                'credentials_form',
+                                e.nativeEvent.layout.y,
+                              )
+                            }>
+                            <Text
+                              style={[
+                                formStyles.label,
+                                {color: C.textSecondary},
+                              ]}
+                              category="label">
+                              {t('credentialsFrom')}
+                            </Text>
+                            <Input
+                              style={[
+                                formStyles.input,
+                                {
+                                  backgroundColor: C.inputBg,
+                                  borderColor: C.inputBorder,
+                                  color: C.inputText,
+                                },
+                              ]}
+                              textStyle={formStyles.inputTextStyle}
+                              value={values.credentials_form}
+                              autoCapitalize="none"
+                              onChangeText={handleChange('credentials_form')}
+                              onBlur={handleBlur('credentials_form')}
+                            />
+                          </View>
+                        </Col>
+                      </Row>
 
-                  <Row>
-                    <Col>
-                      <View
-                        onLayout={e =>
-                          setFieldPos(
-                            'credentials_expiry_date',
-                            e.nativeEvent.layout.y,
-                          )
-                        }>
-                        <Text
-                          style={[formStyles.label, {color: C.textSecondary}]}
-                          category="label">
-                          {t('credentialsExpiry')}
-                        </Text>
-                        <DateTripleDropdown
-                          value={values.credentials_expiry_date}
-                          onChange={d =>
-                            setFieldValue('credentials_expiry_date', d)
-                          }
-                          yearRange={50}
-                        />
-                      </View>
-                    </Col>
-                  </Row>
+                      <Row>
+                        <Col>
+                          <View
+                            onLayout={e =>
+                              setFieldPos(
+                                'credentials_expiry_date',
+                                e.nativeEvent.layout.y,
+                              )
+                            }>
+                            <Text
+                              style={[
+                                formStyles.label,
+                                {color: C.textSecondary},
+                              ]}
+                              category="label">
+                              {t('credentialsExpiry')}
+                            </Text>
+                            <DateTripleDropdown
+                              value={values.credentials_expiry_date}
+                              onChange={d =>
+                                setFieldValue('credentials_expiry_date', d)
+                              }
+                              yearRange={50}
+                            />
+                          </View>
+                        </Col>
+                      </Row>
+                    </>
+                  )}
 
                   <Row>
                     <Col>

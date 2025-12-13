@@ -1236,30 +1236,34 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <View>
-                  <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsFrom')}</Text>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
-                      autoCapitalize="none"
-                      value={values.credentials_from}
-                      onChangeText={t => setFieldValue('credentials_from', t)}
-                      onBlur={handleBlur('credentials_from')}
-                    />
-                  </View>
-                </View>
+                {!!values.credentials && (
+                  <>
+                    <View>
+                      <View style={churchStyles.input}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsFrom')}</Text>
+                        <Input
+                          style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
+                          textStyle={formStyles.inputTextStyle}
+                          autoCapitalize="none"
+                          value={values.credentials_from}
+                          onChangeText={t => setFieldValue('credentials_from', t)}
+                          onBlur={handleBlur('credentials_from')}
+                        />
+                      </View>
+                    </View>
 
-                <View>
-                  <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsExpiry')}</Text>
-                    <DateTripleDropdown
-                      value={values.credentials_expiry_date}
-                      onChange={d => setFieldValue('credentials_expiry_date', d)}
-                      yearRange={50}
-                    />
-                  </View>
-                </View>
+                    <View>
+                      <View style={churchStyles.input}>
+                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsExpiry')}</Text>
+                        <DateTripleDropdown
+                          value={values.credentials_expiry_date}
+                          onChange={d => setFieldValue('credentials_expiry_date', d)}
+                          yearRange={50}
+                        />
+                      </View>
+                    </View>
+                  </>
+                )}
 
                 <View style={{ flexDirection: 'row', marginTop: 16 }}>
                   <View style={{ flex: 1, marginRight: 8 }}>
