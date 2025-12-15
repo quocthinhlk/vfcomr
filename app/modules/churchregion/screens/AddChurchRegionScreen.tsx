@@ -85,9 +85,9 @@ export const AddChurchRegionScreen: React.FC = () => {
           <Grid>
             <Row>
               <Col>
-                <Header title={`${t('addNew')} ${t('churchApostolicRegions')}`} showMenu={false} />
+          <Header title={`${t('addNew')} ${t('churchApostolicRegions')}`} showMenu={false} />
                 <Text style={[formStyles.label, { color: C.textPrimary, marginTop: 12 }]}>{t('churchRegion') || t('churchApostolicRegions')}</Text>
-                <TextInput
+          <TextInput
                   style={[
                     formStyles.textField,
                     {
@@ -98,40 +98,40 @@ export const AddChurchRegionScreen: React.FC = () => {
                       backgroundColor: (C as any).card || C.background,
                     },
                   ]}
-                  placeholder={t('churchRegion') || t('churchApostolicRegions')}
-                  placeholderTextColor={C.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                />
+            placeholder={t('churchRegion') || t('churchApostolicRegions')}
+            placeholderTextColor={C.textSecondary}
+            value={name}
+            onChangeText={setName}
+          />
                 <Text style={[formStyles.label, { color: C.textPrimary }]}>{t('churchParent')}</Text>
-                <ElementDropdown
-                  data={options}
-                  value={parentId}
-                  onChange={(v) => setParentId((typeof v === 'number' ? v : Number(v)) || null)}
-                  placeholder={t('churchParent')}
-                  containerStyle={{ marginBottom: 8 }}
-                />
-                
+          <ElementDropdown
+            data={options}
+            value={parentId}
+            onChange={(v) => setParentId((typeof v === 'number' ? v : Number(v)) || null)}
+            placeholder={t('churchParent')}
+            containerStyle={{ marginBottom: 8 }}
+          />
+          
                 <Text style={[formStyles.label, { color: C.textPrimary }]}>{t('logo')}</Text>
                 <TouchableOpacity
                   onPress={handleImagePick}
                   style={[formStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: (C as any).inputBorder || C.border }] as any}>
-                  {imagePath ? (
-                    <>
+            {imagePath ? (
+              <>
                       <Image source={{ uri: imagePath }} style={formStyles.avatarImage as any} resizeMode="cover" />
                       <TouchableOpacity onPress={clearImage} style={formStyles.avatarClose as any}>
-                        <Text style={{ color: '#fff' }}>✗</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <Text style={[formStyles.avatarPlus as any, { color: C.textSecondary }] as any}>+</Text>
-                  )}
+                  <Text style={{ color: '#fff' }}>✗</Text>
                 </TouchableOpacity>
-                
+              </>
+            ) : (
+                    <Text style={[formStyles.avatarPlus as any, { color: C.textSecondary }] as any}>+</Text>
+            )}
+          </TouchableOpacity>
+          
                 <View style={[formStyles.buttonRow, { marginTop: 24 }]}>
-                  <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
-                  <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
-                </View>
+            <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
+            <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
+          </View>
               </Col>
             </Row>
           </Grid>

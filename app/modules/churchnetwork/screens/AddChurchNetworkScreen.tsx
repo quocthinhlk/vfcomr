@@ -46,9 +46,9 @@ export const AddChurchNetworkScreen: React.FC = () => {
           <Grid>
             <Row>
               <Col>
-                <Header title={`${t('addNew')} ${t('churchNetwork')}`} showMenu={false} />
+        <Header title={`${t('addNew')} ${t('churchNetwork')}`} showMenu={false} />
                 <Text style={[formStyles.label, { color: C.textPrimary, marginTop: 12 }]}>{t('churchNetwork')}</Text>
-                <TextInput
+          <TextInput
                   style={[
                     formStyles.textField,
                     {
@@ -59,19 +59,19 @@ export const AddChurchNetworkScreen: React.FC = () => {
                       backgroundColor: (C as any).card || C.background,
                     },
                   ]}
-                  placeholder={t('churchNetwork')}
-                  placeholderTextColor={C.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                />
+            placeholder={t('churchNetwork')}
+            placeholderTextColor={C.textSecondary}
+            value={name}
+            onChangeText={setName}
+          />
                 <View style={formStyles.switchRow}>
                   <Text style={[formStyles.label, { color: C.textPrimary, marginBottom: 0 }]}>{t('pastorCredentialLocked')}</Text>
-                  <Switch value={pastorLocked} onValueChange={setPastorLocked} />
-                </View>
+            <Switch value={pastorLocked} onValueChange={setPastorLocked} />
+          </View>
                 <View style={formStyles.buttonRow}>
-                  <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
-                  <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
-                </View>
+            <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
+            <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
+          </View>
               </Col>
             </Row>
           </Grid>

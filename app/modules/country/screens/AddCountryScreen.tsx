@@ -46,9 +46,9 @@ export const AddCountryScreen: React.FC = () => {
           <Grid>
             <Row>
               <Col>
-                <Header title={`${t('addNew')} ${t('country')}`} showMenu={false} />
+          <Header title={`${t('addNew')} ${t('country')}`} showMenu={false} />
                 <Text style={[formStyles.label, { color: C.textPrimary, marginTop: 12 }]}>{t('country')}</Text>
-                <TextInput
+          <TextInput
                   style={[
                     formStyles.textField,
                     {
@@ -59,15 +59,15 @@ export const AddCountryScreen: React.FC = () => {
                       backgroundColor: (C as any).card || C.background,
                     },
                   ]}
-                  placeholder={t('country')}
-                  placeholderTextColor={C.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                />
+            placeholder={t('country')}
+            placeholderTextColor={C.textSecondary}
+            value={name}
+            onChangeText={setName}
+          />
                 <View style={formStyles.buttonRow}>
-                  <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
-                  <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
-                </View>
+            <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
+            <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
+          </View>
               </Col>
             </Row>
           </Grid>

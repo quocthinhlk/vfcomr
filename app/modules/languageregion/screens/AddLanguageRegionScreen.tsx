@@ -64,9 +64,9 @@ export const AddLanguageRegionScreen: React.FC = () => {
           <Grid>
             <Row>
               <Col>
-                <Header title={`${t('addNew')} ${t('languageRegion')}`} showMenu={false} />
+        <Header title={`${t('addNew')} ${t('languageRegion')}`} showMenu={false} />
                 <Text style={[formStyles.label, { color: C.textPrimary, marginTop: 12 }]}>{t('languageRegion')}</Text>
-                <TextInput
+          <TextInput
                   style={[
                     formStyles.textField,
                     {
@@ -77,27 +77,27 @@ export const AddLanguageRegionScreen: React.FC = () => {
                       backgroundColor: (C as any).card || C.background,
                     },
                   ]}
-                  placeholder={t('languageRegion')}
-                  placeholderTextColor={C.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                />
+            placeholder={t('languageRegion')}
+            placeholderTextColor={C.textSecondary}
+            value={name}
+            onChangeText={setName}
+          />
                 <Text style={[formStyles.label, { color: C.textPrimary }]}>{t('churchParent')}</Text>
-                <ElementDropdown
-                  data={options}
-                  value={parentId}
-                  onChange={(v) => setParentId((typeof v === 'number' ? v : Number(v)) || null)}
-                  placeholder={t('churchParent')}
-                  containerStyle={{ marginBottom: 8 }}
-                />
+          <ElementDropdown
+            data={options}
+            value={parentId}
+            onChange={(v) => setParentId((typeof v === 'number' ? v : Number(v)) || null)}
+            placeholder={t('churchParent')}
+            containerStyle={{ marginBottom: 8 }}
+          />
                 <View style={formStyles.switchRow}>
                   <Text style={[formStyles.label, { color: C.textPrimary, marginBottom: 0 }]}>{t('disabled')}</Text>
-                  <Switch value={disabled} onValueChange={setDisabled} />
-                </View>
+            <Switch value={disabled} onValueChange={setDisabled} />
+          </View>
                 <View style={formStyles.buttonRow}>
-                  <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
-                  <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
-                </View>
+            <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
+            <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
+          </View>
               </Col>
             </Row>
           </Grid>

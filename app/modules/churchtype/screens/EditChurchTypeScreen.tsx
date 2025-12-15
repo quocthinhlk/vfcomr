@@ -59,9 +59,9 @@ export const EditChurchTypeScreen: React.FC = () => {
           <Grid>
             <Row>
               <Col>
-                <Header title={`${t('edit')} ${t('churchType')}`} showMenu={false} />
+          <Header title={`${t('edit')} ${t('churchType')}`} showMenu={false} />
                 <Text style={[formStyles.label, { color: C.textPrimary, marginTop: 12 }]}>{t('churchType')}</Text>
-                <TextInput
+          <TextInput
                   style={[
                     formStyles.textField,
                     {
@@ -72,15 +72,15 @@ export const EditChurchTypeScreen: React.FC = () => {
                       backgroundColor: (C as any).card || C.background,
                     },
                   ]}
-                  placeholder={t('churchType')}
-                  placeholderTextColor={C.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                />
+            placeholder={t('churchType')}
+            placeholderTextColor={C.textSecondary}
+            value={name}
+            onChangeText={setName}
+          />
                 <View style={formStyles.buttonRow}>
-                  <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
-                  <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
-                </View>
+            <CancelButton label={t('cancel')} onPress={() => navigation.goBack()} disabled={submitting} />
+            <SaveButton label={t('save')} onPress={onSave} disabled={submitting} />
+          </View>
               </Col>
             </Row>
           </Grid>

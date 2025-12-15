@@ -258,41 +258,33 @@ export default function DashboardPastorLeaderScreen() {
     if (!selectedImage) return;
     try {
       console.log('Downloading image URL:', selectedImage);
-      if (Platform.OS === 'android') {
-        // Request permission on Android if needed
-        try {
-          await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-          );
-        } catch {
-          // ignore, CameraRoll will fail gracefully if no permission
-        }
-      }
-
-      // On iOS, CameraRoll works more reliably with local file paths.
+      
+      // On both iOS and Android, CameraRoll works more reliably with local file paths.
       // We download the remote image to a temporary file, then save that file.
-      let uriToSave = selectedImage;
+      const fileName = `dash-image-${Date.now()}.jpg`;
+      const localPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
 
-      if (Platform.OS === 'ios') {
-        const fileName = `dash-image-${Date.now()}.jpg`;
-        const localPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
+      const downloadRes = await RNFS.downloadFile({
+        fromUrl: selectedImage,
+        toFile: localPath,
+      }).promise;
 
-        const downloadRes = await RNFS.downloadFile({
-          fromUrl: selectedImage,
-          toFile: localPath,
-        }).promise;
-
-        if (downloadRes.statusCode && downloadRes.statusCode >= 200 && downloadRes.statusCode < 300) {
-          uriToSave = localPath;
-        } else {
-          console.log('Download failed with status', downloadRes.statusCode);
-          throw new Error('Failed to download image');
+      if (downloadRes.statusCode && downloadRes.statusCode >= 200 && downloadRes.statusCode < 300) {
+        // Use the local file path for CameraRoll.save
+        await CameraRoll.save(`file://${localPath}`, { type: 'photo' });
+        
+        // Clean up the temporary file after saving
+        try {
+          await RNFS.unlink(localPath);
+        } catch (cleanupError) {
+          console.log('Failed to cleanup temp file:', cleanupError);
         }
+        
+        Alert.alert(t('success'), t('imageDownloadSuccess'));
+      } else {
+        console.log('Download failed with status', downloadRes.statusCode);
+        throw new Error('Failed to download image');
       }
-
-      await CameraRoll.save(uriToSave, { type: 'photo' });
-
-      Alert.alert(t('success'), t('imageDownloadSuccess'));
     } catch (error) {
       console.error('Error downloading image:', error);
       Alert.alert(t('error'), t('imageDownloadError'));
