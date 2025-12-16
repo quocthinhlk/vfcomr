@@ -261,15 +261,15 @@ export default function DashboardPastorLeaderScreen() {
       
       // On both iOS and Android, CameraRoll works more reliably with local file paths.
       // We download the remote image to a temporary file, then save that file.
-      const fileName = `dash-image-${Date.now()}.jpg`;
-      const localPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
+        const fileName = `dash-image-${Date.now()}.jpg`;
+        const localPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
 
-      const downloadRes = await RNFS.downloadFile({
-        fromUrl: selectedImage,
-        toFile: localPath,
-      }).promise;
+        const downloadRes = await RNFS.downloadFile({
+          fromUrl: selectedImage,
+          toFile: localPath,
+        }).promise;
 
-      if (downloadRes.statusCode && downloadRes.statusCode >= 200 && downloadRes.statusCode < 300) {
+        if (downloadRes.statusCode && downloadRes.statusCode >= 200 && downloadRes.statusCode < 300) {
         // Use the local file path for CameraRoll.save
         await CameraRoll.save(`file://${localPath}`, { type: 'photo' });
         
@@ -281,10 +281,10 @@ export default function DashboardPastorLeaderScreen() {
         }
         
         Alert.alert(t('success'), t('imageDownloadSuccess'));
-      } else {
-        console.log('Download failed with status', downloadRes.statusCode);
-        throw new Error('Failed to download image');
-      }
+        } else {
+          console.log('Download failed with status', downloadRes.statusCode);
+          throw new Error('Failed to download image');
+        }
     } catch (error) {
       console.error('Error downloading image:', error);
       Alert.alert(t('error'), t('imageDownloadError'));

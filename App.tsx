@@ -14,6 +14,8 @@ import './app/shared/config/ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 // Turn off allowFontScaling for the entire app for Text and TextInput (React Native core)
+// Note: allowFontScaling=false prevents system font scaling, but doesn't fix size issues on HD screens.
+// For responsive sizing on Android HD screens, use responsiveStyleSheet or scale() functions from app/shared/utils/responsiveStyleSheet
 const AnyRNText: any = RNText;
 if (AnyRNText.defaultProps == null) {
   AnyRNText.defaultProps = {};

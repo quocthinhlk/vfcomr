@@ -1,7 +1,8 @@
 import React, { useMemo, useRef } from 'react';
-import { TouchableOpacity, Text as RNText, TextInput, ViewStyle, StyleSheet, Keyboard, Platform } from 'react-native';
+import { TouchableOpacity, Text as RNText, TextInput, ViewStyle, Keyboard, Platform } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useThemedColors } from '../styles/theme';
+import { responsiveStyleSheet } from '../utils/responsiveStyleSheet';
 
 export interface ElementDropdownItem { label: string; value: string | number }
 
@@ -42,7 +43,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   const searchRef = useRef<TextInput>(null);
 
   const themed = useMemo(() =>
-    StyleSheet.create({
+    responsiveStyleSheet.create({
       dropdown: {
         borderWidth: 1,
         borderRadius: 6,
@@ -66,7 +67,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         backgroundColor: C.surface,
       },
       downArrow: {
-        fontSize: 22,
+        fontSize: 16,
         color: C.textSecondary,
         marginRight: 8,
         marginBottom: 10,
@@ -75,8 +76,8 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       clearText: { fontSize: 20, color: C.textSecondary },
       selectedText: { fontSize: 14, color: C.textPrimary },
       placeholderText: { fontSize: 16, color: C.textSecondary },
-      itemText: { fontSize: 14, color: C.textPrimary, lineHeight: 0 },
-      itemContainer: { paddingVertical: 1, minHeight: 26, backgroundColor: C.surface },
+      itemText: { fontSize: 14, color: C.textPrimary, lineHeight: 15 },
+      itemContainer: { paddingVertical: 0, minHeight: 20, backgroundColor: C.surface },
     })
   , [C]);
   const renderRightIcon = () => {

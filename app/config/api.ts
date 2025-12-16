@@ -4,8 +4,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const DEFAULT_PAGE_LIMIT = 10;
 
-export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzQzNDcyMzgsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NzY4fQ.Vk8BsCNMZHfm9ENQ9mUkz5Iib_73yvTrhHMmxUVCUKY";
-// export const TOKEN_FOR_TEST = '';
+// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzQzNDcyMzgsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NzY4fQ.Vk8BsCNMZHfm9ENQ9mUkz5Iib_73yvTrhHMmxUVCUKY";
+export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
   baseURL: 'https://dev.vfcvn.org/api/v1/',
