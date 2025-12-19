@@ -1,26 +1,27 @@
 import { StyleSheet } from 'react-native';
 import { COLORS } from '../../shared/constants/colors';
+import { fs, ws, hs, ms, rs } from '../../shared/utils/scale';
 
 export const dashboardStyles = StyleSheet.create({
   container: {
     flex: 1,
     // justifyContent: 'center',
     // alignItems: 'center',
-    paddingHorizontal: 15,
+    paddingHorizontal: ms(15),
     backgroundColor: '#fff',
   },
   button: {
-    marginVertical: 8,
+    marginVertical: ms(8),
     width: '80%',
   },
   title: {
     // marginBottom: 20,
     fontWeight: 'bold',
-    marginTop: 10,
-    marginLeft: 15,
+    marginTop: ms(10),
+    marginLeft: ms(15),
   },
   menuList: {
-    marginTop: 8,
+    marginTop: ms(8),
     borderTopWidth: 1,
     borderTopColor: '#e0e0e0',
     backgroundColor: '#fff',
@@ -28,13 +29,13 @@ export const dashboardStyles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: ms(16),
+    paddingHorizontal: ms(16),
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
   },
   menuLabel: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: '#1976d2',
   },
   // New styles for DashboardHeader
@@ -46,14 +47,14 @@ export const dashboardStyles = StyleSheet.create({
   profileSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 10,
-    paddingHorizontal: 15,
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(15),
   },
   profileImage: {
-    width: 50,
-    height: 50,
+    width: ws(50),
+    height: hs(50),
     borderRadius: 25,
-    marginRight: 10,
+    marginRight: ms(10),
   },
   profileTextContainer: {
     justifyContent: 'center',
@@ -62,26 +63,26 @@ export const dashboardStyles = StyleSheet.create({
     fontWeight: 'bold',
   },
   profileRole: {
-    fontSize: 12,
+    fontSize: fs(12),
   },
   profileLocation: {
-    fontSize: 12,
+    fontSize: fs(12),
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: ms(15),
   },
   headerEditButton: {
-    padding: 8,
+    padding: ms(8),
   },
   headerEditIcon: {
-    width: 12,
-    height: 12,
+    width: ws(12),
+    height: hs(12),
     resizeMode: 'contain',
   },
   headerMenuButton: {
-    padding: 8,
+    padding: ms(8),
   },
   // Stat Card Styles
   statCardContainer: {
@@ -89,12 +90,12 @@ export const dashboardStyles = StyleSheet.create({
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     // paddingHorizontal: 15,
-    marginTop: 20,
+    marginTop: ms(20),
   },
   statCard: {
     width: '48%',
-    marginBottom: 10,
-    padding: 10,
+    marginBottom: ms(10),
+    padding: ms(10),
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 5,
@@ -102,9 +103,9 @@ export const dashboardStyles = StyleSheet.create({
     alignItems: 'center',
   },
   statIcon: {
-    width: 30,
-    height: 30,
-    marginRight: 10,
+    width: ws(30),
+    height: hs(30),
+    marginRight: ms(10),
     resizeMode: 'contain',
   },
   statTextContainer: {
@@ -112,16 +113,16 @@ export const dashboardStyles = StyleSheet.create({
   },
   statValue: {
     fontWeight: 'bold',
-    fontSize: 16,
+    fontSize: fs(16),
     color: COLORS.mainColor,
   },
   statSecondaryValue: {
-    fontSize: 11,
+    fontSize: fs(11),
     color: '#888',
-    marginTop: 2,
+    marginTop: ms(2),
   },
   statLabel: {
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#888',
   },
   viewMoreButton: {
@@ -129,32 +130,32 @@ export const dashboardStyles = StyleSheet.create({
   },
   viewMoreText: {
     color: COLORS.mainColor,
-    fontSize: 15,
+    fontSize: fs(15),
   },
   actionSection: {
-    marginTop: 20,
-    paddingHorizontal: 15,
+    marginTop: ms(20),
+    paddingHorizontal: ms(15),
   },
   actionItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 15,
+    paddingVertical: ms(15),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   actionIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 15,
+    width: ws(20),
+    height: hs(20),
+    marginRight: ms(15),
     resizeMode: 'contain',
   },
   actionLabel: {
-    fontSize: 16,
+    fontSize: fs(16),
     flex: 1,
   },
   actionArrow: {
-    width: 15,
-    height: 15,
+    width: ws(15),
+    height: hs(15),
     resizeMode: 'contain',
   },
 });

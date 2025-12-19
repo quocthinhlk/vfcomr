@@ -1,23 +1,24 @@
-import { StyleSheet } from 'react-native';
+import { StyleSheet, Platform } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { fs, ws, hs, ms, rs } from '../utils/scale';
 
 export const formStyles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
+    padding: ms(20),
     backgroundColor: '#fff',
   },
 
   row: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: 12,
+    gap: ms(12),
+    marginBottom: ms(12),
   },
 
   rowTight: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: 8,
+    gap: ms(8),
+    marginBottom: ms(8),
   },
 
   // Row with space-between, useful for label + switch, etc.
@@ -25,75 +26,76 @@ export const formStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginTop: 12,
-    marginBottom: 4,
+    marginTop: ms(12),
+    marginBottom: ms(4),
   },
 
   // Generic row for button groups inside forms
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: 12,
-    marginTop: 16,
+    gap: ms(12),
+    marginTop: ms(16),
   },
 
   input: {
     flex: 1,
-    marginBottom: 15,
+    marginBottom: ms(15),
   },
 
   // Base text input style for React Native TextInput fields
   textField: {
-    height: 44,
+    height: ms(32),
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 12,
+    borderRadius: rs(6),
+    paddingHorizontal: ms(12),
   },
 
   select: {
     flex: 1,
-    marginBottom: 15,
+    marginBottom: ms(15),
   },
 
   inputTextStyle: {
-    fontSize: 14,
+    fontSize: fs(14),
+    paddingVertical: 0,
   },
 
   title: {
-    marginBottom: 16,
+    marginBottom: ms(16),
     fontWeight: 'bold',
   },
 
   backButton: {
-    marginBottom: 12,
-    fontSize: 14,
+    marginBottom: ms(12),
+    fontSize: fs(14),
   },
 
   label: {
     color: '#8f9bb3',
     fontWeight: 'bold',
-    marginBottom: 4,
-    // fontSize: 12,
+    marginBottom: ms(4),
+    fontSize: fs(12),
   },
 
   subLabel: {
     color: '#8f9bb3',
     fontWeight: 'normal',
-    marginBottom: 4,
-    fontSize: 11,
+    marginBottom: ms(4),
+    fontSize: fs(11),
   },
 
   pickerWrapper: {
     borderWidth: 1,
     borderColor: '#ccc',
-    borderRadius: 8,
-    marginTop: 4,
+    borderRadius: rs(8),
+    marginTop: ms(4),
   },
 
   dropdown: {
     borderColor: '#ccc',
-    borderRadius: 8,
-    height: 48,
+    borderRadius: rs(8),
+    height: ms(32),
   },
 
   dropdownContainer: {
@@ -106,12 +108,12 @@ export const formStyles = StyleSheet.create({
   },
 
   filePickerButton: {
-    borderRadius: 3,
+    borderRadius: rs(3),
     borderColor: '#e4e9f3',
     borderWidth: 1,
-    padding: 10,
+    padding: ms(10),
     backgroundColor: '#f8f9fc',
-    marginBottom: 15,
+    marginBottom: ms(15),
   },
 
   filePickerContent: {
@@ -121,11 +123,11 @@ export const formStyles = StyleSheet.create({
   },
 
   avatarSquare: {
-    width: 150,
-    height: 150,
+    width: Platform.OS === 'ios' ? ws(150) : ws(130),
+    height: Platform.OS === 'ios' ? ws(150) : ws(130),
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 8,
+    borderRadius: rs(8),
     overflow: 'hidden',
     alignItems: 'center',
     justifyContent: 'center',
@@ -140,38 +142,38 @@ export const formStyles = StyleSheet.create({
 
   avatarClose: {
     position: 'absolute',
-    top: 6,
-    right: 6,
+    top: ms(6),
+    right: ms(6),
     backgroundColor: 'rgba(0,0,0,0.55)',
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    borderRadius: rs(10),
+    paddingHorizontal: ms(6),
+    paddingVertical: ms(2),
   },
 
   avatarPlus: {
-    fontSize: 42,
+    fontSize: fs(42),
     color: '#bbb',
-    lineHeight: 42,
+    lineHeight: fs(42),
   },
 
   avatarHint: {
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#8f9bb3',
-    marginTop: 4,
+    marginTop: ms(4),
   },
 
   addChildButton: {
     backgroundColor: COLORS.mainColor,
-    borderRadius: 3,
+    borderRadius: rs(3),
     borderColor: COLORS.mainColor,
-    width: 120,
-    height: 40,
-    fontSize: 10,
-    marginTop: 8,
+    width: ws(120),
+    height: hs(40),
+    fontSize: fs(10),
+    marginTop: ms(8),
   },
 
   addChildButtonText: {
-    fontSize: 7,
+    fontSize: fs(7),
     fontWeight: '500',
   },
 });

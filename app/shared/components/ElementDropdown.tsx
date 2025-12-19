@@ -1,8 +1,8 @@
 import React, { useMemo, useRef } from 'react';
-import { TouchableOpacity, Text as RNText, TextInput, ViewStyle, Keyboard, Platform } from 'react-native';
+import { TouchableOpacity, Text as RNText, TextInput, ViewStyle, Keyboard, Platform, StyleSheet } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useThemedColors } from '../styles/theme';
-import { responsiveStyleSheet } from '../utils/responsiveStyleSheet';
+import { fs, ws, hs, ms, rs } from '../utils/scale';
 
 export interface ElementDropdownItem { label: string; value: string | number }
 
@@ -43,13 +43,13 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   const searchRef = useRef<TextInput>(null);
 
   const themed = useMemo(() =>
-    responsiveStyleSheet.create({
+    StyleSheet.create({
       dropdown: {
         borderWidth: 1,
-        borderRadius: 6,
-        height: 44,
-        paddingLeft: 12,
-        paddingRight: 5,
+        borderRadius: rs(6),
+        height: ws(38),
+        paddingLeft: ms(12),
+        paddingRight: ms(5),
         backgroundColor: C.inputBg,
         borderColor: C.inputBorder,
       },
@@ -58,26 +58,26 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         backgroundColor: C.surface,
       },
       searchInput: {
-        paddingHorizontal: 12,
-        paddingVertical: 8,
-        fontSize: 16,
+        paddingHorizontal: ms(12),
+        paddingVertical: ms(8),
+        fontSize: fs(16),
         color: C.inputText,
         borderBottomColor: C.surfaceBorder,
         borderBottomWidth: 1,
         backgroundColor: C.surface,
       },
       downArrow: {
-        fontSize: 16,
+        fontSize: fs(16),
         color: C.textSecondary,
-        marginRight: 8,
-        marginBottom: 10,
+        marginRight: ms(8),
+        marginBottom: ms(5),
       },
-      clearButton: { paddingHorizontal: 0, marginRight: 8 },
-      clearText: { fontSize: 20, color: C.textSecondary },
-      selectedText: { fontSize: 14, color: C.textPrimary },
-      placeholderText: { fontSize: 16, color: C.textSecondary },
-      itemText: { fontSize: 14, color: C.textPrimary, lineHeight: 15 },
-      itemContainer: { paddingVertical: 0, minHeight: 20, backgroundColor: C.surface },
+      clearButton: { paddingHorizontal: 0, marginRight: ms(8) },
+      clearText: { fontSize: fs(20), color: C.textSecondary },
+      selectedText: { fontSize: fs(14), color: C.textPrimary },
+      placeholderText: { fontSize: fs(14), color: C.textSecondary, lineHeight: fs(14) },
+      itemText: { fontSize: fs(14), color: C.textPrimary, lineHeight: fs(15) },
+      itemContainer: { paddingVertical: ms(1), minHeight: hs(32), justifyContent: 'center', backgroundColor: C.surface },
     })
   , [C]);
   const renderRightIcon = () => {

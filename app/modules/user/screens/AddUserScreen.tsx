@@ -939,6 +939,7 @@ export default function AddUserScreen() {
                           />
                         </View>
                         <Input
+                          size="small"
                           style={[
                             formStyles.input,
                             {

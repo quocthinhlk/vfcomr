@@ -20,6 +20,7 @@ import { isSuperAdmin } from '../utils/permissions';
 import { useTranslation } from '../hooks/useTranslation';
 import { useThemedColors } from '../styles/theme';
 import LanguageSelectModal from './LanguageSelectModal';
+import { fs, ws, hs, ms, rs } from '../utils/scale';
 
 interface MenuPopupProps {
   visible: boolean;
@@ -43,7 +44,7 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
   const { t } = useTranslation();
   const C = useThemedColors();
   const [isMounted, setIsMounted] = useState(visible);
-  const slideAnim = useRef(new Animated.Value(300)).current;
+  const slideAnim = useRef(new Animated.Value(ws(300))).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   const initialIndex = Math.max(
@@ -79,7 +80,7 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
     } else {
       Animated.parallel([
         Animated.timing(slideAnim, {
-          toValue: 300,
+          toValue: ws(300),
           duration: 300,
           easing: Easing.in(Easing.ease),
           useNativeDriver: true,
@@ -268,15 +269,15 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
   },
   menuContainer: {
-    width: 330,
+    width: ws(330),
     height: '100%',
     backgroundColor: '#3C3F44',
-    paddingTop: 10,
-    paddingHorizontal: 20,
+    paddingTop: ms(10),
+    paddingHorizontal: ms(20),
     shadowColor: '#000',
-    shadowOffset: {width: -2, height: 0},
+    shadowOffset: {width: ms(-2), height: 0},
     shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowRadius: rs(8),
     elevation: 5,
   },
   menuList: {
@@ -285,22 +286,22 @@ const styles = StyleSheet.create({
 
   },
   closeButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 20,
+    width: ws(30),
+    height: hs(30),
+    borderRadius: rs(20),
     backgroundColor: COLORS.mainColor,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: 50,
-    marginRight: 10,
-    marginBottom: 10,
+    marginTop: ms(50),
+    marginRight: ms(10),
+    marginBottom: ms(10),
     display: 'none'
   },
   closeIcon: {
     position: 'relative',
-    width: 15,
-    height: 15,
+    width: ws(15),
+    height: hs(15),
   },
   closeLine: {
     position: 'absolute',
@@ -317,56 +318,56 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
+    paddingVertical: ms(16),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
   menuIcon: {
-    width: 24,
-    height: 24,
-    marginRight: 5,
+    width: ws(24),
+    height: hs(24),
+    marginRight: ms(5),
     resizeMode: 'contain',
   },
   menuBulletText: {
     color: '#fff',
-    fontSize: 12,
-    lineHeight: 12,
-    marginRight: 6,
+    fontSize: fs(12),
+    lineHeight: fs(12),
+    marginRight: ms(6),
   },
   menuLabel: {
-    fontSize: 17,
+    fontSize: fs(17),
     color: '#fff',
     flex: 1,
   },
   expandIndicator: {
     color: '#fff',
-    marginLeft: 6,
-    fontSize: 15,
+    marginLeft: ms(6),
+    fontSize: fs(15),
   },
   subMenuList: {
-    paddingLeft: 20,
+    paddingLeft: ms(20),
   },
   subMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
+    paddingVertical: ms(12),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
   subMenuIcon: {
-    width: 18,
-    height: 18,
-    marginRight: 6,
+    width: ws(18),
+    height: hs(18),
+    marginRight: ms(6),
     resizeMode: 'contain',
   },
   subMenuBulletText: {
     color: '#fff',
-    fontSize: 9,
-    lineHeight: 11,
-    marginRight: 6,
+    fontSize: fs(9),
+    lineHeight: fs(11),
+    marginRight: ms(6),
   },
   subMenuLabel: {
-    fontSize: 17,
+    fontSize: fs(17),
     color: '#fff',
   },
 
@@ -375,12 +376,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutIcon: {
-    width: 20,
-    height: 20,
+    width: ws(20),
+    height: hs(20),
     tintColor: '#fff',
   },
   logoutLabel: {
-    fontSize: 17,
+    fontSize: fs(17),
     color: '#fff',
   },
   bottomSection: {
@@ -393,7 +394,7 @@ const styles = StyleSheet.create({
 
   },
   languageSelect: {
-    marginRight: 10,
+    marginRight: ms(10),
   },
   languageButton: {
     // paddingHorizontal: 5,
@@ -401,8 +402,8 @@ const styles = StyleSheet.create({
     // borderRadius: 5,
   },
   languageIcon: {
-    width: 20,
-    marginRight: 4,
+    width: ws(20),
+    marginRight: ms(4),
     resizeMode: 'contain',
   },
   languageButtonContent: {
@@ -410,9 +411,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   arrowIcon: {
-    width: 10,
-    height: 10,
-    marginLeft: 2,
+    width: ws(10),
+    height: hs(10),
+    marginLeft: ms(2),
     tintColor: '#fff',
     resizeMode: 'contain',
   },
@@ -424,68 +425,68 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: {
     backgroundColor: '#fff',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    minWidth: 220,
-    maxWidth: 320,
-    maxHeight: 450,
+    borderRadius: rs(12),
+    paddingVertical: ms(8),
+    paddingHorizontal: ms(8),
+    minWidth: ws(220),
+    maxWidth: ws(320),
+    maxHeight: hs(450),
     elevation: 8,
     shadowColor: '#000',
     shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: rs(12),
+    shadowOffset: { width: 0, height: hs(6) },
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: ms(12),
+    paddingHorizontal: ms(12),
     width: '100%',
   },
   dropdownItemActive: {
     backgroundColor: 'rgba(53,99,233,0.08)',
-    borderRadius: 8,
+    borderRadius: rs(8),
   },
   dropdownHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(8),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#eee',
   },
   dropdownTitle: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '700',
     color: '#111',
   },
   dropdownClose: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(4),
   },
   dropdownCloseText: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: '#333',
   },
   dropdownList: {
-    paddingVertical: 4,
+    paddingVertical: ms(4),
   },
   flagIcon: {
-    width: 28,
-    height: 18,
-    marginRight: 10,
+    width: ws(28),
+    height: hs(18),
+    marginRight: ms(10),
     resizeMode: 'contain',
   },
   languageText: {
-    fontSize: 17,
+    fontSize: fs(17),
     color: '#fff',
   },
   languageOptionText: {
-    fontSize: 16,
+    fontSize: fs(16),
     color: '#000',
-    paddingVertical: 4,
+    paddingVertical: ms(4),
   },
   languageOptionTextActive: {
     fontWeight: '700',
@@ -493,14 +494,14 @@ const styles = StyleSheet.create({
   },
   checkIcon: {
     marginLeft: 'auto',
-    fontSize: 16,
+    fontSize: fs(16),
     color: COLORS.successColor,
-    paddingHorizontal: 4,
+    paddingHorizontal: ms(4),
   },
   checkIconPlaceholder: {
     marginLeft: 'auto',
-    width: 16,
-    height: 16,
+    width: ws(16),
+    height: hs(16),
   },
   safeArea: {
     flex: 1,

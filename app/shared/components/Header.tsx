@@ -15,6 +15,7 @@ import {
   useRoute,
 } from '@react-navigation/native';
 import { useThemedColors } from '../styles/theme';
+import { fs, ws, hs, ms, rs } from '../utils/scale';
 
  
 
@@ -93,7 +94,7 @@ export const Header: React.FC<HeaderProps> = ({ title, showMenu = true }) => {
         </>
       ) : (
         // keep layout spacing when menu is hidden
-        <View style={{ width: 35 }} />
+        <View style={{ width: ws(35) }} />
       )}
     </View>
   );
@@ -104,19 +105,19 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: 50,
+    height: hs(50),
     backgroundColor: '#fff',
     elevation: 0,
     borderBottomWidth: 0,
   },
   backText: {
-    fontSize: 44,
-    lineHeight: 34,
+    fontSize: fs(44),
+    lineHeight: fs(34),
     color: '#111',
   },
   backIcon: {
-    width: 35,
-    height: 35,
+    width: ws(35),
+    height: hs(35),
     resizeMode: 'contain',
     marginLeft: 0,
   },
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
   title: {
     flex: 1,
     textAlign: 'center',
-    fontSize: 14,
+    fontSize: fs(14),
     fontWeight: '700',
     color: '#111',
   },

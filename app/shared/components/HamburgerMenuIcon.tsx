@@ -1,6 +1,7 @@
 import React from 'react';
 import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { COLORS } from '../constants/colors';
+import { fs, ws, hs, ms, rs } from '../utils/scale';
 
 interface HamburgerMenuIconProps {
   onPress: () => void;
@@ -18,9 +19,9 @@ export const HamburgerMenuIcon: React.FC<HamburgerMenuIconProps> = ({ onPress })
 
 const styles = StyleSheet.create({
   menuButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ws(40),
+    height: ws(40),
+    borderRadius: rs(20),
     backgroundColor: COLORS.mainColor,
     justifyContent: 'center',
     alignItems: 'center',
@@ -30,10 +31,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuLine: {
-    width: 15,
-    height: 1,
+    width: ws(15),
+    height: ws(1),
     backgroundColor: '#fff',
-    borderRadius: 1,
-    marginVertical: 2,
+    borderRadius: rs(1),
+    marginVertical: ws(2),
   },
 });

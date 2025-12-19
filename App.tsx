@@ -1,8 +1,15 @@
 // App.tsx
 import React from 'react';
 import * as eva from '@eva-design/eva';
-import { ApplicationProvider, IconRegistry, Text as UIKittenText, Input as UIKittenInput } from '@ui-kitten/components';
-import { Text as RNText, TextInput as RNTextInput } from 'react-native';
+import {
+  ApplicationProvider,
+  IconRegistry,
+} from '@ui-kitten/components';
+import {
+  Text as RNText,
+  TextInput as RNTextInput,
+  PixelRatio,
+} from 'react-native';
 import { EvaIconsPack } from '@ui-kitten/eva-icons';
 import Navigation from './app/config/navigation';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -13,42 +20,52 @@ import { LogBox } from 'react-native';
 import './app/shared/config/ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
-// Turn off allowFontScaling for the entire app for Text and TextInput (React Native core)
-// Note: allowFontScaling=false prevents system font scaling, but doesn't fix size issues on HD screens.
-// For responsive sizing on Android HD screens, use responsiveStyleSheet or scale() functions from app/shared/utils/responsiveStyleSheet
-const AnyRNText: any = RNText;
-if (AnyRNText.defaultProps == null) {
-  AnyRNText.defaultProps = {};
+/* ================================
+   1. TẮT FONT SCALING TOÀN APP
+================================ */
+
+// React Native core
+const disableFontScaling = () => {
+  const AnyRNText: any = RNText;
+  if (AnyRNText.defaultProps == null) {
+    AnyRNText.defaultProps = {};
+  }
+  AnyRNText.defaultProps.allowFontScaling = false;
+
+  const AnyRNTextInput: any = RNTextInput;
+  if (AnyRNTextInput.defaultProps == null) {
+    AnyRNTextInput.defaultProps = {};
+  }
+  AnyRNTextInput.defaultProps.allowFontScaling = false;
+};
+
+disableFontScaling();
+
+/* ================================
+   2. NORMALIZE FONT ANDROID (HD)
+================================ */
+
+// Giảm scale font Android HD để gần iOS
+const fontScale = PixelRatio.getFontScale();
+if (fontScale > 1) {
+  PixelRatio.getFontScale = () => 1;
 }
-AnyRNText.defaultProps.allowFontScaling = false;
 
-const AnyRNTextInput: any = RNTextInput;
-if (AnyRNTextInput.defaultProps == null) {
-  AnyRNTextInput.defaultProps = {};
-}
-AnyRNTextInput.defaultProps.allowFontScaling = false;
+/* ================================
+   APP SETUP
+================================ */
 
-// Add this for UI Kitten Text & Input (in case you are not using the default React Native Text directly)
-const AnyUIKittenText: any = UIKittenText;
-if (AnyUIKittenText.defaultProps == null) {
-  AnyUIKittenText.defaultProps = {};
-}
-AnyUIKittenText.defaultProps.allowFontScaling = false;
-
-const AnyUIKittenInput: any = UIKittenInput;
-if (AnyUIKittenInput.defaultProps == null) {
-  AnyUIKittenInput.defaultProps = {};
-}
-AnyUIKittenInput.defaultProps.allowFontScaling = false;
-
-LogBox.ignoreAllLogs(true); // Disable all warnings (yellow box)
-
+LogBox.ignoreAllLogs(true);
 enableScreens();
 
 function AppInner() {
   const { theme } = useThemeMode();
+
   return (
-    <ApplicationProvider {...eva} theme={theme === 'dark' ? eva.dark : eva.light}>
+    <ApplicationProvider
+      {...eva}
+      theme={theme === 'dark' ? eva.dark : eva.light}
+    >
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <LanguageProvider>
