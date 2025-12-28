@@ -1,14 +1,15 @@
-import { StyleSheet } from 'react-native';
-import { ThemeColors, ThemeMode } from './theme';
-import { COLORS } from '../constants/colors';
+import {StyleSheet} from 'react-native';
+import {ThemeColors, ThemeMode} from './theme';
+import {COLORS} from '../constants/colors';
+import {fs, ws, hs, ms, rs} from '../utils/scale';
 
 export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
   const borderW = theme === 'light' ? 1 : StyleSheet.hairlineWidth;
   return {
     itemCard: {
-      borderRadius: 12,
-      padding: 12,
-      marginBottom: 10,
+      borderRadius: rs(12),
+      padding: ms(12),
+      marginBottom: ms(10),
       borderWidth: borderW,
       borderColor: C.inputBorder,
       backgroundColor: C.surface,
@@ -19,15 +20,15 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      paddingVertical: 2,
+      paddingVertical: ms(2),
     } as const,
     avatarWrap: {
-      marginRight: 12,
+      marginRight: ms(12),
     } as const,
     avatar: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: ws(40),
+      height: ws(40),
+      borderRadius: rs(20),
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: borderW,
@@ -39,31 +40,32 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
       color: C.textPrimary,
     } as const,
     chevron: {
-      fontSize: 22,
-      lineHeight: 22,
-      marginTop: 6,
+      fontSize: fs(22),
+      lineHeight: fs(22),
+      marginTop: ms(6),
       color: C.textSecondary,
     } as const,
     searchContainer: {
       flexDirection: 'row',
       alignItems: 'center',
       borderWidth: borderW,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      marginBottom: 10,
-      height: 40,
-      marginTop: 6,
+      borderRadius: rs(6),
+      marginBottom: ms(10),
+      height: ws(35),
+      marginTop: ms(6),
       borderColor: C.inputBorder,
       backgroundColor: C.inputBg,
     } as const,
     searchIcon: {
-      fontSize: 16,
-      marginRight: 6,
+      fontSize: fs(12),
+      marginRight: ms(4),
+      marginLeft: ms(4),
       color: C.textSecondary,
     } as const,
     searchInput: {
       flex: 1,
-      height: 40,
+      // height: ws(35),
+      fontSize: fs(12),
       color: C.inputText,
     } as const,
 
@@ -73,12 +75,12 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
       alignItems: 'center',
     } as const,
     pageNumber: {
-      borderRadius: 16,
+      borderRadius: rs(16),
       borderWidth: borderW,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: 10,
-      marginLeft: 8,
+      paddingHorizontal: ms(10),
+      marginLeft: ms(8),
       backgroundColor: C.surface,
       borderColor: C.inputBorder,
     } as const,
@@ -92,6 +94,7 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
     pageNumberText: {
       color: C.textPrimary,
       fontWeight: '600',
+      fontSize: fs(12),
     } as const,
     pageNumberTextActive: {
       color: '#fff',
@@ -105,27 +108,27 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
       alignSelf: 'stretch',
     } as const,
     swipeDeleteButton: {
-      minWidth: 96,
-      paddingHorizontal: 14,
+      minWidth: ws(96),
+      paddingHorizontal: ms(14),
       paddingVertical: 0,
       justifyContent: 'center',
       alignItems: 'center',
       backgroundColor: COLORS.dangerColor,
-      borderTopLeftRadius: 12,
-      borderBottomLeftRadius: 12,
+      borderTopLeftRadius: rs(12),
+      borderBottomLeftRadius: rs(12),
       marginVertical: 0,
       shadowColor: '#000',
       shadowOpacity: 0.12,
-      shadowRadius: 6,
-      shadowOffset: { width: 0, height: 2 },
+      shadowRadius: rs(6),
+      shadowOffset: {width: 0, height: hs(2)},
       elevation: 3,
       height: '100%',
       alignSelf: 'stretch',
     } as const,
     swipeDeleteIconWrap: {
-      width: 32,
-      height: 32,
-      borderRadius: 16,
+      width: ws(32),
+      height: ws(32),
+      borderRadius: rs(16),
       alignItems: 'center',
       justifyContent: 'center',
       backgroundColor: 'rgba(255,255,255,0.2)',
@@ -133,8 +136,8 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
     swipeDeleteText: {
       color: '#fff',
       fontWeight: '700',
-      fontSize: 12,
-      marginTop: 6,
+      fontSize: fs(12),
+      marginTop: ms(6),
     } as const,
   };
 };

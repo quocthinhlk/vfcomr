@@ -19,8 +19,8 @@ export const HamburgerMenuIcon: React.FC<HamburgerMenuIconProps> = ({ onPress })
 
 const styles = StyleSheet.create({
   menuButton: {
-    width: ws(40),
-    height: ws(40),
+    width: ws(35),
+    height: ws(35),
     borderRadius: rs(20),
     backgroundColor: COLORS.mainColor,
     justifyContent: 'center',

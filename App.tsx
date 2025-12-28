@@ -3,14 +3,12 @@ import React from 'react';
 import * as eva from '@eva-design/eva';
 import {
   ApplicationProvider,
-  IconRegistry,
 } from '@ui-kitten/components';
 import {
   Text as RNText,
   TextInput as RNTextInput,
   PixelRatio,
 } from 'react-native';
-import { EvaIconsPack } from '@ui-kitten/eva-icons';
 import Navigation from './app/config/navigation';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LanguageProvider } from './app/shared/context/LanguageContext';
@@ -79,11 +77,8 @@ function AppInner() {
 
 export default function App() {
   return (
-    <>
-      <IconRegistry icons={EvaIconsPack} />
-      <ThemeProvider>
-        <AppInner />
-      </ThemeProvider>
-    </>
+    <ThemeProvider>
+      <AppInner />
+    </ThemeProvider>
   );
 }

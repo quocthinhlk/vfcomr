@@ -1,30 +1,45 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import { View, TextInput, RefreshControl, FlatList, TouchableOpacity, StyleSheet, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import {
+  View,
+  TextInput,
+  RefreshControl,
+  FlatList,
+  TouchableOpacity,
+  StyleSheet,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
-import { COLORS } from '../../../shared/constants/colors';
+import {COLORS} from '../../../shared/constants/colors';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
-import { useThemedColors } from '../../../shared/styles/theme';
-import { useThemeMode } from '../../../shared/context/ThemeContext';
-import { getListStyles } from '../../../shared/styles/list';
-import { useTranslation } from '../../../shared/hooks/useTranslation';
+import {useThemedColors} from '../../../shared/styles/theme';
+import {useThemeMode} from '../../../shared/context/ThemeContext';
+import {getListStyles} from '../../../shared/styles/list';
+import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {
   getChurchesList,
   ChurchListItem,
 } from '../services/church.service';
-import { EditSvgIcon, DisabledSvgIcon, EnabledSvgIcon, CopySvgIcon } from '../../../shared/components/icons';
-import ActionSheetModal, { ActionItem } from '../../../shared/components/ActionSheetModal';
-import { isSuperAdmin } from '../../../shared/utils/permissions';
+import {
+  EditSvgIcon,
+  DisabledSvgIcon,
+  EnabledSvgIcon,
+  CopySvgIcon,
+} from '../../../shared/components/icons';
+import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
+import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 
 export const ChurchesListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { t } = useTranslation();
+  const {t} = useTranslation();
   const C = useThemedColors();
-  const { theme } = useThemeMode();
+  const {theme} = useThemeMode();
   const listStyles = getListStyles(C, theme);
   const [items, setItems] = useState<ChurchListItem[]>([]);
   const [page, setPage] = useState(1);
@@ -40,7 +55,9 @@ export const ChurchesListScreen: React.FC = () => {
   const fetchData = useCallback(
     async (targetPage: number, reset = false) => {
       try {
-        if (loading) {return;}
+        if (loading) {
+          return;
+        }
         setLoading(true);
         const data = await getChurchesList({
           page: targetPage,
@@ -106,7 +123,13 @@ export const ChurchesListScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: ChurchListItem}) => {
     const name = item.name || '';
-    const initials = name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join('') || 'C';
+    const initials =
+      name
+        .split(' ')
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(s => s[0]?.toUpperCase())
+        .join('') || 'C';
     const isMother = (item as any)?.is_mother_church;
     const isMsc = (item as any)?.is_msc;
     return (
@@ -123,11 +146,23 @@ export const ChurchesListScreen: React.FC = () => {
             </View>
           </View>
           <View style={styles.itemCol}>
-            <Text style={[styles.name, { color: C.textPrimary }]} numberOfLines={1}>{name}</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, marginTop: 2 }}>
+            <Text
+              style={[styles.name, {color: C.textPrimary}]}
+              numberOfLines={1}>
+              {name}
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: ms(6),
+                marginTop: ms(2),
+              }}>
               {isMother ? (
                 <View style={[styles.badge, styles.badgePrimary]}>
-                  <Text style={styles.badgeTextPrimary}>{t('motherChurch') || 'Mother'}</Text>
+                  <Text style={styles.badgeTextPrimary}>
+                    {t('motherChurch') || 'Mother'}
+                  </Text>
                 </View>
               ) : null}
               {isMsc ? (
@@ -136,7 +171,9 @@ export const ChurchesListScreen: React.FC = () => {
                 </View>
               ) : null}
             </View>
-            <Text style={[styles.meta, { color: C.textSecondary }]} numberOfLines={1}>
+            <Text
+              style={[styles.meta, {color: C.textSecondary}]}
+              numberOfLines={1}>
               {item.city} · {item.country_name}
             </Text>
           </View>
@@ -145,7 +182,7 @@ export const ChurchesListScreen: React.FC = () => {
               <TouchableOpacity
                 style={[styles.actionBtn, styles.deleteBtn]}
                 onPress={() => navigation.navigate('EnableChurch', { id: item.id })}>
-                <EnabledSvgIcon width={18} height={18} />
+                <EnabledSvgIcon width={ws(15)} height={hs(15)} />
               </TouchableOpacity>
             </View>
           </View>
@@ -202,9 +239,14 @@ export const ChurchesListScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} style={{ flex: 1, backgroundColor: C.background }}>
-      <View style={[styles.container, { backgroundColor: C.background }]}>
+    <SafeAreaView
+      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+      edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
+        style={{flex: 1, backgroundColor: C.background}}>
+        <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('disabledChurches')} />
 
         {/* <View style={styles.headerRow}>
@@ -236,15 +278,21 @@ export const ChurchesListScreen: React.FC = () => {
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets
           contentInsetAdjustmentBehavior="always"
-          contentContainerStyle={{ paddingBottom: 24 }}
+          contentContainerStyle={{paddingBottom: ms(24)}}
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
-          ListEmptyComponent={!loading ? (
-            <Text style={[styles.empty, { color: C.textSecondary }]}>{t('noChurchesFound')}</Text>
-          ) : null}
+          ListEmptyComponent={
+            !loading ? (
+              <Text style={[styles.empty, {color: C.textSecondary}]}>
+                {t('noChurchesFound')}
+              </Text>
+            ) : null
+          }
         />
-        <Text style={[styles.subTitle, { color: C.textSecondary }]}>{`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}</Text>
+        <Text style={[styles.subTitle, {color: C.textSecondary}]}>
+          {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
+        </Text>
         <View style={styles.pagination}>{renderPagination()}</View>
 
         <ActionSheetModal
@@ -261,7 +309,7 @@ export const ChurchesListScreen: React.FC = () => {
             return list;
           })()}
         />
-      </View>
+        </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -271,29 +319,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingTop: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: ms(16),
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
-  title: {fontSize: 22, fontWeight: '600'},
-  subTitle: {marginTop: 6, marginBottom: 10, fontSize: 12},
+  title: {fontSize: fs(16), fontWeight: '600'},
+  subTitle: {
+    marginTop: ms(6),
+    marginBottom: ms(10),
+    fontSize: fs(12),
+  },
   addButton: {
     backgroundColor: COLORS.mainColor,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(8),
+    borderRadius: rs(6),
   },
   addButtonText: {color: '#fff', fontWeight: '600'},
   search: {
-    height: 40,
+    height: hs(40),
     borderWidth: 1,
-    borderRadius: 6,
-    paddingHorizontal: 12,
-    marginBottom: 10,
-    marginTop: 6,
+    borderRadius: rs(6),
+    paddingHorizontal: ms(12),
+    marginBottom: ms(10),
+    marginTop: ms(6),
   },
   itemRow: {
     flexDirection: 'row',
@@ -305,16 +357,16 @@ const styles = StyleSheet.create({
   itemColRight: {
     alignItems: 'flex-end',
     justifyContent: 'center',
-    paddingLeft: 8,
-    width: 72,
+    paddingLeft: ms(8),
+    width: ws(72),
   },
-  name: {fontSize: 16, fontWeight: '600', marginBottom: 2},
-  meta: {fontSize: 12},
-  actionRow: {flexDirection: 'row', gap: 6},
+  name: {fontSize: fs(14), fontWeight: '600', marginBottom: ms(2)},
+  meta: {fontSize: fs(12)},
+  actionRow: {flexDirection: 'row', gap: ms(6)},
   actionBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 4,
+    width: ws(25),
+    height: ws(25),
+    borderRadius: rs(4),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -327,29 +379,37 @@ const styles = StyleSheet.create({
   copyBtn: {
     backgroundColor: COLORS.mainColor,
   },
-  empty: {textAlign: 'center', marginTop: 40},
-  pagination: {paddingVertical: 12, alignItems: 'flex-end'},
+  empty: {textAlign: 'center', marginTop: ms(40)},
+  pagination: {paddingVertical: ms(12), alignItems: 'flex-end'},
   pageNumbersContainer: {flexDirection: 'row', alignItems: 'center'},
   pageNumber: {
-    borderRadius: 0,
+    borderRadius: rs(1),
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    marginLeft: 8,
+    paddingHorizontal: ms(10),
+    marginLeft: ms(8),
   },
   pageNumberActive: {
     backgroundColor: COLORS.mainColor,
     borderColor: COLORS.mainColor,
   },
   pageNumberDisabled: {opacity: 0.5},
-  pageNumberText: {fontWeight: '600'},
+  pageNumberText: {fontWeight: '600', fontSize: fs(12)},
   pageNumberTextActive: {color: '#fff'},
-  badge: { paddingVertical: 2, paddingHorizontal: 8, borderRadius: 999 },
-  badgePrimary: { backgroundColor: COLORS.mainColor },
-  badgeInfo: { backgroundColor: '#0ea5e9' },
-  badgeTextPrimary: { color: '#fff', fontSize: 11, fontWeight: '700' },
-  badgeTextInfo: { color: '#fff', fontSize: 11, fontWeight: '700' },
+  badge: {
+    paddingVertical: ms(2),
+    paddingHorizontal: ms(8),
+    borderRadius: rs(999),
+  },
+  badgePrimary: {backgroundColor: COLORS.mainColor},
+  badgeInfo: {backgroundColor: '#0ea5e9'},
+  badgeTextPrimary: {
+    color: '#fff',
+    fontSize: fs(11),
+    fontWeight: '700',
+  },
+  badgeTextInfo: {color: '#fff', fontSize: fs(11), fontWeight: '700'},
 });
 
 export default ChurchesListScreen;

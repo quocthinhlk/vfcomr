@@ -1,6 +1,7 @@
 import React from 'react';
-import { Select, SelectItem, Text } from '@ui-kitten/components';
-import { View, StyleSheet } from 'react-native';
+import {Select, SelectItem, Text} from '@ui-kitten/components';
+import {View, StyleSheet} from 'react-native';
+import {fs, ms} from '../../utils/scale';
 
 interface Option {
   label: string;
@@ -22,7 +23,7 @@ export default function FormSelect({
   onSelect,
   options,
   valueLabel,
-  error
+  error,
 }: FormSelectProps) {
   return (
     <View style={styles.wrapper}>
@@ -44,14 +45,14 @@ export default function FormSelect({
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 8,
+    marginBottom: ms(8),
     flex: 1,
   },
   label: {
-    marginBottom: 4,
+    marginBottom: ms(4),
   },
   errorText: {
-    fontSize: 12,
-    marginTop: 4,
+    fontSize: fs(12),
+    marginTop: ms(4),
   },
 });

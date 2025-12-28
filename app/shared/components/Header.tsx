@@ -116,10 +116,11 @@ const styles = StyleSheet.create({
     color: '#111',
   },
   backIcon: {
-    width: ws(35),
+    width: ws(25),
     height: hs(35),
     resizeMode: 'contain',
     marginLeft: 0,
+    textAlign: 'right',
   },
   backWrap: {
     marginLeft: 0,

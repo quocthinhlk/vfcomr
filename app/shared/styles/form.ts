@@ -2,6 +2,9 @@ import { StyleSheet, Platform } from 'react-native';
 import { COLORS } from '../constants/colors';
 import { fs, ws, hs, ms, rs } from '../utils/scale';
 
+// Form input height config - shared across AppInput and ElementDropdown
+export const FORM_INPUT_HEIGHT = ms(35);
+
 export const formStyles = StyleSheet.create({
   container: {
     flex: 1,
@@ -45,10 +48,10 @@ export const formStyles = StyleSheet.create({
 
   // Base text input style for React Native TextInput fields
   textField: {
-    height: ms(32),
+    height: FORM_INPUT_HEIGHT,
     borderWidth: 1,
-    borderRadius: rs(6),
-    paddingHorizontal: ms(12),
+    borderRadius: rs(3),
+    paddingLeft: ms(6),
   },
 
   select: {
@@ -57,7 +60,7 @@ export const formStyles = StyleSheet.create({
   },
 
   inputTextStyle: {
-    fontSize: fs(14),
+    fontSize: fs(12),
     paddingVertical: 0,
   },
 
@@ -72,7 +75,6 @@ export const formStyles = StyleSheet.create({
   },
 
   label: {
-    color: '#8f9bb3',
     fontWeight: 'bold',
     marginBottom: ms(4),
     fontSize: fs(12),
@@ -175,6 +177,29 @@ export const formStyles = StyleSheet.create({
   addChildButtonText: {
     fontSize: fs(7),
     fontWeight: '500',
+  },
+
+  // Phone input container style
+  phoneInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: FORM_INPUT_HEIGHT,
+    paddingHorizontal: ms(8),
+    borderWidth: 1,
+    borderRadius: rs(6),
+  },
+
+  // Phone input calling code text
+  phoneCallingCodeText: {
+    marginLeft: ms(8),
+    fontSize: fs(14),
+  },
+
+  // Phone input text field
+  phoneInputText: {
+    flex: 1,
+    marginLeft: ms(8),
+    fontSize: fs(16),
   },
 });
 

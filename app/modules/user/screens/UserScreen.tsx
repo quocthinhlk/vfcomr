@@ -2,16 +2,19 @@ import React, { useEffect, useState, useCallback } from 'react';
 import { BackButton } from '../../../shared/components/BackButton';
 import { View, ScrollView, ActivityIndicator, StyleSheet, Image, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Layout, Text, Button } from '@ui-kitten/components';
-import { Header } from '../../../shared/components/Header';
-import { globalStyles } from '../../../shared/styles/global';
-import { useRoute, useNavigation } from '@react-navigation/native';
-import { getUserById, UserDetailData } from '../services/user.service';
-import { COLORS } from '../../../shared/constants/colors';
-import { useTranslation } from '../../../shared/hooks/useTranslation';
-import { useThemedColors } from '../../../shared/styles/theme';
-import { isSuperAdmin } from '../../../shared/utils/permissions';
+import {Layout, Text} from '@ui-kitten/components';
+import {Header} from '../../../shared/components/Header';
+import {globalStyles} from '../../../shared/styles/global';
+import {useRoute, useNavigation} from '@react-navigation/native';
+import {getUserById, UserDetailData} from '../services/user.service';
+import {COLORS} from '../../../shared/constants/colors';
+import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useThemedColors} from '../../../shared/styles/theme';
+import {isSuperAdmin} from '../../../shared/utils/permissions';
 import api from '../../../config/api';
+import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
+import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 
 const blankAvatar = require('../../../assets/images/blank-avatar.png');
 
@@ -84,101 +87,114 @@ export const UserScreen = () => {
       <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
       <Header title={t('userDetail')} />
         <ScrollView showsVerticalScrollIndicator={false}>
-          <View style={styles.banner} />
 
           <View style={[styles.profileCard, { backgroundColor: C.surface, shadowOpacity: 0.15 }] }>
-            <View style={styles.avatarWrapper}>
+            <View style={styles.detailsPhotoWrapper}>
               <Image
                 source={user?.photo_url && !avatarError ? { uri: user.photo_url } : blankAvatar}
-                style={styles.avatar}
+                style={styles.detailsPhoto}
+                resizeMode="cover"
                 onError={() => setAvatarError(true)}
               />
             </View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={[styles.name, { color: C.textPrimary }]}>{user?.name || '-'}</Text>
-              {isOwnProfile && (
-                <View style={[styles.ownProfileBadge, { backgroundColor: COLORS.mainColor }]}>
-                  <Text style={styles.ownProfileBadgeText}>{t('you')}</Text>
-                </View>
-              )}
-            </View>
-            {user?.title ? <Text style={[styles.title, { color: C.textSecondary }]}>{user.title}</Text> : null}
 
-            <View style={styles.chipsRow}>
-              {user?.role?.name ? (
-                <View style={[styles.chip, styles.chipPrimary]}>
-                  <Text style={styles.chipTextPrimary}>{user.role.name}</Text>
-                </View>
-              ) : null}
-              {user?.country_name ? (
-                <View style={[styles.chip, { backgroundColor: C.surface }]}>
-                  <Text style={[styles.chipText, { color: C.textPrimary }]}>{user.country_name}</Text>
-                </View>
-              ) : null}
-              {typeof user?.sensitive_nation === 'boolean' ? (
-                <View style={[styles.chip, user.sensitive_nation ? styles.chipDanger : styles.chipSuccess]}>
-                  <Text style={[styles.chipText, user.sensitive_nation ? styles.chipTextDanger : styles.chipTextSuccess]}>
-                    {user.sensitive_nation ? t('sensitiveNation') : t('open')}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          </View>
+            <View style={[styles.detailsTable, { borderTopColor: C.border }]}>
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>
+                  {t('fullName')}
+                </Text>
+                <Text style={[styles.detailValueStrong, { color: COLORS.mainColor }]}>
+                  {user?.name || '-'}
+                </Text>
+              </View>
 
-          <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
-            <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('contact')}</Text>
-            <View style={styles.row}>
-              <Text style={[styles.label, { color: C.textSecondary }]}>{t('phone')}</Text>
-              <Text
-                style={[styles.value, { color: C.textPrimary }, user?.mobile_phone ? styles.link : undefined]}
-                onPress={() => user?.mobile_phone && dialPhone(user.mobile_phone)}
-              >
-                {user?.mobile_phone ? formatPhoneDisplay(user.mobile_phone) : '-'}
-              </Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={[styles.label, { color: C.textSecondary }]}>{t('email')}</Text>
-              <Text
-                style={[styles.value, { color: C.textPrimary }, user?.email_address ? styles.link : undefined]}
-                onPress={() => user?.email_address && sendEmail(user.email_address)}
-              >
-                {user?.email_address || '-'}
-              </Text>
-            </View>
-          </View>
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('ministryTitle')}</Text>
+                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
+                  {user?.title || '-'}
+                </Text>
+              </View>
 
-          <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
-            <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('roleLocation')}</Text>
-            <View style={styles.row}>
-              <Text style={[styles.label, { color: C.textSecondary }]}>{t('role')}</Text>
-              <Text style={[styles.value, { color: C.textPrimary }]}>{user?.role?.name || '-'}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={[styles.label, { color: C.textSecondary }]}>{t('country')}</Text>
-              <Text style={[styles.value, { color: C.textPrimary }]}>{user?.country_name || '-'}</Text>
-            </View>
-            <View style={styles.row}>
-              <Text style={[styles.label, { color: C.textSecondary }]}>{t('sensitiveNation')}</Text>
-              <Text style={[styles.value, { color: C.textPrimary }]}>{user?.sensitive_nation ? t('yes') : t('no')}</Text>
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('omrUsername')}</Text>
+                <Text style={[styles.detailValueLink, { color: '#2e7d32' }]}>
+                  {(user as any)?.username || '-'}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('omrStatus')}</Text>
+                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
+                  {user?.role?.name || '-'}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('language')}</Text>
+                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
+                  {(user as any)?.language_name || (user as any)?.language?.name || '-'}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('country')}</Text>
+                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
+                  {user?.country_name || '-'}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('sensitiveNation')}</Text>
+                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
+                  {user?.sensitive_nation ? t('yes') : t('no')}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('emailAddress')}</Text>
+                <Text
+                  style={[styles.detailValueLink, { color: COLORS.mainColor }]}
+                  onPress={() => user?.email_address && sendEmail(user.email_address)}
+                >
+                  {user?.email_address || '-'}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('mobilePhone')}</Text>
+                <Text
+                  style={[styles.detailValueLink, { color: COLORS.mainColor }]}
+                  onPress={() => user?.mobile_phone && dialPhone(user.mobile_phone)}
+                >
+                  {user?.mobile_phone ? formatPhoneDisplay(user.mobile_phone) : '-'}
+                </Text>
+              </View>
+
+              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
+                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('from')}</Text>
+                <Text style={[styles.detailValueLink, { color: COLORS.mainColor }]}>
+                  {(user as any)?.church_name || (user as any)?.church?.name || '-'}
+                </Text>
+              </View>
             </View>
           </View>
 
           {user?.credentials ? (
             <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
               <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('credentials')}</Text>
-              <View style={styles.row}>
+              <View style={[styles.row, { borderBottomColor: C.border }]}>
                 <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentials')}</Text>
                 <Text style={[styles.value, { color: C.textPrimary }]}>{user.credentials || '-'}</Text>
               </View>
-              <View style={styles.row}>
+              <View style={[styles.row, { borderBottomColor: C.border }]}>
                 <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentialsNumber')}</Text>
                 <Text style={[styles.value, { color: C.textPrimary }]}>{user.credentials_number || '-'}</Text>
               </View>
-              <View style={styles.row}>
+              <View style={[styles.row, { borderBottomColor: C.border }]}>
                 <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentialsFrom')}</Text>
                 <Text style={[styles.value, { color: C.textPrimary }]}>{user.credentials_from || '-'}</Text>
               </View>
-              <View style={styles.row}>
+              <View style={[styles.row, { borderBottomColor: C.border }]}>
                 <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentialsExpiry')}</Text>
                 <Text style={[styles.value, { color: C.textPrimary }]}>{formatDateDMY(user.credentials_expiry_date) || '-'}</Text>
               </View>
@@ -204,19 +220,27 @@ export const UserScreen = () => {
             </View>
           ) : null}
           {isSuperAdmin(roleId) && !isOwnProfile ? (
-          <View style={{ marginTop: 12 }}>
-          <Button style={{ backgroundColor: COLORS.dangerColor, borderColor: COLORS.dangerColor }} onPress={() => navigation.navigate('DeleteUser' as any, { userId })}>
-            {t('deleteUser')}
-          </Button>
-        </View>
-        ) : null}
+            <View style={{marginTop: ms(12)}}>
+              <AddNewHeaderButton
+                name="DeleteUser"
+                params={{userId}}
+                text={t('deleteUser')}
+                prefix=""
+                style={{
+                  backgroundColor: COLORS.dangerColor,
+                  marginTop: 0,
+                }}
+                textStyle={{fontSize: fs(12)}}
+              />
+            </View>
+          ) : null}
         </ScrollView>
       </Layout>
     </SafeAreaView>
   );
 };
 
-const CARD_RADIUS = 12;
+const CARD_RADIUS = rs(12);
 
 function dialPhone(phone?: string) {
   if (!phone) return;
@@ -241,52 +265,67 @@ function formatDateDMY(value?: any): string {
 }
 
 const styles = StyleSheet.create({
-  banner: {
-    height: 100,
-    backgroundColor: COLORS.mainColor,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    marginHorizontal: -15,
-  },
   profileCard: {
-    marginTop: -40,
     backgroundColor: '#fff',
-    borderRadius: CARD_RADIUS,
-    padding: 16,
+    padding: ms(16),
     marginHorizontal: 0,
     shadowColor: '#000',
     shadowOpacity: 0.05,
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+  },
+  detailsPhotoWrapper: {
     alignItems: 'center',
+    marginBottom: ms(12),
   },
-  avatarWrapper: {
-    marginTop: -50,
-    marginBottom: 6,
+  detailsPhoto: {
+    width: '100%',
+    height: hs(180),
   },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    borderWidth: 3,
-    borderColor: '#fff',
+  detailsTable: {
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  name: {
-    fontSize: 22,
+  detailRow: {
+    flexDirection: 'row',
+    paddingVertical: ms(8),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  detailLabel: {
+    width: ws(120),
+    fontSize: fs(12),
+    flexShrink: 1,
+    flexWrap: 'wrap',
+  },
+  detailValue: {
+    flex: 1,
+    fontSize: fs(12),
+    fontWeight: '500',
+    flexShrink: 1,
+  },
+  detailValueStrong: {
+    flex: 1,
+    fontSize: fs(14),
     fontWeight: '700',
-    marginTop: 6,
+    flexShrink: 1,
+  },
+  detailValueLink: {
+    flex: 1,
+    fontSize: fs(12),
+    fontWeight: '600',
+    textDecorationLine: 'underline',
+    flexShrink: 1,
   },
   ownProfileBadge: {
     backgroundColor: COLORS.mainColor,
-    borderRadius: 12,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginTop: 6,
+    borderRadius: rs(12),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(4),
+    marginTop: ms(6),
   },
   ownProfileBadgeText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: fs(12),
     fontWeight: '700',
     textTransform: 'uppercase',
   },
@@ -298,14 +337,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'center',
-    gap: 8,
-    marginTop: 10,
+    gap: ms(8),
+    marginTop: ms(10),
   },
   chip: {
     backgroundColor: '#F3F4F6',
     borderRadius: 999,
-    paddingVertical: 6,
-    paddingHorizontal: 12,
+    paddingVertical: ms(6),
+    paddingHorizontal: ms(12),
   },
   chipText: {
     color: '#111827',
@@ -335,8 +374,8 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: '#fff',
     borderRadius: CARD_RADIUS,
-    padding: 16,
-    marginTop: 12,
+    padding: ms(16),
+    marginTop: ms(12),
     shadowColor: '#000',
     shadowOpacity: 0.04,
     shadowRadius: 6,
@@ -344,40 +383,47 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   cardTitle: {
-    fontSize: 16,
+    fontSize: fs(14),
     fontWeight: '700',
-    marginBottom: 8,
+    marginBottom: ms(8),
   },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 6,
+    paddingVertical: ms(6),
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
   },
   label: {
-    color: '#666',
+    width: ws(180),
+    fontSize: fs(12),
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   value: {
-    fontWeight: '600',
+    flex: 1,
+    fontSize: fs(12),
+    fontWeight: '500',
+    flexShrink: 1,
   },
   link: {
     color: COLORS.mainColor,
   },
   multiline: {
-    color: '#333',
-    lineHeight: 20,
+    flex: 1,
+    fontSize: fs(12),
+    fontWeight: '500',
+    flexShrink: 1,
   },
   loadingOverlay: {
-    marginTop: 16,
+    marginTop: ms(16),
     alignItems: 'center',
   },
   errorBox: {
-    marginTop: 12,
+    marginTop: ms(12),
     backgroundColor: '#FEF2F2',
-    borderRadius: 8,
-    padding: 10,
+    borderRadius: rs(8),
+    padding: ms(10),
   },
   errorText: {
     color: '#991B1B',

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { View, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Layout, Text, Input, Button } from '@ui-kitten/components';
+import { Layout, Text } from '@ui-kitten/components';
 import { globalStyles } from '../../../shared/styles/global';
 import { formStyles } from '../../../shared/styles/form';
 import { Header } from '../../../shared/components/Header';
@@ -13,6 +13,9 @@ import { isSuperAdmin } from '../../../shared/utils/permissions';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
 import { Col, Row, Grid } from 'react-native-easy-grid';
+import AppInput from '../../../shared/components/AppInput';
+import AppButton from '../../../shared/components/AppButton';
+import { ms, hs } from '../../../shared/utils/scale';
 
 export default function ChangePasswordForOtherUserScreen() {
   const navigation = useNavigation<any>();
@@ -31,7 +34,7 @@ export default function ChangePasswordForOtherUserScreen() {
     setFieldY(prev => (prev[key] === y ? prev : { ...prev, [key]: y }));
   const scrollToField = (key: string) => {
     const y = fieldY[key] ?? 0;
-    scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true });
+    scrollRef.current?.scrollTo({ y: Math.max(0, y - ms(20)), animated: true });
   };
   const clearInvalid = (key: string) => setInvalid(prev => ({ ...prev, [key]: false }));
 
@@ -70,7 +73,11 @@ export default function ChangePasswordForOtherUserScreen() {
       <Header title={t('changePassword')} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
+          keyboardVerticalOffset={
+            Platform.OS === 'ios'
+              ? hs(64)
+              : (StatusBar.currentHeight || 0) + hs(50)
+          }
           style={{ flex: 1 }}
         >
           <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentInsetAdjustmentBehavior="always" contentContainerStyle={{ paddingBottom: 24 }}>
@@ -140,15 +147,13 @@ export default function ChangePasswordForOtherUserScreen() {
                           <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                             {t('oldPassword')} <Text status="danger">*</Text>
                           </Text>
-                          <Input
-                            style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.old_password ? '#db2d2d' : C.inputBorder }]}
-                            textStyle={{ color: C.inputText }}
+                          <AppInput
                             value={values.old_password}
                             onChangeText={t => { setFieldValue('old_password', t); clearInvalid('old_password'); }}
                             onBlur={handleBlur('old_password')}
                             secureTextEntry
                             autoCapitalize="none"
-                            status={invalid.old_password ? 'danger' : 'basic'}
+                            error={!!invalid.old_password}
                           />
                         </View>
                       </Col>
@@ -161,15 +166,13 @@ export default function ChangePasswordForOtherUserScreen() {
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                           {t('newPassword')} <Text status="danger">*</Text>
                         </Text>
-                        <Input
-                          style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.new_password ? '#db2d2d' : C.inputBorder }]}
-                          textStyle={{ color: C.inputText }}
+                        <AppInput
                           value={values.new_password}
                           onChangeText={t => { setFieldValue('new_password', t); clearInvalid('new_password'); }}
                           onBlur={handleBlur('new_password')}
                           secureTextEntry
                           autoCapitalize="none"
-                          status={invalid.new_password ? 'danger' : 'basic'}
+                          error={!!invalid.new_password}
                         />
                       </View>
                     </Col>
@@ -181,15 +184,13 @@ export default function ChangePasswordForOtherUserScreen() {
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
                           {t('repeatNewPassword')} <Text status="danger">*</Text>
                         </Text>
-                        <Input
-                          style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid.repeat_new_password ? '#db2d2d' : C.inputBorder }]}
-                          textStyle={{ color: C.inputText }}
+                        <AppInput
                           value={values.repeat_new_password}
                           onChangeText={t => { setFieldValue('repeat_new_password', t); clearInvalid('repeat_new_password'); }}
                           onBlur={handleBlur('repeat_new_password')}
                           secureTextEntry
                           autoCapitalize="none"
-                          status={invalid.repeat_new_password ? 'danger' : 'basic'}
+                          error={!!invalid.repeat_new_password}
                         />
                       </View>
                     </Col>
@@ -197,9 +198,13 @@ export default function ChangePasswordForOtherUserScreen() {
 
                   <Row>
                     <Col>
-                      <Button onPress={() => handleSubmit()} style={globalStyles.mainButton}>
+                      <AppButton
+                        onPress={() => handleSubmit()}
+                        variant="primary"
+                        style={globalStyles.mainButton}
+                      >
                         {t('changePassword')}
-                      </Button>
+                      </AppButton>
                     </Col>
                   </Row>
                 </Grid>

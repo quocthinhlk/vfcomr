@@ -1,7 +1,7 @@
 // modules/auth/screens/LoginScreen.tsx
 import React, { useState } from 'react';
 import { View, Image, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView, Modal, TouchableWithoutFeedback, StyleSheet } from 'react-native';
-import { Button, Input, Text } from '@ui-kitten/components';
+import { Text } from '@ui-kitten/components';
 import { globalStyles } from '../../../shared/styles/global';
 import { authStyles } from '../styles';
 import { authImages } from '../config/auth.constants';
@@ -15,6 +15,9 @@ import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
 import { COLORS } from '../../../shared/constants/colors';
 import LanguageSelectModal from '../../../shared/components/LanguageSelectModal';
+import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
+import AppInput from '../../../shared/components/AppInput';
+import { SaveButton } from '../../../shared/components/ActionButtons';
 
 export default function LoginScreen() {
   const { navigate } = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -47,26 +50,22 @@ export default function LoginScreen() {
 
         </View>
 
-        <Input
+        <AppInput
           placeholder={t('username')}
           value={username}
           onChangeText={setUsername}
-          style={[globalStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-          textStyle={{ color: C.inputText }}
-          placeholderTextColor={C.textSecondary}
           autoCapitalize="none"
+          containerStyle={{ width: '100%', marginBottom: ms(15) }}
         />
 
-        <View style={authStyles.passwordInputContainer}>
-          <Input
+        <View style={[authStyles.passwordInputContainer, { marginBottom: ms(15) }]}>
+          <AppInput
             placeholder={t('password')}
             value={password}
             onChangeText={setPassword}
             secureTextEntry={!showPassword}
-            style={[globalStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-            textStyle={{ color: C.inputText }}
-            placeholderTextColor={C.textSecondary}
             autoCapitalize="none"
+            containerStyle={{ width: '100%' }}
           />
           <TouchableOpacity
             onPress={() => setShowPassword(!showPassword)}
@@ -79,13 +78,14 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <Button
-          onPress={handleLogin}
-          disabled={isLoading}
-          style={globalStyles.button}
-        >
-          {isLoading ? t('loggingIn') : t('login')}
-        </Button>
+        <View style={{ width: '100%', marginTop: ms(15) }}>
+          <SaveButton
+            label={isLoading ? t('loggingIn') : t('login')}
+            onPress={handleLogin}
+            disabled={isLoading}
+            style={{ flex: 0 }}
+          />
+        </View>
         {/* <TouchableOpacity style={authStyles.forgotPassword} onPress={() => navigate('ForgotPassword')}>
           <Text style={authStyles.forgotPasswordTxt}>Forgot your password?</Text>
         </TouchableOpacity> */}
@@ -124,7 +124,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    marginTop: 16,
+    marginTop: ms(16),
   },
   languageSelect: {
     marginRight: 0,
@@ -139,13 +139,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   languageIcon: {
-    width: 20,
-    height: 20,
-    marginRight: 6,
+    width: ws(20),
+    height: hs(20),
+    marginRight: ms(6),
     resizeMode: 'contain',
   },
   languageText: {
-    fontSize: 15,
+    fontSize: fs(15),
   },
   dropdownOverlay: {
     flex: 1,
@@ -155,74 +155,74 @@ const styles = StyleSheet.create({
   },
   dropdownContainer: {
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: rs(12),
     borderWidth: 0,
-    paddingVertical: 8,
-    paddingHorizontal: 8,
-    minWidth: 220,
-    maxWidth: 320,
-    maxHeight: 400,
+    paddingVertical: ms(8),
+    paddingHorizontal: ms(8),
+    minWidth: ws(220),
+    maxWidth: ws(320),
+    maxHeight: hs(400),
     elevation: 8,
     shadowColor: '#000',
     shadowOpacity: 0.2,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 6 },
+    shadowRadius: rs(12),
+    shadowOffset: { width: 0, height: hs(6) },
   },
   dropdownItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingVertical: ms(12),
+    paddingHorizontal: ms(12),
     width: '100%',
   },
   dropdownItemActive: {
     backgroundColor: 'rgba(53,99,233,0.08)',
-    borderRadius: 8,
+    borderRadius: rs(8),
   },
   dropdownHeader: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 8,
-    paddingVertical: 8,
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(8),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#eee',
   },
   dropdownTitle: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '700',
   },
   dropdownClose: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(4),
   },
   dropdownCloseText: {
-    fontSize: 16,
+    fontSize: fs(16),
   },
   dropdownList: {
-    paddingVertical: 4,
+    paddingVertical: ms(4),
   },
   flagIcon: {
-    width: 28,
-    height: 18,
-    marginRight: 10,
+    width: ws(28),
+    height: hs(18),
+    marginRight: ms(10),
     resizeMode: 'contain',
   },
   languageOptionText: {
-    fontSize: 16,
+    fontSize: fs(16),
   },
   languageOptionTextActive: {
     fontWeight: '700',
   },
   checkIcon: {
     marginLeft: 'auto',
-    fontSize: 16,
+    fontSize: fs(16),
     color: COLORS.successColor,
-    paddingHorizontal: 4,
+    paddingHorizontal: ms(4),
   },
   checkIconPlaceholder: {
     marginLeft: 'auto',
-    width: 16,
-    height: 16,
+    width: ws(16),
+    height: hs(16),
   },
 });

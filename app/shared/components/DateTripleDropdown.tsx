@@ -1,8 +1,9 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { View } from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {View} from 'react-native';
 import ElementDropdown from './ElementDropdown';
-import { useThemedColors } from '../styles/theme';
-import { useTranslation } from '../hooks/useTranslation';
+import {useThemedColors} from '../styles/theme';
+import {useTranslation} from '../hooks/useTranslation';
+import {ms} from '../utils/scale';
 
 type Props = {
   value: Date | null;
@@ -12,7 +13,13 @@ type Props = {
   error?: boolean;
 };
 
-const DateTripleDropdown: React.FC<Props> = ({ value, onChange, yearRange = 50, startYear, error }) => {
+const DateTripleDropdown: React.FC<Props> = ({
+  value,
+  onChange,
+  yearRange = 50,
+  startYear,
+  error,
+}) => {
   const C = useThemedColors();
   const { t } = useTranslation();
   const currentYear = new Date().getFullYear();
@@ -60,8 +67,8 @@ const DateTripleDropdown: React.FC<Props> = ({ value, onChange, yearRange = 50, 
   };
 
   return (
-    <View style={{ flexDirection: 'row', gap: 8 }}>
-      <View style={{ flex: 1 }}>
+    <View style={{flexDirection: 'row', gap: ms(8)}}>
+      <View style={{flex: 1}}>
         <ElementDropdown
           data={days.map(n => ({ label: String(n), value: n }))}
           value={localDay as any}
@@ -73,7 +80,7 @@ const DateTripleDropdown: React.FC<Props> = ({ value, onChange, yearRange = 50, 
           activeItemColor={C.surface}
         />
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={{flex: 1}}>
         <ElementDropdown
           data={months.map(n => ({ label: String(n), value: n }))}
           value={localMonth as any}
@@ -85,7 +92,7 @@ const DateTripleDropdown: React.FC<Props> = ({ value, onChange, yearRange = 50, 
           activeItemColor={C.surface}
         />
       </View>
-      <View style={{ flex: 1 }}>
+      <View style={{flex: 1}}>
         <ElementDropdown
           data={years.map(n => ({ label: String(n), value: n }))}
           value={localYear as any}

@@ -318,7 +318,7 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: ms(16),
+    paddingVertical: ms(10),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
   },
@@ -335,7 +335,7 @@ const styles = StyleSheet.create({
     marginRight: ms(6),
   },
   menuLabel: {
-    fontSize: fs(17),
+    fontSize: fs(15),
     color: '#fff',
     flex: 1,
   },
@@ -345,12 +345,12 @@ const styles = StyleSheet.create({
     fontSize: fs(15),
   },
   subMenuList: {
-    paddingLeft: ms(20),
+    paddingLeft: ms(8),
   },
   subMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: ms(12),
+    paddingVertical: ms(10),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.06)',
   },
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     marginRight: ms(6),
   },
   subMenuLabel: {
-    fontSize: fs(17),
+    fontSize: fs(15),
     color: '#fff',
   },
 
@@ -376,12 +376,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   logoutIcon: {
-    width: ws(20),
-    height: hs(20),
+    width: ws(18),
+    height: hs(18),
     tintColor: '#fff',
   },
   logoutLabel: {
-    fontSize: fs(17),
+    fontSize: fs(15),
     color: '#fff',
   },
   bottomSection: {
@@ -402,7 +402,7 @@ const styles = StyleSheet.create({
     // borderRadius: 5,
   },
   languageIcon: {
-    width: ws(20),
+    width: ws(18),
     marginRight: ms(4),
     resizeMode: 'contain',
   },
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   languageText: {
-    fontSize: fs(17),
+    fontSize: fs(15),
     color: '#fff',
   },
   languageOptionText: {

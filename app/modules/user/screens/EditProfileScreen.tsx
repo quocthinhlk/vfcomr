@@ -11,16 +11,13 @@ import {
   StatusBar,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Input, Button, Layout, Datepicker, Text} from '@ui-kitten/components';
+import {Layout, Text} from '@ui-kitten/components';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {BackButton} from '../../../shared/components/BackButton';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import CountryPicker, {
-  Country,
-  CountryCode,
-} from 'react-native-country-picker-modal';
+import { CountryPicker } from 'react-native-country-codes-picker';
 import {resolveByCallingCodePrefix} from '../config/phone';
 import {formStyles} from '../../../shared/styles/form';
 import {getChurchesList} from '../../church/services/church.service';
@@ -34,7 +31,27 @@ import {COLORS} from '../../../shared/constants/colors';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
+import {fs, ms, rs, hs} from '../../../shared/utils/scale';
+import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import {Col, Row, Grid} from 'react-native-easy-grid';
+import AppInput from '../../../shared/components/AppInput';
+import AppButton from '../../../shared/components/AppButton';
+import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+
+const countryCodeToFlag = (code: string) => {
+  if (!code) {
+    return '🏳️';
+  }
+  const chars = code.toUpperCase().split('');
+  if (chars.length !== 2) {
+    return '🏳️';
+  }
+  const base = 127397;
+  return String.fromCodePoint(
+    base + chars[0].charCodeAt(0),
+    base + chars[1].charCodeAt(0),
+  );
+};
 
 export default function EditProfileScreen() {
   const route = useRoute<any>();
@@ -42,13 +59,6 @@ export default function EditProfileScreen() {
   const userId = Number(route.params?.id);
   const {t} = useTranslation();
   const C = useThemedColors();
-  const cpTheme: any = {
-    primaryColor: C.textPrimary,
-    primaryColorVariant: C.textSecondary,
-    backgroundColor: C.surface,
-    onBackgroundTextColor: C.textPrimary,
-    filterPlaceholderTextColor: C.textSecondary,
-  };
 
   const {imagePath, handleImagePick, clearImage} = useImagePicker();
 
@@ -71,7 +81,8 @@ export default function EditProfileScreen() {
   >([]);
   const [credentialOptions, setCredentialOptions] = useState<string[]>([]);
 
-  const [countryCode, setCountryCode] = useState<CountryCode>('SG');
+  const [countryCode, setCountryCode] = useState<string>('SG');
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [callingCode, setCallingCode] = useState<string>('65');
 
   const [churchItems, setChurchItems] = useState<{id: number; name: string}[]>(
@@ -87,7 +98,10 @@ export default function EditProfileScreen() {
     setFieldY(prev => (prev[key] === y ? prev : {...prev, [key]: y}));
   const scrollToField = (key: string) => {
     const y = fieldY[key] ?? 0;
-    scrollRef.current?.scrollTo({y: Math.max(0, y - 20), animated: true});
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, y - ms(20)),
+      animated: true,
+    });
   };
 
   const formatPhoneReadable = (digits: string) => {
@@ -168,7 +182,7 @@ export default function EditProfileScreen() {
 
           // if not found, leave defaults; mapping already tries longest prefix
 
-          if (resolvedCca2) {setCountryCode(resolvedCca2 as CountryCode);}
+          if (resolvedCca2) {setCountryCode(resolvedCca2);}
           if (resolvedCode) {setCallingCode(resolvedCode);}
         }
 
@@ -233,7 +247,9 @@ export default function EditProfileScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={
-            Platform.OS === 'ios' ? 64 : (StatusBar.currentHeight || 0) + 50
+            Platform.OS === 'ios'
+              ? hs(64)
+              : (StatusBar.currentHeight || 0) + hs(50)
           }
           style={{flex: 1}}>
           <ScrollView
@@ -374,21 +390,13 @@ export default function EditProfileScreen() {
                         style={{
                           flexDirection: 'row',
                           justifyContent: 'flex-end',
-                          marginBottom: 12,
                         }}>
-                        <Button
-                          size="small"
-                          appearance="outline"
-                          onPress={() =>
-                            navigation.navigate(
-                              'ChangePasswordForOtherUser' as any,
-                              {
-                                id: userId,
-                              },
-                            )
-                          }>
-                          {t('changePassword')}
-                        </Button>
+                        <AddNewHeaderButton
+                          name="ChangePasswordForOtherUser"
+                          params={{id: userId}}
+                          text={t('changePassword')}
+                          prefix=""
+                        />
                       </View>
                     </Col>
                   </Row>
@@ -442,18 +450,7 @@ export default function EditProfileScreen() {
                           {t('firstName')}{' '}
                           <Text style={{color: '#c00000'}}>*</Text>
                         </Text>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: invalid.first_name
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.first_name}
                           autoCapitalize="words"
                           onChangeText={t => {
@@ -461,7 +458,7 @@ export default function EditProfileScreen() {
                             clearInvalid('first_name');
                           }}
                           onBlur={handleBlur('first_name')}
-                          status={invalid.first_name ? 'danger' : 'basic'}
+                          error={!!invalid.first_name}
                         />
                       </View>
                     </Col>
@@ -488,18 +485,7 @@ export default function EditProfileScreen() {
                             offsetY={-2}
                           />
                         </View>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: invalid.title
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.title}
                           autoCapitalize="words"
                           onChangeText={t => {
@@ -507,7 +493,7 @@ export default function EditProfileScreen() {
                             clearInvalid('title');
                           }}
                           onBlur={handleBlur('title')}
-                          status={invalid.title ? 'danger' : 'basic'}
+                          error={!!invalid.title}
                         />
                       </View>
                     </Col>
@@ -524,16 +510,7 @@ export default function EditProfileScreen() {
                           category="label">
                           {t('lastName')}
                         </Text>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.last_name}
                           autoCapitalize="words"
                           onChangeText={handleChange('last_name')}
@@ -564,27 +541,16 @@ export default function EditProfileScreen() {
                             offsetY={-2}
                           />
                         </View>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: invalid.username
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.username}
                           autoCapitalize="none"
-                          disabled
+                          editable={false}
                           onChangeText={t => {
                             setFieldValue('username', t);
                             clearInvalid('username');
                           }}
                           onBlur={handleBlur('username')}
-                          status={invalid.username ? 'danger' : 'basic'}
+                          error={!!invalid.username}
                         />
                       </View>
                     </Col>
@@ -918,18 +884,7 @@ export default function EditProfileScreen() {
                             offsetY={-2}
                           />
                         </View>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: invalid.email_address
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.email_address}
                           keyboardType="email-address"
                           autoCapitalize="none"
@@ -938,7 +893,7 @@ export default function EditProfileScreen() {
                             clearInvalid('email_address');
                           }}
                           onBlur={handleBlur('email_address')}
-                          status={invalid.email_address ? 'danger' : 'basic'}
+                          error={!!invalid.email_address}
                         />
                       </View>
                     </Col>
@@ -959,41 +914,35 @@ export default function EditProfileScreen() {
                           ) : null}
                         </Text>
                         <View
-                          style={[
-                            formStyles.input,
-                            {
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              height: 44,
-                              paddingHorizontal: 8,
-                              borderWidth: 1,
-                              borderRadius: 6,
-                              borderColor: invalid.mobile_phone
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                              backgroundColor: C.inputBg,
-                            },
-                          ]}>
-                          <CountryPicker
-                            theme={cpTheme}
-                            countryCode={countryCode}
-                            withFlag
-                            withFilter
-                            withCallingCode
-                            withEmoji
-                            onSelect={(c: Country) => {
-                              setCountryCode(c.cca2 as CountryCode);
-                              const cc =
-                                c.callingCode && c.callingCode[0]
-                                  ? c.callingCode[0]
-                                  : '';
-                              setCallingCode(cc);
-                            }}
-                          />
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderRadius: rs(3),
+                            paddingLeft: ms(8),
+                            paddingRight: ms(12),
+                            height: FORM_INPUT_HEIGHT,
+                            borderColor: invalid.mobile_phone
+                              ? '#db2d2d'
+                              : C.inputBorder,
+                            backgroundColor: C.inputBg,
+                          }}>
+                          <TouchableOpacity
+                            onPress={() => setShowCountryPicker(true)}
+                            style={{flexDirection: 'row', alignItems: 'center'}}>
+                            <Text
+                              style={{
+                                fontSize: fs(18),
+                                marginRight: ms(4),
+                              }}>
+                              {countryCodeToFlag(countryCode)}
+                            </Text>
+                          </TouchableOpacity>
                           <Text
                             style={{
-                              marginLeft: 8,
-                              fontSize: 16,
+                              marginLeft: ms(8),
+                              fontSize: fs(14),
                               color: C.textPrimary,
                             }}>
                             +{callingCode}
@@ -1001,9 +950,10 @@ export default function EditProfileScreen() {
                           <TextInput
                             style={{
                               flex: 1,
-                              marginLeft: 8,
-                              fontSize: 16,
+                              marginLeft: ms(8),
+                              fontSize: fs(14),
                               color: C.inputText,
+                              paddingVertical: 0,
                             }}
                             keyboardType="number-pad"
                             autoCapitalize="none"
@@ -1016,6 +966,53 @@ export default function EditProfileScreen() {
                             placeholder=""
                           />
                         </View>
+                        <CountryPicker
+                          show={showCountryPicker}
+                          lang={'en'}
+                          pickerButtonOnPress={item => {
+                            setCountryCode(item.code);
+                            setCallingCode(item.dial_code.replace('+', ''));
+                            setShowCountryPicker(false);
+                          }}
+                          onBackdropPress={() => setShowCountryPicker(false)}
+                          inputPlaceholderTextColor={C.textSecondary}
+                          style={{
+                            backdrop: {
+                              backgroundColor: C.overlay,
+                            },
+                            modal: {
+                              backgroundColor: C.surface,
+                            },
+                            modalInner: {
+                              backgroundColor: C.surface,
+                            },
+                            textInput: {
+                              color: C.inputText,
+                              backgroundColor: C.inputBg,
+                            },
+                            line: {
+                              backgroundColor: C.inputBorder,
+                            },
+                            itemsList: {
+                              backgroundColor: C.surface,
+                            },
+                            searchMessageText: {
+                              color: C.textSecondary,
+                            },
+                            countryName: {
+                              color: C.textPrimary,
+                            },
+                            dialCode: {
+                              color: C.textSecondary,
+                            },
+                            countryButtonStyles: {
+                              backgroundColor: C.bgSelectedOption,
+                            },
+                            flag: {
+                              color: C.textPrimary,
+                            },
+                          }}
+                        />
                       </View>
                     </Col>
                   </Row>
@@ -1077,16 +1074,7 @@ export default function EditProfileScreen() {
                               category="label">
                               {t('credentialsNumber')}
                             </Text>
-                            <Input
-                              style={[
-                                formStyles.input,
-                                {
-                                  backgroundColor: C.inputBg,
-                                  borderColor: C.inputBorder,
-                                  color: C.inputText,
-                                },
-                              ]}
-                              textStyle={formStyles.inputTextStyle}
+                            <AppInput
                               value={values.credentials_number}
                               autoCapitalize="none"
                               onChangeText={handleChange('credentials_number')}
@@ -1113,16 +1101,7 @@ export default function EditProfileScreen() {
                               category="label">
                               {t('credentialsFrom')}
                             </Text>
-                            <Input
-                              style={[
-                                formStyles.input,
-                                {
-                                  backgroundColor: C.inputBg,
-                                  borderColor: C.inputBorder,
-                                  color: C.inputText,
-                                },
-                              ]}
-                              textStyle={formStyles.inputTextStyle}
+                            <AppInput
                               value={values.credentials_form}
                               autoCapitalize="none"
                               onChangeText={handleChange('credentials_form')}
@@ -1164,11 +1143,12 @@ export default function EditProfileScreen() {
 
                   <Row>
                     <Col>
-                      <Button
+                      <AppButton
                         onPress={() => handleSubmit()}
+                        variant="primary"
                         style={globalStyles.mainButton}>
                         {t('save')}
-                      </Button>
+                      </AppButton>
                     </Col>
                   </Row>
                 </Grid>

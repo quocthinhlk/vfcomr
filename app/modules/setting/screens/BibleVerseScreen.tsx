@@ -1,12 +1,16 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { ScrollView, View, KeyboardAvoidingView, Platform, Alert, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Layout, Text, Input, Button } from '@ui-kitten/components';
+import { Layout, Text } from '@ui-kitten/components';
 import { Header } from '../../../shared/components/Header';
 import { globalStyles } from '../../../shared/styles/global';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import api from '../../../config/api';
 import { useThemedColors } from '../../../shared/styles/theme';
+import { fs, ms, hs } from '../../../shared/utils/scale';
+import AppInput from '../../../shared/components/AppInput';
+import { SaveButton } from '../../../shared/components/ActionButtons';
+import { formStyles } from '../../../shared/styles/form';
 
 export default function BibleVerseScreen() {
   const { t } = useTranslation();
@@ -57,21 +61,51 @@ export default function BibleVerseScreen() {
         <Header title={t('bibleVerse')} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : ((StatusBar.currentHeight || 0) + hs(50))}
           style={{ flex: 1 }}
         >
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: 16, paddingTop: 10 }} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets>
-            <View style={{ gap: 12 }}>
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: ms(16), paddingTop: ms(10) }}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets>
+            <View style={{ gap: ms(12) }}>
+              <Text
+                category="label"
+                style={[formStyles.label, { marginBottom: ms(4), color: C.textSecondary }]}>
+                Verse Heading
+              </Text>
+              <AppInput
+                value={verseHeading}
+                onChangeText={setVerseHeading}
+                autoCapitalize="sentences"
+              />
 
-              <Text category="label" style={{ marginBottom: 4, color: C.textSecondary }}>Verse Heading</Text>
-              <Input value={verseHeading} onChangeText={setVerseHeading} autoCapitalize="sentences" />
+              <Text
+                category="label"
+                style={[formStyles.label, { marginTop: ms(8), marginBottom: ms(4), color: C.textSecondary }]}>
+                Verse Body
+              </Text>
+              <AppInput
+                value={verseBody}
+                onChangeText={setVerseBody}
+                multiline
+                style={{ height: undefined, minHeight: hs(140), textAlignVertical: 'top', paddingTop: ms(8) }}
+                autoCapitalize="sentences"
+              />
 
-              <Text category="label" style={{ marginTop: 8, marginBottom: 4, color: C.textSecondary }}>Verse Body</Text>
-              <Input value={verseBody} onChangeText={setVerseBody} multiline textStyle={{ minHeight: 140 }} autoCapitalize="sentences" />
+              <SaveButton
+                label={t('save')}
+                onPress={handleSave}
+                disabled={saving}
+                style={{ marginTop: ms(12) }}
+              />
 
-              <Button onPress={handleSave} disabled={saving} style={[globalStyles.button, { marginTop: 12 }]}>{t('save')}</Button>
-
-              {loading ? <Text style={{ marginTop: 8, color: C.textPrimary }}>{t('loading')}...</Text> : null}
+              {loading ? (
+                <Text style={{ marginTop: ms(8), color: C.textPrimary, fontSize: fs(14) }}>
+                  {t('loading')}...
+                </Text>
+              ) : null}
             </View>
           </ScrollView>
         </KeyboardAvoidingView>

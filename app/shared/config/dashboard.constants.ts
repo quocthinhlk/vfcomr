@@ -1,8 +1,8 @@
 import { ImageSourcePropType } from 'react-native';
-import { CommonMenuItem } from '../../shared/interfaces/MenuItem';
+import { CommonMenuItem } from '../interfaces/MenuItem';
 import api from '../../config/api';
-import { isSuperAdmin } from '../../shared/utils/permissions';
-import { translations, TranslationKey, LanguageCode } from '../../shared/translations';
+import { isSuperAdmin } from '../utils/permissions';
+import { translations, TranslationKey, LanguageCode } from '../translations';
 
 const iconChurch = require('../../assets/images/icon/church.png');
 const iconRelated = require('../../assets/images/icon/related.png');

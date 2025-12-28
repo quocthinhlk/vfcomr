@@ -1,7 +1,16 @@
-import React, { useState } from 'react';
-import { TouchableOpacity, View, Text, ViewStyle, Modal, StyleSheet, ScrollView } from 'react-native';
-import { COLORS } from '../../shared/constants/colors';
-import { useThemedColors } from '../styles/theme';
+import React, {useState} from 'react';
+import {
+  TouchableOpacity,
+  View,
+  Text,
+  ViewStyle,
+  Modal,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
+import {COLORS} from '../constants/colors';
+import {useThemedColors} from '../styles/theme';
+import {fs, hs, ms, rs} from '../utils/scale';
 
 type Props = {
   onPress?: () => void;
@@ -26,10 +35,10 @@ export default function HelpIcon({
   onPress,
   title,
   message,
-  size = 16,
+  size = 13,
   color = COLORS.mainColor,
   marginLeft = 10,
-  offsetY = 0,
+  offsetY = -2,
   backgroundColor = 'rgba(53,99,233,0.12)',
   containerStyle,
 }: Props) {
@@ -50,8 +59,10 @@ export default function HelpIcon({
     <>
       <TouchableOpacity
         onPress={handlePress}
-        style={[{ marginLeft, transform: [{ translateY: offsetY }] }, containerStyle]}
-      >
+        style={[
+          {marginLeft: ms(marginLeft), transform: [{translateY: ms(offsetY)}]},
+          containerStyle,
+        ]}>
         <View
           style={{
             width: size,
@@ -68,7 +79,7 @@ export default function HelpIcon({
             style={{
               color,
               fontWeight: '700',
-              fontSize: Math.max(10, Math.round(size * 0.55)),
+              fontSize: Math.max(fs(10), Math.round(size * 0.55)),
             }}
           >
             i
@@ -86,8 +97,7 @@ export default function HelpIcon({
           <TouchableOpacity
             activeOpacity={1}
             style={helpIconStyles.backdrop}
-            onPress={() => setVisible(false)}
-          >
+            onPress={() => setVisible(false)}>
             <TouchableOpacity
               activeOpacity={1}
               style={[helpIconStyles.card, { backgroundColor: C.surface }]}
@@ -95,7 +105,7 @@ export default function HelpIcon({
             >
               <View style={helpIconStyles.header}>
                 <Text
-                  style={[helpIconStyles.title, { color: C.textPrimary }]}
+                  style={[helpIconStyles.title, {color: C.textPrimary}]}
                   numberOfLines={2}
                 >
                   {title}
@@ -104,7 +114,8 @@ export default function HelpIcon({
                   onPress={() => setVisible(false)}
                   style={helpIconStyles.closeButton}
                 >
-                  <Text style={[helpIconStyles.closeText, { color: C.textPrimary }]}>
+                  <Text
+                    style={[helpIconStyles.closeText, {color: C.textPrimary}]}>
                     ✕
                   </Text>
                 </TouchableOpacity>
@@ -114,7 +125,8 @@ export default function HelpIcon({
                   showsVerticalScrollIndicator={false}
                   bounces={false}
                 >
-                  <Text style={[helpIconStyles.body, { color: C.textSecondary }]}>
+                  <Text
+                    style={[helpIconStyles.body, {color: C.textSecondary}]}>
                     {message}
                   </Text>
                 </ScrollView>
@@ -133,19 +145,19 @@ const helpIconStyles = StyleSheet.create({
     backgroundColor: 'rgba(15,23,42,0.45)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 24,
+    paddingHorizontal: ms(20),
+    paddingVertical: ms(24),
   },
   card: {
     width: '80%',
     maxWidth: 360,
     maxHeight: '70%',
-    paddingHorizontal: 18,
-    paddingVertical: 14,
+    paddingHorizontal: ms(18),
+    paddingVertical: ms(14),
     shadowColor: '#000',
     shadowOpacity: 0.2,
-    shadowRadius: 16,
-    shadowOffset: { width: 0, height: 8 },
+    shadowRadius: rs(16),
+    shadowOffset: {width: 0, height: hs(8)},
     elevation: 6,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
@@ -154,31 +166,31 @@ const helpIconStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: 8,
-    marginBottom: 8,
+    paddingBottom: ms(8),
+    marginBottom: ms(8),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E5E7EB',
   },
   title: {
     flex: 1,
-    fontSize: 12,
+    fontSize: fs(12),
     fontWeight: '600',
-    paddingRight: 8,
+    paddingRight: ms(8),
   },
   closeButton: {
-    paddingHorizontal: 4,
-    paddingVertical: 2,
+    paddingHorizontal: ms(4),
+    paddingVertical: ms(2),
   },
   closeText: {
-    fontSize: 14,
+    fontSize: fs(14),
   },
   bodyContainer: {
-    maxHeight: 220,
-    paddingTop: 2,
+    maxHeight: hs(220),
+    paddingTop: ms(2),
   },
   body: {
-    fontSize: 12,
-    lineHeight: 18,
+    fontSize: fs(12),
+    lineHeight: fs(18),
     textAlign: 'left',
   },
 });

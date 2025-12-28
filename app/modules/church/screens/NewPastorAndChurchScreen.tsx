@@ -1,27 +1,55 @@
-import React, { useRef, useState, useEffect } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, TextInput, Alert, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Input, Button, Layout, Text } from '@ui-kitten/components';
-import { BackButton } from '../../../shared/components/BackButton';
-import { Header } from '../../../shared/components/Header';
-import { globalStyles } from '../../../shared/styles/global';
-import { churchStyles } from '../styles';
-import { formStyles } from '../../../shared/styles/form';
+import React, {useRef, useState, useEffect} from 'react';
+import {
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  TextInput,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  StatusBar,
+} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {Layout, Text} from '@ui-kitten/components';
+import {BackButton} from '../../../shared/components/BackButton';
+import {Header} from '../../../shared/components/Header';
+import {globalStyles} from '../../../shared/styles/global';
+import {churchStyles} from '../styles';
+import {formStyles, FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import { Formik } from 'formik';
+import {Formik} from 'formik';
 import api from '../../../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useNavigation } from '@react-navigation/native';
-import { useImagePicker } from '../../church/hooks/useImagePicker';
-import { DEFAULT_PAGE_LIMIT } from '../../../config/api';
-import { AddChurchFormValues, useFormOptions } from './utils/addChurch.utils';
-import CountryPicker, { Country, CountryCode } from 'react-native-country-picker-modal';
+import {useNavigation} from '@react-navigation/native';
+import {useImagePicker} from '../../church/hooks/useImagePicker';
+import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
+import {AddChurchFormValues, useFormOptions} from './utils/addChurch.utils';
+import {CountryPicker} from 'react-native-country-codes-picker';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
-import { COLORS } from '../../../shared/constants/colors';
+import {COLORS} from '../../../shared/constants/colors';
 import HelpIcon from '../../../shared/components/HelpIcon';
-import { useTranslation } from '../../../shared/hooks/useTranslation';
-import { useThemedColors } from '../../../shared/styles/theme';
-import { Col, Row, Grid } from 'react-native-easy-grid';
+import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useThemedColors} from '../../../shared/styles/theme';
+import {Col, Row, Grid} from 'react-native-easy-grid';
+import AppInput from '../../../shared/components/AppInput';
+import AppButton from '../../../shared/components/AppButton';
+import {fs, hs, ms, rs} from '../../../shared/utils/scale';
+
+const countryCodeToFlag = (code: string) => {
+  if (!code) {
+    return '🏳️';
+  }
+  const chars = code.toUpperCase().split('');
+  if (chars.length !== 2) {
+    return '🏳️';
+  }
+  const base = 127397;
+  return String.fromCodePoint(
+    base + chars[0].charCodeAt(0),
+    base + chars[1].charCodeAt(0),
+  );
+};
 
 type CombinedFormValues = AddChurchFormValues & {
   // user fields
@@ -46,20 +74,20 @@ const CHURCH_DRAFT_KEY = 'new_pastor_and_church_church_draft_v1';
 
 export default function NewPastorAndChurchScreen() {
   const navigation = useNavigation<any>();
-  const { t } = useTranslation();
+  const {t} = useTranslation();
   const C = useThemedColors();
-  const cpTheme: any = {
-    primaryColor: C.textPrimary,
-    primaryColorVariant: C.textSecondary,
-    backgroundColor: C.surface,
-    onBackgroundTextColor: C.textPrimary,
-    filterPlaceholderTextColor: C.textSecondary,
-  };
   const scrollRef = useRef<ScrollView>(null);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
-  const setFieldPos = (key: string, y: number) => setFieldY(prev => (prev[key] === y ? prev : { ...prev, [key]: y }));
-  const scrollToField = (key: string) => { const y = fieldY[key] ?? 0; scrollRef.current?.scrollTo({ y: Math.max(0, y - 20), animated: true }); };
+  const setFieldPos = (key: string, y: number) =>
+    setFieldY(prev => (prev[key] === y ? prev : {...prev, [key]: y}));
+  const scrollToField = (key: string) => {
+    const y = fieldY[key] ?? 0;
+    scrollRef.current?.scrollTo({
+      y: Math.max(0, y - ms(20)),
+      animated: true,
+    });
+  };
   const [showPastorSection, setShowPastorSection] = useState(false);
 
   // church dropdown options
@@ -90,7 +118,9 @@ export default function NewPastorAndChurchScreen() {
   } = useImagePicker();
 
   // dependent cities for church
-  const [cityOptions, setCityOptions] = useState<{ label: string; value: string }[]>([]);
+  const [cityOptions, setCityOptions] = useState<
+    {label: string; value: string}[]
+  >([]);
   const loadCities = async (countryId: string | number) => {
     try {
       const res = await api.get(`cities/country/${countryId}`);
@@ -105,10 +135,13 @@ export default function NewPastorAndChurchScreen() {
   const [langHasNext, setLangHasNext] = useState(false);
   const [langQuery, setLangQuery] = useState('');
   const [prefixOptions, setPrefixOptions] = useState<string[]>([]);
-  const [roleOptions, setRoleOptions] = useState<Array<{ id: number; name: string }>>([]);
+  const [roleOptions, setRoleOptions] = useState<
+    Array<{id: number; name: string}>
+  >([]);
   const [credentialOptions, setCredentialOptions] = useState<string[]>([]);
-  const [userCountryCode, setUserCountryCode] = useState<CountryCode>('SG');
+  const [userCountryCode, setUserCountryCode] = useState<string>('SG');
   const [userCallingCode, setUserCallingCode] = useState<string>('65');
+  const [showUserCountryPicker, setShowUserCountryPicker] = useState(false);
   const [initialValues, setInitialValues] = useState<CombinedFormValues>({
     // church
     name: '', short_name: '', is_msc: '', enable_cpm: '', parent_id: '', language_id: '', church_type_id: '', pastor_id: '', church_network_id: '', church_region_id: '', geographical_region_id: '', language_region_id: '', sensitive_nation: '', country_id: '', currency_id: '', city_id: '', photo_dir: '', service_address_street: '', service_address_postal_code: '', mailing_address_postal_code: '', office_address_street: '', office_address_postal_code: '', office_phone: '', office_fax: '', email_address: '', website: '', facebook: '', instagram: '', twitter: '', date_of_birth: null,
@@ -118,7 +151,9 @@ export default function NewPastorAndChurchScreen() {
   const [draftLoaded, setDraftLoaded] = useState(false);
 
   const formatPhoneReadable = (digits: string) => {
-    if (!digits) return '';
+    if (!digits) {
+      return '';
+    }
     const only = String(digits).replace(/\D/g, '').slice(0, 15);
     return only.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
   };
@@ -133,7 +168,11 @@ export default function NewPastorAndChurchScreen() {
     } catch {}
   };
 
-  useEffect(() => { if (!langQuery && langPage === 1) setLangOptions(languageOptions); }, [languageOptions]);
+  useEffect(() => {
+    if (!langQuery && langPage === 1) {
+      setLangOptions(languageOptions);
+    }
+  }, [languageOptions]);
 
   // Load saved church draft (step 1) from storage on mount
   useEffect(() => {
@@ -288,23 +327,35 @@ export default function NewPastorAndChurchScreen() {
   };
 
   return (
-    <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
-      <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
-      <Header title={t('addNewChurchAndPastor')} showMenu={false} />
+    <SafeAreaView
+      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+      edges={['top', 'bottom', 'left', 'right']}>
+      <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
+        <Header title={t('addNewChurchAndPastor')} showMenu={false} />
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
-          style={{ flex: 1, backgroundColor: C.background }}
-        >
-          <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentInsetAdjustmentBehavior="always" style={{ backgroundColor: C.background }} contentContainerStyle={{ paddingBottom: 24 }}>
+          keyboardVerticalOffset={
+            Platform.OS === 'ios'
+              ? hs(64)
+              : (StatusBar.currentHeight || 0) + hs(50)
+          }
+          style={{flex: 1, backgroundColor: C.background}}>
+          <ScrollView
+            ref={scrollRef}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
+            contentInsetAdjustmentBehavior="always"
+            style={{backgroundColor: C.background}}
+            contentContainerStyle={{paddingBottom: ms(24)}}>
 
-          {draftLoaded && (
-          <Formik<CombinedFormValues>
-            enableReinitialize
-            initialValues={initialValues}
-            onSubmit={async (values) => {
+            {draftLoaded && (
+              <Formik<CombinedFormValues>
+                enableReinitialize
+                initialValues={initialValues}
+                onSubmit={async values => {
               try {
-                const newInvalid: Record<string, boolean> = {};
+                  const newInvalid: Record<string, boolean> = {};
                 // required (church)
                 newInvalid.name = !values.name;
                 newInvalid.is_msc = !values.is_msc;
@@ -328,20 +379,27 @@ export default function NewPastorAndChurchScreen() {
                 newInvalid.user_church_id = !values.user_church_id;
                 newInvalid.user_email_address = !values.user_email_address;
                 newInvalid.user_mobile_phone = !values.user_mobile_phone;
-                setInvalid(newInvalid);
-                const firstInvalidKey = [
+                  setInvalid(newInvalid);
+                  const firstInvalidKey = [
                   'name','is_msc','language_id','church_type_id','church_network_id','church_region_id','geographical_region_id','language_region_id','country_id','currency_id','email_address','date_of_birth',
                   'username','password','title','first_name','user_role_id','user_language_id','user_church_id','user_email_address','user_mobile_phone'
-                ].find(k => newInvalid[k]);
-                if (firstInvalidKey) {
-                  Alert.alert(t('validation'), t('fillRequiredFields'), [
-                    { text: 'OK', onPress: () => { try { setTimeout(() => scrollToField(firstInvalidKey), 0); } catch {} } }
-                  ]);
-                  return;
-                }
+                  ].find(k => newInvalid[k]);
+                  if (firstInvalidKey) {
+                    Alert.alert(t('validation'), t('fillRequiredFields'), [
+                      {
+                        text: 'OK',
+                        onPress: () => {
+                          try {
+                            setTimeout(() => scrollToField(firstInvalidKey), 0);
+                          } catch {}
+                        },
+                      },
+                    ]);
+                    return;
+                  }
 
                 // upload images first if any
-                let churchPhotoPath: string | null = null;
+                  let churchPhotoPath: string | null = null;
                 if (churchImagePath) {
                   const form = new FormData();
                   const fileName = churchImagePath.split('/').pop() || 'photo.jpg';
@@ -351,7 +409,7 @@ export default function NewPastorAndChurchScreen() {
                   const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
                   churchPhotoPath = uploadRes?.data?.data?.path || null;
                 }
-                let userPhotoPath: string | null = null;
+                  let userPhotoPath: string | null = null;
                 if (userImagePath) {
                   const form = new FormData();
                   const fileName = userImagePath.split('/').pop() || 'photo.jpg';
@@ -362,7 +420,7 @@ export default function NewPastorAndChurchScreen() {
                   userPhotoPath = uploadRes?.data?.data?.path || null;
                 }
 
-                const churchPayload: any = {
+                  const churchPayload: any = {
                   name: values.name,
                   short_name: values.short_name,
                   is_msc: values.is_msc === 'Yes',
@@ -401,12 +459,15 @@ export default function NewPastorAndChurchScreen() {
                 };
 
                 // format phone for user as +<digits> (assuming already includes country code in UI)
-                const formattedUserPhone = (() => {
-                  const digits = (values.user_mobile_phone || '').replace(/\D/g, '');
-                  return digits ? `+${userCallingCode}${digits}` : '';
-                })();
+                  const formattedUserPhone = (() => {
+                    const digits = (values.user_mobile_phone || '').replace(
+                      /\D/g,
+                      '',
+                    );
+                    return digits ? `+${userCallingCode}${digits}` : '';
+                  })();
 
-                const userPayload: any = {
+                  const userPayload: any = {
                   username: values.username,
                   password: values.password,
                   prefix: values.prefix,
@@ -422,71 +483,87 @@ export default function NewPastorAndChurchScreen() {
                   credentials: values.credentials || undefined,
                   credentials_from: values.credentials_from || undefined,
                   credentials_expiry_date: values.credentials_expiry_date ? `${values.credentials_expiry_date.getFullYear()}-${String(values.credentials_expiry_date.getMonth() + 1).padStart(2, '0')}-${String(values.credentials_expiry_date.getDate()).padStart(2, '0')}` : undefined,
-                };
+                  };
 
-                const payload = { church: churchPayload, user: userPayload };
-                await api.post('churches/with-user', payload);
-                try {
-                  await AsyncStorage.removeItem(CHURCH_DRAFT_KEY);
-                } catch {}
-                Alert.alert(t('success'), t('churchCreatedSuccess'));
-                navigation.navigate('Churches');
-              } catch (e: any) {
-                Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('failedToCreateChurch'));
-              }
-            }}
-            >
-            {({ values, handleChange, handleBlur, handleSubmit, setFieldValue }) => (
-              <Grid>
-                <Row>
-                  <Col>
-              <View>
-                {!showPastorSection && (
-                  <>
-                <Text category="label" style={[churchStyles.title, { marginTop: 8, color: C.textPrimary }]}>{t('churchData')}</Text>
+                  const payload = {church: churchPayload, user: userPayload};
+                  await api.post('churches/with-user', payload);
+                  try {
+                    await AsyncStorage.removeItem(CHURCH_DRAFT_KEY);
+                  } catch {}
+                  Alert.alert(t('success'), t('churchCreatedSuccess'));
+                  navigation.navigate('Churches');
+                } catch (e: any) {
+                  Alert.alert(
+                    t('error'),
+                    e?.response?.data?.message ||
+                      e?.message ||
+                      t('failedToCreateChurch'),
+                  );
+                }
+              }}>
+                {({
+                  values,
+                  handleChange,
+                  handleBlur,
+                  handleSubmit,
+                  setFieldValue,
+                }) => (
+                  <Grid>
+                    <Row>
+                      <Col>
+                        <View>
+                          {!showPastorSection && (
+                            <>
+                <Text category="label" style={[churchStyles.title, { marginTop: ms(8), color: C.textPrimary }]}>{t('churchData')}</Text>
                 <View onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('churchName')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('churchName')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('churchName')}
                         message={t('helpChurchName')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
-                      autoCapitalize="words"
+                    <AppInput
                       value={values.name}
-                      onChangeText={t => { setFieldValue('name', t); setInvalid(prev => ({ ...prev, name: false })); }}
+                      autoCapitalize="words"
+                      onChangeText={text => {
+                        setFieldValue('name', text);
+                        setInvalid(prev => ({...prev, name: false}));
+                      }}
                       onBlur={handleBlur('name')}
-                      status={invalid?.name ? 'danger' : 'basic'}
+                      error={!!invalid.name}
                     />
                   </View>
                 </View>
 
                 <View>
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
                         {t('shortName')}
-                        <Text style={formStyles.subLabel}> [{t('only10Chars')}]</Text>
+                        <Text style={formStyles.subLabel}>
+                          {' '}
+                          [{t('only10Chars')}]
+                        </Text>
                       </Text>
                       <HelpIcon
                         title={t('shortName')}
                         message={t('helpShortName')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       autoCapitalize="none"
                       value={values.short_name}
-                      onChangeText={t => setFieldValue('short_name', (t || '').slice(0, 10))}
+                      onChangeText={text =>
+                        setFieldValue('short_name', (text || '').slice(0, 10))
+                      }
                       onBlur={handleBlur('short_name')}
                     />
                   </View>
@@ -494,8 +571,12 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('msc')}? <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('msc')}? <Text status="danger">*</Text>
+                      </Text>
                     </View>
                     <ElementDropdown
                       data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
@@ -510,8 +591,12 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('motherChurch')}</Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('motherChurch')}
+                      </Text>
                     </View>
                     <ElementDropdown
                       data={motherChurchOptions}
@@ -525,17 +610,18 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
-                          {t('languageUsedInTheService')} <Text status="danger">*</Text>
-                        </Text>
-                        <HelpIcon
-                          title={t('languageUsedInTheService')}
-                          message={t('helpLanguage')}
-                          size={16}
-                          offsetY={-2}
-                        />
-                      </View>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('languageUsedInTheService')}{' '}
+                        <Text status="danger">*</Text>
+                      </Text>
+                      <HelpIcon
+                        title={t('languageUsedInTheService')}
+                        message={t('helpLanguage')}
+                      />
+                    </View>
                     <ElementDropdown
                       data={langOptions}
                       value={values.language_id as any}
@@ -552,13 +638,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('churchType')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('churchType')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('churchType')}
                         message={t('helpChurchType')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -576,13 +664,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('churchNetwork')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('churchNetwork')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('churchNetwork')}
                         message={t('helpChurchNetwork')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -598,13 +688,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('apostolicRegion')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('apostolicRegion')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('apostolicRegion')}
                         message={t('helpApostolicRegion')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -620,13 +712,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('geographicalRegion')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('geographicalRegion')} <Text status="danger" />
+                      </Text>
                       <HelpIcon
                         title={t('geographicalRegion')}
                         message={t('helpGeographicalRegion')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -642,13 +736,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('languageRegion')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('languageRegion')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('languageRegion')}
                         message={t('helpLanguageRegion')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -664,13 +760,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}?</Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('sensitiveNation')}?
+                      </Text>
                       <HelpIcon
                         title={t('sensitiveNation')}
                         message={t('helpSensitiveNation')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -685,7 +783,11 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('nation')} <Text status="danger">*</Text></Text>
+                    <Text
+                      style={[formStyles.label, {color: C.textSecondary}]}
+                      category="label">
+                      {t('nation')} <Text status="danger">*</Text>
+                    </Text>
                     <ElementDropdown
                       data={countryOptions}
                       value={values.country_id as any}
@@ -700,13 +802,18 @@ export default function NewPastorAndChurchScreen() {
                 {values.country_id ? (
                   <View>
                     <View style={churchStyles.input}>
-                      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('city')}</Text>
+                      <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Text
+                          style={[
+                            formStyles.label,
+                            {color: C.textSecondary},
+                          ]}
+                          category="label">
+                          {t('city')}
+                        </Text>
                         <HelpIcon
                           title={t('city')}
                           message={t('helpCity')}
-                          size={16}
-                          offsetY={-2}
                         />
                       </View>
                       <ElementDropdown
@@ -722,13 +829,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('currency')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('currency')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('currency')}
                         message={t('helpCurrency')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -744,16 +853,19 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
                         {t('churchPhoto')}
-                        <Text style={formStyles.subLabel}> [{t('max5mb')}]</Text>
+                        <Text style={formStyles.subLabel}>
+                          {' '}
+                          [{t('max5mb')}]
+                        </Text>
                       </Text>
                       <HelpIcon
                         title={t('churchPhoto')}
                         message={t('helpChurchPhoto')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <TouchableOpacity onPress={() => pickChurchImage()} style={[formStyles.avatarSquare as any, { backgroundColor: C.inputBg, borderColor: C.inputBorder }] as any}>
@@ -769,10 +881,12 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('serviceAddress')}</Text>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <Text
+                      style={[formStyles.label, {color: C.textSecondary}]}
+                      category="label">
+                      {t('serviceAddress')}
+                    </Text>
+                    <AppInput
                       autoCapitalize="none"
                       value={values.service_address_street}
                       onChangeText={handleChange('service_address_street')}
@@ -782,10 +896,12 @@ export default function NewPastorAndChurchScreen() {
                 </View>
                 <View>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('servicePostalCode')}</Text>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <Text
+                      style={[formStyles.label, {color: C.textSecondary}]}
+                      category="label">
+                      {t('servicePostalCode')}
+                    </Text>
+                    <AppInput
                       autoCapitalize="none"
                       value={values.service_address_postal_code}
                       onChangeText={handleChange('service_address_postal_code')}
@@ -796,37 +912,41 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
-                        {t('emailAddress')}<Text status="danger">*</Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('emailAddress')}
+                        <Text status="danger">*</Text>
                       </Text>
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       autoCapitalize="none"
                       value={values.email_address}
-                      onChangeText={t => { setFieldValue('email_address', t); setInvalid(prev => ({...prev, email_address: false})); }}
+                      onChangeText={text => {
+                        setFieldValue('email_address', text);
+                        setInvalid(prev => ({...prev, email_address: false}));
+                      }}
                       onBlur={handleBlur('email_address')}
-                      status={invalid?.email_address ? 'danger' : 'basic'}
+                      error={!!invalid.email_address}
                     />
                   </View>
                 </View>
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('website')}</Text>
-                    <HelpIcon
-                      title={t('website')}
-                      message={t('helpWebsite')}
-                      size={16}
-                      offsetY={-2}
-                    />
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('website')}
+                      </Text>
+                      <HelpIcon
+                        title={t('website')}
+                        message={t('helpWebsite')}
+                      />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       autoCapitalize="none"
                       value={values.website}
                       onChangeText={handleChange('website')}
@@ -837,18 +957,18 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('facebook')}</Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('facebook')}
+                      </Text>
                       <HelpIcon
                         title={t('facebook')}
                         message={t('helpFacebook')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       autoCapitalize="none"
                       value={values.facebook}
                       onChangeText={handleChange('facebook')}
@@ -859,18 +979,18 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">Instagram</Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        Instagram
+                      </Text>
                       <HelpIcon
                         title="Instagram"
                         message={t('helpInstagram')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       autoCapitalize="none"
                       value={values.instagram}
                       onChangeText={handleChange('instagram')}
@@ -881,18 +1001,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">X</Text>
-                      <HelpIcon
-                        title="X"
-                        message={t('helpX')}
-                        size={16}
-                        offsetY={-2}
-                      />
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        X
+                      </Text>
+                      <HelpIcon title="X" message={t('helpX')} />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       autoCapitalize="none"
                       value={values.twitter}
                       onChangeText={handleChange('twitter')}
@@ -903,14 +1020,13 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('dob')} <Text status="danger">*</Text></Text>
-                      <HelpIcon
-                        title={t('dob')}
-                        message={t('helpDob')}
-                        size={16}
-                        offsetY={-2}
-                      />
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('dob')} <Text status="danger">*</Text>
+                      </Text>
+                      <HelpIcon title={t('dob')} message={t('helpDob')} />
                     </View>
                     <DateTripleDropdown
                       value={values.date_of_birth}
@@ -922,12 +1038,11 @@ export default function NewPastorAndChurchScreen() {
                   </View>
                 </View>
 
-                <Button
+                <AppButton
                   onPress={() => handleSaveChurchAndContinue(values)}
-                  style={globalStyles.mainButton}
-                >
+                  style={globalStyles.mainButton}>
                   {t('saveAndContinuePastorDetails')}
-                </Button>
+                </AppButton>
                   </>
                 )}
 
@@ -950,15 +1065,20 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('first_name', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('firstName')} <Text status="danger">*</Text></Text>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.first_name ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <Text
+                      style={[formStyles.label, {color: C.textSecondary}]}
+                      category="label">
+                      {t('firstName')} <Text status="danger">*</Text>
+                    </Text>
+                    <AppInput
                       value={values.first_name}
                       autoCapitalize="words"
-                      onChangeText={t => { setFieldValue('first_name', t); setInvalid(prev => ({ ...prev, first_name: false })); }}
+                      onChangeText={text => {
+                        setFieldValue('first_name', text);
+                        setInvalid(prev => ({...prev, first_name: false}));
+                      }}
                       onBlur={handleBlur('first_name')}
-                      status={invalid?.first_name ? 'danger' : 'basic'}
+                      error={!!invalid.first_name}
                     />
                   </View>
                 </View>
@@ -966,9 +1086,7 @@ export default function NewPastorAndChurchScreen() {
                 <View>
                   <View style={churchStyles.input}>
                     <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('lastName')}</Text>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       value={values.last_name}
                       autoCapitalize="words"
                       onChangeText={handleChange('last_name')}
@@ -979,85 +1097,85 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('username')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('username')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('username')}
                         message={t('usernameHelp')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.username ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       value={values.username}
                       autoCapitalize="none"
-                      onChangeText={t => { setFieldValue('username', t); setInvalid(prev => ({ ...prev, username: false })); }}
+                      onChangeText={text => { setFieldValue('username', text); setInvalid(prev => ({ ...prev, username: false })); }}
                       onBlur={handleBlur('username')}
-                      status={invalid?.username ? 'danger' : 'basic'}
+                      error={!!invalid.username}
                     />
                   </View>
                 </View>
 
                 <View onLayout={e => setFieldPos('password', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('password')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('password')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('password')}
                         message={t('passwordHelp')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.password ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       value={values.password}
                       autoCapitalize="none"
                       secureTextEntry
-                      onChangeText={t => { setFieldValue('password', t); setInvalid(prev => ({ ...prev, password: false })); }}
+                      onChangeText={text => { setFieldValue('password', text); setInvalid(prev => ({ ...prev, password: false })); }}
                       onBlur={handleBlur('password')}
-                      status={invalid?.password ? 'danger' : 'basic'}
+                      error={!!invalid.password}
                     />
                   </View>
                 </View>
 
                 <View onLayout={e => setFieldPos('title', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
                         {t('ministryTitle')} <Text status="danger">*</Text>
                       </Text>
                       <HelpIcon
                         title={t('ministryTitle')}
                         message={t('helpMinistryTitle')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.title ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       value={values.title}
                       autoCapitalize="words"
-                      onChangeText={t => { setFieldValue('title', t); setInvalid(prev => ({ ...prev, title: false })); }}
+                      onChangeText={text => { setFieldValue('title', text); setInvalid(prev => ({ ...prev, title: false })); }}
                       onBlur={handleBlur('title')}
-                      status={invalid?.title ? 'danger' : 'basic'}
+                      error={!!invalid.title}
                     />
                   </View>
                 </View>
 
                 <View onLayout={e => setFieldPos('user_role_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('omrStatus')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('omrStatus')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('omrStatus')}
                         message={t('helpOmrStatus')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -1098,13 +1216,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('sensitiveNation')}?</Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('sensitiveNation')}?
+                      </Text>
                       <HelpIcon
                         title={t('sensitiveNation')}
                         message={t('helpSensitiveNation')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -1119,13 +1239,15 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('language')} <Text status="danger">*</Text></Text>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('language')} <Text status="danger">*</Text>
+                      </Text>
                       <HelpIcon
                         title={t('language')}
                         message={t('helpUserLanguage')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
                     <ElementDropdown
@@ -1143,14 +1265,16 @@ export default function NewPastorAndChurchScreen() {
 
                 <View onLayout={e => setFieldPos('user_church_id', e.nativeEvent.layout.y)}>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('church')} <Text status="danger">*</Text></Text>
-                    <HelpIcon
-                      title={t('church')}
-                      message={t('helpUserChurch')}
-                      size={16}
-                      offsetY={-2}
-                    />
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
+                        {t('church')} <Text status="danger">*</Text>
+                      </Text>
+                      <HelpIcon
+                        title={t('church')}
+                        message={t('helpUserChurch')}
+                      />
                     </View>
                     <ElementDropdown
                       data={motherChurchOptions}
@@ -1165,63 +1289,141 @@ export default function NewPastorAndChurchScreen() {
 
                 <View>
                   <View style={churchStyles.input}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text
+                        style={[formStyles.label, {color: C.textSecondary}]}
+                        category="label">
                         {t('emailAddress')} <Text status="danger">*</Text>
                       </Text>
                       <HelpIcon
                         title={t('emailAddress')}
                         message={t('infoEmailAddress')}
-                        size={16}
-                        offsetY={-2}
                       />
                     </View>
-                    <Input
-                      style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: invalid?.user_email_address ? '#db2d2d' : C.inputBorder, color: C.inputText }]}
-                      textStyle={formStyles.inputTextStyle}
+                    <AppInput
                       value={values.user_email_address}
                       autoCapitalize="none"
                       keyboardType="email-address"
-                      onChangeText={t => { setFieldValue('user_email_address', t); setInvalid(prev => ({ ...prev, user_email_address: false })); }}
+                      onChangeText={text => { setFieldValue('user_email_address', text); setInvalid(prev => ({ ...prev, user_email_address: false })); }}
                       onBlur={handleBlur('user_email_address')}
-                      status={invalid?.user_email_address ? 'danger' : 'basic'}
+                      error={!!invalid.user_email_address}
                     />
                   </View>
                 </View>
 
                 <View>
                   <View style={churchStyles.input}>
-                    <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('mobilePhone')} <Text status="danger">*</Text></Text>
-                    <View style={[formStyles.input as any, { flexDirection: 'row', alignItems: 'center', height: 44, paddingHorizontal: 8, borderWidth: 1, borderRadius: 6, borderColor: invalid.user_mobile_phone ? '#db2d2d' : C.inputBorder, backgroundColor: C.inputBg }]}> 
-                      <CountryPicker
-                        theme={cpTheme}
-                        countryCode={userCountryCode}
-                        withFlag
-                        withFilter
-                        withCallingCode
-                        withEmoji
-                        onSelect={(c: Country) => {
-                          setUserCountryCode(c.cca2 as CountryCode);
-                          const cc = c.callingCode && c.callingCode[0] ? c.callingCode[0] : '';
-                          setUserCallingCode(cc);
-                        }}
-                      />
-                      <Text style={{marginLeft: 8, fontSize: 16, color: C.textPrimary}}>+{userCallingCode}</Text>
+                    <Text
+                      style={[formStyles.label, {color: C.textSecondary}]}
+                      category="label">
+                      {t('mobilePhone')} <Text status="danger">*</Text>
+                    </Text>
+                    <View
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderWidth: 1,
+                        borderRadius: rs(3),
+                        paddingLeft: ms(8),
+                        paddingRight: ms(12),
+                        height: FORM_INPUT_HEIGHT,
+                        borderColor: invalid.user_mobile_phone
+                          ? '#db2d2d'
+                          : C.inputBorder,
+                        backgroundColor: C.inputBg,
+                      }}>
+                      <TouchableOpacity
+                        onPress={() => setShowUserCountryPicker(true)}
+                        style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Text
+                          style={{
+                            fontSize: fs(18),
+                            marginRight: ms(4),
+                          }}>
+                          {countryCodeToFlag(userCountryCode)}
+                        </Text>
+                      </TouchableOpacity>
+                      <Text
+                        style={{
+                          marginLeft: ms(8),
+                          fontSize: fs(14),
+                          color: C.textPrimary,
+                        }}>
+                        +{userCallingCode}
+                      </Text>
                       <TextInput
-                        style={{flex: 1, marginLeft: 8, fontSize: 16, color: C.inputText}}
+                        allowFontScaling={false}
+                        style={{
+                          flex: 1,
+                          marginLeft: ms(8),
+                          fontSize: fs(14),
+                          color: C.inputText,
+                          paddingVertical: 0,
+                        }}
                         keyboardType="number-pad"
                         autoCapitalize="none"
                         value={formatPhoneReadable(values.user_mobile_phone)}
                         onChangeText={t => {
                           const digits = t.replace(/\D/g, '').slice(0, 15);
                           setFieldValue('user_mobile_phone', digits);
-                          setInvalid(prev => ({ ...prev, user_mobile_phone: false }));
+                          setInvalid(prev => ({
+                            ...prev,
+                            user_mobile_phone: false,
+                          }));
                         }}
                         placeholder=""
                       />
                     </View>
                   </View>
                 </View>
+                <CountryPicker
+                  show={showUserCountryPicker}
+                  lang={'en'}
+                  pickerButtonOnPress={item => {
+                    setUserCountryCode(item.code);
+                    setUserCallingCode(item.dial_code.replace('+', ''));
+                    setShowUserCountryPicker(false);
+                  }}
+                  onBackdropPress={() => setShowUserCountryPicker(false)}
+                  inputPlaceholderTextColor={C.textSecondary}
+                  style={{
+                    backdrop: {
+                      backgroundColor: C.overlay,
+                    },
+                    modal: {
+                      backgroundColor: C.surface,
+                    },
+                    modalInner: {
+                      backgroundColor: C.surface,
+                    },
+                    textInput: {
+                      color: C.inputText,
+                      backgroundColor: C.inputBg,
+                    },
+                    line: {
+                      backgroundColor: C.inputBorder,
+                    },
+                    itemsList: {
+                      backgroundColor: C.surface,
+                    },
+                    searchMessageText: {
+                      color: C.textSecondary,
+                    },
+                    countryName: {
+                      color: C.textPrimary,
+                    },
+                    dialCode: {
+                      color: C.textSecondary,
+                    },
+                    countryButtonStyles: {
+                      backgroundColor: C.bgSelectedOption,
+                    },
+                    flag: {
+                      color: C.textPrimary,
+                    },
+                  }}
+                />
 
                 <View>
                   <View style={churchStyles.input}>
@@ -1241,12 +1443,10 @@ export default function NewPastorAndChurchScreen() {
                     <View>
                       <View style={churchStyles.input}>
                         <Text style={[formStyles.label, { color: C.textSecondary }]} category="label">{t('credentialsFrom')}</Text>
-                        <Input
-                          style={[formStyles.input, { backgroundColor: C.inputBg, borderColor: C.inputBorder, color: C.inputText }]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           autoCapitalize="none"
                           value={values.credentials_from}
-                          onChangeText={t => setFieldValue('credentials_from', t)}
+                          onChangeText={text => setFieldValue('credentials_from', text)}
                           onBlur={handleBlur('credentials_from')}
                         />
                       </View>
@@ -1265,22 +1465,22 @@ export default function NewPastorAndChurchScreen() {
                   </>
                 )}
 
-                <View style={{ flexDirection: 'row', marginTop: 16 }}>
-                  <View style={{ flex: 1, marginRight: 8 }}>
-                    <Button
+                <View style={{ flexDirection: 'row', marginTop: ms(16) }}>
+                  <View style={{ flex: 1, marginRight: ms(8) }}>
+                    <AppButton
                       style={globalStyles.mainButton}
                       onPress={() => setShowPastorSection(false)}
                     >
                       {t('back')}
-                    </Button>
+                    </AppButton>
                   </View>
-                  <View style={{ flex: 1, marginLeft: 8 }}>
-                    <Button
+                  <View style={{ flex: 1, marginLeft: ms(8) }}>
+                    <AppButton
                       style={globalStyles.mainButton}
                       onPress={() => handleSubmit()}
                     >
                       {t('save')}
-                    </Button>
+                    </AppButton>
                   </View>
                 </View>
                 </>)}

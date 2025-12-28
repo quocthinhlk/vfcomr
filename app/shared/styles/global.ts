@@ -1,34 +1,34 @@
 // shared/styles/global.ts
-import { StyleSheet } from 'react-native';
-import { COLORS } from '../constants/colors';
+import {StyleSheet} from 'react-native';
+import {COLORS} from '../constants/colors';
+import {ms, rs} from '../utils/scale';
 
 export const globalStyles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
     justifyContent: 'center',
   },
   input: {
-    marginVertical: 10,
+    marginVertical: ms(10),
   },
   button: {
-    marginTop: 15,
+    marginTop: ms(15),
     backgroundColor: COLORS.mainColor,
-    borderRadius: 3,
+    borderRadius: rs(3),
     borderColor: COLORS.mainColor,
     width: '100%',
   },
   backButton: {
-    marginTop: 15,
+    marginTop: ms(15),
     backgroundColor: COLORS.gray,
-    borderRadius: 3,
+    borderRadius: rs(3),
     borderColor: COLORS.mainColor,
     width: '100%',
   },
   mainButton: {
-    marginTop: 15,
+    marginTop: ms(15),
     backgroundColor: COLORS.mainColor,
-    borderRadius: 3,
+    borderRadius: rs(3),
     borderColor: COLORS.mainColor,
     width: '100%',
   },
@@ -38,8 +38,8 @@ export const globalStyles = StyleSheet.create({
   },
   layout: {
     flex: 1,
-    paddingHorizontal: 15,
-    paddingBottom: 15,
-    paddingTop: 5
-  }
+    paddingHorizontal: ms(15),
+    paddingBottom: ms(15),
+    paddingTop: ms(5),
+  },
 });

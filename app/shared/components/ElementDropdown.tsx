@@ -3,6 +3,7 @@ import { TouchableOpacity, Text as RNText, TextInput, ViewStyle, Keyboard, Platf
 import { Dropdown } from 'react-native-element-dropdown';
 import { useThemedColors } from '../styles/theme';
 import { fs, ws, hs, ms, rs } from '../utils/scale';
+import { FORM_INPUT_HEIGHT } from '../styles/form';
 
 export interface ElementDropdownItem { label: string; value: string | number }
 
@@ -47,7 +48,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       dropdown: {
         borderWidth: 1,
         borderRadius: rs(6),
-        height: ws(38),
+        height: FORM_INPUT_HEIGHT,
         paddingLeft: ms(12),
         paddingRight: ms(5),
         backgroundColor: C.inputBg,

@@ -1,6 +1,7 @@
 import React from 'react';
-import { Input, Text } from '@ui-kitten/components';
-import { View, StyleSheet } from 'react-native';
+import {Input, Text} from '@ui-kitten/components';
+import {View, StyleSheet} from 'react-native';
+import {fs, ms} from '../../utils/scale';
 
 interface FormInputProps {
   label: string;
@@ -17,7 +18,7 @@ export default function FormInput({
   onChangeText,
   onBlur,
   keyboardType = 'default',
-  error
+  error,
 }: FormInputProps) {
   return (
     <View style={styles.wrapper}>
@@ -36,11 +37,11 @@ export default function FormInput({
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 8,
+    marginBottom: ms(8),
     flex: 1,
   },
   errorText: {
-    marginTop: 4,
-    fontSize: 12,
+    marginTop: ms(4),
+    fontSize: fs(12),
   },
 });

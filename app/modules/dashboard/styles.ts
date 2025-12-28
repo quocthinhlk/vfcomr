@@ -52,7 +52,7 @@ export const dashboardStyles = StyleSheet.create({
   },
   profileImage: {
     width: ws(50),
-    height: hs(50),
+    height: ws(50),
     borderRadius: 25,
     marginRight: ms(10),
   },

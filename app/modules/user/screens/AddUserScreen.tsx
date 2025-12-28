@@ -15,8 +15,6 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
-  Input,
-  Button,
   Layout,
   Datepicker,
   Text,
@@ -26,8 +24,10 @@ import {
 import {Formik} from 'formik';
 import {Col, Row, Grid} from 'react-native-easy-grid';
 import {globalStyles} from '../../../shared/styles/global';
-import {formStyles} from '../../../shared/styles/form';
+import {formStyles, FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import {addUser, uploadImage} from '../services/user.service';
+import AppInput from '../../../shared/components/AppInput';
+import AppButton from '../../../shared/components/AppButton';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
 import {useSelectState} from '../../church/hooks/useSelectState';
 import {useNavigation} from '@react-navigation/native';
@@ -37,10 +37,7 @@ import SelectListWithClear from '../../../shared/components/SelectListWithClear'
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 // Note: DropDownPicker removed in favor of SelectListWithClear
-import CountryPicker, {
-  Country,
-  CountryCode,
-} from 'react-native-country-picker-modal';
+import { CountryPicker } from 'react-native-country-codes-picker';
 import api from '../../../config/api';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {authImages} from '../../auth/config/auth.constants';
@@ -49,6 +46,22 @@ import {COLORS} from '../../../shared/constants/colors';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
+import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+
+const countryCodeToFlag = (code: string) => {
+  if (!code) {
+    return '🏳️';
+  }
+  const chars = code.toUpperCase().split('');
+  if (chars.length !== 2) {
+    return '🏳️';
+  }
+  const base = 127397;
+  return String.fromCodePoint(
+    base + chars[0].charCodeAt(0),
+    base + chars[1].charCodeAt(0),
+  );
+};
 
 interface FormDataApi {
   success: boolean;
@@ -65,14 +78,6 @@ export default function AddUserScreen() {
   const navigation = useNavigation<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
-
-  const cpTheme: any = {
-    primaryColor: C.textPrimary,
-    primaryColorVariant: C.textSecondary,
-    backgroundColor: C.surface,
-    onBackgroundTextColor: C.textPrimary,
-    filterPlaceholderTextColor: C.textSecondary,
-  };
 
   const {imagePath, handleImagePick, clearImage} = useImagePicker();
 
@@ -92,8 +97,9 @@ export default function AddUserScreen() {
     {id: number; name: string}[]
   >([]);
   const [credentialOptions, setCredentialOptions] = useState<string[]>([]);
-  const [countryCode, setCountryCode] = useState<CountryCode>('SG');
+  const [countryCode, setCountryCode] = useState<string>('SG');
   const [callingCode, setCallingCode] = useState<string>('65');
+  const [showCountryPicker, setShowCountryPicker] = useState(false);
   const [churchItems, setChurchItems] = useState<{id: number; name: string}[]>(
     [],
   );
@@ -188,7 +194,7 @@ export default function AddUserScreen() {
 
   const scrollToField = (key: string) => {
     const y = fieldY[key] ?? 0;
-    scrollRef.current?.scrollTo({y: Math.max(0, y - 20), animated: true});
+    scrollRef.current?.scrollTo({y: Math.max(0, y - ms(20)), animated: true});
   };
 
   return (
@@ -200,7 +206,7 @@ export default function AddUserScreen() {
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={
-            Platform.OS === 'ios' ? 64 : (StatusBar.currentHeight || 0) + 50
+            Platform.OS === 'ios' ? hs(64) : (StatusBar.currentHeight || 0) + hs(50)
           }
           style={{flex: 1}}>
           <ScrollView
@@ -209,7 +215,7 @@ export default function AddUserScreen() {
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"
-            contentContainerStyle={{paddingBottom: 24}}>
+            contentContainerStyle={{paddingBottom: ms(24)}}>
             <Formik
               initialValues={{
                 username: '',
@@ -399,26 +405,15 @@ export default function AddUserScreen() {
                           {t('firstName')}{' '}
                           <Text style={{color: '#c00000'}}>*</Text>
                         </Text>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              color: C.inputText,
-                              borderColor: invalid.first_name
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.first_name}
                           autoCapitalize="words"
-                          onChangeText={t => {
+                          onChangeText={(t: string) => {
                             setFieldValue('first_name', t);
                             clearInvalid('first_name');
                           }}
                           onBlur={handleBlur('first_name')}
-                          status={invalid.first_name ? 'danger' : 'basic'}
+                          error={!!invalid.first_name}
                         />
                       </View>
                     </Col>
@@ -436,16 +431,7 @@ export default function AddUserScreen() {
                           category="label">
                           {t('lastName')}
                         </Text>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              color: C.inputText,
-                              borderColor: C.inputBorder,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.last_name}
                           autoCapitalize="words"
                           onChangeText={handleChange('last_name')}
@@ -473,30 +459,17 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('username')}
                             message={t('usernameHelp')}
-                            size={13}
-                            offsetY={-4}
                           />
                         </View>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              color: C.inputText,
-                              borderColor: invalid.username
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                            },
-                          ]}
+                        <AppInput
                           value={values.username}
-                          textStyle={formStyles.inputTextStyle}
                           autoCapitalize="none"
-                          onChangeText={t => {
+                          onChangeText={(t: string) => {
                             setFieldValue('username', t);
                             clearInvalid('username');
                           }}
                           onBlur={handleBlur('username')}
-                          status={invalid.username ? 'danger' : 'basic'}
+                          error={!!invalid.username}
                         />
                       </View>
 
@@ -516,51 +489,39 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('password')}
                             message={t('passwordHelp')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
                         <View style={{position: 'relative'}}>
-                          <Input
-                            style={[
-                              formStyles.input,
-                              {
-                                backgroundColor: C.inputBg,
-                                borderColor: invalid.password
-                                  ? '#db2d2d'
-                                  : C.inputBorder,
-                                color: C.inputText,
-                              },
-                            ]}
-                            textStyle={formStyles.inputTextStyle}
+                          <AppInput
                             secureTextEntry={!showPassword}
                             value={values.password}
                             autoCapitalize="none"
-                            onChangeText={t => {
+                            onChangeText={(t: string) => {
                               setFieldValue('password', t);
                               clearInvalid('password');
                             }}
                             onBlur={handleBlur('password')}
-                            status={invalid.password ? 'danger' : 'basic'}
+                            error={!!invalid.password}
                           />
                           <TouchableOpacity
                             onPress={() => setShowPassword(!showPassword)}
                             style={{
                               position: 'absolute',
-                              right: 12,
-                              top: 10,
-                              height: 24,
-                              width: 24,
+                              right: ms(12),
+                              top: ms(10),
+                              height: hs(24),
+                              width: ws(24),
                               alignItems: 'center',
                               justifyContent: 'center',
+                              zIndex: 1,
                             }}>
                             <Image
                               source={
                                 showPassword ? authImages.eye : authImages.blind
                               }
                               style={{
-                                width: 20,
-                                height: 20,
+                                width: ws(20),
+                                height: hs(20),
                                 resizeMode: 'contain',
                               }}
                             />
@@ -584,30 +545,17 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('ministryTitle')}
                             message={t('helpMinistryTitle')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
-                        <Input
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              borderColor: invalid.title
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                              color: C.inputText,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.title}
                           autoCapitalize="words"
-                          onChangeText={t => {
+                          onChangeText={(t: string) => {
                             setFieldValue('title', t);
                             clearInvalid('title');
                           }}
                           onBlur={handleBlur('title')}
-                          status={invalid.title ? 'danger' : 'basic'}
+                          error={!!invalid.title}
                         />
                       </View>
                     </Col>
@@ -631,8 +579,6 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('omrStatus')}
                             message={t('helpOmrStatus')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
                         <ElementDropdown
@@ -689,8 +635,6 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('userPhoto')}
                             message={t('helpUserPhoto')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
                         <TouchableOpacity
@@ -755,8 +699,6 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('sensitiveNation')}
                             message={t('helpSensitiveNation')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
                         <ElementDropdown
@@ -803,8 +745,6 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('language')}
                             message={t('helpUserLanguage')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
                         <ElementDropdown
@@ -860,8 +800,6 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('church')}
                             message={t('helpUserChurch')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
                         <ElementDropdown
@@ -934,32 +872,18 @@ export default function AddUserScreen() {
                           <HelpIcon
                             title={t('emailAddress')}
                             message={t('infoEmailAddress')}
-                            size={13}
-                            offsetY={-2}
                           />
                         </View>
-                        <Input
-                          size="small"
-                          style={[
-                            formStyles.input,
-                            {
-                              backgroundColor: C.inputBg,
-                              color: C.inputText,
-                              borderColor: invalid.email_address
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                            },
-                          ]}
-                          textStyle={formStyles.inputTextStyle}
+                        <AppInput
                           value={values.email_address}
                           keyboardType="email-address"
                           autoCapitalize="none"
-                          onChangeText={t => {
+                          onChangeText={(t: string) => {
                             setFieldValue('email_address', t);
                             clearInvalid('email_address');
                           }}
                           onBlur={handleBlur('email_address')}
-                          status={invalid.email_address ? 'danger' : 'basic'}
+                          error={!!invalid.email_address}
                         />
                       </View>
                     </Col>
@@ -981,51 +905,47 @@ export default function AddUserScreen() {
                           ) : null}
                         </Text>
                         <View
-                          style={[
-                            formStyles.input,
-                            {
-                              flexDirection: 'row',
-                              alignItems: 'center',
-                              height: 44,
-                              paddingHorizontal: 8,
-                              borderWidth: 1,
-                              borderRadius: 6,
-                              borderColor: invalid.mobile_phone
-                                ? '#db2d2d'
-                                : C.inputBorder,
-                              backgroundColor: C.inputBg,
-                            },
-                          ]}>
-                          <CountryPicker
-                            theme={cpTheme}
-                            countryCode={countryCode}
-                            withFlag
-                            withFilter
-                            withCallingCode
-                            withEmoji
-                            onSelect={(c: Country) => {
-                              setCountryCode(c.cca2 as CountryCode);
-                              const cc =
-                                c.callingCode && c.callingCode[0]
-                                  ? c.callingCode[0]
-                                  : '';
-                              setCallingCode(cc);
-                            }}
-                          />
+                          style={{
+                            flexDirection: 'row',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            borderWidth: 1,
+                            borderRadius: rs(3),
+                            paddingLeft: ms(8),
+                            paddingRight: ms(12),
+                            height: FORM_INPUT_HEIGHT,
+                            borderColor: invalid.mobile_phone
+                              ? '#db2d2d'
+                              : C.inputBorder,
+                            backgroundColor: C.inputBg,
+                          }}>
+                          <TouchableOpacity
+                            onPress={() => setShowCountryPicker(true)}
+                            style={{flexDirection: 'row', alignItems: 'center'}}>
+                            <Text
+                              style={{
+                                fontSize: fs(18),
+                                marginRight: ms(4),
+                              }}>
+                              {countryCodeToFlag(countryCode)}
+                            </Text>
+                          </TouchableOpacity>
                           <Text
                             style={{
-                              marginLeft: 8,
-                              fontSize: 16,
+                              marginLeft: ms(8),
+                              fontSize: fs(14),
                               color: C.textPrimary,
                             }}>
                             +{callingCode}
                           </Text>
                           <TextInput
+                            allowFontScaling={false}
                             style={{
                               flex: 1,
-                              marginLeft: 8,
-                              fontSize: 16,
+                              marginLeft: ms(8),
+                              fontSize: fs(14),
                               color: C.inputText,
+                              paddingVertical: 0,
                             }}
                             keyboardType="number-pad"
                             autoCapitalize="none"
@@ -1038,6 +958,53 @@ export default function AddUserScreen() {
                             placeholder=""
                           />
                         </View>
+                        <CountryPicker
+                          show={showCountryPicker}
+                          lang={'en'}
+                          pickerButtonOnPress={item => {
+                            setCountryCode(item.code);
+                            setCallingCode(item.dial_code.replace('+', ''));
+                            setShowCountryPicker(false);
+                          }}
+                          onBackdropPress={() => setShowCountryPicker(false)}
+                          inputPlaceholderTextColor={C.textSecondary}
+                          style={{
+                            backdrop: {
+                              backgroundColor: C.overlay,
+                            },
+                            modal: {
+                              backgroundColor: C.surface,
+                            },
+                            modalInner: {
+                              backgroundColor: C.surface,
+                            },
+                            textInput: {
+                              color: C.inputText,
+                              backgroundColor: C.inputBg,
+                            },
+                            line: {
+                              backgroundColor: C.inputBorder,
+                            },
+                            itemsList: {
+                              backgroundColor: C.surface,
+                            },
+                            searchMessageText: {
+                              color: C.textSecondary,
+                            },
+                            countryName: {
+                              color: C.textPrimary,
+                            },
+                            dialCode: {
+                              color: C.textSecondary,
+                            },
+                            countryButtonStyles: {
+                              backgroundColor: C.bgSelectedOption,
+                            },
+                            flag: {
+                              color: C.textPrimary,
+                            },
+                          }}
+                        />
                       </View>
                     </Col>
                   </Row>
@@ -1101,16 +1068,7 @@ export default function AddUserScreen() {
                               category="label">
                               {t('credentialsNumber')}
                             </Text>
-                            <Input
-                              style={[
-                                formStyles.input,
-                                {
-                                  backgroundColor: C.inputBg,
-                                  color: C.inputText,
-                                  borderColor: C.inputBorder,
-                                },
-                              ]}
-                              textStyle={formStyles.inputTextStyle}
+                            <AppInput
                               value={values.credentials_number}
                               autoCapitalize="none"
                               onChangeText={handleChange('credentials_number')}
@@ -1138,16 +1096,7 @@ export default function AddUserScreen() {
                               category="label">
                               {t('credentialsFrom')}
                             </Text>
-                            <Input
-                              style={[
-                                formStyles.input,
-                                {
-                                  backgroundColor: C.inputBg,
-                                  color: C.inputText,
-                                  borderColor: C.inputBorder,
-                                },
-                              ]}
-                              textStyle={formStyles.inputTextStyle}
+                            <AppInput
                               value={values.credentials_form}
                               autoCapitalize="none"
                               onChangeText={handleChange('credentials_form')}
@@ -1190,11 +1139,12 @@ export default function AddUserScreen() {
 
                   <Row>
                     <Col>
-                      <Button
+                      <AppButton
                         onPress={() => handleSubmit()}
+                        variant="primary"
                         style={globalStyles.mainButton}>
                         {t('save')}
-                      </Button>
+                      </AppButton>
                     </Col>
                   </Row>
                 </Grid>

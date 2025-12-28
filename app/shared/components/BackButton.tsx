@@ -1,13 +1,14 @@
-import React, { useContext } from 'react';
-import { TouchableOpacity, StyleSheet, View } from 'react-native';
-import { Text } from '@ui-kitten/components';
-import { useNavigation, NavigationProp, ParamListBase } from '@react-navigation/native';
+import React from 'react';
+import {TouchableOpacity, StyleSheet, View} from 'react-native';
+import {Text} from '@ui-kitten/components';
+import {useNavigation, NavigationProp, ParamListBase} from '@react-navigation/native';
 // import { MenuPopup } from './MenuPopup'; // Removed
 // import { HamburgerMenuIcon } from './HamburgerMenuIcon'; // Removed
 // import { CommonMenuItem } from '../interfaces/MenuItem'; // Removed as it's not used here anymore
 // import { logout } from '../../modules/auth/services/auth.service'; // Removed as it's not used here anymore
 // import { AuthContext } from '../../config/navigation'; // Removed as it's not used here anymore
 // import { dashboardMenuItems } from '../../modules/dashboard/config/dashboard.constants'; // Removed
+import {fs, hs, ms} from '../utils/scale';
 
 interface BackButtonProps {
   style?: any;
@@ -17,7 +18,11 @@ interface BackButtonProps {
   // menuItems?: CommonMenuItem[]; // Removed
 }
 
-export const BackButton: React.FC<BackButtonProps> = ({ style, textStyle, title}) => {
+export const BackButton: React.FC<BackButtonProps> = ({
+  style,
+  textStyle,
+  title,
+}) => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   // const [menuVisible, setMenuVisible] = useState(false); // Removed
   // const { setIsAuthenticated } = useContext(AuthContext); // Removed
@@ -79,23 +84,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    height: 20,
+    height: hs(20),
     backgroundColor: '#fff',
-    marginBottom: 5,
-    marginTop: 5,
+    marginBottom: ms(5),
+    marginTop: ms(5),
   },
   backButton: {
-    marginRight: 10,
+    marginRight: ms(10),
   },
   backButtonText: {
-    fontSize: 14,
+    fontSize: fs(12),
     color: '#000',
   },
   titleText: {
-    fontSize: 14,
+    fontSize: fs(12),
     color: '#000',
     flex: 1,
     textAlign: 'center',
-    marginRight: 60,
+    marginRight: ms(60),
   },
 });

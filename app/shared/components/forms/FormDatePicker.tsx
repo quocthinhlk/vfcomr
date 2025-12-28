@@ -1,8 +1,9 @@
 import React from 'react';
-import { Datepicker, Text } from '@ui-kitten/components';
-import { View, StyleSheet } from 'react-native';
-import { useThemedColors } from '../../styles/theme';
-import { useThemeMode } from '../../context/ThemeContext';
+import {Datepicker, Text} from '@ui-kitten/components';
+import {View, StyleSheet} from 'react-native';
+import {useThemedColors} from '../../styles/theme';
+import {useThemeMode} from '../../context/ThemeContext';
+import {fs, ms, rs} from '../../utils/scale';
 
 interface FormDatePickerProps {
   label: string;
@@ -15,10 +16,10 @@ export default function FormDatePicker({
   label,
   date,
   onSelect,
-  error
+  error,
 }: FormDatePickerProps) {
   const C = useThemedColors();
-  const { theme } = useThemeMode();
+  const {theme} = useThemeMode();
   return (
     <View style={styles.wrapper}>
       <Datepicker
@@ -26,21 +27,30 @@ export default function FormDatePicker({
         date={date === null ? undefined : date}
         onSelect={onSelect}
         status={error ? 'danger' : 'basic'}
-        style={{ backgroundColor: 'transparent' }}
-        controlStyle={{ backgroundColor: theme === 'dark' ? C.inputBg : '#fff', borderColor: C.inputBorder, borderWidth: 1, borderRadius: 6 }}
+        style={{backgroundColor: 'transparent'}}
+        controlStyle={{
+          backgroundColor: theme === 'dark' ? C.inputBg : '#fff',
+          borderColor: C.inputBorder,
+          borderWidth: 1,
+          borderRadius: rs(6),
+        }}
       />
-      {error && <Text status="danger" style={styles.errorText}>{error}</Text>}
+      {error && (
+        <Text status="danger" style={styles.errorText}>
+          {error}
+        </Text>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   wrapper: {
-    marginBottom: 8,
+    marginBottom: ms(8),
     flex: 1,
   },
   errorText: {
-    marginTop: 4,
-    fontSize: 12,
+    marginTop: ms(4),
+    fontSize: fs(12),
   },
 });

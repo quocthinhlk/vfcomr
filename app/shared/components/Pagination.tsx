@@ -1,7 +1,14 @@
 import React from 'react';
-import { View, TouchableOpacity, StyleSheet, StyleProp, ViewStyle } from 'react-native';
-import { Text } from '@ui-kitten/components';
-import { COLORS } from '../constants/colors';
+import {
+  View,
+  TouchableOpacity,
+  StyleSheet,
+  StyleProp,
+  ViewStyle,
+} from 'react-native';
+import {Text} from '@ui-kitten/components';
+import {COLORS} from '../constants/colors';
+import {fs, ms, ws, rs} from '../utils/scale';
 
 export interface PaginationItem {
   label: string;
@@ -45,7 +52,7 @@ export const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <View style={[styles.pageNumbersContainer, containerStyle]}>
-      {items.map((p) => (
+      {items.map(p => (
         <TouchableOpacity
           key={`${p.label}-${p.page}`}
           style={[
@@ -56,7 +63,13 @@ export const Pagination: React.FC<PaginationProps> = ({
           onPress={() => onChange(p.page)}
           disabled={!!p.disabled || loading}
         >
-          <Text style={[styles.pageNumberText, p.active && styles.pageNumberTextActive]}>{p.label}</Text>
+          <Text
+            style={[
+              styles.pageNumberText,
+              p.active && styles.pageNumberTextActive,
+            ]}>
+            {p.label}
+          </Text>
         </TouchableOpacity>
       ))}
     </View>
@@ -69,14 +82,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pageNumber: {
-    borderRadius: 16,
+    width: ws(32),
+    height: ws(32),
+    borderRadius: rs(1),
     borderWidth: 1,
     borderColor: '#ddd',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    marginLeft: 8,
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(4),
+    marginLeft: ms(6),
     backgroundColor: '#fff',
   },
   pageNumberActive: {
@@ -89,6 +104,7 @@ const styles = StyleSheet.create({
   pageNumberText: {
     color: '#333',
     fontWeight: '600',
+    fontSize: fs(12),
   },
   pageNumberTextActive: {
     color: '#fff',

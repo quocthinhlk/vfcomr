@@ -1,27 +1,43 @@
-import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { View, FlatList, RefreshControl, TextInput, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, Image, KeyboardAvoidingView, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Text } from '@ui-kitten/components';
-import { listUsers, ListUsersItem } from '../services/user.service';
-import api, { DEFAULT_PAGE_LIMIT } from '../../../config/api';
-import { useNavigation, useRoute } from '@react-navigation/native';
-import { Header } from '../../../shared/components/Header';
-import { COLORS } from '../../../shared/constants/colors';
-import { globalStyles } from '../../../shared/styles/global';
-import { EditSvgIcon } from '../../../shared/components/icons';
-import { useTranslation } from '../../../shared/hooks/useTranslation';
-import { useThemedColors } from '../../../shared/styles/theme';
-import { useThemeMode } from '../../../shared/context/ThemeContext';
-import { getListStyles } from '../../../shared/styles/list';
-import { isSuperAdmin } from '../../../shared/utils/permissions';
-import ActionSheetModal, { ActionItem } from '../../../shared/components/ActionSheetModal';
+import React, {useEffect, useState, useCallback, useRef} from 'react';
+import {
+  View,
+  FlatList,
+  RefreshControl,
+  TextInput,
+  StyleSheet,
+  TouchableOpacity,
+  ActivityIndicator,
+  ScrollView,
+  Image,
+  KeyboardAvoidingView,
+  Platform,
+} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
+import {Text} from '@ui-kitten/components';
+import {listUsers, ListUsersItem} from '../services/user.service';
+import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {Header} from '../../../shared/components/Header';
+import {COLORS} from '../../../shared/constants/colors';
+import {globalStyles} from '../../../shared/styles/global';
+import {EditSvgIcon} from '../../../shared/components/icons';
+import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useThemedColors} from '../../../shared/styles/theme';
+import {useThemeMode} from '../../../shared/context/ThemeContext';
+import {getListStyles} from '../../../shared/styles/list';
+import {isSuperAdmin} from '../../../shared/utils/permissions';
+import ActionSheetModal, {
+  ActionItem,
+} from '../../../shared/components/ActionSheetModal';
+import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 
 export const UserListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const { t } = useTranslation();
+  const {t} = useTranslation();
   const C = useThemedColors();
-  const { theme } = useThemeMode();
+  const {theme} = useThemeMode();
   const [items, setItems] = useState<ListUsersItem[]>([]);
   const listStyles = getListStyles(C, theme);
   const [page, setPage] = useState(1);
@@ -48,28 +64,39 @@ export const UserListScreen: React.FC = () => {
       try {
         const res = await api.get('users/me');
         const r = res?.data?.data?.role?.id;
-        if (typeof r === 'number') setRoleId(r);
+        if (typeof r === 'number') {
+          setRoleId(r);
+        }
       } catch {}
     })();
   }, []);
 
-  const fetchData = useCallback(async (targetPage: number, reset = false) => {
-    try {
-      if (loading) return;
-      setLoading(true);
-      const res = await listUsers({ page: targetPage, limit: DEFAULT_PAGE_LIMIT, name: query });
-      const nextItems = res?.data?.items ?? [];
-      setTotalPages(res?.data?.total_pages ?? 1);
-      setTotal(res?.data?.total ?? 0);
-      setPage(res?.data?.page ?? targetPage);
-      setItems(reset ? nextItems : [...items, ...nextItems]);
-    } catch (e) {
-      // You can add error handling UI here
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
-  }, [loading, query, items]);
+  const fetchData = useCallback(
+    async (targetPage: number, reset = false) => {
+      try {
+        if (loading) {
+          return;
+        }
+        setLoading(true);
+        const res = await listUsers({
+          page: targetPage,
+          limit: DEFAULT_PAGE_LIMIT,
+          name: query,
+        });
+        const nextItems = res?.data?.items ?? [];
+        setTotalPages(res?.data?.total_pages ?? 1);
+        setTotal(res?.data?.total ?? 0);
+        setPage(res?.data?.page ?? targetPage);
+        setItems(reset ? nextItems : [...items, ...nextItems]);
+      } catch (e) {
+        // You can add error handling UI here
+        console.error(e);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [loading, query, items],
+  );
 
   useEffect(() => {
     // On query change, reset to page 1
@@ -97,21 +124,29 @@ export const UserListScreen: React.FC = () => {
   };
 
   const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) return;
+    if (targetPage < 1 || targetPage > totalPages || loading) {
+      return;
+    }
     setItems([]);
     fetchData(targetPage, true);
   };
 
   const handleEdit = (user: ListUsersItem) => {
-    navigation.navigate('EditProfile', { id: user.id });
+    navigation.navigate('EditProfile', {id: user.id});
   };
 
-  const openActions = (user: ListUsersItem) => { setSelectedUser(user); setActionsVisible(true); };
-  const closeActions = () => { setActionsVisible(false); setSelectedUser(null); };
+  const openActions = (user: ListUsersItem) => {
+    setSelectedUser(user);
+    setActionsVisible(true);
+  };
+  const closeActions = () => {
+    setActionsVisible(false);
+    setSelectedUser(null);
+  };
 
   // open animation is inside ActionSheetModal; close is instant
 
-  const renderItem = ({ item }: { item: ListUsersItem }) => {
+  const renderItem = ({item}: {item: ListUsersItem}) => {
     const name = item.name || '';
     const initials = name
       .split(' ')
@@ -120,23 +155,49 @@ export const UserListScreen: React.FC = () => {
       .map(s => s[0]?.toUpperCase())
       .join('') || 'U';
     return (
-      <TouchableOpacity style={listStyles.itemCard as any} onPress={() => navigation.navigate('User', { userId: item.id })} onLongPress={() => openActions(item)} delayLongPress={300}>
-        <View style={listStyles.itemRow as any}> 
+      <TouchableOpacity
+        style={listStyles.itemCard as any}
+        onPress={() => navigation.navigate('User', {userId: item.id})}
+        onLongPress={() => openActions(item)}
+        delayLongPress={300}>
+        <View style={listStyles.itemRow as any}>
           <View style={listStyles.avatarWrap as any}>
             <View style={listStyles.avatar as any}>
               <Text style={listStyles.avatarText as any}>{initials}</Text>
             </View>
           </View>
           <View style={styles.itemCol}>
-            <Text style={[styles.name, { color: C.textPrimary }]} numberOfLines={1}>{name}</Text>
-            <Text style={[styles.meta, { color: C.textSecondary }]} numberOfLines={1}>{item.role_name} · {item.country_name}</Text>
-            {!!item.mobile_phone && (<Text style={[styles.meta, { color: C.textSecondary }]} numberOfLines={1}>{formatPhoneDisplay(item.mobile_phone)}</Text>)}
-            {!!item.email && (<Text style={[styles.meta, { color: C.textSecondary }]} numberOfLines={1}>{item.email}</Text>)}
+            <Text
+              style={[styles.name, {color: C.textPrimary}]}
+              numberOfLines={1}>
+              {name}
+            </Text>
+            <Text
+              style={[styles.meta, {color: C.textSecondary}]}
+              numberOfLines={1}>
+              {item.role_name} · {item.country_name}
+            </Text>
+            {!!item.mobile_phone && (
+              <Text
+                style={[styles.meta, {color: C.textSecondary}]}
+                numberOfLines={1}>
+                {formatPhoneDisplay(item.mobile_phone)}
+              </Text>
+            )}
+            {!!item.email && (
+              <Text
+                style={[styles.meta, {color: C.textSecondary}]}
+                numberOfLines={1}>
+                {item.email}
+              </Text>
+            )}
           </View>
           <View style={styles.itemColRight}>
             <View style={styles.actionRow}>
-              <TouchableOpacity style={[styles.actionBtn, styles.editBtn]} onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={18} height={18} />
+              <TouchableOpacity
+                style={[styles.actionBtn, styles.editBtn]}
+                onPress={() => handleEdit(item)}>
+                <EditSvgIcon width={ws(15)} height={ws(15)} />
               </TouchableOpacity>
             </View>
           </View>
@@ -148,7 +209,12 @@ export const UserListScreen: React.FC = () => {
   const keyExtractor = (item: ListUsersItem) => String(item.id);
 
   const renderPagination = () => {
-    const itemsToRender: Array<{ label: string; page: number; active?: boolean; disabled?: boolean }> = [];
+    const itemsToRender: Array<{
+      label: string;
+      page: number;
+      active?: boolean;
+      disabled?: boolean;
+    }> = [];
 
     // << (first page)
     itemsToRender.push({ label: '<<', page: 1, disabled: page === 1 });
@@ -175,7 +241,7 @@ export const UserListScreen: React.FC = () => {
 
     return (
       <View style={listStyles.pageNumbersContainer as any}>
-        {itemsToRender.map((p) => (
+        {itemsToRender.map(p => (
           <TouchableOpacity
             key={`${p.label}-${p.page}`}
             style={[
@@ -184,12 +250,14 @@ export const UserListScreen: React.FC = () => {
               (p.disabled || loading) && (listStyles.pageNumberDisabled as any),
             ]}
             onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}
-          >
-            <Text style={[
-              listStyles.pageNumberText as any,
-              p.active && (listStyles.pageNumberTextActive as any),
-            ]}>{p.label}</Text>
+            disabled={!!p.disabled || loading}>
+            <Text
+              style={[
+                listStyles.pageNumberText as any,
+                p.active && (listStyles.pageNumberTextActive as any),
+              ]}>
+              {p.label}
+            </Text>
           </TouchableOpacity>
         ))}
       </View>
@@ -197,65 +265,113 @@ export const UserListScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0} style={{ flex: 1 }}>
-    <View style={[styles.container, { backgroundColor: C.background }]}>
-      <Header title={t('usersList')} />
+    <SafeAreaView
+      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+      edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
+        style={{flex: 1}}>
+        <View style={[styles.container, {backgroundColor: C.background}]}>
+          <Header title={t('usersList')} />
 
-      <View style={styles.headerRow}>
-        <TouchableOpacity style={styles.addButton} onPress={() => navigation.navigate('AddUser')}>
-          <Text style={styles.addButtonText}>+ {t('addNew')}</Text>
-        </TouchableOpacity>
-      </View>
+          <View style={styles.headerRow}>
+            <AddNewHeaderButton name="AddUser" text={t('addNew')} />
+          </View>
 
-      <View style={listStyles.searchContainer as any}> 
-        <Text style={listStyles.searchIcon as any}>🔎</Text>
-        <TextInput
-          style={listStyles.searchInput as any}
-          placeholder={t('search')}
-          placeholderTextColor={C.textSecondary}
-          value={query}
-          onChangeText={setQuery}
-          returnKeyType="search"
-          onSubmitEditing={() => goToPage(1)}
-        />
-      </View>
+          <View style={listStyles.searchContainer as any}>
+            <Text style={listStyles.searchIcon as any}>🔎</Text>
+            <TextInput
+              style={listStyles.searchInput as any}
+              placeholder={t('search')}
+              placeholderTextColor={C.textSecondary}
+              value={query}
+              onChangeText={setQuery}
+              returnKeyType="search"
+              onSubmitEditing={() => goToPage(1)}
+            />
+          </View>
 
-      <FlatList
-        data={items}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        showsVerticalScrollIndicator={false}
-        keyboardShouldPersistTaps="handled"
-        automaticallyAdjustKeyboardInsets
-        contentInsetAdjustmentBehavior="always"
-        contentContainerStyle={{ paddingBottom: 24 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={!loading ? <Text style={[styles.empty, { color: C.textSecondary }]}>{t('noUsersFound')} 😕</Text> : null}
-      />
-      <Text style={[styles.subTitle, { color: C.textSecondary }]}>{`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}</Text>
+          <FlatList
+            data={items}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
+            contentInsetAdjustmentBehavior="always"
+            contentContainerStyle={{paddingBottom: ms(24)}}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListEmptyComponent={
+              !loading ? (
+                <Text style={[styles.empty, {color: C.textSecondary}]}>
+                  {t('noUsersFound')}
+                </Text>
+              ) : null
+            }
+          />
+          <Text
+            style={[styles.subTitle, {color: C.textSecondary}]}
+          >{`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}</Text>
 
-      <View style={styles.pagination}>{renderPagination()}</View>
+          <View style={styles.pagination}>{renderPagination()}</View>
 
-      <ActionSheetModal
-        visible={actionsVisible}
-        title={selectedUser?.name || t('userDetail')}
-        onRequestClose={closeActions}
-        actions={((): ActionItem[] => {
-          const list: ActionItem[] = [];
-          list.push({ label: t('userDetail'), onPress: () => { if (selectedUser) navigation.navigate('User', { userId: selectedUser.id }); closeActions(); } });
-          list.push({ label: t('editUser'), onPress: () => { if (selectedUser) navigation.navigate('EditProfile', { id: selectedUser.id }); closeActions(); } });
-          list.push({ label: t('changePassword'), onPress: () => { if (selectedUser) navigation.navigate('ChangePasswordForOtherUser', { id: selectedUser.id }); closeActions(); } });
-          if (isSuperAdmin(roleId)) {
-            list.push({ label: t('deleteUser'), type: 'danger', onPress: () => { if (selectedUser) navigation.navigate('DeleteUser', { userId: selectedUser.id }); closeActions(); } });
-          }
-          return list;
-        })()}
-      />
-    </View>
-    </KeyboardAvoidingView>
+          <ActionSheetModal
+            visible={actionsVisible}
+            title={selectedUser?.name || t('userDetail')}
+            onRequestClose={closeActions}
+            actions={((): ActionItem[] => {
+              const list: ActionItem[] = [];
+              list.push({
+                label: t('userDetail'),
+                onPress: () => {
+                  if (selectedUser) {
+                    navigation.navigate('User', {userId: selectedUser.id});
+                  }
+                  closeActions();
+                },
+              });
+              list.push({
+                label: t('editUser'),
+                onPress: () => {
+                  if (selectedUser) {
+                    navigation.navigate('EditProfile', {id: selectedUser.id});
+                  }
+                  closeActions();
+                },
+              });
+              list.push({
+                label: t('changePassword'),
+                onPress: () => {
+                  if (selectedUser) {
+                    navigation.navigate('ChangePasswordForOtherUser', {
+                      id: selectedUser.id,
+                    });
+                  }
+                  closeActions();
+                },
+              });
+              if (isSuperAdmin(roleId)) {
+                list.push({
+                  label: t('deleteUser'),
+                  type: 'danger',
+                  onPress: () => {
+                    if (selectedUser) {
+                      navigation.navigate('DeleteUser', {
+                        userId: selectedUser.id,
+                      });
+                    }
+                    closeActions();
+                  },
+                });
+              }
+              return list;
+            })()}
+          />
+        </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -265,7 +381,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     paddingTop: 0,
-    paddingHorizontal: 16,
+    paddingHorizontal: ms(16),
   },
   headerRow: {
     flexDirection: 'row',
@@ -273,34 +389,25 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    fontSize: 22,
+    fontSize: fs(22),
     fontWeight: '600',
   },
   subTitle: {
-    marginTop: 6,
-    marginBottom: 10,
+    marginTop: ms(6),
+    marginBottom: ms(10),
     color: '#666',
-    fontSize: 12,
-  },
-  addButton: {
-    backgroundColor: COLORS.mainColor,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 6,
-  },
-  addButtonText: {
-    color: '#fff',
-    fontWeight: '600',
+    fontSize: fs(12),
   },
   search: {
-    height: 40,
+    height: hs(40),
     borderWidth: 1,
     borderColor: '#ddd',
-    borderRadius: 6,
-    paddingHorizontal: 12,
+    borderRadius: rs(6),
+    paddingHorizontal: ms(12),
     color: '#000',
-    marginBottom: 10,
-    marginTop: 6,
+    marginBottom: ms(10),
+    marginTop: ms(6),
+    fontSize: fs(14),
   },
   itemRow: {
     flexDirection: 'row',
@@ -319,22 +426,22 @@ const styles = StyleSheet.create({
     width: 72,
   },
   name: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '600',
-    marginBottom: 2,
+    marginBottom: ms(2),
   },
   meta: {
-    fontSize: 12,
+    fontSize: fs(12),
     color: '#666',
   },
   actionRow: {
     flexDirection: 'row',
-    gap: 6,
+    gap: ms(6),
   },
   actionBtn: {
-    width: 30,
-    height: 30,
-    borderRadius: 6,
+    width: ws(25),
+    height: ws(25),
+    borderRadius: rs(3),
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -346,12 +453,12 @@ const styles = StyleSheet.create({
   },
   empty: {
     textAlign: 'center',
-    marginTop: 40,
+    marginTop: ms(40),
     color: '#888',
-    fontSize: 14,
+    fontSize: fs(14),
   },
   pagination: {
-    paddingVertical: 12,
+    // paddingVertical: ms(8),
     alignItems: 'flex-end',
     // backgroundColor: 'red'
   },
@@ -362,13 +469,13 @@ const styles = StyleSheet.create({
   pageNumber: {
     // minWidth: 36,
     // height: 36,
-    borderRadius: 16,
+    borderRadius: rs(3),
     borderWidth: 1,
     borderColor: '#ddd',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 10,
-    marginLeft: 8,
+    paddingHorizontal: ms(10),
+    marginLeft: ms(8),
     backgroundColor: '#fff',
   },
   pageNumberActive: {
@@ -386,20 +493,20 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   itemCard: {
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 10,
+    borderRadius: rs(12),
+    padding: ms(12),
+    marginBottom: ms(10),
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
   },
   avatarWrap: {
-    marginRight: 12,
+    marginRight: ms(12),
   },
   avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: ws(40),
+    height: ws(40),
+    borderRadius: rs(20),
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -408,27 +515,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   chevron: {
-    fontSize: 22,
-    lineHeight: 22,
-    marginTop: 6,
+    fontSize: fs(22),
+    lineHeight: fs(22),
+    marginTop: ms(6),
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    marginBottom: 10,
-    height: 40,
-    marginTop: 6,
+    borderRadius: rs(8),
+    paddingHorizontal: ms(10),
+    marginBottom: ms(10),
+    height: hs(35),
+    marginTop: ms(6),
   },
   searchIcon: {
-    fontSize: 16,
-    marginRight: 6,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
+    fontSize: fs(14),
+    height: hs(35),
   },
   modalContainer: {
     position: 'absolute',
@@ -460,28 +563,28 @@ const styles = StyleSheet.create({
   },
   sheetHandle: {
     alignSelf: 'center',
-    width: 40,
-    height: 4,
-    borderRadius: 2,
+    width: ws(40),
+    height: hs(4),
+    borderRadius: rs(2),
     backgroundColor: '#999',
     opacity: 0.5,
-    marginBottom: 8,
+    marginBottom: ms(8),
   },
   sheetTitle: {
-    fontSize: 17,
+    fontSize: fs(17),
     fontWeight: '700',
-    paddingHorizontal: 16,
-    paddingTop: 6,
-    paddingBottom: 10,
+    paddingHorizontal: ms(16),
+    paddingTop: ms(6),
+    paddingBottom: ms(10),
   },
   sheetItem: {
-    paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(14),
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#eee',
   },
   sheetItemText: {
-    fontSize: 16,
+    fontSize: fs(16),
     fontWeight: '600',
   },
 }); 

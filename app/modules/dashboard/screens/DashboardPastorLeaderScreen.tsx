@@ -700,6 +700,7 @@ const styles = StyleSheet.create({
   },
   viewMoreButton: {
     alignItems: 'flex-end',
+    fontSize: fs(12),
     marginBottom: ms(20),
     paddingHorizontal: ms(16),
   },
@@ -720,7 +721,7 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: ms(16),
+    paddingVertical: ms(12),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },

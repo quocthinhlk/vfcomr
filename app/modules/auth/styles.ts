@@ -1,23 +1,24 @@
 import { StyleSheet } from 'react-native';
 import {COLORS} from '../../shared/constants/colors';
+import {fs, ws, hs, ms} from '../../shared/utils/scale';
 
 export const authStyles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: ms(20),
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 40,
+    marginBottom: ms(40),
   },
   logo: {
-    width: 300,
-    height: 85,
+    width: ws(250),
+    height: ws(85),
   },
   title: {
-    marginTop: 20,
+    marginTop: ms(20),
   },
   passwordInputContainer: {
     position: 'relative',
@@ -25,24 +26,28 @@ export const authStyles = StyleSheet.create({
   },
   passwordToggle: {
     position: 'absolute',
-    right: 10,
-    top: 20,
+    right: ms(12),
+    top: ms(5),
+    height: hs(24),
+    width: ws(24),
+    alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1,
   },
   passwordToggleIcon: {
-    width: 20,
-    height: 20,
+    width: ws(20),
+    height: hs(20),
   },
   subTitle: {
-    padding: 20,
+    paddingTop: ms(10),
     textAlign: 'center',
-    fontSize: 15
+    fontSize: fs(15)
   },
   forgotPassword: {
     width: '100%',
   },
   forgotPasswordTxt: {
-    paddingTop: 15,
+    paddingTop: ms(15),
     textAlign: 'right',
     color: COLORS.mainColor,
     fontWeight: 'bold',
