@@ -95,7 +95,7 @@ export const dashboardStyles = StyleSheet.create({
   statCard: {
     width: '48%',
     marginBottom: ms(10),
-    padding: ms(10),
+    padding: ms(5),
     borderWidth: 1,
     borderColor: '#e0e0e0',
     borderRadius: 5,
@@ -103,8 +103,8 @@ export const dashboardStyles = StyleSheet.create({
     alignItems: 'center',
   },
   statIcon: {
-    width: ws(30),
-    height: hs(30),
+    width: ws(25),
+    height: ws(25),
     marginRight: ms(10),
     resizeMode: 'contain',
   },
@@ -117,12 +117,12 @@ export const dashboardStyles = StyleSheet.create({
     color: COLORS.mainColor,
   },
   statSecondaryValue: {
-    fontSize: fs(11),
+    fontSize: fs(10),
     color: '#888',
     marginTop: ms(2),
   },
   statLabel: {
-    fontSize: fs(12),
+    fontSize: fs(11),
     color: '#888',
   },
   viewMoreButton: {

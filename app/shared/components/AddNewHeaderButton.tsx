@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {COLORS} from '../constants/colors';
-import {fs, ms, rs} from '../utils/scale';
+import {fs, ms, rs, ws} from '../utils/scale';
 import {FORM_INPUT_HEIGHT} from '../styles/form';
 
 type Props = {
@@ -62,7 +62,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(10),
     borderRadius: rs(3),
     marginTop: ms(6),
-    height: FORM_INPUT_HEIGHT,
+    height: ws(28),
     alignItems: 'center',
     justifyContent: 'center',
     flexDirection: 'row',

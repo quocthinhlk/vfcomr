@@ -125,6 +125,8 @@ export default function DashboardPastorLeaderScreen() {
   const [orgModalVisible, setOrgModalVisible] = useState(false);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.timing(rotation, {
@@ -258,7 +260,6 @@ export default function DashboardPastorLeaderScreen() {
   const handleDownloadImage = async () => {
     if (!selectedImage) return;
     try {
-      console.log('Downloading image URL:', selectedImage);
       
       // On both iOS and Android, CameraRoll works more reliably with local file paths.
       // We download the remote image to a temporary file, then save that file.
@@ -281,7 +282,27 @@ export default function DashboardPastorLeaderScreen() {
           console.log('Failed to cleanup temp file:', cleanupError);
         }
         
-        Alert.alert(t('success'), t('imageDownloadSuccess'));
+        // Close image modal
+        setImageModalVisible(false);
+        
+        // Show toast message instead of alert
+        setToastVisible(true);
+        Animated.timing(toastOpacity, {
+          toValue: 1,
+          duration: 200,
+          useNativeDriver: true,
+        }).start();
+        
+        // Auto hide after 3 seconds
+        setTimeout(() => {
+          Animated.timing(toastOpacity, {
+            toValue: 0,
+            duration: 200,
+            useNativeDriver: true,
+          }).start(() => {
+            setToastVisible(false);
+          });
+        }, 3000);
         } else {
           console.log('Download failed with status', downloadRes.statusCode);
           throw new Error('Failed to download image');
@@ -502,6 +523,30 @@ export default function DashboardPastorLeaderScreen() {
           </View>
         </Modal>
 
+        {/* Toast Message Modal - Separate modal with highest zIndex */}
+        <Modal
+          visible={toastVisible}
+          transparent
+          animationType="none"
+          onRequestClose={() => {}}
+          statusBarTranslucent
+        >
+          <Animated.View
+            pointerEvents="none"
+            style={[
+              styles.toastContainer,
+              {
+                opacity: toastOpacity,
+              },
+            ]}>
+            <View style={styles.toastBackground}>
+              <Text style={styles.toastText}>
+                {t('imageDownloadSuccess')}
+              </Text>
+            </View>
+          </Animated.View>
+        </Modal>
+
         <Animated.View style={[dashboardStyles.statCardContainer, { paddingHorizontal: ms(15), opacity: fade, transform: [{ translateY }] }]}>
           {visibleStats.map((stat, index) => (
             <DashboardStatCard key={index} {...stat} />
@@ -650,21 +695,22 @@ const styles = StyleSheet.create({
   },
   lastRecordContainer: {
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
     justifyContent: 'flex-end',
   },
   lastRecordLabel: {
     fontSize: fs(10),
     color: '#000',
-    lineHeight: 14,
+    lineHeight: fs(10),
     includeFontPadding: false,
+    fontWeight: '400',
   },
   lastRecordValue: {
     fontSize: fs(10),
     color: '#c00000',
-    lineHeight: 14,
+    lineHeight: fs(10),
     includeFontPadding: false,
-    // fontWeight: 'bold',
+    fontWeight: '400',
   },
   statsContainer: {
     flexDirection: 'row',
@@ -806,7 +852,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(12),
     paddingVertical: ms(6),
     borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.6)',
+    // backgroundColor: 'rgba(0,0,0,0.6)',
   },
   downloadButtonText: {
     color: '#fff',
@@ -821,5 +867,27 @@ const styles = StyleSheet.create({
   fullImage: {
     width: '100%',
     height: '100%',
+  },
+  toastContainer: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    paddingBottom: hs(80),
+    pointerEvents: 'none',
+  },
+  toastBackground: {
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
+    paddingVertical: ms(12),
+    paddingHorizontal: ms(24),
+    borderRadius: rs(8),
+    minWidth: ws(120),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toastText: {
+    fontSize: fs(14),
+    fontWeight: '500',
+    textAlign: 'center',
+    color: '#fff',
   },
 });

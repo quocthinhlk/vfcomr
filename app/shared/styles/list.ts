@@ -75,11 +75,12 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
       alignItems: 'center',
     } as const,
     pageNumber: {
-      borderRadius: rs(16),
+      width: ws(25),
+      height: ws(25),
+      borderRadius: rs(3),
       borderWidth: borderW,
       alignItems: 'center',
       justifyContent: 'center',
-      paddingHorizontal: ms(10),
       marginLeft: ms(8),
       backgroundColor: C.surface,
       borderColor: C.inputBorder,
@@ -94,7 +95,7 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
     pageNumberText: {
       color: C.textPrimary,
       fontWeight: '600',
-      fontSize: fs(12),
+      fontSize: fs(11),
     } as const,
     pageNumberTextActive: {
       color: '#fff',

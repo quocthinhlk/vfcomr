@@ -287,16 +287,16 @@ const styles = StyleSheet.create({
   },
   closeButton: {
     width: ws(30),
-    height: hs(30),
+    height: ws(30),
     borderRadius: rs(20),
     backgroundColor: COLORS.mainColor,
     justifyContent: 'center',
     alignItems: 'center',
     alignSelf: 'flex-start',
-    marginTop: ms(50),
+    // marginTop: ms(50),
     marginRight: ms(10),
-    marginBottom: ms(10),
-    display: 'none'
+    marginBottom: ms(5),
+    // display: 'none'
   },
   closeIcon: {
     position: 'relative',
@@ -335,14 +335,14 @@ const styles = StyleSheet.create({
     marginRight: ms(6),
   },
   menuLabel: {
-    fontSize: fs(15),
+    fontSize: fs(16),
     color: '#fff',
     flex: 1,
   },
   expandIndicator: {
     color: '#fff',
     marginLeft: ms(6),
-    fontSize: fs(15),
+    fontSize: fs(16),
   },
   subMenuList: {
     paddingLeft: ms(8),
@@ -367,7 +367,7 @@ const styles = StyleSheet.create({
     marginRight: ms(6),
   },
   subMenuLabel: {
-    fontSize: fs(15),
+    fontSize: fs(16),
     color: '#fff',
   },
 
@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     tintColor: '#fff',
   },
   logoutLabel: {
-    fontSize: fs(15),
+    fontSize: fs(16),
     color: '#fff',
   },
   bottomSection: {
@@ -480,7 +480,7 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   languageText: {
-    fontSize: fs(15),
+    fontSize: fs(16),
     color: '#fff',
   },
   languageOptionText: {

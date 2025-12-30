@@ -217,6 +217,24 @@ export default function NewPastorAndChurchScreen() {
             twitter: saved.twitter ?? prev.twitter,
             date_of_birth: saved.date_of_birth ? new Date(saved.date_of_birth as any) : prev.date_of_birth,
           }));
+        } else {
+          // Load defaults for create mode (no draft exists)
+          try {
+            const res = await api.get('churches/defaults');
+            if (!mounted) return;
+            const defaults = res?.data?.data;
+            if (defaults) {
+              setInitialValues(prev => ({
+                ...prev,
+                church_network_id: defaults.church_network_id ? String(defaults.church_network_id) : prev.church_network_id,
+                church_region_id: defaults.church_region_id ? String(defaults.church_region_id) : prev.church_region_id,
+                geographical_region_id: defaults.geographical_region_id ? String(defaults.geographical_region_id) : prev.geographical_region_id,
+                language_region_id: defaults.language_region_id ? String(defaults.language_region_id) : prev.language_region_id,
+              }));
+            }
+          } catch (error) {
+            console.error('Error loading church defaults:', error);
+          }
         }
       } catch {
         // ignore storage errors

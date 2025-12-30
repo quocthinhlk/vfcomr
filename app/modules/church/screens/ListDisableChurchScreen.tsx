@@ -336,7 +336,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.mainColor,
     paddingHorizontal: ms(12),
     paddingVertical: ms(8),
-    borderRadius: rs(6),
+    borderRadius: rs(3),
   },
   addButtonText: {color: '#fff', fontWeight: '600'},
   search: {
@@ -383,11 +383,12 @@ const styles = StyleSheet.create({
   pagination: {paddingVertical: ms(12), alignItems: 'flex-end'},
   pageNumbersContainer: {flexDirection: 'row', alignItems: 'center'},
   pageNumber: {
-    borderRadius: rs(1),
+    width: ws(20),
+    height: ws(20),
+    borderRadius: rs(3),
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: ms(10),
     marginLeft: ms(8),
   },
   pageNumberActive: {

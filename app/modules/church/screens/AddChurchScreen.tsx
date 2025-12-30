@@ -238,12 +238,30 @@ export default function AddChurchScreen() {
             await loadCities(d.country_id);
           }
         } catch {}
+      } else {
+        // Load defaults for create mode
+        try {
+          const res = await api.get('churches/defaults');
+          if (!mounted) return;
+          const defaults = res?.data?.data;
+          if (defaults) {
+            setInitialFormValues(prev => ({
+              ...prev,
+              church_network_id: defaults.church_network_id ? String(defaults.church_network_id) : prev.church_network_id,
+              church_region_id: defaults.church_region_id ? String(defaults.church_region_id) : prev.church_region_id,
+              geographical_region_id: defaults.geographical_region_id ? String(defaults.geographical_region_id) : prev.geographical_region_id,
+              language_region_id: defaults.language_region_id ? String(defaults.language_region_id) : prev.language_region_id,
+            }));
+          }
+        } catch (error) {
+          console.error('Error loading church defaults:', error);
+        }
       }
     })();
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [editId]);
 
   const [initialFormValues, setInitialFormValues] = useState<AddChurchFormValues>({
     name: '',

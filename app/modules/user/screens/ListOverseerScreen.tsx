@@ -395,13 +395,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pageNumber: {
-    width: ws(32),
-    height: ws(32),
-    borderRadius: rs(1),
+    width: ws(20),
+    height: ws(20),
+    borderRadius: rs(3),
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 0,
     marginLeft: ms(8),
   },
   pageNumberActive: {
