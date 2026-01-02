@@ -51,7 +51,17 @@ export type RootStackParamList = {
   Resources: undefined;
   Relating: undefined;
   FAQ: undefined;
+  FAQs: undefined;
+  FAQDetail: { faqId: number } | undefined;
+  AddFAQ: undefined;
+  EditFAQ: { faqId: number } | undefined;
+  DeleteFAQ: { faqId: number } | undefined;
   EventType: undefined;
+  EventTypes: undefined;
+  EventTypeDetail: { eventTypeId: number } | undefined;
+  AddEventType: undefined;
+  EditEventType: { eventTypeId: number } | undefined;
+  DeleteEventType: { eventTypeId: number } | undefined;
   PushMail: undefined;
   Settings: undefined;
   SettingsGeneral: undefined;
@@ -68,6 +78,11 @@ export type RootStackParamList = {
   ChangePasswordForOtherUser: { id: number } | undefined;
   DashboardPastorLeader: undefined;
   ChurchRegions: undefined;
+  WorshipServices: undefined;
+  WorshipServiceDetail: { worshipServiceId: number } | undefined;
+  AddWorshipService: undefined;
+  EditWorshipService: { worshipServiceId: number } | undefined;
+  DeleteWorshipService: { worshipServiceId: number } | undefined;
   AddChurchRegion: undefined;
   EditChurchRegion: { churchRegionId: number } | undefined;
   DeleteChurchRegion: { churchRegionId: number } | undefined;
@@ -127,7 +142,17 @@ import DeleteLanguageScreen from '../modules/language/screens/DeleteLanguageScre
 import { ResourcesScreen } from '../modules/dashboard/screens/ResourcesScreen';
 import { RelatingScreen } from '../modules/dashboard/screens/RelatingScreen';
 import { FAQScreen } from '../modules/dashboard/screens/FAQScreen';
+import FAQsScreen from '../modules/faq/screens/FAQsScreen';
+import FAQDetailScreen from '../modules/faq/screens/FAQDetailScreen';
+import AddFAQScreen from '../modules/faq/screens/AddFAQScreen';
+import EditFAQScreen from '../modules/faq/screens/EditFAQScreen';
+import DeleteFAQScreen from '../modules/faq/screens/DeleteFAQScreen';
 import { EventTypeScreen } from '../modules/dashboard/screens/EventTypeScreen';
+import EventTypesScreen from '../modules/eventTypes/screens/EventTypesScreen';
+import EventTypeDetailScreen from '../modules/eventTypes/screens/EventTypeDetailScreen';
+import AddEventTypeScreen from '../modules/eventTypes/screens/AddEventTypeScreen';
+import EditEventTypeScreen from '../modules/eventTypes/screens/EditEventTypeScreen';
+import DeleteEventTypeScreen from '../modules/eventTypes/screens/DeleteEventTypeScreen';
 import { PushMailScreen } from '../modules/dashboard/screens/PushMailScreen';
 import { SettingsScreen } from '../modules/dashboard/screens/SettingsScreen';
 import GeneralScreen from '../modules/setting/screens/GeneralScreen';
@@ -141,6 +166,11 @@ import DeleteUserScreen from '../modules/user/screens/DeleteUserScreen';
 import EditCountryScreen from '../modules/country/screens/EditCountryScreen';
 import DeleteCountryScreen from '../modules/country/screens/DeleteCountryScreen';
 import AddCountryScreen from '../modules/country/screens/AddCountryScreen';
+import WorshipServicesScreen from '../modules/worshipservices/screens/WorshipServicesScreen';
+import WorshipServiceDetailScreen from '../modules/worshipservices/screens/WorshipServiceDetailScreen';
+import AddWorshipServiceScreen from '../modules/worshipservices/screens/AddWorshipServiceScreen';
+import EditWorshipServiceScreen from '../modules/worshipservices/screens/EditWorshipServiceScreen';
+import DeleteWorshipServiceScreen from '../modules/worshipservices/screens/DeleteWorshipServiceScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -241,7 +271,17 @@ export default function Navigation() {
               <Stack.Screen name="Resources" component={ResourcesScreen} />
               <Stack.Screen name="Relating" component={RelatingScreen} />
               <Stack.Screen name="FAQ" component={FAQScreen} />
+              <Stack.Screen name="FAQs" component={FAQsScreen} />
+              <Stack.Screen name="FAQDetail" component={FAQDetailScreen} />
+              <Stack.Screen name="AddFAQ" component={AddFAQScreen} />
+              <Stack.Screen name="EditFAQ" component={EditFAQScreen} />
+              <Stack.Screen name="DeleteFAQ" component={DeleteFAQScreen} />
               <Stack.Screen name="EventType" component={EventTypeScreen} />
+              <Stack.Screen name="EventTypes" component={EventTypesScreen} />
+              <Stack.Screen name="EventTypeDetail" component={EventTypeDetailScreen} />
+              <Stack.Screen name="AddEventType" component={AddEventTypeScreen} />
+              <Stack.Screen name="EditEventType" component={EditEventTypeScreen} />
+              <Stack.Screen name="DeleteEventType" component={DeleteEventTypeScreen} />
               <Stack.Screen name="PushMail" component={PushMailScreen} />
               <Stack.Screen name="Support" component={SupportScreen} />
               <Stack.Screen name="Settings" component={SettingsScreen} />
@@ -255,6 +295,11 @@ export default function Navigation() {
               <Stack.Screen name="EditCountry" component={EditCountryScreen} />
               <Stack.Screen name="DeleteCountry" component={DeleteCountryScreen} />
               <Stack.Screen name="AddCountry" component={AddCountryScreen} />
+              <Stack.Screen name="WorshipServices" component={WorshipServicesScreen} />
+              <Stack.Screen name="WorshipServiceDetail" component={WorshipServiceDetailScreen} />
+              <Stack.Screen name="AddWorshipService" component={AddWorshipServiceScreen} />
+              <Stack.Screen name="EditWorshipService" component={EditWorshipServiceScreen} />
+              <Stack.Screen name="DeleteWorshipService" component={DeleteWorshipServiceScreen} />
             </>
           )}
         </Stack.Navigator>

@@ -19,8 +19,9 @@ export async function login(payload: LoginPayload) {
 }
 
 export async function logout() {
-  // Remove token in AsyncStorage
+  // Remove token and selected church_id in AsyncStorage
   await AsyncStorage.removeItem('token');
+  await AsyncStorage.removeItem('selectedChurchId');
 }
 
 export async function forgotPassword(email: string) {

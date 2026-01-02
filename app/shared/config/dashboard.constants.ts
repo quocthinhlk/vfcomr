@@ -187,23 +187,21 @@ export const getTranslatedMenuItems = (languageCode: LanguageCode = 'en', userRo
     //     { label: t('multiUserRestrictions'), routeName: 'Relating' },
     //   ],
     // },
-    // {
-    //   label: t('faq'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('createFaq'), routeName: 'FAQ' },
-    //     { label: t('searchFaq'), routeName: 'FAQ' },
-    //     { label: t('listFaq'), routeName: 'FAQ' },
-    //   ],
-    // },
-    // {
-    //   label: t('eventType'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('addTypeOfVisit'), routeName: 'EventType' },
-    //     { label: t('viewEventType'), routeName: 'EventType' },
-    //   ],
-    // },
+    {
+      label: t('faq'),
+      children: [
+        { label: t('createFaq'), routeName: 'AddFAQ' },
+        { label: t('searchFaq'), routeName: 'FAQs' },
+        { label: t('listFaq'), routeName: 'FAQs' },
+      ],
+    },
+    {
+      label: t('eventType'),
+      children: [
+        { label: t('addNew') || 'Add New', routeName: 'AddEventType' },
+        { label: t('list') || 'List', routeName: 'EventTypes' },
+      ],
+    },
     // {
     //   label: t('pushMail'),
     //   disabled: true,

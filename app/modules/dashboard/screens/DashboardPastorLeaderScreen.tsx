@@ -20,6 +20,7 @@ import { useThemedColors } from '../../../shared/styles/theme';
 import { Col, Row, Grid } from 'react-native-easy-grid';
 import RNFS from 'react-native-fs';
 import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // CameraRoll is provided by '@react-native-camera-roll/camera-roll' at runtime.
 // The library exports `CameraRoll` as a named export in recent versions,
 // so we resolve it from `.CameraRoll` first, then fall back to default/CommonJS.
@@ -98,7 +99,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
 const menuItems = [
   { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Monthly Data', routeName: 'WeeklyReport', disabled: true },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch', disabled: true },
-  { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'EnterVisits', disabled: true },
+  { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'WorshipServices' },
   { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
   { icon: require('../../../../app/assets/images/icon/user.png'), label: 'New Pastor', routeName: 'AddUser' },
   { icon: require('../../../../app/assets/images/icon/home.png'), label: 'New Church', routeName: 'AddChurch' },
@@ -169,6 +170,12 @@ export default function DashboardPastorLeaderScreen() {
       setBannerError(false);
       setProfileError(false);
       setLogoError(false);
+      
+      // Save selected church_id to AsyncStorage
+      if (church?.id) {
+        await AsyncStorage.setItem('selectedChurchId', String(church.id));
+      }
+      
       const res = await api.get('dashboard', { params: { church_id: church?.id } });
       const data = res?.data?.data;
       if (data) {
@@ -196,9 +203,15 @@ export default function DashboardPastorLeaderScreen() {
     let mounted = true;
     (async () => {
       try {
+        // Load selected church_id from AsyncStorage
+        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+        
+        // Prepare dashboard API call with church_id if available
+        const dashboardParams = savedChurchId ? { church_id: parseInt(savedChurchId, 10) } : undefined;
+        
         const [userRes, dashboardRes] = await Promise.all([
           api.get('users/me'),
-          api.get('dashboard')
+          api.get('dashboard', dashboardParams ? { params: dashboardParams } : undefined)
         ]);
         if (!mounted) return;
         
@@ -235,6 +248,8 @@ export default function DashboardPastorLeaderScreen() {
 
   const handleLogout = async () => {
     try {
+      // Remove selected church_id from AsyncStorage on logout
+      await AsyncStorage.removeItem('selectedChurchId');
       await logout();
       setIsAuthenticated(false);
     } catch (error) {

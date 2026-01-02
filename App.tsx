@@ -17,7 +17,6 @@ import { enableScreens } from 'react-native-screens';
 import { LogBox } from 'react-native';
 import './app/shared/config/ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
-import { NetworkStatusBanner } from './app/shared/components/NetworkStatusBanner';
 
 /* ================================
    1. TẮT FONT SCALING TOÀN APP
@@ -68,7 +67,6 @@ function AppInner() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <LanguageProvider>
-            <NetworkStatusBanner />
             <Navigation />
           </LanguageProvider>
         </SafeAreaProvider>
