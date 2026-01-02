@@ -12,6 +12,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import api from '../../../config/api';
+import {getChurchDetail} from '../../church/services/church.service';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
@@ -32,6 +33,8 @@ export const UserScreen = () => {
   const [roleId, setRoleId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
+  const [pastorChurches, setPastorChurches] = useState<any[]>([]);
+  const [loadingChurches, setLoadingChurches] = useState<boolean>(false);
 
   const formatPhoneDisplay = (value?: string | null) => {
     if (!value) return '';
@@ -49,14 +52,43 @@ export const UserScreen = () => {
     try {
       setError(null);
       setLoading(true);
-      const res = await getUserById(userId);
-      setUser(res?.data ?? null);
+      const res = await getUserById(userId, true);
+      const userData = res?.data ?? null;
+      setUser(userData);
+      
+      // Load pastor churches if pastor_church_ids exists
+      const pastorChurchIds = (userData as any)?.pastor_church_ids;
+      console.log('[UserScreen] pastor_church_ids:', pastorChurchIds);
+      
+      if (userData && pastorChurchIds && Array.isArray(pastorChurchIds) && pastorChurchIds.length > 0) {
+        setLoadingChurches(true);
+        try {
+          const churchPromises = pastorChurchIds.map((churchId: number) => 
+            getChurchDetail(churchId).catch(err => {
+              console.error(`[UserScreen] Error loading church ${churchId}:`, err);
+              return null;
+            })
+          );
+          const churches = await Promise.all(churchPromises);
+          const validChurches = churches.filter(ch => ch !== null && ch !== undefined);
+          console.log('[UserScreen] Loaded churches:', validChurches.length, 'out of', pastorChurchIds.length);
+          setPastorChurches(validChurches);
+        } catch (err) {
+          console.error('[UserScreen] Error loading pastor churches:', err);
+          setPastorChurches([]);
+        } finally {
+          setLoadingChurches(false);
+        }
+      } else {
+        setPastorChurches([]);
+        setLoadingChurches(false);
+      }
     } catch (e: any) {
       setError(e?.message || t('failedToChangePassword'));
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, t]);
 
   useEffect(() => {
     load();
@@ -205,6 +237,62 @@ export const UserScreen = () => {
             <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
               <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('address')}</Text>
               <Text style={[styles.multiline, { color: C.textSecondary }]}>{user.street_address}</Text>
+            </View>
+          ) : null}
+
+          {(pastorChurches.length > 0 || loadingChurches) ? (
+            <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
+              <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('churches') || 'Churches'}</Text>
+              {loadingChurches ? (
+                <View style={styles.loadingOverlay}>
+                  <ActivityIndicator />
+                </View>
+              ) : pastorChurches.length > 0 ? (
+                pastorChurches.map((church, index) => (
+                  <View key={church.id || index} style={[styles.churchItem, { borderBottomColor: C.border }]}>
+                    <View style={styles.churchHeader}>
+                      {church.photo_url ? (
+                        <Image
+                          source={{ uri: church.photo_url }}
+                          style={styles.churchPhoto}
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View style={[styles.churchPhoto, styles.churchPhotoPlaceholder, { backgroundColor: C.border }]} />
+                      )}
+                      <View style={styles.churchInfo}>
+                        <Text style={[styles.churchName, { color: C.textPrimary }]}>{church.name || '-'}</Text>
+                        {church.language_name ? (
+                          <Text style={[styles.churchDetail, { color: C.textSecondary }]}>
+                            {t('language')}: {church.language_name}
+                          </Text>
+                        ) : null}
+                        {church.country_name ? (
+                          <Text style={[styles.churchDetail, { color: C.textSecondary }]}>
+                            {t('country')}: {church.country_name}
+                          </Text>
+                        ) : null}
+                        {church.email_address ? (
+                          <Text
+                            style={[styles.churchDetail, styles.churchLink, { color: COLORS.mainColor }]}
+                            onPress={() => sendEmail(church.email_address)}
+                          >
+                            {t('emailAddress')}: {church.email_address}
+                          </Text>
+                        ) : null}
+                        {church.office_phone ? (
+                          <Text
+                            style={[styles.churchDetail, styles.churchLink, { color: COLORS.mainColor }]}
+                            onPress={() => dialPhone(church.office_phone)}
+                          >
+                            {t('officePhone') || 'Office Phone'}: {formatPhoneDisplay(church.office_phone)}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
+                  </View>
+                ))
+              ) : null}
             </View>
           ) : null}
 
@@ -427,5 +515,40 @@ const styles = StyleSheet.create({
   },
   errorText: {
     color: '#991B1B',
+  },
+  churchItem: {
+    paddingVertical: ms(12),
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  churchHeader: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  churchPhoto: {
+    width: ws(80),
+    height: ws(80),
+    borderRadius: rs(8),
+    marginRight: ms(12),
+  },
+  churchPhotoPlaceholder: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  churchInfo: {
+    flex: 1,
+  },
+  churchName: {
+    fontSize: fs(14),
+    fontWeight: '700',
+    marginBottom: ms(4),
+    flexShrink: 1,
+  },
+  churchDetail: {
+    fontSize: fs(12),
+    marginBottom: ms(2),
+    flexShrink: 1,
+  },
+  churchLink: {
+    textDecorationLine: 'underline',
   },
 }); 

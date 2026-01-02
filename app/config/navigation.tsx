@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NetworkReloadListener } from '../shared/components/NetworkReloadListener';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -180,6 +181,7 @@ export default function Navigation() {
   return (
     <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated }}>
       <NavigationContainer>
+        <NetworkReloadListener />
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
             <>

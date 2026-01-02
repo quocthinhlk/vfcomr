@@ -1282,6 +1282,8 @@ PODS:
     - Yoga
   - react-native-image-resizer (1.4.5):
     - React-Core
+  - react-native-netinfo (11.4.1):
+    - React-Core
   - react-native-pager-view (6.9.1):
     - DoubleConversion
     - glog
@@ -1903,6 +1905,7 @@ DEPENDENCIES:
   - "react-native-cameraroll (from `../node_modules/@react-native-camera-roll/camera-roll`)"
   - react-native-image-picker (from `../node_modules/react-native-image-picker`)
   - react-native-image-resizer (from `../node_modules/react-native-image-resizer`)
+  - "react-native-netinfo (from `../node_modules/@react-native-community/netinfo`)"
   - react-native-pager-view (from `../node_modules/react-native-pager-view`)
   - react-native-safe-area-context (from `../node_modules/react-native-safe-area-context`)
   - React-NativeModulesApple (from `../node_modules/react-native/ReactCommon/react/nativemodule/core/platform/ios`)
@@ -2029,6 +2032,8 @@ EXTERNAL SOURCES:
     :path: "../node_modules/react-native-image-picker"
   react-native-image-resizer:
     :path: "../node_modules/react-native-image-resizer"
+  react-native-netinfo:
+    :path: "../node_modules/@react-native-community/netinfo"
   react-native-pager-view:
     :path: "../node_modules/react-native-pager-view"
   react-native-safe-area-context:
@@ -2147,6 +2152,7 @@ SPEC CHECKSUMS:
   react-native-cameraroll: ac7c6a1c30d14d5c843331dd55be0c7f079be527
   react-native-image-picker: fb2d12cb86e0b3e58caee9aa660ddbd5742c841c
   react-native-image-resizer: d9fb629a867335bdc13230ac2a58702bb8c8828f
+  react-native-netinfo: f0a9899081c185db1de5bb2fdc1c88c202a059ac
   react-native-pager-view: 5bab97f356bdaba4ed3b08cf3fa6e927c0746b2b
   react-native-safe-area-context: 337fce5941460e2605fb3c39dbb0f6e0765c8010
   React-NativeModulesApple: 79a4404ac301b40bec3b367879c5e9a9ce81683c

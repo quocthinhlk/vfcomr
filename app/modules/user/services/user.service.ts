@@ -217,13 +217,18 @@ export interface GetUserResponse {
   message: string;
 }
 
-export async function getUserById(id: number) {
+export async function getUserById(id: number, includePastorChurches?: boolean) {
   const token = await AsyncStorage.getItem('token');
   if (!token) {
     throw new Error('No authentication token found.');
   }
   try {
+    const params: any = {};
+    if (includePastorChurches) {
+      params.include_pastor_churches = 'true';
+    }
     const response = await api.get<GetUserResponse>(`/users/${id}`, {
+      params,
       headers: {
         'Authorization': `Bearer ${token}`,
       },

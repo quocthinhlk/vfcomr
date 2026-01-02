@@ -14,6 +14,7 @@ export type ThemeColors = {
   inputBorder: string;
   overlay: string;
   bgSelectedOption: string; // background for selected option in dropdown
+  error?: string; // error color (optional for backward compatibility)
 };
 
 export const THEME: Record<ThemeMode, ThemeColors> = {
@@ -29,6 +30,7 @@ export const THEME: Record<ThemeMode, ThemeColors> = {
     inputBorder: '#ddd',
     overlay: 'rgba(0,0,0,0.3)',
     bgSelectedOption: '#f0f0f0',
+    error: '#ff4444',
   },
   dark: {
     background: '#000',
@@ -42,6 +44,7 @@ export const THEME: Record<ThemeMode, ThemeColors> = {
     inputBorder: '#333',
     overlay: 'rgba(0,0,0,0.6)',
     bgSelectedOption: '#242323',
+    error: '#ff4444',
   }
 };
 
