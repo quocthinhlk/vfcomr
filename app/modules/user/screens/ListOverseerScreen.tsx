@@ -3,7 +3,6 @@ import {
   View,
   FlatList,
   RefreshControl,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
   KeyboardAvoidingView,
@@ -24,6 +23,7 @@ import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import SearchInput from '../../../shared/components/SearchInput';
 
 type OverseerItem = {
   id: number;
@@ -227,18 +227,12 @@ export const ListOverseerScreen: React.FC = () => {
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={t('overseers')} />
 
-          <View style={listStyles.searchContainer as any}>
-            <Text style={listStyles.searchIcon as any}>🔎</Text>
-            <TextInput
-              style={listStyles.searchInput as any}
-              placeholder={t('search')}
-              placeholderTextColor={C.textSecondary}
-              value={query}
-              onChangeText={setQuery}
-              returnKeyType="search"
-              onSubmitEditing={() => goToPage(1)}
-            />
-          </View>
+          <SearchInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('search')}
+            onSubmitEditing={() => goToPage(1)}
+          />
 
           <FlatList
             data={items}

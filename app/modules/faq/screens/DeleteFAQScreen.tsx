@@ -16,6 +16,8 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
+import {isSuperAdmin} from '../../../shared/utils/permissions';
+import api from '../../../config/api';
 
 export const DeleteFAQScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -25,10 +27,37 @@ export const DeleteFAQScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const {t} = useTranslation();
   const C = useThemedColors();
+  const [userRoleId, setUserRoleId] = useState<number | null>(null);
+  const [checkingRole, setCheckingRole] = useState(true);
+
+  // Check user role on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('users/me');
+        const roleId = res?.data?.data?.role?.id;
+        if (typeof roleId === 'number') {
+          setUserRoleId(roleId);
+          if (!isSuperAdmin(roleId)) {
+            // Redirect non-admin users
+            Alert.alert(t('error') || 'Error', t('accessDenied') || 'Access denied. Only administrators can delete FAQs.');
+            navigation.goBack();
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching user role:', e);
+        Alert.alert(t('error') || 'Error', t('failedToVerifyPermissions') || 'Failed to verify permissions.');
+        navigation.goBack();
+      } finally {
+        setCheckingRole(false);
+      }
+    })();
+  }, [navigation, t]);
 
   useEffect(() => {
     let mounted = true;
-    if (faqId) {
+    if (faqId && isSuperAdmin(userRoleId)) {
       getFAQById(faqId)
         .then(res => {
           if (!mounted) {
@@ -41,7 +70,7 @@ export const DeleteFAQScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [faqId]);
+  }, [faqId, userRoleId]);
 
   const onConfirm = async () => {
     if (!faqId) return;
@@ -56,6 +85,22 @@ export const DeleteFAQScreen: React.FC = () => {
       setSubmitting(false);
     }
   };
+
+  if (checkingRole) {
+    return (
+      <SafeAreaView
+        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+          <Text style={{color: C.textPrimary}}>{t('loading') || 'Loading'}...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!isSuperAdmin(userRoleId)) {
+    return null; // Will redirect in useEffect
+  }
 
   return (
     <SafeAreaView

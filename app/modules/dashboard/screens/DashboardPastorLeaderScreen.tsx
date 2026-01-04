@@ -97,7 +97,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
 };
 
 const menuItems = [
-  { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Monthly Data', routeName: 'WeeklyReport', disabled: true },
+  { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Monthly Data', routeName: 'MonthlyDataSelect' },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch', disabled: true },
   { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'WorshipServices' },
   { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
@@ -114,6 +114,7 @@ export default function DashboardPastorLeaderScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [logoError, setLogoError] = useState(false);
@@ -224,6 +225,12 @@ export default function DashboardPastorLeaderScreen() {
           // Store user ID for navigation
           if (typeof userData.id === 'number') {
             setCurrentUserId(userData.id);
+          }
+          
+          // Store user role ID for menu filtering
+          const roleId = userData?.role?.id;
+          if (typeof roleId === 'number') {
+            setCurrentUserRoleId(roleId);
           }
 
           setUserProfile({
@@ -387,7 +394,7 @@ export default function DashboardPastorLeaderScreen() {
           <MenuPopup
             visible={menuVisible}
             onClose={() => setMenuVisible(false)}
-            menuItems={getTranslatedMenuItems(selectedLanguage as any)}
+            menuItems={getTranslatedMenuItems(selectedLanguage as any, currentUserRoleId ?? undefined)}
             onMenuItemPress={handleMenuItemPress}
             onLogout={handleLogout}
             onChangeLanguage={handleChangeLanguage}

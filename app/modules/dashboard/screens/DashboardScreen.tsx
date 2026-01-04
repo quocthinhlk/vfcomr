@@ -172,29 +172,28 @@ export default function DashboardScreen() {
   const menuItems = [
     {
       icon: require('../../../../app/assets/images/icon/plus.png'),
-      label: 'Enter Visits',
+      label: t('enterVisits') || 'Enter Visits',
       routeName: 'EnterVisits',
-      disabled: true,
     },
     {
       icon: require('../../../../app/assets/images/icon/edit.png'),
-      label: 'Edit Profile',
+      label: t('editProfile') || 'Edit Profile',
       routeName: 'EditProfile',
       disabled: true,
     },
     {
       icon: require('../../../../app/assets/images/icon/plus.png'),
-      label: 'New Church & New Pastor',
+      label: t('addNewChurchAndPastor') || 'New Church & New Pastor',
       routeName: 'NewPastorAndChurch',
     },
     {
       icon: require('../../../../app/assets/images/icon/plus.png'),
-      label: 'New Pastor',
+      label: t('addNewPastor') || 'New Pastor',
       routeName: 'AddUser',
     },
     {
       icon: require('../../../../app/assets/images/icon/plus.png'),
-      label: 'New Church',
+      label: t('addNewChurch') || 'New Church',
       routeName: 'AddChurch',
     },
   ];
@@ -339,52 +338,52 @@ export default function DashboardScreen() {
               {
                 icon: require('../../../../app/assets/images/icon/house.png'),
                 value: '40',
-                label: 'Churches',
+                label: t('churches') || 'Churches',
               },
               {
                 icon: require('../../../../app/assets/images/icon/group.png'),
                 value: '500',
-                label: 'People',
+                label: t('people') || 'People',
               },
               {
                 icon: require('../../../../app/assets/images/icon/growth.png'),
                 value: '5%',
-                label: 'Churches Growing',
+                label: t('churchesGrowing') || 'Churches Growing',
               },
               {
                 icon: require('../../../../app/assets/images/icon/reporting.png'),
                 value: '20',
-                label: 'Churches Reporting',
+                label: t('churchesReporting') || 'Churches Reporting',
               },
               {
                 icon: require('../../../../app/assets/images/icon/earth.png'),
                 value: '2',
-                label: 'Nations',
+                label: t('nations') || 'Nations',
               },
               {
                 icon: require('../../../../app/assets/images/icon/plant.png'),
                 value: '30',
-                label: 'Churches Planting',
+                label: t('churchesPlanting') || 'Churches Planting',
               },
               {
                 icon: require('../../../../app/assets/images/icon/cell-group.png'),
                 value: '500',
-                label: 'Churches with CGs',
+                label: t('churchesWithCgs') || 'Churches with CGs',
               },
               {
                 icon: require('../../../../app/assets/images/icon/education.png'),
                 value: '300',
-                label: 'Churches with GT/LIW',
+                label: t('churchesWithGtLiw') || 'Churches with GT/LIW',
               },
               {
                 icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
                 value: '20',
-                label: 'Churches with MFP',
+                label: t('churchesWithMfp') || 'Churches with MFP',
               },
               {
                 icon: require('../../../../app/assets/images/icon/worldwide.png'),
                 value: '530',
-                label: 'Churches Visited',
+                label: t('churchesVisited') || 'Churches Visited',
               },
             ] as Array<{icon: any; value: string; label: string}>
           )
@@ -451,17 +450,7 @@ export default function DashboardScreen() {
                 }}
               />
               <Text style={[{flex: 1}, {color: C.textPrimary, fontSize: fs(14)}]}>
-                {item.label === 'Enter Visits'
-                  ? item.label
-                  : item.label === 'Edit Profile'
-                  ? item.label
-                  : item.label === 'New Church & New Pastor'
-                  ? t('addNewChurchAndPastor')
-                  : item.label === 'New Pastor'
-                  ? t('addNewPastor')
-                  : item.label === 'New Church'
-                  ? t('addNewChurch')
-                  : item.label}
+                {item.label}
               </Text>
               <Image
                 source={require('../../../../app/assets/images/icon-down.png')}

@@ -54,7 +54,7 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
       );
       navigation.navigate('WorshipServices', {reload: true});
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete Worship Service');
+      Alert.alert(t('error') || 'Error', t('failedToDeleteWorshipService') || 'Failed to delete Worship Service');
     } finally {
       setSubmitting(false);
     }

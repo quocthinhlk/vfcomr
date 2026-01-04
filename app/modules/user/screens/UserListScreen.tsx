@@ -3,7 +3,6 @@ import {
   View,
   FlatList,
   RefreshControl,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
   ActivityIndicator,
@@ -31,6 +30,7 @@ import ActionSheetModal, {
 } from '../../../shared/components/ActionSheetModal';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+import SearchInput from '../../../shared/components/SearchInput';
 
 export const UserListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -279,18 +279,12 @@ export const UserListScreen: React.FC = () => {
             <AddNewHeaderButton name="AddUser" text={t('addNew')} />
           </View>
 
-          <View style={listStyles.searchContainer as any}>
-            <Text style={listStyles.searchIcon as any}>🔎</Text>
-            <TextInput
-              style={listStyles.searchInput as any}
-              placeholder={t('search')}
-              placeholderTextColor={C.textSecondary}
-              value={query}
-              onChangeText={setQuery}
-              returnKeyType="search"
-              onSubmitEditing={() => goToPage(1)}
-            />
-          </View>
+          <SearchInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('search')}
+            onSubmitEditing={() => goToPage(1)}
+          />
 
           <FlatList
             data={items}

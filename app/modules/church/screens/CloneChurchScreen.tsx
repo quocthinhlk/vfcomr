@@ -1,7 +1,6 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
-  TextInput,
   RefreshControl,
   FlatList,
   TouchableOpacity,
@@ -29,6 +28,7 @@ import {
   CopySvgIcon,
 } from '../../../shared/components/icons';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import SearchInput from '../../../shared/components/SearchInput';
 
 export const CloneChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -228,18 +228,12 @@ export const CloneChurchScreen: React.FC = () => {
           </TouchableOpacity>
         </View> */}
 
-        <View style={listStyles.searchContainer as any}>
-          <Text style={listStyles.searchIcon as any}>🔎</Text>
-          <TextInput
-            style={listStyles.searchInput as any}
-            placeholder={t('search')}
-            placeholderTextColor={C.textSecondary}
-            value={query}
-            onChangeText={setQuery}
-            returnKeyType="search"
-            onSubmitEditing={() => goToPage(1)}
-          />
-        </View>
+        <SearchInput
+          value={query}
+          onChangeText={setQuery}
+          placeholder={t('search')}
+          onSubmitEditing={() => goToPage(1)}
+        />
 
         <FlatList
           data={items}

@@ -129,7 +129,8 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
           child.routeName === 'CloneChurch' ||
           child.routeName === 'DisableChurches' ||
           child.routeName === 'SettingsBibleVerse' ||
-          child.routeName === 'SettingsRationalising'
+          child.routeName === 'SettingsRationalising' ||
+          child.routeName === 'AddFAQ'
         ) {
           return isSuperAdmin(roleId || undefined);
         }

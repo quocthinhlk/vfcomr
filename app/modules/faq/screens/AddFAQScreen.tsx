@@ -19,11 +19,62 @@ import ElementDropdown from '../../../shared/components/ElementDropdown';
 import api from '../../../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {DeleteSvgIcon} from '../../../shared/components/icons';
+import {isSuperAdmin} from '../../../shared/utils/permissions';
 
 interface LanguageOption {
   id: number;
   name: string;
 }
+
+// Function to convert HTML to formatted text
+const convertHtmlToText = (html: string): string => {
+  if (!html) return '';
+  
+  let text = html;
+  
+  // Replace block-level elements with newlines
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<\/div>/gi, '\n');
+  text = text.replace(/<\/h[1-6]>/gi, '\n\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<\/li>/gi, '\n');
+  text = text.replace(/<\/ul>/gi, '\n');
+  text = text.replace(/<\/ol>/gi, '\n');
+  
+  // Remove all remaining HTML tags
+  text = text.replace(/<[^>]*>/g, '');
+  
+  // Decode HTML entities
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&apos;/g, "'");
+  
+  // Decode numeric entities (decimal)
+  text = text.replace(/&#(\d+);/g, (match, dec) => {
+    return String.fromCharCode(parseInt(dec, 10));
+  });
+  
+  // Decode numeric entities (hex)
+  text = text.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+  
+  // Clean up multiple newlines (more than 2 consecutive)
+  text = text.replace(/\n{3,}/g, '\n\n');
+  
+  // Clean up spaces around newlines
+  text = text.replace(/[ \t]+\n/g, '\n');
+  text = text.replace(/\n[ \t]+/g, '\n');
+  
+  // Trim and clean up
+  text = text.trim();
+  
+  return text;
+};
 
 export const AddFAQScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -35,6 +86,33 @@ export const AddFAQScreen: React.FC = () => {
   const {t} = useTranslation();
   const C = useThemedColors();
   const [languageOptions, setLanguageOptions] = useState<{label: string; value: number}[]>([]);
+  const [userRoleId, setUserRoleId] = useState<number | null>(null);
+  const [checkingRole, setCheckingRole] = useState(true);
+
+  // Check user role on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await api.get('users/me');
+        const roleId = res?.data?.data?.role?.id;
+        if (typeof roleId === 'number') {
+          setUserRoleId(roleId);
+          if (!isSuperAdmin(roleId)) {
+            // Redirect non-admin users
+            Alert.alert(t('error') || 'Error', t('accessDenied') || 'Access denied. Only administrators can add FAQs.');
+            navigation.goBack();
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Error fetching user role:', e);
+        Alert.alert(t('error') || 'Error', t('failedToVerifyPermissions') || 'Failed to verify permissions.');
+        navigation.goBack();
+      } finally {
+        setCheckingRole(false);
+      }
+    })();
+  }, [navigation, t]);
 
   const loadLanguages = useCallback(async () => {
     try {

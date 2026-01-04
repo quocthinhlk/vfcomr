@@ -1,7 +1,7 @@
 import { ImageSourcePropType } from 'react-native';
 import { CommonMenuItem } from '../interfaces/MenuItem';
 import api from '../../config/api';
-import { isSuperAdmin } from '../utils/permissions';
+import { isSuperAdmin, isPastorLeader } from '../utils/permissions';
 import { translations, TranslationKey, LanguageCode } from '../translations';
 
 const iconChurch = require('../../assets/images/icon/church.png');
@@ -45,6 +45,7 @@ export const getTranslatedMenuItems = (languageCode: LanguageCode = 'en', userRo
   };
 
   const isSuperAdminUser = isSuperAdmin(userRoleId);
+  const isPastorUser = isPastorLeader(userRoleId);
 
   return [
     { label: t('myDashboard'), routeName: 'Dashboard' },
@@ -79,6 +80,16 @@ export const getTranslatedMenuItems = (languageCode: LanguageCode = 'en', userRo
 
       ],
     },
+    ...(isPastorUser ? [
+      {
+        label: t('churchPlantingProjections') || 'Church Planting Projections',
+        children: [
+          { label: t('addProjections'), routeName: 'AddChurchPlantingProjection' },
+          { label: t('viewProjections'), routeName: 'ChurchPlantingProjections' },
+
+        ],
+      },
+    ] : []),
     // {
     //   label: t('watchList'),
     //   disabled: true,
@@ -190,18 +201,22 @@ export const getTranslatedMenuItems = (languageCode: LanguageCode = 'en', userRo
     {
       label: t('faq'),
       children: [
-        { label: t('createFaq'), routeName: 'AddFAQ' },
-        { label: t('searchFaq'), routeName: 'FAQs' },
+        ...(isSuperAdminUser ? [
+          { label: t('createFaq'), routeName: 'AddFAQ' },
+        ] : []),
+        { label: t('searchFaq'), routeName: 'SearchFAQ' },
         { label: t('listFaq'), routeName: 'FAQs' },
       ],
     },
-    {
-      label: t('eventType'),
-      children: [
-        { label: t('addNew') || 'Add New', routeName: 'AddEventType' },
-        { label: t('list') || 'List', routeName: 'EventTypes' },
-      ],
-    },
+    ...(isSuperAdminUser ? [
+      {
+        label: t('eventType'),
+        children: [
+          { label: t('addNew') || 'Add New', routeName: 'AddEventType' },
+          { label: t('list') || 'List', routeName: 'EventTypes' },
+        ],
+      },
+    ] : []),
     // {
     //   label: t('pushMail'),
     //   disabled: true,

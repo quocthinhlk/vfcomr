@@ -39,11 +39,15 @@ export const EditWorshipServiceScreen: React.FC = () => {
   const [dayName, setDayName] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [loading, setLoading] = useState(true);
   const [churchId, setChurchId] = useState<number | null>(null);
   const [churchName, setChurchName] = useState<string>('');
   const {t} = useTranslation();
   const C = useThemedColors();
+
+  const clearInvalid = (key: string) =>
+    setInvalid(prev => ({...prev, [key]: false}));
 
   const dayNameOptions = [
     {label: 'Sunday', value: 'Sunday'},
@@ -99,25 +103,15 @@ export const EditWorshipServiceScreen: React.FC = () => {
 
   const onSave = async () => {
     if (!worshipServiceId) return;
-    if (!name.trim()) {
-      Alert.alert(
-        t('validation') || 'Validation',
-        t('fillRequiredFields') || 'Please fill all required fields.',
-      );
-      return;
-    }
-    if (!dayName) {
-      Alert.alert(
-        t('validation') || 'Validation',
-        t('fillRequiredFields') || 'Please fill all required fields.',
-      );
-      return;
-    }
-    if (!time) {
-      Alert.alert(
-        t('validation') || 'Validation',
-        t('fillRequiredFields') || 'Please fill all required fields.',
-      );
+
+    const newInvalid: Record<string, boolean> = {};
+    newInvalid.name = !name.trim();
+    newInvalid.dayName = !dayName;
+    newInvalid.time = !time;
+
+    setInvalid(newInvalid);
+
+    if (newInvalid.name || newInvalid.dayName || newInvalid.time) {
       return;
     }
 
@@ -136,7 +130,7 @@ export const EditWorshipServiceScreen: React.FC = () => {
     } catch (e: any) {
       Alert.alert(
         t('error') || 'Error',
-        e?.message || 'Failed to update Worship Service',
+        e?.message || t('failedToUpdateWorshipService') || 'Failed to update Worship Service',
       );
     } finally {
       setSubmitting(false);
@@ -151,7 +145,7 @@ export const EditWorshipServiceScreen: React.FC = () => {
         <View style={{flex: 1, backgroundColor: C.background}}>
           <View style={styles.container}>
             <Header
-              title={`${t('update') || 'Update'} for ${churchName || '...'}`}
+              title={`${t('update') || 'Update'} ${t('worshipService') || 'Worship Service'}`}
               showMenu={false}
             />
             <Text style={[styles.loading, {color: C.textPrimary}]}>
@@ -170,9 +164,21 @@ export const EditWorshipServiceScreen: React.FC = () => {
       <View style={{flex: 1, backgroundColor: C.background}}>
         <View style={styles.container}>
           <Header
-            title={`${t('update') || 'Update'} for ${churchName}`}
+            title={`${t('update') || 'Update'} ${t('worshipService') || 'Worship Service'}`}
             showMenu={false}
           />
+          
+          {churchName ? (
+            <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
+              <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
+                {t('church') || 'Church'}:{' '}
+              </Text>
+              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
+                {churchName}
+              </Text>
+            </View>
+          ) : null}
+          
           <KeyboardAvoidingView
             behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
             keyboardVerticalOffset={
@@ -197,8 +203,12 @@ export const EditWorshipServiceScreen: React.FC = () => {
                   </Text>
                   <AppInput
                     value={name}
-                    onChangeText={setName}
+                    onChangeText={(text) => {
+                      setName(text);
+                      clearInvalid('name');
+                    }}
                     placeholder={t('name') || 'Name'}
+                    error={!!invalid.name}
                   />
                 </View>
 
@@ -216,12 +226,14 @@ export const EditWorshipServiceScreen: React.FC = () => {
                     value={dayName as any}
                     onChange={v => {
                       setDayName(v as string);
+                      clearInvalid('dayName');
                     }}
                     placeholder={t('selectDay') || 'Select Day'}
+                    error={!!invalid.dayName}
                     containerStyle={
                       {
                         backgroundColor: C.inputBg,
-                        borderColor: C.inputBorder,
+                        borderColor: invalid.dayName ? '#db2d2d' : C.inputBorder,
                       } as any
                     }
                   />
@@ -236,7 +248,14 @@ export const EditWorshipServiceScreen: React.FC = () => {
                     {t('time') || 'Time'}{' '}
                     <Text style={{color: '#c00000'}}>*</Text>
                   </Text>
-                  <TimePicker value={time} onChange={setTime} />
+                  <TimePicker 
+                    value={time} 
+                    onChange={(val) => {
+                      setTime(val);
+                      clearInvalid('time');
+                    }}
+                    error={!!invalid.time}
+                  />
                 </View>
 
                 <View style={formStyles.buttonRow}>
@@ -266,11 +285,30 @@ const styles = StyleSheet.create({
     paddingLeft: ms(16),
     paddingRight: ms(16),
   },
+  churchNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: ms(8),
+    marginBottom: ms(12),
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(12),
+    borderRadius: rs(8),
+    borderWidth: 1,
+  },
+  churchNameLabel: {
+    fontSize: fs(14),
+    fontWeight: '500',
+  },
+  churchNameText: {
+    fontSize: fs(14),
+    fontWeight: '600',
+    flex: 1,
+  },
   scrollContent: {
     paddingBottom: ms(24),
   },
   form: {
-    marginTop: ms(16),
+    marginTop: ms(8),
     gap: ms(16),
   },
   field: {

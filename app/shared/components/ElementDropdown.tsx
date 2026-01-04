@@ -47,7 +47,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
     StyleSheet.create({
       dropdown: {
         borderWidth: 1,
-        borderRadius: rs(6),
+        borderRadius: rs(3),
         height: FORM_INPUT_HEIGHT,
         paddingLeft: ms(12),
         paddingRight: ms(5),

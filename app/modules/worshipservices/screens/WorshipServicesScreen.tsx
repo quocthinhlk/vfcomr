@@ -65,12 +65,12 @@ export const WorshipServicesScreen: React.FC = () => {
         }
         const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
         if (!savedChurchId) {
-          Alert.alert(t('error') || 'Error', 'Church ID not found');
+          Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
           return;
         }
         const id = parseInt(savedChurchId, 10);
         if (isNaN(id)) {
-          Alert.alert(t('error') || 'Error', 'Invalid Church ID');
+          Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
           return;
         }
         setChurchId(id);
@@ -83,7 +83,7 @@ export const WorshipServicesScreen: React.FC = () => {
         await fetchChurchInfo(id);
       } catch (e) {
         console.error('Error fetching worship services:', e);
-        Alert.alert(t('error') || 'Error', 'Failed to load worship services');
+        Alert.alert(t('error') || 'Error', t('failedToLoadWorshipServices') || 'Failed to load worship services');
       } finally {
         setLoading(false);
       }
@@ -177,6 +177,17 @@ export const WorshipServicesScreen: React.FC = () => {
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={t('worshipServices') || 'Worship Services'} />
 
+          {churchName ? (
+            <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
+              <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
+                {t('church') || 'Church'}:{' '}
+              </Text>
+              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
+                {churchName}
+              </Text>
+            </View>
+          ) : null}
+
           <View style={styles.headerRow}>
             <AddNewHeaderButton
               name="AddWorshipService"
@@ -260,6 +271,22 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingLeft: ms(16),
     paddingRight: ms(16),
+  },
+  churchNameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: ms(8),
+    marginBottom: ms(4),
+    paddingVertical: ms(4),
+  },
+  churchNameLabel: {
+    fontSize: fs(14),
+    fontWeight: '500',
+  },
+  churchNameText: {
+    fontSize: fs(14),
+    fontWeight: '600',
+    flex: 1,
   },
   headerRow: {
     flexDirection: 'row',

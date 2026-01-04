@@ -52,6 +52,7 @@ export type RootStackParamList = {
   Relating: undefined;
   FAQ: undefined;
   FAQs: undefined;
+  SearchFAQ: undefined;
   FAQDetail: { faqId: number } | undefined;
   AddFAQ: undefined;
   EditFAQ: { faqId: number } | undefined;
@@ -86,6 +87,24 @@ export type RootStackParamList = {
   AddChurchRegion: undefined;
   EditChurchRegion: { churchRegionId: number } | undefined;
   DeleteChurchRegion: { churchRegionId: number } | undefined;
+  ChurchPlantingProjections: undefined;
+  ChurchPlantingProjectionDetail: { projectionId: number } | undefined;
+  AddChurchPlantingProjection: undefined;
+  EditChurchPlantingProjection: { projectionId: number } | undefined;
+  DeleteChurchPlantingProjection: { projectionId: number } | undefined;
+  EditStepsChart: { projectionId: number } | undefined;
+  Visits: undefined;
+  VisitDetail: { visitId: number } | undefined;
+  AddVisits: undefined;
+  DeleteVisit: { visitId: number } | undefined;
+  MonthlyDataSelect: undefined;
+  MonthlyDataEntry: {
+    churchId: number;
+    churchName: string;
+    year: number;
+    month: number;
+    weekNumbers: number[];
+  } | undefined;
 };
 
 import LoginScreen from '../modules/auth/screens/LoginScreen';
@@ -143,6 +162,7 @@ import { ResourcesScreen } from '../modules/dashboard/screens/ResourcesScreen';
 import { RelatingScreen } from '../modules/dashboard/screens/RelatingScreen';
 import { FAQScreen } from '../modules/dashboard/screens/FAQScreen';
 import FAQsScreen from '../modules/faq/screens/FAQsScreen';
+import SearchFAQScreen from '../modules/faq/screens/SearchFAQScreen';
 import FAQDetailScreen from '../modules/faq/screens/FAQDetailScreen';
 import AddFAQScreen from '../modules/faq/screens/AddFAQScreen';
 import EditFAQScreen from '../modules/faq/screens/EditFAQScreen';
@@ -171,6 +191,18 @@ import WorshipServiceDetailScreen from '../modules/worshipservices/screens/Worsh
 import AddWorshipServiceScreen from '../modules/worshipservices/screens/AddWorshipServiceScreen';
 import EditWorshipServiceScreen from '../modules/worshipservices/screens/EditWorshipServiceScreen';
 import DeleteWorshipServiceScreen from '../modules/worshipservices/screens/DeleteWorshipServiceScreen';
+import ChurchPlantingProjectionsScreen from '../modules/churchplantingprojections/screens/ChurchPlantingProjectionsScreen';
+import ChurchPlantingProjectionDetailScreen from '../modules/churchplantingprojections/screens/ChurchPlantingProjectionDetailScreen';
+import AddChurchPlantingProjectionScreen from '../modules/churchplantingprojections/screens/AddChurchPlantingProjectionScreen';
+import EditChurchPlantingProjectionScreen from '../modules/churchplantingprojections/screens/EditChurchPlantingProjectionScreen';
+import DeleteChurchPlantingProjectionScreen from '../modules/churchplantingprojections/screens/DeleteChurchPlantingProjectionScreen';
+import EditStepsChartScreen from '../modules/churchplantingprojections/screens/EditStepsChartScreen';
+import VisitsScreen from '../modules/visits/screens/VisitsScreen';
+import VisitDetailScreen from '../modules/visits/screens/VisitDetailScreen';
+import AddVisitsScreen from '../modules/visits/screens/AddVisitsScreen';
+import DeleteVisitScreen from '../modules/visits/screens/DeleteVisitScreen';
+import MonthlyDataSelectScreen from '../modules/monthlydata/screens/MonthlyDataSelectScreen';
+import MonthlyDataEntryScreen from '../modules/monthlydata/screens/MonthlyDataEntryScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -235,7 +267,11 @@ export default function Navigation() {
               <Stack.Screen name="EnableChurch" component={EnableChurchScreen} />
               <Stack.Screen name="Overseer" component={OverseerScreen} />
               <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-              <Stack.Screen name="EnterVisits" component={EnterVisitsScreen} />
+              <Stack.Screen name="EnterVisits" component={AddVisitsScreen} />
+              <Stack.Screen name="Visits" component={VisitsScreen} />
+              <Stack.Screen name="VisitDetail" component={VisitDetailScreen} />
+              <Stack.Screen name="AddVisits" component={AddVisitsScreen} />
+              <Stack.Screen name="DeleteVisit" component={DeleteVisitScreen} />
               <Stack.Screen name="NewPastorAndChurch" component={NewPastorAndChurchScreen} />
               {/* New screens */}
               <Stack.Screen name="User" component={UserScreen} />
@@ -272,6 +308,7 @@ export default function Navigation() {
               <Stack.Screen name="Relating" component={RelatingScreen} />
               <Stack.Screen name="FAQ" component={FAQScreen} />
               <Stack.Screen name="FAQs" component={FAQsScreen} />
+              <Stack.Screen name="SearchFAQ" component={SearchFAQScreen} />
               <Stack.Screen name="FAQDetail" component={FAQDetailScreen} />
               <Stack.Screen name="AddFAQ" component={AddFAQScreen} />
               <Stack.Screen name="EditFAQ" component={EditFAQScreen} />
@@ -300,6 +337,14 @@ export default function Navigation() {
               <Stack.Screen name="AddWorshipService" component={AddWorshipServiceScreen} />
               <Stack.Screen name="EditWorshipService" component={EditWorshipServiceScreen} />
               <Stack.Screen name="DeleteWorshipService" component={DeleteWorshipServiceScreen} />
+              <Stack.Screen name="ChurchPlantingProjections" component={ChurchPlantingProjectionsScreen} />
+              <Stack.Screen name="ChurchPlantingProjectionDetail" component={ChurchPlantingProjectionDetailScreen} />
+              <Stack.Screen name="AddChurchPlantingProjection" component={AddChurchPlantingProjectionScreen} />
+              <Stack.Screen name="EditChurchPlantingProjection" component={EditChurchPlantingProjectionScreen} />
+              <Stack.Screen name="DeleteChurchPlantingProjection" component={DeleteChurchPlantingProjectionScreen} />
+              <Stack.Screen name="EditStepsChart" component={EditStepsChartScreen} />
+              <Stack.Screen name="MonthlyDataSelect" component={MonthlyDataSelectScreen} />
+              <Stack.Screen name="MonthlyDataEntry" component={MonthlyDataEntryScreen} />
             </>
           )}
         </Stack.Navigator>

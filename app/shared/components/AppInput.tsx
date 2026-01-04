@@ -33,6 +33,7 @@ export default function AppInput(props: Props) {
         {...rest}
         allowFontScaling={false}
         placeholderTextColor={C.textSecondary}
+        textAlignVertical={rest.multiline ? 'top' : 'center'}
         style={[
           styles.input,
           {
@@ -57,6 +58,6 @@ const styles = StyleSheet.create({
   input: {
     fontSize: fs(14),
     height: FORM_INPUT_HEIGHT,
-    paddingVertical: 0,
+    paddingVertical: ms(8),
   },
 });

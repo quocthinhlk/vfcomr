@@ -3,7 +3,6 @@ import {
   View,
   FlatList,
   RefreshControl,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
@@ -25,6 +24,7 @@ import ActionSheetModal, {
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import {EditSvgIcon} from '../../../shared/components/icons';
+import SearchInput from '../../../shared/components/SearchInput';
 
 export const LanguagesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -209,18 +209,12 @@ export const LanguagesScreen: React.FC = () => {
             <AddNewHeaderButton name="AddLanguage" text={t('addNew')} />
           </View>
 
-          <View style={L.searchContainer as any}>
-            <Text style={L.searchIcon as any}>🔎</Text>
-            <TextInput
-              style={L.searchInput as any}
-              placeholder={t('search')}
-              placeholderTextColor={C.textSecondary}
-              value={query}
-              onChangeText={setQuery}
-              returnKeyType="search"
-              onSubmitEditing={() => goToPage(1)}
-            />
-          </View>
+          <SearchInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('search')}
+            onSubmitEditing={() => goToPage(1)}
+          />
 
           <FlatList
             data={items}

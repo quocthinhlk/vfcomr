@@ -8,7 +8,7 @@ import {globalStyles} from '../../../shared/styles/global';
 import {getEventTypeById} from '../services/eventType.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ms, rs, hs} from '../../../shared/utils/scale';
 import {EventTypeItem} from '../services/eventType.service';
 
 export const EventTypeDetailScreen: React.FC = () => {
@@ -64,46 +64,54 @@ export const EventTypeDetailScreen: React.FC = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
               <View style={styles.content}>
-                <View style={[styles.detailCard, {backgroundColor: C.card}]}>
-                  <Text style={[styles.label, {color: C.textSecondary}]}>
-                    {t('name') || 'Name'}:
-                  </Text>
-                  <Text style={[styles.value, {color: C.textPrimary}]}>
-                    {eventType.name}
-                  </Text>
-                </View>
-
-                <View style={[styles.detailCard, {backgroundColor: C.card}]}>
-                  <Text style={[styles.label, {color: C.textSecondary}]}>
-                    {t('color') || 'Color'}:
-                  </Text>
-                  <View style={styles.colorRow}>
-                    <View style={[styles.colorBox, {backgroundColor: eventType.color}]} />
+                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, {color: C.textSecondary}]}>
+                      {t('name') || 'Name'}
+                    </Text>
                     <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {eventType.color}
+                      {eventType.name}
                     </Text>
                   </View>
                 </View>
 
-                <View style={[styles.detailCard, {backgroundColor: C.card}]}>
-                  <Text style={[styles.label, {color: C.textSecondary}]}>
-                    {t('cellColor') || 'Cell Color'}:
-                  </Text>
-                  <View style={styles.colorRow}>
-                    <View style={[styles.colorBox, {backgroundColor: eventType.cell_color}]} />
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {eventType.cell_color}
+                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, {color: C.textSecondary}]}>
+                      {t('textColour') || 'Text Colour'}
                     </Text>
+                    <View style={styles.colorRow}>
+                      <View style={[styles.colorBox, {backgroundColor: eventType.color, borderColor: C.inputBorder}]} />
+                      <Text style={[styles.colorValue, {color: C.textPrimary}]}>
+                        {eventType.color}
+                      </Text>
+                    </View>
                   </View>
                 </View>
 
-                <View style={[styles.detailCard, {backgroundColor: C.card}]}>
-                  <Text style={[styles.label, {color: C.textSecondary}]}>
-                    {t('meetingType') || 'Meeting Type'}:
-                  </Text>
-                  <Text style={[styles.value, {color: C.textPrimary}]}>
-                    {eventType.meeting_type}
-                  </Text>
+                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, {color: C.textSecondary}]}>
+                      {t('reportCellColour') || 'Report Cell Colour'}
+                    </Text>
+                    <View style={styles.colorRow}>
+                      <View style={[styles.colorBox, {backgroundColor: eventType.cell_color, borderColor: C.inputBorder}]} />
+                      <Text style={[styles.colorValue, {color: C.textPrimary}]}>
+                        {eventType.cell_color}
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+
+                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, {color: C.textSecondary}]}>
+                      {t('meetingType') || 'Meeting Type'}
+                    </Text>
+                    <Text style={[styles.value, {color: C.textPrimary}]}>
+                      {eventType.meeting_type}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </ScrollView>
@@ -125,32 +133,57 @@ const styles = StyleSheet.create({
   },
   content: {
     marginTop: ms(16),
-    gap: ms(12),
+    gap: ms(16),
   },
   detailCard: {
     padding: ms(16),
-    borderRadius: rs(8),
+    borderRadius: rs(12),
+    borderWidth: 1,
+  },
+  cardShadow: {
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: rs(6),
+    shadowOffset: {width: 0, height: hs(3)},
+    elevation: 2,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: ms(12),
   },
   label: {
     fontSize: fs(14),
     fontWeight: '600',
-    marginBottom: ms(8),
+    flexShrink: 0,
   },
   value: {
-    fontSize: fs(16),
+    fontSize: fs(14),
     fontWeight: '500',
+    flex: 1,
+    textAlign: 'right',
+    flexShrink: 1,
   },
   colorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: ms(12),
+    flex: 1,
+    justifyContent: 'flex-end',
   },
   colorBox: {
-    width: ms(40),
-    height: ms(40),
+    width: ms(32),
+    height: ms(32),
     borderRadius: rs(6),
     borderWidth: 1,
-    borderColor: '#ddd',
+    flexShrink: 0,
+  },
+  colorValue: {
+    fontSize: fs(14),
+    fontWeight: '500',
+    fontFamily: 'monospace',
+    minWidth: ms(70),
   },
   loading: {
     textAlign: 'center',

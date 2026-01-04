@@ -1,5 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {View, FlatList, RefreshControl, TextInput, StyleSheet, TouchableOpacity} from 'react-native';
+import {View, FlatList, RefreshControl, StyleSheet, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {Header} from '../../../shared/components/Header';
@@ -21,6 +21,7 @@ import ActionSheetModal, {
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import {EditSvgIcon} from '../../../shared/components/icons';
+import SearchInput from '../../../shared/components/SearchInput';
 
 export const ChurchRegionsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -206,18 +207,12 @@ export const ChurchRegionsScreen: React.FC = () => {
             <AddNewHeaderButton name="AddChurchRegion" text={t('addNew')} />
           </View>
 
-          <View style={L.searchContainer as any}>
-            <Text style={L.searchIcon as any}>🔎</Text>
-            <TextInput
-              style={L.searchInput as any}
-              placeholder={t('search')}
-              placeholderTextColor={C.textSecondary}
-              value={query}
-              onChangeText={setQuery}
-              returnKeyType="search"
-              onSubmitEditing={() => goToPage(1)}
-            />
-          </View>
+          <SearchInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('search')}
+            onSubmitEditing={() => goToPage(1)}
+          />
 
           <FlatList
             data={items}

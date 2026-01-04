@@ -5,6 +5,8 @@ import {
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
@@ -20,17 +22,12 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
-import {fs, ws, ms, rs} from '../../../shared/utils/scale';
+import {fs, ws, ms, rs, hs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import {EditSvgIcon} from '../../../shared/components/icons';
-import ElementDropdown from '../../../shared/components/ElementDropdown';
 import api from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-
-interface LanguageOption {
-  id: number;
-  name: string;
-}
+import SearchInput from '../../../shared/components/SearchInput';
+import {isSuperAdmin} from '../../../shared/utils/permissions';
 
 export const FAQsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -44,35 +41,23 @@ export const FAQsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQItem | null>(null);
-  const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(null);
-  const [languageOptions, setLanguageOptions] = useState<{label: string; value: number}[]>([]);
-  const [languages, setLanguages] = useState<LanguageOption[]>([]);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [userRoleId, setUserRoleId] = useState<number | null>(null);
 
-  const loadLanguages = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-      const res = await api.get('/languages', {
-        params: {page: 1, limit: 100, sort_by: 'name', sort_desc: false},
-        headers: {Authorization: `Bearer ${token}`},
-      });
-      const langItems = res?.data?.data?.items || [];
-      setLanguages(langItems);
-      setLanguageOptions([
-        {label: t('all') || 'All Languages', value: 0},
-        ...langItems.map((lang: LanguageOption) => ({
-          label: lang.name,
-          value: lang.id,
-        })),
-      ]);
-    } catch (e) {
-      console.error('Error loading languages:', e);
-    }
-  }, [t]);
-
+  // Fetch user role to check permissions
   useEffect(() => {
-    loadLanguages();
-  }, [loadLanguages]);
+    (async () => {
+      try {
+        const res = await api.get('users/me');
+        const roleId = res?.data?.data?.role?.id;
+        if (typeof roleId === 'number') {
+          setUserRoleId(roleId);
+        }
+      } catch (e) {
+        console.error('Error fetching user role:', e);
+      }
+    })();
+  }, []);
 
   const fetchData = useCallback(
     async (reset = false) => {
@@ -81,25 +66,31 @@ export const FAQsScreen: React.FC = () => {
           return;
         }
         setLoading(true);
-        const params: any = {};
-        if (selectedLanguageId && selectedLanguageId > 0) {
-          params.language_id = selectedLanguageId;
-        }
-        const res = await listFAQs(params);
-        const faqs = res?.data ?? [];
-        setItems(faqs);
+        const res = await listFAQs({});
+        const allFaqs = res?.data ?? [];
+        
+        // Filter by search query (question_header) client-side
+        const filteredFaqs = searchQuery.trim()
+          ? allFaqs.filter(faq =>
+              faq.question_header
+                ?.toLowerCase()
+                .includes(searchQuery.trim().toLowerCase())
+            )
+          : allFaqs;
+        
+        setItems(filteredFaqs);
       } catch (e) {
         console.error(e);
       } finally {
         setLoading(false);
       }
     },
-    [loading, selectedLanguageId],
+    [loading, searchQuery],
   );
 
   useEffect(() => {
     fetchData(true);
-  }, [selectedLanguageId]);
+  }, [searchQuery]);
 
   useFocusEffect(
     useCallback(() => {
@@ -156,15 +147,17 @@ export const FAQsScreen: React.FC = () => {
               </View>
             )}
           </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={fs(15)} height={fs(15)} />
-              </TouchableOpacity>
+          {isSuperAdmin(userRoleId) && (
+            <View style={styles.itemColRight}>
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.actionBtn, styles.editBtn]}
+                  onPress={() => handleEdit(item)}>
+                  <EditSvgIcon width={fs(15)} height={fs(15)} />
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
@@ -176,52 +169,45 @@ export const FAQsScreen: React.FC = () => {
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={[styles.container, {backgroundColor: C.background}]}>
-          <Header title={t('faq') || 'FAQ'} />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
+        style={{flex: 1}}>
+        <View style={{flex: 1, backgroundColor: C.background}}>
+          <View style={[styles.container, {backgroundColor: C.background}]}>
+            <Header title={t('faq') || 'FAQ'} />
 
-          <View style={styles.headerRow}>
-            <AddNewHeaderButton name="AddFAQ" text={t('addNew') || 'Add New'} />
-          </View>
+            {isSuperAdmin(userRoleId) && (
+              <View style={styles.headerRow}>
+                <AddNewHeaderButton name="AddFAQ" text={t('addNew') || 'Add New'} />
+              </View>
+            )}
 
-          <View style={styles.filterRow}>
-            <Text style={[styles.filterLabel, {color: C.textSecondary}]}>
-              {t('language') || 'Language'}:
-            </Text>
-            <View style={styles.dropdownContainer}>
-              <ElementDropdown
-                data={languageOptions}
-                value={selectedLanguageId === null ? 0 : selectedLanguageId}
-                onChange={v => {
-                  const val = v as number;
-                  setSelectedLanguageId(val === 0 ? null : val);
-                }}
-                placeholder={t('selectOption') || 'Select Language'}
-                containerStyle={[
-                  {
-                    backgroundColor: C.inputBg,
-                    borderColor: C.inputBorder,
-                  } as any,
-                ]}
+            <View style={styles.filterRow}>
+              <SearchInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder={t('search') || 'Search by question...'}
               />
             </View>
-          </View>
 
-          <FlatList
-            data={items}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              !loading ? (
-                <Text style={[styles.empty, {color: C.textSecondary}]}>
-                  {t('noDataFound') || 'No data found'}
-                </Text>
-              ) : null
-            }
-          />
+            <FlatList
+              data={items}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              showsVerticalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+              ListEmptyComponent={
+                !loading ? (
+                  <Text style={[styles.empty, {color: C.textSecondary}]}>
+                    {t('noDataFound') || 'No data found'}
+                  </Text>
+                ) : null
+              }
+            />
 
           <ActionSheetModal
             visible={actionsVisible}
@@ -242,32 +228,36 @@ export const FAQsScreen: React.FC = () => {
                   setSelectedFAQ(null);
                 },
               });
-              list.push({
-                label: t('edit') || 'Edit',
-                onPress: () => {
-                  if (selectedFAQ) {
-                    navigation.navigate('EditFAQ', {faqId: selectedFAQ.id});
-                  }
-                  setActionsVisible(false);
-                  setSelectedFAQ(null);
-                },
-              });
-              list.push({
-                label: t('delete') || 'Delete',
-                type: 'danger',
-                onPress: () => {
-                  if (selectedFAQ) {
-                    navigation.navigate('DeleteFAQ', {faqId: selectedFAQ.id});
-                  }
-                  setActionsVisible(false);
-                  setSelectedFAQ(null);
-                },
-              });
+              // Only show edit and delete for admin
+              if (isSuperAdmin(userRoleId)) {
+                list.push({
+                  label: t('edit') || 'Edit',
+                  onPress: () => {
+                    if (selectedFAQ) {
+                      navigation.navigate('EditFAQ', {faqId: selectedFAQ.id});
+                    }
+                    setActionsVisible(false);
+                    setSelectedFAQ(null);
+                  },
+                });
+                list.push({
+                  label: t('delete') || 'Delete',
+                  type: 'danger',
+                  onPress: () => {
+                    if (selectedFAQ) {
+                      navigation.navigate('DeleteFAQ', {faqId: selectedFAQ.id});
+                    }
+                    setActionsVisible(false);
+                    setSelectedFAQ(null);
+                  },
+                });
+              }
               return list;
             })()}
-          />
+            />
+          </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
@@ -285,19 +275,8 @@ const styles = StyleSheet.create({
     marginTop: ms(8),
   },
   filterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: ms(12),
     marginBottom: ms(8),
-    gap: ms(8),
-  },
-  filterLabel: {
-    fontSize: fs(14),
-    fontWeight: '600',
-  },
-  dropdownContainer: {
-    flex: 1,
-    maxWidth: ws(200),
   },
   itemCol: {
     flex: 1,

@@ -3,7 +3,6 @@ import {
   View,
   FlatList,
   RefreshControl,
-  TextInput,
   StyleSheet,
   TouchableOpacity,
 } from 'react-native';
@@ -25,6 +24,7 @@ import ActionSheetModal, {
 } from '../../../shared/components/ActionSheetModal';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+import SearchInput from '../../../shared/components/SearchInput';
 
 export const CountriesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -174,18 +174,12 @@ export const CountriesScreen: React.FC = () => {
             <AddNewHeaderButton name="AddCountry" text={t('addNew')} />
           </View>
 
-          <View style={L.searchContainer as any}>
-            <Text style={L.searchIcon as any}>🔎</Text>
-            <TextInput
-              style={L.searchInput as any}
-              placeholder={t('search')}
-              placeholderTextColor={C.textSecondary}
-              value={query}
-              onChangeText={setQuery}
-              returnKeyType="search"
-              onSubmitEditing={() => goToPage(1)}
-            />
-          </View>
+          <SearchInput
+            value={query}
+            onChangeText={setQuery}
+            placeholder={t('search')}
+            onSubmitEditing={() => goToPage(1)}
+          />
 
           <FlatList
             data={items}

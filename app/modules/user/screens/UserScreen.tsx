@@ -296,11 +296,11 @@ export const UserScreen = () => {
             </View>
           ) : null}
 
-          {loading ? (
+          {/* {loading ? (
             <View style={styles.loadingOverlay}>
               <ActivityIndicator />
             </View>
-          ) : null}
+          ) : null} */}
 
           {error ? (
             <View style={styles.errorBox}>

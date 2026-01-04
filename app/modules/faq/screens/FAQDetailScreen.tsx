@@ -8,16 +8,57 @@ import {globalStyles} from '../../../shared/styles/global';
 import {getFAQById} from '../services/faq.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ms, rs, hs} from '../../../shared/utils/scale';
 import {FAQItem} from '../services/faq.service';
 
-// Simple function to strip HTML tags for display
-const stripHtmlTags = (html: string): string => {
+// Function to convert HTML to formatted text
+const convertHtmlToText = (html: string): string => {
   if (!html) return '';
-  return html
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  
+  let text = html;
+  
+  // Replace block-level elements with newlines
+  text = text.replace(/<\/p>/gi, '\n\n');
+  text = text.replace(/<\/div>/gi, '\n');
+  text = text.replace(/<\/h[1-6]>/gi, '\n\n');
+  text = text.replace(/<br\s*\/?>/gi, '\n');
+  text = text.replace(/<\/li>/gi, '\n');
+  text = text.replace(/<\/ul>/gi, '\n');
+  text = text.replace(/<\/ol>/gi, '\n');
+  
+  // Remove all remaining HTML tags
+  text = text.replace(/<[^>]*>/g, '');
+  
+  // Decode HTML entities
+  text = text.replace(/&nbsp;/g, ' ');
+  text = text.replace(/&amp;/g, '&');
+  text = text.replace(/&lt;/g, '<');
+  text = text.replace(/&gt;/g, '>');
+  text = text.replace(/&quot;/g, '"');
+  text = text.replace(/&#39;/g, "'");
+  text = text.replace(/&apos;/g, "'");
+  
+  // Decode numeric entities (decimal)
+  text = text.replace(/&#(\d+);/g, (match, dec) => {
+    return String.fromCharCode(parseInt(dec, 10));
+  });
+  
+  // Decode numeric entities (hex)
+  text = text.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
+    return String.fromCharCode(parseInt(hex, 16));
+  });
+  
+  // Clean up multiple newlines (more than 2 consecutive)
+  text = text.replace(/\n{3,}/g, '\n\n');
+  
+  // Clean up spaces around newlines
+  text = text.replace(/[ \t]+\n/g, '\n');
+  text = text.replace(/\n[ \t]+/g, '\n');
+  
+  // Trim and clean up
+  text = text.trim();
+  
+  return text;
 };
 
 export const FAQDetailScreen: React.FC = () => {
@@ -89,12 +130,12 @@ export const FAQDetailScreen: React.FC = () => {
                   </View>
                 )}
 
-                <View style={[styles.answerContainer, {backgroundColor: C.card}]}>
+                <View style={[styles.answerContainer, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
                   <Text style={[styles.answerLabel, {color: C.textSecondary}]}>
                     {t('answer') || 'Answer'}:
                   </Text>
                   <Text style={[styles.answerText, {color: C.textPrimary}]}>
-                    {stripHtmlTags(faq.answer)}
+                    {convertHtmlToText(faq.answer)}
                   </Text>
                 </View>
               </View>
@@ -119,7 +160,7 @@ const styles = StyleSheet.create({
     marginTop: ms(16),
   },
   questionHeader: {
-    fontSize: fs(20),
+    fontSize: fs(14),
     fontWeight: '700',
     marginBottom: ms(16),
   },
@@ -139,8 +180,16 @@ const styles = StyleSheet.create({
   },
   answerContainer: {
     padding: ms(16),
-    borderRadius: rs(8),
+    borderRadius: rs(12),
+    borderWidth: 1,
     marginTop: ms(8),
+  },
+  cardShadow: {
+    shadowColor: '#000',
+    shadowOpacity: 0.06,
+    shadowRadius: rs(6),
+    shadowOffset: {width: 0, height: hs(3)},
+    elevation: 2,
   },
   answerLabel: {
     fontSize: fs(14),

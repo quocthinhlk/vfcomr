@@ -76,31 +76,37 @@ export const WorshipServiceDetailScreen: React.FC = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
               <View style={styles.content}>
-                <View style={[styles.detailCard, {backgroundColor: C.card}]}>
-                  <Text style={[styles.label, {color: C.textSecondary}]}>
-                    {t('name') || 'Name'}:
-                  </Text>
-                  <Text style={[styles.value, {color: C.textPrimary}]}>
-                    {service.name}
-                  </Text>
+                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, {color: C.textSecondary}]}>
+                      {t('name') || 'Name'}:
+                    </Text>
+                    <Text style={[styles.value, {color: C.textPrimary}]}>
+                      {service.name}
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={[styles.detailCard, {backgroundColor: C.card}]}>
-                  <Text style={[styles.label, {color: C.textSecondary}]}>
-                    {t('day') || 'Day'}:
-                  </Text>
-                  <Text style={[styles.value, {color: C.textPrimary}]}>
-                    {service.day_name}
-                  </Text>
+                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, {color: C.textSecondary}]}>
+                      {t('day') || 'Day'}:
+                    </Text>
+                    <Text style={[styles.value, {color: C.textPrimary}]}>
+                      {service.day_name}
+                    </Text>
+                  </View>
                 </View>
 
-                <View style={[styles.detailCard, {backgroundColor: C.card}]}>
-                  <Text style={[styles.label, {color: C.textSecondary}]}>
-                    {t('time') || 'Time'}:
-                  </Text>
-                  <Text style={[styles.value, {color: C.textPrimary}]}>
-                    {formatTime(service.time)}
-                  </Text>
+                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
+                  <View style={styles.detailRow}>
+                    <Text style={[styles.label, {color: C.textSecondary}]}>
+                      {t('time') || 'Time'}:
+                    </Text>
+                    <Text style={[styles.value, {color: C.textPrimary}]}>
+                      {formatTime(service.time)}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </ScrollView>
@@ -126,16 +132,28 @@ const styles = StyleSheet.create({
   },
   detailCard: {
     padding: ms(16),
-    borderRadius: rs(8),
+    borderRadius: rs(12),
+    borderWidth: 1,
+    shadowOffset: {width: 0, height: 2},
+    shadowOpacity: 0.1,
+    shadowRadius: rs(8),
+    elevation: 3,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   label: {
     fontSize: fs(14),
-    fontWeight: '600',
-    marginBottom: ms(8),
+    fontWeight: '500',
+    flex: 1,
   },
   value: {
-    fontSize: fs(16),
-    fontWeight: '500',
+    fontSize: fs(14),
+    fontWeight: '600',
+    textAlign: 'right',
+    flex: 1,
   },
   loading: {
     textAlign: 'center',
