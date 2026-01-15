@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
@@ -67,7 +67,7 @@ export default function MonthlyDataSelectScreen() {
   const [churchName, setChurchName] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
-  const [weekNumbers, setWeekNumbers] = useState<number[]>([]);
+  const [weekInfos, setWeekInfos] = useState<Array<{week_number: number; is_reported: boolean}>>([]);
   const [selectedWeeks, setSelectedWeeks] = useState<Set<number>>(new Set());
   const [loadingWeeks, setLoadingWeeks] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -140,21 +140,30 @@ export default function MonthlyDataSelectScreen() {
 
   // Load week numbers when year and month are selected
   useEffect(() => {
-    if (selectedYear && selectedMonth) {
+    if (selectedYear && selectedMonth && churchId) {
       loadWeekNumbers();
     } else {
-      setWeekNumbers([]);
+      setWeekInfos([]);
       setSelectedWeeks(new Set());
     }
-  }, [selectedYear, selectedMonth]);
+  }, [selectedYear, selectedMonth, churchId]);
+
+  // Reload week data when screen is focused (e.g., after saving data)
+  useFocusEffect(
+    useCallback(() => {
+      if (selectedYear && selectedMonth && churchId) {
+        loadWeekNumbers();
+      }
+    }, [selectedYear, selectedMonth, churchId]),
+  );
 
   const loadWeekNumbers = useCallback(async () => {
-    if (!selectedYear || !selectedMonth) return;
+    if (!selectedYear || !selectedMonth || !churchId) return;
     
     setLoadingWeeks(true);
     try {
-      const weeks = await getWeekNumbers(selectedYear, selectedMonth);
-      setWeekNumbers(weeks);
+      const weeks = await getWeekNumbers(selectedYear, selectedMonth, churchId);
+      setWeekInfos(weeks);
       setSelectedWeeks(new Set()); // Reset selection when weeks change
     } catch (error: any) {
       console.error('Error loading week numbers:', error);
@@ -165,7 +174,7 @@ export default function MonthlyDataSelectScreen() {
     } finally {
       setLoadingWeeks(false);
     }
-  }, [selectedYear, selectedMonth, t]);
+  }, [selectedYear, selectedMonth, churchId, t]);
 
   const toggleWeek = (weekNumber: number) => {
     const newSelected = new Set(selectedWeeks);
@@ -191,12 +200,15 @@ export default function MonthlyDataSelectScreen() {
       return;
     }
 
+    // Sort week numbers in ascending order
+    const sortedWeekNumbers = Array.from(selectedWeeks).sort((a, b) => a - b);
+    
     navigation.navigate('MonthlyDataEntry', {
       churchId,
       churchName,
       year: selectedYear,
       month: selectedMonth,
-      weekNumbers: Array.from(selectedWeeks).sort((a, b) => a - b),
+      weekNumbers: sortedWeekNumbers,
     });
   };
 
@@ -292,9 +304,11 @@ export default function MonthlyDataSelectScreen() {
                     {t('loading')}...
                   </Text>
                 </View>
-              ) : weekNumbers.length > 0 ? (
-                weekNumbers.map((weekNumber) => {
+              ) : weekInfos.length > 0 ? (
+                weekInfos.map((weekInfo) => {
+                  const weekNumber = weekInfo.week_number;
                   const isSelected = selectedWeeks.has(weekNumber);
+                  const hasData = weekInfo.is_reported;
                   const weekRange = getWeekDateRange(selectedYear!, weekNumber);
                   const isDisabled = false; // Can add logic to disable future weeks if needed
                   
@@ -332,6 +346,11 @@ export default function MonthlyDataSelectScreen() {
                           ]}>
                           {t('week') || 'Week'} {weekNumber} ({weekRange})
                         </Text>
+                        {hasData && (
+                          <View style={[styles.dataIndicator, {backgroundColor: COLORS.successColor}]}>
+                            <Text style={styles.dataIndicatorText}>✓</Text>
+                          </View>
+                        )}
                       </View>
                     </TouchableOpacity>
                   );
@@ -349,8 +368,11 @@ export default function MonthlyDataSelectScreen() {
             <SaveButton
               label={t('next') || 'Next'}
               onPress={handleNext}
-              disabled={selectedWeeks.size === 0}
+              disabled={true}
             />
+            <Text style={[styles.noticeText, {color: C.textSecondary}]}>
+              {t('featureUnderDevelopment') || 'This feature is under development, please come back later'}
+            </Text>
           </View>
         </ScrollView>
       </View>
@@ -445,6 +467,19 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
     flex: 1,
   },
+  dataIndicator: {
+    width: ws(20),
+    height: ws(20),
+    borderRadius: rs(10),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: ms(8),
+  },
+  dataIndicatorText: {
+    color: '#fff',
+    fontSize: fs(10),
+    fontWeight: 'bold',
+  },
   noWeeksText: {
     textAlign: 'center',
     paddingVertical: ms(20),
@@ -453,6 +488,12 @@ const styles = StyleSheet.create({
   nextButtonContainer: {
     // marginTop: ms(8),
     paddingHorizontal: ms(16),
+  },
+  noticeText: {
+    textAlign: 'center',
+    fontSize: fs(12),
+    marginTop: ms(8),
+    fontStyle: 'italic',
   },
 });
 

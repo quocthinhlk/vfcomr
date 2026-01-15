@@ -54,9 +54,18 @@ export interface GetWeeklyReportsResponse {
   message: string;
 }
 
+export interface WeekInfo {
+  week_number: number;
+  is_reported: boolean;
+}
+
 export interface GetWeekNumbersResponse {
   success: boolean;
-  data: number[];
+  data: {
+    year: number;
+    month: number;
+    weeks: WeekInfo[];
+  };
   message: string;
 }
 
@@ -81,13 +90,17 @@ export interface BatchWeeklyReportPayload {
   church_metrics: ChurchMetrics;
 }
 
-// Get week numbers for a specific year and month
-export async function getWeekNumbers(year: number, month: number): Promise<number[]> {
+// Get week numbers for a specific year, month, and church
+export async function getWeekNumbers(
+  year: number,
+  month: number,
+  churchId: number,
+): Promise<WeekInfo[]> {
   try {
     const response = await api.get<GetWeekNumbersResponse>('/week-numbers', {
-      params: { year, month },
+      params: { year, month, church_id: churchId },
     });
-    return response.data.data || [];
+    return response.data.data?.weeks || [];
   } catch (err: any) {
     const message = err?.response?.data?.message || err?.message || 'Failed to get week numbers';
     console.error('Get week numbers error:', message);

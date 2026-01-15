@@ -13,6 +13,7 @@ import Navigation from './app/config/navigation';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { LanguageProvider } from './app/shared/context/LanguageContext';
 import { ThemeProvider, useThemeMode } from './app/shared/context/ThemeContext';
+import { MonthlyDataProvider } from './app/modules/monthlydata/context/MonthlyDataContext';
 import { enableScreens } from 'react-native-screens';
 import { LogBox } from 'react-native';
 import './app/shared/config/ui';
@@ -67,7 +68,9 @@ function AppInner() {
       <GestureHandlerRootView style={{ flex: 1 }}>
         <SafeAreaProvider>
           <LanguageProvider>
-            <Navigation />
+            <MonthlyDataProvider>
+              <Navigation />
+            </MonthlyDataProvider>
           </LanguageProvider>
         </SafeAreaProvider>
       </GestureHandlerRootView>

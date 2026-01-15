@@ -98,7 +98,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
 
 const menuItems = [
   { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Monthly Data', routeName: 'MonthlyDataSelect' },
-  { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch', disabled: true },
+  { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch' },
   { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'WorshipServices' },
   { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
   { icon: require('../../../../app/assets/images/icon/user.png'), label: 'New Pastor', routeName: 'AddUser' },
@@ -266,9 +266,29 @@ export default function DashboardPastorLeaderScreen() {
     }
   };
 
-  const handleMenuItemPress = (item: any) => {
+  const handleMenuItemPress = async (item: any) => {
     if (item.routeName) {
-      navigation.navigate(item.routeName);
+      // Handle Edit Church navigation with church_id
+      if (item.routeName === 'EditChurch') {
+        try {
+          const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+          if (savedChurchId) {
+            const churchId = parseInt(savedChurchId, 10);
+            if (!isNaN(churchId)) {
+              navigation.navigate('EditChurch', { id: churchId });
+            } else {
+              Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
+            }
+          } else {
+            Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
+          }
+        } catch (error) {
+          console.error('Error getting church ID:', error);
+          Alert.alert(t('error') || 'Error', t('failedToLoadData') || 'Failed to get Church ID');
+        }
+      } else {
+        navigation.navigate(item.routeName);
+      }
     } else if (item.label === 'Logout') {
       handleLogout();
     }
@@ -586,25 +606,28 @@ export default function DashboardPastorLeaderScreen() {
 
         {/* Menu Items */}
         <View style={styles.menuContainer}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[styles.menuItem, { borderBottomColor: C.border }, item.disabled ? { opacity: 0.5 } : null]}
-              onPress={() => { if (!item.disabled) handleMenuItemPress(item); }}
-              activeOpacity={item.disabled ? 1 : 0.7}
-            >
-              <Image source={item.icon} style={styles.menuIcon} />
-              <Text style={[styles.menuLabel, { color: C.textPrimary }]}>
-                {item.label === 'Monthly Data' ? t('monthlyData') :
-                 item.label === 'Edit Church' ? t('editChurch') :
-                 item.label === 'Worship Services' ? t('worshipServices') :
-                 item.label === 'New Pastor & New Church' ? t('addNewChurchAndPastor') :
-                 item.label === 'New Pastor' ? t('addNewPastor') :
-                 item.label === 'New Church' ? t('addNewChurch') : item.label}
-              </Text>
-              <Image source={require('../../../../app/assets/images/icon-down.png')} style={styles.menuArrow} />
-            </TouchableOpacity>
-          ))}
+          {menuItems.map((item, index) => {
+            const isDisabled = (item as any).disabled === true;
+            return (
+              <TouchableOpacity
+                key={index}
+                style={[styles.menuItem, { borderBottomColor: C.border }, isDisabled ? { opacity: 0.5 } : null]}
+                onPress={() => { if (!isDisabled) handleMenuItemPress(item); }}
+                activeOpacity={isDisabled ? 1 : 0.7}
+              >
+                <Image source={item.icon} style={styles.menuIcon} />
+                <Text style={[styles.menuLabel, { color: C.textPrimary }]}>
+                  {item.label === 'Monthly Data' ? t('monthlyData') :
+                   item.label === 'Edit Church' ? t('editChurch') :
+                   item.label === 'Worship Services' ? t('worshipServices') :
+                   item.label === 'New Pastor & New Church' ? t('addNewChurchAndPastor') :
+                   item.label === 'New Pastor' ? t('addNewPastor') :
+                   item.label === 'New Church' ? t('addNewChurch') : item.label}
+                </Text>
+                <Image source={require('../../../../app/assets/images/icon-down.png')} style={styles.menuArrow} />
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>

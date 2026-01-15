@@ -179,7 +179,7 @@ export const WorshipServicesScreen: React.FC = () => {
 
           {churchName ? (
             <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
-              <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
+              <Text style={[styles.churchNameLabel, {color: C.textPrimary}]}>
                 {t('church') || 'Church'}:{' '}
               </Text>
               <Text style={[styles.churchNameText, {color: C.textPrimary}]}>

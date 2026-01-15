@@ -269,12 +269,9 @@ export const EditChurchPlantingProjectionScreen: React.FC = () => {
           />
           
           {churchName ? (
-            <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
-              <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
-                {t('church') || 'Church'}:{' '}
-              </Text>
+            <View style={styles.churchNameContainer}>
               <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {churchName}
+                {t('update') || 'Update'} {t('churchPlantingProjection') || 'Church Planting Projection'} {t('for') || 'for'} {churchName}
               </Text>
             </View>
           ) : null}
@@ -518,23 +515,12 @@ const styles = StyleSheet.create({
     paddingRight: ms(16),
   },
   churchNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: ms(8),
     marginBottom: ms(12),
-    paddingVertical: ms(10),
-    paddingHorizontal: ms(12),
-    borderRadius: rs(8),
-    borderWidth: 1,
-  },
-  churchNameLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
   },
   churchNameText: {
     fontSize: fs(14),
-    fontWeight: '600',
-    flex: 1,
+    fontWeight: '500',
   },
   scrollContent: {
     paddingBottom: ms(24),

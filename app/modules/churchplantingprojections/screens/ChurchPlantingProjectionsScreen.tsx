@@ -201,11 +201,8 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
 
           {churchName ? (
             <View style={styles.churchNameContainer}>
-              <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
-                {t('church') || 'Church'}:{' '}
-              </Text>
               <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {churchName}
+                {t('churchPlantingProjections') || 'Church Planting Projections'} {t('for') || 'for'} {churchName}
               </Text>
             </View>
           ) : null}
@@ -305,20 +302,12 @@ const styles = StyleSheet.create({
     paddingRight: ms(16),
   },
   churchNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     marginTop: ms(8),
     marginBottom: ms(4),
-    paddingVertical: ms(4),
-  },
-  churchNameLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
   },
   churchNameText: {
     fontSize: fs(14),
-    fontWeight: '600',
-    flex: 1,
+    fontWeight: '500',
   },
   headerRow: {
     flexDirection: 'row',
