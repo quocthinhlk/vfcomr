@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback, useRef} from 'react';
+import React, {useState, useEffect, useCallback, useRef, useMemo} from 'react';
 import {
   View,
   ScrollView,
@@ -27,11 +27,12 @@ import {
   batchCreateOrUpdateWeeklyReports,
 } from '../services/monthlydata.service';
 import {formStyles} from '../../../shared/styles/form';
-import {listWorshipServicesByChurch} from '../../worshipservices/services/worshipService.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {SaveButton, CancelButton} from '../../../shared/components/ActionButtons';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useMonthlyData} from '../context/MonthlyDataContext';
+import api from '../../../config/api';
+import {listWorshipServicesByChurch} from '../../worshipservices/services/worshipService.service';
 
 interface RouteParams {
   churchId: number;
@@ -81,71 +82,250 @@ export default function MonthlyDataEntryScreen() {
   const C = useThemedColors();
   const {getWeekData, setWeekData: saveWeekDataToContext} = useMonthlyData();
   
-  const params = route.params as RouteParams;
-  const {churchId, churchName, year, weekNumbers} = params;
+  const params = (route.params ?? {}) as Partial<RouteParams>;
+  const routeChurchId = params.churchId ?? null;
+  const churchName = params.churchName ?? '';
+  const year = typeof params.year === 'number' ? params.year : 0;
+  const weekNumbers = Array.isArray(params.weekNumbers) ? params.weekNumbers : [];
 
+  const [churchId, setChurchId] = useState<number | null>(routeChurchId || null);
+  const [displayChurchName, setDisplayChurchName] = useState<string>(churchName || '');
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weekData, setWeekData] = useState<Map<number, WeeklyReportData>>(new Map());
   const [worshipSessions, setWorshipSessions] = useState<WorshipSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingWeeks, setLoadingWeeks] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
+  const [saveOption, setSaveOption] = useState<'continue' | 'goToChurch'>('continue');
   const [fieldErrors, setFieldErrors] = useState<Map<string, boolean>>(new Map());
   const [completedWeeks, setCompletedWeeks] = useState<Set<number>>(new Set());
   const scrollViewRef = useRef<ScrollView>(null);
   const fieldRefs = useRef<Map<string, any>>(new Map());
   const loadingQueueRef = useRef<number[]>([]);
+  const loadingWeeksRef = useRef<Set<number>>(new Set());
+  const loadedWeeksRef = useRef<Set<number>>(new Set());
+  const worshipServicesRef = useRef<WorshipSession[] | null>(null);
 
-  const currentWeekNumber = weekNumbers[currentWeekIndex];
-  const currentData = weekData.get(currentWeekNumber);
+  const sortedWeekNumbers = useMemo(() => {
+    return weekNumbers.length > 0 ? [...weekNumbers].sort((a, b) => a - b) : [];
+  }, [weekNumbers]);
+  const currentWeekNumber = useMemo(() => {
+    return sortedWeekNumbers[currentWeekIndex] ?? sortedWeekNumbers[0] ?? 0;
+  }, [sortedWeekNumbers, currentWeekIndex]);
+  const currentData = useMemo(() => weekData.get(currentWeekNumber), [weekData, currentWeekNumber]);
+
+  // Resolve church_id (prefer route param for correctness and speed)
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        if (routeChurchId && mounted) {
+          setChurchId(routeChurchId);
+          await AsyncStorage.setItem('selectedChurchId', String(routeChurchId));
+          return;
+        }
+        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+        if (savedChurchId) {
+          const id = parseInt(savedChurchId, 10);
+          if (!isNaN(id) && mounted) {
+            setChurchId(id);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading church ID from AsyncStorage:', error);
+        // Fallback to route param on error
+        if (routeChurchId) {
+          setChurchId(routeChurchId);
+        }
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [routeChurchId]);
+
+  // Resolve church name for display (route param -> AsyncStorage -> dashboard API)
+  useEffect(() => {
+    if (churchName) {
+      setDisplayChurchName(churchName);
+      return;
+    }
+    let mounted = true;
+    (async () => {
+      try {
+        const savedChurchName = await AsyncStorage.getItem('selectedChurchName');
+        if (mounted && savedChurchName) {
+          setDisplayChurchName(savedChurchName);
+          return;
+        }
+
+        if (mounted && churchId) {
+          const response = await api.get('dashboard', {params: {church_id: churchId}});
+          const dashboardChurchName = response.data?.data?.dashboard_info?.church_name;
+          if (dashboardChurchName) {
+            setDisplayChurchName(dashboardChurchName);
+            await AsyncStorage.setItem('selectedChurchName', String(dashboardChurchName));
+          }
+        }
+      } catch (error) {
+        console.error('Error loading church name:', error);
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [churchName, churchId]);
 
   // Load worship sessions structure and first week data
   useEffect(() => {
-    loadInitialData();
-  }, []);
+    if (churchId) {
+      loadInitialData();
+    }
+  }, [churchId, sortedWeekNumbers]);
+
+  const fetchWorshipServices = useCallback(async (force = false): Promise<WorshipSession[]> => {
+    if (!churchId) return [];
+    if (!force && worshipServicesRef.current) {
+      return worshipServicesRef.current;
+    }
+    try {
+      const listResponse = await listWorshipServicesByChurch(churchId);
+      const services = Array.isArray(listResponse?.data)
+        ? listResponse.data
+        : Array.isArray((listResponse as any)?.data?.data)
+          ? (listResponse as any).data.data
+          : [];
+      const mapped = services.map((service: any) => ({
+        id: service.id,
+        name: service.name || '',
+        day_name: service.day_name || '',
+        time: service.time || '',
+        attendance: {
+          adult_attendance: null,
+          youth_attendance: null,
+          child_attendance: null,
+          number_of_service_for_children: null,
+          total_attendance: null,
+        },
+      }));
+      worshipServicesRef.current = mapped;
+      return mapped;
+    } catch (error) {
+      console.error('Error loading worship services:', error);
+      return [];
+    }
+  }, [churchId]);
+
+  useEffect(() => {
+    worshipServicesRef.current = null;
+  }, [churchId]);
+
+
+  const mergeWorshipSessions = useCallback(
+    (base: WorshipSession[], reported?: WorshipSession[]) => {
+      if (!base.length && reported && reported.length > 0) return reported;
+      const reportMap = new Map((reported || []).map(session => [session.id, session]));
+      const merged = base.map(service => {
+        const report = reportMap.get(service.id);
+        if (!report) return service;
+        return {
+          ...service,
+          attendance: report.attendance ?? service.attendance,
+        };
+      });
+      (reported || []).forEach(session => {
+        if (!merged.some(existing => existing.id === session.id)) {
+          merged.push(session);
+        }
+      });
+      return merged;
+    },
+    [],
+  );
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      if (!churchId) return;
+      const services = await fetchWorshipServices(true);
+      if (!mounted || services.length === 0) return;
+      setWorshipSessions(prev => mergeWorshipSessions(services, prev));
+      if (currentWeekNumber) {
+        setWeekData(prev => {
+          const current = prev.get(currentWeekNumber);
+          if (!current) return prev;
+          const merged = mergeWorshipSessions(services, current.worship_sessions || []);
+          return new Map(prev).set(currentWeekNumber, {
+            ...current,
+            worship_sessions: merged,
+          });
+        });
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, [churchId, currentWeekNumber, fetchWorshipServices, mergeWorshipSessions]);
 
   const loadInitialData = async () => {
+    if (!churchId) return;
     setLoading(true);
     try {
-      // Load worship services structure first
-      const worshipServicesResult = await listWorshipServicesByChurch(churchId);
-      
-      if (worshipServicesResult?.data?.length > 0) {
-        const sessions: WorshipSession[] = worshipServicesResult.data.map((ws: any) => ({
-          id: ws.id,
-          name: ws.name,
-          day_name: ws.day_name,
-          time: ws.time,
-          attendance: {
-            adult_attendance: null,
-            youth_attendance: null,
-            child_attendance: null,
-            number_of_service_for_children: null,
-            total_attendance: null,
-          },
-        }));
-        setWorshipSessions(sessions);
-      }
+      const firstWeekNumber = sortedWeekNumbers[0];
 
-      // Start loading weeks sequentially
-      if (weekNumbers.length > 0) {
-        loadingQueueRef.current = [...weekNumbers];
-        loadWeekSequentially();
+      if (firstWeekNumber) {
+        // Use shared loader to reuse cached/context data
+        await loadSingleWeek(firstWeekNumber, true);
+
+        // Preload next week in background for smooth navigation
+        if (sortedWeekNumbers.length > 1) {
+          const nextWeekNumber = sortedWeekNumbers[1];
+          loadSingleWeek(nextWeekNumber, false).catch(() => {});
+        }
+      } else {
+        setLoading(false);
       }
     } catch (error: any) {
       console.error('Error loading initial data:', error);
+      // Even if API fails, show form with empty state
       setLoading(false);
     }
   };
 
-  // Load weeks sequentially - show first week immediately when loaded
-  const loadWeekSequentially = async () => {
-    if (loadingQueueRef.current.length === 0) {
-      setLoading(false);
-      return;
+  // Load a single week and show immediately if it's the first week
+  const loadSingleWeek = useCallback(async (weekNumber: number, isFirstWeek: boolean = false) => {
+    if (!churchId) return;
+    
+    // Check if already loaded using ref for immediate synchronous check
+    if (loadedWeeksRef.current.has(weekNumber)) {
+      // Already loaded, just show it if it's the first week
+      if (isFirstWeek) {
+        const existingData = weekData.get(weekNumber);
+        if (existingData) {
+          const baseServices = await fetchWorshipServices();
+          const mergedSessions = mergeWorshipSessions(baseServices, existingData.worship_sessions || []);
+          if (mergedSessions.length > 0) {
+            setWorshipSessions(mergedSessions);
+          }
+          if (mergedSessions.length !== (existingData.worship_sessions || []).length) {
+            setWeekData(prev => new Map(prev).set(weekNumber, {
+              ...existingData,
+              worship_sessions: mergedSessions,
+            }));
+          }
+        }
+        setLoading(false);
+      }
+      return; // Already loaded, exit early
     }
-
-    const weekNumber = loadingQueueRef.current.shift()!;
+    
+    // Check if already loading using ref
+    if (loadingWeeksRef.current.has(weekNumber)) {
+      return; // Already loading, exit early
+    }
+    
+    // Mark as loading
+    loadingWeeksRef.current.add(weekNumber);
     setLoadingWeeks(prev => new Set(prev).add(weekNumber));
 
     try {
@@ -153,72 +333,119 @@ export default function MonthlyDataEntryScreen() {
       const contextData = getWeekData(churchId, year, weekNumber);
       if (contextData) {
         // Restore from context
+        const baseServices = await fetchWorshipServices();
+        const mergedSessions = mergeWorshipSessions(baseServices, contextData.worshipSessions);
         const restoredData: WeeklyReportData = {
           church_id: churchId,
           year,
           week_number: weekNumber,
-          worship_sessions: contextData.worshipSessions,
+          worship_sessions: mergedSessions,
           church_metrics: contextData.churchMetrics,
         };
-        setWeekData(prev => new Map(prev).set(weekNumber, restoredData));
+        setWeekData(prev => {
+          if (prev.has(weekNumber)) return prev; // Already loaded
+          loadedWeeksRef.current.add(weekNumber);
+          return new Map(prev).set(weekNumber, restoredData);
+        });
         
         // If this is the first week, show it immediately
-        if (weekNumber === weekNumbers[0]) {
-          setWorshipSessions(contextData.worshipSessions);
+        if (isFirstWeek) {
+          setWorshipSessions(mergedSessions);
           setLoading(false);
         }
       } else {
         // Load from API
         const data = await getWeeklyReport(churchId, year, weekNumber);
-        setWeekData(prev => new Map(prev).set(weekNumber, data));
+        const baseServices = await fetchWorshipServices();
+        const worshipSessionsForWeek = mergeWorshipSessions(baseServices, data.worship_sessions || []);
+        const mergedData = {
+          ...data,
+          worship_sessions: worshipSessionsForWeek,
+        };
+        setWeekData(prev => {
+          if (prev.has(weekNumber)) return prev; // Already loaded
+          loadedWeeksRef.current.add(weekNumber);
+          return new Map(prev).set(weekNumber, mergedData);
+        });
         
         // If this is the first week, show it immediately
-        if (weekNumber === weekNumbers[0]) {
-          if (data.worship_sessions && data.worship_sessions.length > 0) {
-            setWorshipSessions(data.worship_sessions);
+        if (isFirstWeek) {
+          if (worshipSessionsForWeek && worshipSessionsForWeek.length > 0) {
+            setWorshipSessions(worshipSessionsForWeek);
           }
           setLoading(false);
         }
       }
     } catch (error: any) {
       // If report doesn't exist, create empty structure
+      const worshipSessionsForWeek = await fetchWorshipServices();
       const emptyData: WeeklyReportData = {
         church_id: churchId,
         year,
         week_number: weekNumber,
-        worship_sessions: [],
+        worship_sessions: worshipSessionsForWeek,
         church_metrics: {} as ChurchMetrics,
       };
-      setWeekData(prev => new Map(prev).set(weekNumber, emptyData));
+      setWeekData(prev => {
+        if (prev.has(weekNumber)) return prev; // Already loaded
+        loadedWeeksRef.current.add(weekNumber);
+        return new Map(prev).set(weekNumber, emptyData);
+      });
       
       // If this is the first week, show it immediately
-      if (weekNumber === weekNumbers[0]) {
+      if (isFirstWeek) {
+        if (worshipSessionsForWeek.length > 0) {
+          setWorshipSessions(worshipSessionsForWeek);
+        }
         setLoading(false);
       }
     } finally {
+      loadingWeeksRef.current.delete(weekNumber);
       setLoadingWeeks(prev => {
         const newSet = new Set(prev);
         newSet.delete(weekNumber);
         return newSet;
       });
-      
-      // Continue loading next week
-      if (loadingQueueRef.current.length > 0) {
-        loadWeekSequentially();
-      } else {
-        setLoading(false);
+    }
+  }, [churchId, year, getWeekData, fetchWorshipServices, mergeWorshipSessions, weekData]);
+
+  // Preload next week when user is on current week (for smooth navigation)
+  const preloadNextWeek = useCallback(() => {
+    if (!churchId) return;
+    const nextIndex = currentWeekIndex + 1;
+    if (nextIndex < sortedWeekNumbers.length) {
+      const nextWeekNumber = sortedWeekNumbers[nextIndex];
+      // Only preload if not already loaded or loading
+      if (!weekData.has(nextWeekNumber) && !loadingWeeksRef.current.has(nextWeekNumber)) {
+        loadSingleWeek(nextWeekNumber, false).catch(() => {});
       }
     }
-  };
+  }, [churchId, currentWeekIndex, sortedWeekNumbers, weekData, loadSingleWeek]);
 
   // Load data for a specific week when switching to it
   const loadWeekData = useCallback(async (weekNumber: number) => {
+    if (!churchId) return;
     // Check if already loaded
     if (weekData.has(weekNumber)) {
       const data = weekData.get(weekNumber);
-      if (data?.worship_sessions) {
-        setWorshipSessions(data.worship_sessions);
+      if (data) {
+        const baseServices = await fetchWorshipServices();
+        const mergedSessions = mergeWorshipSessions(baseServices, data.worship_sessions || []);
+        if (mergedSessions.length > 0) {
+          setWorshipSessions(mergedSessions);
+        }
+        if (mergedSessions.length !== (data.worship_sessions || []).length) {
+          setWeekData(prev => new Map(prev).set(weekNumber, {
+            ...data,
+            worship_sessions: mergedSessions,
+          }));
+        }
       }
+      return;
+    }
+
+    // Check if already loading to avoid duplicate requests
+    if (loadingWeeks.has(weekNumber)) {
       return;
     }
 
@@ -241,20 +468,30 @@ export default function MonthlyDataEntryScreen() {
     setLoadingWeeks(prev => new Set(prev).add(weekNumber));
     try {
       const data = await getWeeklyReport(churchId, year, weekNumber);
-      setWeekData(prev => new Map(prev).set(weekNumber, data));
-      if (data.worship_sessions) {
-        setWorshipSessions(data.worship_sessions);
+      const baseServices = await fetchWorshipServices();
+      const worshipSessionsForWeek = mergeWorshipSessions(baseServices, data.worship_sessions || []);
+      const mergedData = {
+        ...data,
+        worship_sessions: worshipSessionsForWeek,
+      };
+      setWeekData(prev => new Map(prev).set(weekNumber, mergedData));
+      if (worshipSessionsForWeek && worshipSessionsForWeek.length > 0) {
+        setWorshipSessions(worshipSessionsForWeek);
       }
     } catch (error: any) {
       // If report doesn't exist, create empty structure
+      const worshipSessionsForWeek = await fetchWorshipServices();
       const emptyData: WeeklyReportData = {
         church_id: churchId,
         year,
         week_number: weekNumber,
-        worship_sessions: [],
+        worship_sessions: worshipSessionsForWeek,
         church_metrics: {} as ChurchMetrics,
       };
       setWeekData(prev => new Map(prev).set(weekNumber, emptyData));
+      if (worshipSessionsForWeek.length > 0) {
+        setWorshipSessions(worshipSessionsForWeek);
+      }
     } finally {
       setLoadingWeeks(prev => {
         const newSet = new Set(prev);
@@ -262,9 +499,11 @@ export default function MonthlyDataEntryScreen() {
         return newSet;
       });
     }
-  }, [churchId, year, weekData, getWeekData]);
+  }, [churchId, year, weekData, getWeekData, loadingWeeks, fetchWorshipServices, mergeWorshipSessions]);
 
-  const updateWorshipSession = (sessionId: number, field: string, value: string) => {
+  const updateWorshipSession = useCallback((sessionId: number, field: string, value: string) => {
+    if (!churchId) return;
+    const currentChurchId = churchId; // Store for use in callback
     // Parse the input value (remove formatting, only keep digits)
     const numValue = parseNumber(value);
     setWorshipSessions(prev => {
@@ -291,42 +530,47 @@ export default function MonthlyDataEntryScreen() {
       
       // Save to context
       const currentMetrics = currentData?.church_metrics || ({} as ChurchMetrics);
-      saveWeekDataToContext(churchId, year, currentWeekNumber, updated, currentMetrics);
+      saveWeekDataToContext(currentChurchId, year, currentWeekNumber, updated, currentMetrics);
       
       return updated;
     });
-  };
+  }, [churchId, year, currentWeekNumber, currentData, saveWeekDataToContext]);
 
-  const calculateTotalAttendance = (attendance: any): number | null => {
+  const calculateTotalAttendance = useCallback((attendance: any): number | null => {
     const adult = attendance.adult_attendance || 0;
     const youth = attendance.youth_attendance || 0;
     const child = attendance.child_attendance || 0;
     const total = adult + youth + child;
     return total > 0 ? total : null;
-  };
+  }, []);
 
-  const updateChurchMetrics = (field: keyof ChurchMetrics, value: string) => {
+  const updateChurchMetrics = useCallback((field: keyof ChurchMetrics, value: string) => {
+    if (!churchId) return;
     // Parse the input value (remove formatting, only keep digits)
     const numValue = parseNumber(value);
-    const currentMetrics = currentData?.church_metrics || ({} as ChurchMetrics);
-    const updatedMetrics = {
-      ...currentMetrics,
-      [field]: numValue,
-    };
-    const updatedData: WeeklyReportData = {
-      ...(currentData || {
-        church_id: churchId,
-        year,
-        week_number: currentWeekNumber,
-        worship_sessions: [],
-        church_metrics: {} as ChurchMetrics,
-      }),
-      church_metrics: updatedMetrics,
-    };
-    setWeekData(prev => new Map(prev).set(currentWeekNumber, updatedData));
-    
-    // Save to context
-    saveWeekDataToContext(churchId, year, currentWeekNumber, worshipSessions, updatedMetrics);
+    setWeekData(prev => {
+      const currentData = prev.get(currentWeekNumber);
+      const currentMetrics = currentData?.church_metrics || ({} as ChurchMetrics);
+      const updatedMetrics = {
+        ...currentMetrics,
+        [field]: numValue,
+      };
+      const updatedData: WeeklyReportData = {
+        ...(currentData || {
+          church_id: churchId,
+          year,
+          week_number: currentWeekNumber,
+          worship_sessions: [],
+          church_metrics: {} as ChurchMetrics,
+        }),
+        church_metrics: updatedMetrics,
+      };
+      
+      // Save to context
+      saveWeekDataToContext(churchId, year, currentWeekNumber, worshipSessions, updatedMetrics);
+      
+      return new Map(prev).set(currentWeekNumber, updatedData);
+    });
     
     // Clear error when user types
     setFieldErrors(prev => {
@@ -334,7 +578,7 @@ export default function MonthlyDataEntryScreen() {
       newMap.delete(`church_metrics.${field}`);
       return newMap;
     });
-  };
+  }, [churchId, year, currentWeekNumber, worshipSessions, saveWeekDataToContext]);
 
   // Check if a week has all required fields filled
   const checkWeekCompleted = useCallback((weekNum: number, data: WeeklyReportData | undefined): boolean => {
@@ -440,7 +684,7 @@ export default function MonthlyDataEntryScreen() {
   };
 
   const handleSave = async () => {
-    if (!currentWeekNumber) return;
+    if (!currentWeekNumber || !churchId) return;
 
     setSaving(true);
     try {
@@ -485,6 +729,7 @@ export default function MonthlyDataEntryScreen() {
   };
 
   const handleSaveAll = async () => {
+    if (!churchId) return;
     // Validate before saving
     const validation = validateCurrentWeek();
     if (!validation.isValid) {
@@ -500,7 +745,7 @@ export default function MonthlyDataEntryScreen() {
     
     setSaving(true);
     try {
-      const payloads = weekNumbers.map(weekNumber => {
+      const payloads = sortedWeekNumbers.map(weekNumber => {
         const data = weekData.get(weekNumber);
         const metrics = data?.church_metrics || ({} as ChurchMetrics);
         const sessions = weekNumber === currentWeekNumber 
@@ -525,7 +770,18 @@ export default function MonthlyDataEntryScreen() {
       });
 
       await batchCreateOrUpdateWeeklyReports(payloads);
-      Alert.alert(t('success') || 'Success', t('allDataSavedSuccessfully') || 'All data saved successfully');
+      const handleSuccess = () => {
+        if (saveOption === 'goToChurch') {
+          navigation.navigate('EditChurch', { id: churchId });
+        } else {
+          navigation.goBack();
+        }
+      };
+      Alert.alert(
+        t('success') || 'Success',
+        t('allDataSavedSuccessfully') || 'All data saved successfully',
+        [{ text: t('ok') || 'OK', onPress: handleSuccess }]
+      );
     } catch (error: any) {
       console.error('Error saving all data:', error);
       Alert.alert(t('error') || 'Error', error?.message || t('failedToSaveData') || 'Failed to save data');
@@ -535,7 +791,8 @@ export default function MonthlyDataEntryScreen() {
   };
 
   const handleNextWeek = () => {
-    if (currentWeekIndex < weekNumbers.length - 1) {
+    if (!churchId) return;
+    if (currentWeekIndex < sortedWeekNumbers.length - 1) {
       // Validate before moving to next week
       const validation = validateCurrentWeek();
       if (!validation.isValid) {
@@ -575,13 +832,34 @@ export default function MonthlyDataEntryScreen() {
       // Switch to next week
       const nextIndex = currentWeekIndex + 1;
       setCurrentWeekIndex(nextIndex);
-      const nextWeekNumber = weekNumbers[nextIndex];
-      loadWeekData(nextWeekNumber);
+      const nextWeekNumber = sortedWeekNumbers[nextIndex];
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
+      
+      // Load next week data (should be preloaded, but load if not)
+      if (!weekData.has(nextWeekNumber)) {
+        loadWeekData(nextWeekNumber);
+      } else {
+        // Data already loaded, just update UI
+        const nextData = weekData.get(nextWeekNumber);
+        if (nextData?.worship_sessions) {
+          setWorshipSessions(nextData.worship_sessions);
+        }
+      }
+      
+      // Preload week after next for smooth navigation
+      if (nextIndex + 1 < sortedWeekNumbers.length) {
+        const weekAfterNext = sortedWeekNumbers[nextIndex + 1];
+        if (!weekData.has(weekAfterNext) && !loadingWeeksRef.current.has(weekAfterNext)) {
+          loadSingleWeek(weekAfterNext, false).catch(() => {});
+        }
+      }
+      
       setFieldErrors(new Map()); // Clear errors when switching weeks
     }
   };
 
   const handleBackWeek = () => {
+    if (!churchId) return;
     if (currentWeekIndex > 0) {
       // Save current week data before switching
       const currentMetrics = currentData?.church_metrics || ({} as ChurchMetrics);
@@ -604,8 +882,9 @@ export default function MonthlyDataEntryScreen() {
       // Switch to previous week
       const prevIndex = currentWeekIndex - 1;
       setCurrentWeekIndex(prevIndex);
-      const prevWeekNumber = weekNumbers[prevIndex];
+      const prevWeekNumber = sortedWeekNumbers[prevIndex];
       loadWeekData(prevWeekNumber);
+      scrollViewRef.current?.scrollTo({ y: 0, animated: true });
     }
   };
 
@@ -642,6 +921,7 @@ export default function MonthlyDataEntryScreen() {
 
   // Update worship sessions when switching weeks
   useEffect(() => {
+    if (!churchId) return;
     // Check context first when switching weeks
     const contextData = getWeekData(churchId, year, currentWeekNumber);
     if (contextData) {
@@ -658,22 +938,62 @@ export default function MonthlyDataEntryScreen() {
       }
     }
     setFieldErrors(new Map()); // Clear errors when switching weeks
-  }, [currentWeekNumber, currentData, checkWeekCompleted, churchId, year, getWeekData]);
+    
+    // Preload next week for smooth navigation
+    preloadNextWeek();
+  }, [currentWeekNumber, currentData, checkWeekCompleted, churchId, year, getWeekData, preloadNextWeek]);
 
-  if (loading) {
+  // Skeleton loading component
+  const renderSkeletonLoader = () => (
+    <View style={styles.skeletonContainer}>
+      <View style={[styles.skeletonHeader, {backgroundColor: C.surface}]} />
+      <View style={styles.skeletonWeekNav}>
+        {[1, 2, 3, 4].map((i) => (
+          <View key={i} style={[styles.skeletonWeekButton, {backgroundColor: C.surface}]} />
+        ))}
+      </View>
+      {worshipSessions.length > 0 ? (
+        worshipSessions.map((session, idx) => (
+          <View key={session.id || idx} style={styles.skeletonSection}>
+            <View style={[styles.skeletonTitle, {backgroundColor: C.surface}]} />
+            {[1, 2, 3, 4, 5].map((i) => (
+              <View key={i} style={styles.skeletonField}>
+                <View style={[styles.skeletonLabel, {backgroundColor: C.surface}]} />
+                <View style={[styles.skeletonInput, {backgroundColor: C.surface}]} />
+              </View>
+            ))}
+          </View>
+        ))
+      ) : (
+        <View style={styles.skeletonSection}>
+          <View style={[styles.skeletonTitle, {backgroundColor: C.surface}]} />
+          {[1, 2, 3, 4, 5].map((i) => (
+            <View key={i} style={styles.skeletonField}>
+              <View style={[styles.skeletonLabel, {backgroundColor: C.surface}]} />
+              <View style={[styles.skeletonInput, {backgroundColor: C.surface}]} />
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  );
+
+  if (!churchId || !year || sortedWeekNumbers.length === 0) {
     return (
       <SafeAreaView
         style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
         edges={['top', 'bottom', 'left', 'right']}>
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.mainColor} />
           <Text style={[styles.loadingText, {color: C.textSecondary}]}>
-            {t('loading')}...
+            {t('noWeeksAvailable') || 'No weeks available for this month'}
           </Text>
         </View>
       </SafeAreaView>
     );
   }
+
+  // Show skeleton while loading initial data, but show form structure if worship sessions are loaded
+  const showSkeleton = loading && worshipSessions.length === 0;
 
   const currentMetrics = currentData?.church_metrics || ({} as ChurchMetrics);
 
@@ -689,30 +1009,39 @@ export default function MonthlyDataEntryScreen() {
           />
       </View>
 
-        <ScrollView
-          ref={scrollViewRef}
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}>
+        {showSkeleton ? (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}>
+            {renderSkeletonLoader()}
+          </ScrollView>
+        ) : (
+          <ScrollView
+            ref={scrollViewRef}
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}>
           
           {/* Church Name and Week Info */}
           <View style={styles.infoContainer}>
             <Text style={[styles.infoLabel, {color: C.textPrimary}]}>
-              {t('enterDataFor') || 'Enter Data for'}: {churchName}
+              {t('enterDataFor') || 'Enter data for'}: {displayChurchName}
             </Text>
             <Text style={[styles.weekInfo, {color: C.textPrimary}]}>
-              {t('week') || 'Week'} {currentWeekNumber} ({getWeekDateRange(year, currentWeekNumber)})
+              {t('week') || 'Week'} {currentWeekNumber}
+              {currentWeekNumber ? ` (${getWeekDateRange(year, currentWeekNumber)})` : ''}
             </Text>
           </View>
 
           {/* Week Navigation */}
-          {weekNumbers.length > 1 && (
+          {sortedWeekNumbers.length > 1 && (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.weekNavContainer}
               style={styles.weekNavScrollView}>
-              {weekNumbers.map((weekNum, index) => {
+              {sortedWeekNumbers.map((weekNum, index) => {
                 const weekDataForCheck = weekData.get(weekNum);
                 const isLoading = loadingWeeks.has(weekNum);
                 const isCompleted = completedWeeks.has(weekNum) || checkWeekCompleted(weekNum, weekDataForCheck);
@@ -726,8 +1055,8 @@ export default function MonthlyDataEntryScreen() {
                   index === 0 || 
                   isCurrent || 
                   (index > 0 && 
-                   (completedWeeks.has(weekNumbers[index - 1]) || 
-                    checkWeekCompleted(weekNumbers[index - 1], weekData.get(weekNumbers[index - 1]))) &&
+                   (completedWeeks.has(sortedWeekNumbers[index - 1]) || 
+                    checkWeekCompleted(sortedWeekNumbers[index - 1], weekData.get(sortedWeekNumbers[index - 1]))) &&
                    !isLoading &&
                    weekData.has(weekNum));
                 
@@ -743,6 +1072,7 @@ export default function MonthlyDataEntryScreen() {
                       },
                     ]}
                     onPress={() => {
+                      if (!churchId) return;
                       if (!canAccess) {
                         if (isLoading) {
                           Alert.alert(
@@ -781,33 +1111,29 @@ export default function MonthlyDataEntryScreen() {
                     }}
                     disabled={!canAccess}
                     activeOpacity={0.7}>
-                    {isLoading ? (
-                      <ActivityIndicator size="small" color={isCurrent || isCompleted ? '#fff' : COLORS.mainColor} />
-                    ) : (
-                      <>
-                        <Text
-                          style={[
-                            styles.weekNavText,
-                            {
-                              color: isCurrent || isCompleted ? '#fff' : C.textPrimary,
-                            },
-                          ]}>
-                          {t('week') || 'Week'} {weekNum}
-                        </Text>
-                        <Text
-                          style={[
-                            styles.weekNavDateText,
-                            {
-                              color: isCurrent || isCompleted ? '#fff' : C.textPrimary,
-                            },
-                          ]}>
-                          ({getWeekDateRange(year, weekNum)})
-                        </Text>
-                        {isCompleted && !isCurrent && (
-                          <Text style={styles.weekNavCheckmark}>✓</Text>
-                        )}
-                      </>
-                    )}
+                    <>
+                      <Text
+                        style={[
+                          styles.weekNavText,
+                          {
+                            color: isCurrent || isCompleted ? '#fff' : C.textPrimary,
+                          },
+                        ]}>
+                        {t('week') || 'Week'} {weekNum}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.weekNavDateText,
+                          {
+                            color: isCurrent || isCompleted ? '#fff' : C.textPrimary,
+                          },
+                        ]}>
+                        ({getWeekDateRange(year, weekNum)})
+                      </Text>
+                      {isCompleted && !isCurrent && (
+                        <Text style={styles.weekNavCheckmark}>✓</Text>
+                      )}
+                    </>
                   </TouchableOpacity>
                 );
               })}
@@ -816,7 +1142,17 @@ export default function MonthlyDataEntryScreen() {
 
           {/* Main Worship Service Attendance */}
           <View style={styles.section}>
-            {worshipSessions.length > 0 ? (
+            {loading && worshipSessions.length === 0 ? (
+              <View style={styles.skeletonSection}>
+                <View style={[styles.skeletonTitle, {backgroundColor: C.surface}]} />
+                {[1, 2, 3, 4, 5].map((i) => (
+                  <View key={i} style={styles.skeletonField}>
+                    <View style={[styles.skeletonLabel, {backgroundColor: C.surface}]} />
+                    <View style={[styles.skeletonInput, {backgroundColor: C.surface}]} />
+                  </View>
+                ))}
+              </View>
+            ) : worshipSessions.length > 0 ? (
               worshipSessions.map((session, index) => {
                 const attendanceError = fieldErrors.has(`worship_session_${session.id}_attendance`);
                 return (
@@ -826,82 +1162,84 @@ export default function MonthlyDataEntryScreen() {
                     ref={(ref) => {
                       if (ref) fieldRefs.current.set(`worship_session_${session.id}`, ref);
                     }}>
-                    {worshipSessions.length > 1 && (
-                      <Text style={[styles.sessionName, {color: C.textPrimary}]}>
-                        {index + 1}. {t('mainWorshipServiceAttendance') || 'Main Worship Service Attendance'}: {session.name} ({session.day_name} {session.time?.substring(0, 5)})
-                      </Text>
-                    )}
+                    <Text style={[styles.sessionName, {color: C.textPrimary}]}>
+                      {index + 1}. {t('mainWorshipServiceAttendance') || 'Main Worship Service Attendance'}: {session.name} ({session.day_name} {session.time?.substring(0, 5)})
+                    </Text>
                     
-                    <View 
-                      style={styles.fieldContainer}
-                      ref={(ref) => {
-                        if (ref) fieldRefs.current.set(`worship_session_${session.id}_attendance`, ref);
-                      }}>
-                      <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('adults') || 'Adults'} *
-                      </Text>
-                      <AppInput
-                        value={formatNumber(session.attendance.adult_attendance)}
-                        onChangeText={value => {
-                          updateWorshipSession(session.id, 'adult_attendance', value);
-                          setFieldErrors(prev => {
-                            const newMap = new Map(prev);
-                            newMap.delete(`worship_session_${session.id}_attendance`);
-                            return newMap;
-                          });
-                        }}
-                        keyboardType="numeric"
-                        placeholder="0"
-                        error={attendanceError && session.attendance.adult_attendance === null && session.attendance.youth_attendance === null && session.attendance.child_attendance === null}
-                      />
+                    <View style={styles.fieldRow}>
+                      <View
+                        style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                        ref={(ref) => {
+                          if (ref) fieldRefs.current.set(`worship_session_${session.id}_attendance`, ref);
+                        }}>
+                        <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                          {t('adults') || 'Adults'} *
+                        </Text>
+                        <AppInput
+                          value={formatNumber(session.attendance.adult_attendance)}
+                          onChangeText={value => {
+                            updateWorshipSession(session.id, 'adult_attendance', value);
+                            setFieldErrors(prev => {
+                              const newMap = new Map(prev);
+                              newMap.delete(`worship_session_${session.id}_attendance`);
+                              return newMap;
+                            });
+                          }}
+                          keyboardType="numeric"
+                          placeholder="0"
+                          error={attendanceError && session.attendance.adult_attendance === null && session.attendance.youth_attendance === null && session.attendance.child_attendance === null}
+                        />
+                      </View>
+
+                      <View style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}>
+                        <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                          {t('youth') || 'Youth [13-22]'}
+                        </Text>
+                        <AppInput
+                          value={formatNumber(session.attendance.youth_attendance)}
+                          onChangeText={value => updateWorshipSession(session.id, 'youth_attendance', value)}
+                          keyboardType="numeric"
+                          placeholder="0"
+                        />
+                      </View>
                     </View>
 
-                  <View style={styles.fieldContainer}>
-                    <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                      {t('youth') || 'Youth [13-22]'}
-                    </Text>
-                    <AppInput
-                      value={formatNumber(session.attendance.youth_attendance)}
-                      onChangeText={value => updateWorshipSession(session.id, 'youth_attendance', value)}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </View>
+                    <View style={styles.fieldRow}>
+                      <View style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}>
+                        <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                          {t('children') || 'Children [0-12]'}
+                        </Text>
+                        <AppInput
+                          value={formatNumber(session.attendance.child_attendance)}
+                          onChangeText={value => updateWorshipSession(session.id, 'child_attendance', value)}
+                          keyboardType="numeric"
+                          placeholder="0"
+                        />
+                      </View>
 
-                  <View style={styles.fieldContainer}>
-                    <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                      {t('children') || 'Children [0-12]'}
-                    </Text>
-                    <AppInput
-                      value={formatNumber(session.attendance.child_attendance)}
-                      onChangeText={value => updateWorshipSession(session.id, 'child_attendance', value)}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </View>
+                      <View style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}>
+                        <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                          {t('numberOfServicesForChildren') || 'Number of Services for Children'}
+                        </Text>
+                        <AppInput
+                          value={formatNumber(session.attendance.number_of_service_for_children)}
+                          onChangeText={value => updateWorshipSession(session.id, 'number_of_service_for_children', value)}
+                          keyboardType="numeric"
+                          placeholder="0"
+                        />
+                      </View>
+                    </View>
 
-                  <View style={styles.fieldContainer}>
-                    <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                      {t('numberOfServicesForChildren') || 'Number of Services for Children'}
-                    </Text>
-                    <AppInput
-                      value={formatNumber(session.attendance.number_of_service_for_children)}
-                      onChangeText={value => updateWorshipSession(session.id, 'number_of_service_for_children', value)}
-                      keyboardType="numeric"
-                      placeholder="0"
-                    />
-                  </View>
-
-                  <View style={styles.fieldContainer}>
-                    <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                      {t('totalAttendance') || 'Total Attendance'}
-                    </Text>
-                    <AppInput
-                      value={formatNumber(session.attendance.total_attendance)}
-                      editable={false}
-                      containerStyle={{backgroundColor: C.bgSelectedOption}}
-                    />
-                  </View>
+                    <View style={styles.fieldContainer}>
+                      <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                        {t('totalAttendance') || 'Total Attendance'}
+                      </Text>
+                      <AppInput
+                        value={formatNumber(session.attendance.total_attendance)}
+                        editable={false}
+                        containerStyle={{backgroundColor: C.bgSelectedOption}}
+                      />
+                    </View>
                 </View>
                 );
               })
@@ -918,38 +1256,40 @@ export default function MonthlyDataEntryScreen() {
               {worshipSessions.length + 1}. {t('cellGroups') || 'Cell Groups'}
             </Text>
             
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.number_of_cell_groups', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('numberOfCellGroups') || 'Number of Cell Groups'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.number_of_cell_groups)}
-                onChangeText={value => updateChurchMetrics('number_of_cell_groups', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.number_of_cell_groups')}
-              />
-            </View>
+            <View style={styles.fieldRow}>
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.number_of_cell_groups', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('numberOfCellGroups') || 'Number of Cell Groups'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.number_of_cell_groups)}
+                  onChangeText={value => updateChurchMetrics('number_of_cell_groups', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.number_of_cell_groups')}
+                />
+              </View>
 
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.cell_group_weekly_attendance', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('totalAttendanceInAll') || 'Total Attendance in All'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.cell_group_weekly_attendance)}
-                onChangeText={value => updateChurchMetrics('cell_group_weekly_attendance', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.cell_group_weekly_attendance')}
-              />
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.cell_group_weekly_attendance', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('totalAttendanceInAll') || 'Total Attendance in All'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.cell_group_weekly_attendance)}
+                  onChangeText={value => updateChurchMetrics('cell_group_weekly_attendance', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.cell_group_weekly_attendance')}
+                />
+              </View>
             </View>
           </View>
 
@@ -959,38 +1299,40 @@ export default function MonthlyDataEntryScreen() {
               {worshipSessions.length + 2}. {t('prayerMeetings') || 'Prayer Meetings'}
             </Text>
             
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.number_of_prayer_meetings', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('numberOfPrayerMeetings') || 'Number of Prayer Meetings'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.number_of_prayer_meetings)}
-                onChangeText={value => updateChurchMetrics('number_of_prayer_meetings', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.number_of_prayer_meetings')}
-              />
-            </View>
+            <View style={styles.fieldRow}>
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.number_of_prayer_meetings', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('numberOfPrayerMeetings') || 'Number of Prayer Meetings'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.number_of_prayer_meetings)}
+                  onChangeText={value => updateChurchMetrics('number_of_prayer_meetings', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.number_of_prayer_meetings')}
+                />
+              </View>
 
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.prayer_meeting_weekly_attendance', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('totalAttendanceInAll') || 'Total Attendance in All'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.prayer_meeting_weekly_attendance)}
-                onChangeText={value => updateChurchMetrics('prayer_meeting_weekly_attendance', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.prayer_meeting_weekly_attendance')}
-              />
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.prayer_meeting_weekly_attendance', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('totalAttendanceInAll') || 'Total Attendance in All'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.prayer_meeting_weekly_attendance)}
+                  onChangeText={value => updateChurchMetrics('prayer_meeting_weekly_attendance', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.prayer_meeting_weekly_attendance')}
+                />
+              </View>
             </View>
           </View>
 
@@ -1000,44 +1342,46 @@ export default function MonthlyDataEntryScreen() {
               {worshipSessions.length + 3}. {t('decisionsDisciplingWaterBaptisms') || 'Decisions, Discipling & Water Baptisms'}
             </Text>
             
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.weekly_decisions_made', ref);
-              }}>
-              <View style={styles.labelWithHelp}>
-                <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                  {t('numberOfNewDecisions') || 'Number of New Decisions'} *
-                </Text>
-                <HelpIcon
-                  title={t('numberOfNewDecisions') || 'Number of New Decisions'}
-                  message={t('helpNumberOfNewDecisions') || 'Number of people who gave their lives to Christ in that week'}
+            <View style={styles.fieldRow}>
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.weekly_decisions_made', ref);
+                }}>
+                <View style={styles.labelWithHelpRow}>
+                  <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                    {t('numberOfNewDecisions') || 'Number of New Decisions'} *
+                  </Text>
+                  <HelpIcon
+                    title={t('numberOfNewDecisions') || 'Number of New Decisions'}
+                    message={t('helpNumberOfNewDecisions') || 'Number of people who gave their lives to Christ in that week'}
+                  />
+                </View>
+                <AppInput
+                  value={formatNumber(currentMetrics.weekly_decisions_made)}
+                  onChangeText={value => updateChurchMetrics('weekly_decisions_made', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.weekly_decisions_made')}
                 />
               </View>
-              <AppInput
-                value={formatNumber(currentMetrics.weekly_decisions_made)}
-                onChangeText={value => updateChurchMetrics('weekly_decisions_made', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.weekly_decisions_made')}
-              />
-            </View>
 
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.being_actively_discipled', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('numberBeingActivelyDiscipled') || 'Number being Actively Discipled'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.being_actively_discipled)}
-                onChangeText={value => updateChurchMetrics('being_actively_discipled', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.being_actively_discipled')}
-              />
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.being_actively_discipled', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('numberBeingActivelyDiscipled') || 'Number being Actively Discipled'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.being_actively_discipled)}
+                  onChangeText={value => updateChurchMetrics('being_actively_discipled', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.being_actively_discipled')}
+                />
+              </View>
             </View>
 
             <View 
@@ -1076,38 +1420,40 @@ export default function MonthlyDataEntryScreen() {
               {worshipSessions.length + 4}. {t('teachingTraining') || 'Teaching & Training'}
             </Text>
             
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.number_of_liw_classes', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('numberOfGtLiwClasses') || 'Number of GT/LIW Classes'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.number_of_liw_classes)}
-                onChangeText={value => updateChurchMetrics('number_of_liw_classes', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.number_of_liw_classes')}
-              />
-            </View>
+            <View style={styles.fieldRow}>
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.number_of_liw_classes', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('numberOfGtLiwClasses') || 'Number of GT/LIW Classes'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.number_of_liw_classes)}
+                  onChangeText={value => updateChurchMetrics('number_of_liw_classes', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.number_of_liw_classes')}
+                />
+              </View>
 
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.liw_total_students', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('totalAttendanceInAllGtLiwClasses') || 'Total Attendance in all GT/LIW Classes'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.liw_total_students)}
-                onChangeText={value => updateChurchMetrics('liw_total_students', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.liw_total_students')}
-              />
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.liw_total_students', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('totalAttendanceInAllGtLiwClasses') || 'Total Attendance in all GT/LIW Classes'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.liw_total_students)}
+                  onChangeText={value => updateChurchMetrics('liw_total_students', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.liw_total_students')}
+                />
+              </View>
             </View>
 
             <View 
@@ -1134,44 +1480,73 @@ export default function MonthlyDataEntryScreen() {
               {worshipSessions.length + 5}. {t('giving') || 'Giving'}
             </Text>
             
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.giving_in_local_currency', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('tithesOfferings') || 'Tithes + Offerings (VNĐ)'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.giving_in_local_currency)}
-                onChangeText={value => updateChurchMetrics('giving_in_local_currency', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.giving_in_local_currency')}
-              />
-            </View>
+            <View style={styles.fieldRow}>
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.giving_in_local_currency', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('tithesOfferings') || 'Tithes + Offerings (VNĐ)'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.giving_in_local_currency)}
+                  onChangeText={value => updateChurchMetrics('giving_in_local_currency', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.giving_in_local_currency')}
+                />
+              </View>
 
-            <View 
-              style={styles.fieldContainer}
-              ref={(ref) => {
-                if (ref) fieldRefs.current.set('church_metrics.mfp_in_local_currency', ref);
-              }}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('missionsGivingMfp') || 'Missions Giving [MFP] (VNĐ)'} *
-              </Text>
-              <AppInput
-                value={formatNumber(currentMetrics.mfp_in_local_currency)}
-                onChangeText={value => updateChurchMetrics('mfp_in_local_currency', value)}
-                keyboardType="numeric"
-                placeholder="0"
-                error={fieldErrors.has('church_metrics.mfp_in_local_currency')}
-              />
+              <View 
+                style={[styles.fieldContainer, styles.fieldContainerRow, styles.fieldHalf]}
+                ref={(ref) => {
+                  if (ref) fieldRefs.current.set('church_metrics.mfp_in_local_currency', ref);
+                }}>
+                <Text style={[formStyles.label, styles.rowLabel, {color: C.textSecondary}]} category="label">
+                  {t('missionsGivingMfp') || 'Missions Giving [MFP] (VNĐ)'} *
+                </Text>
+                <AppInput
+                  value={formatNumber(currentMetrics.mfp_in_local_currency)}
+                  onChangeText={value => updateChurchMetrics('mfp_in_local_currency', value)}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has('church_metrics.mfp_in_local_currency')}
+                />
+              </View>
             </View>
           </View>
 
+          {currentWeekIndex === sortedWeekNumbers.length - 1 && (
+            <View style={styles.saveOptionsContainer}>
+              <TouchableOpacity
+                style={styles.saveOptionRow}
+                onPress={() => setSaveOption('continue')}
+                activeOpacity={0.7}>
+                <View style={styles.radioOuter}>
+                  {saveOption === 'continue' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={[styles.saveOptionText, {color: C.textPrimary}]}>
+                  {t('saveAndContinueEntering') || 'Save and continue entering'}
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.saveOptionRow}
+                onPress={() => setSaveOption('goToChurch')}
+                activeOpacity={0.7}>
+                <View style={styles.radioOuter}>
+                  {saveOption === 'goToChurch' && <View style={styles.radioInner} />}
+                </View>
+                <Text style={[styles.saveOptionText, {color: C.textPrimary}]}>
+                  {t('saveAndGoToChurch') || 'Save and go to church'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
           {/* Navigation Buttons */}
           <View style={styles.buttonContainer}>
-            <CancelButton
+            <SaveButton
               label={t('back') || 'Back'}
               onPress={handleBackWeek}
               disabled={currentWeekIndex === 0 || saving}
@@ -1179,16 +1554,22 @@ export default function MonthlyDataEntryScreen() {
             />
             <SaveButton
               label={
-                currentWeekIndex < weekNumbers.length - 1
+                currentWeekIndex < sortedWeekNumbers.length - 1
                   ? t('next') || 'Next'
-                  : t('saveAll') || 'Save All'
+                  : t('save') || 'Save'
               }
-              onPress={currentWeekIndex < weekNumbers.length - 1 ? handleNextWeek : handleSaveAll}
-              disabled={saving || (currentWeekIndex < weekNumbers.length - 1 && !isCurrentWeekCompleted())}
-              style={styles.navButton}
+              onPress={currentWeekIndex < sortedWeekNumbers.length - 1 ? handleNextWeek : handleSaveAll}
+              disabled={saving || (currentWeekIndex < sortedWeekNumbers.length - 1 && !isCurrentWeekCompleted())}
+              style={[
+                styles.navButton,
+                currentWeekIndex === sortedWeekNumbers.length - 1
+                  ? {backgroundColor: '#5CB85C', borderColor: '#5CB85C'}
+                  : null,
+              ]}
             />
           </View>
         </ScrollView>
+        )}
       </View>
     </SafeAreaView>
   );
@@ -1271,30 +1652,51 @@ const styles = StyleSheet.create({
   section: {
     // padding: ms(16),
     borderRadius: rs(8),
-    marginBottom: ms(16),
+    marginBottom: ms(12),
   },
   sectionTitle: {
     fontSize: fs(14),
     fontWeight: '600',
-    marginBottom: ms(16),
+    marginBottom: ms(12),
   },
   sessionContainer: {
-    marginBottom: ms(8),
-    paddingBottom: ms(8),
+    marginBottom: ms(6),
+    paddingBottom: ms(6),
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.1)',
   },
   sessionName: {
     fontSize: fs(14),
     fontWeight: '600',
+    marginBottom: ms(8),
+  },
+  fieldRow: {
+    flexDirection: 'row',
+    gap: ms(12),
     marginBottom: ms(12),
+    alignItems: 'flex-start',
+  },
+  fieldHalf: {
+    flex: 1,
+  },
+  rowLabel: {
+    lineHeight: fs(14),
+    minHeight: fs(14) * 2,
   },
   fieldContainer: {
-    marginBottom: ms(16),
+    marginBottom: ms(12),
+  },
+  fieldContainerRow: {
+    marginBottom: 0,
   },
   labelWithHelp: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: ms(4),
+  },
+  labelWithHelpRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     marginBottom: ms(4),
   },
   helpIcon: {
@@ -1313,8 +1715,77 @@ const styles = StyleSheet.create({
     marginBottom: ms(16),
     gap: ms(12),
   },
+  saveOptionsContainer: {
+    marginBottom: ms(12),
+    marginTop: ms(4),
+  },
+  saveOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: ms(6),
+  },
+  radioOuter: {
+    width: ws(20),
+    height: ws(20),
+    borderRadius: ws(10),
+    borderWidth: 2,
+    borderColor: COLORS.mainColor,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: ms(10),
+  },
+  radioInner: {
+    width: ws(10),
+    height: ws(10),
+    borderRadius: ws(5),
+    backgroundColor: COLORS.mainColor,
+  },
+  saveOptionText: {
+    fontSize: fs(14),
+    fontWeight: '500',
+  },
   navButton: {
     flex: 1,
+  },
+  skeletonContainer: {
+    padding: ms(16),
+  },
+  skeletonHeader: {
+    height: ms(40),
+    borderRadius: rs(8),
+    marginBottom: ms(16),
+  },
+  skeletonWeekNav: {
+    flexDirection: 'row',
+    gap: ms(8),
+    marginBottom: ms(16),
+  },
+  skeletonWeekButton: {
+    width: ws(100),
+    height: ms(60),
+    borderRadius: rs(3),
+  },
+  skeletonSection: {
+    marginBottom: ms(24),
+  },
+  skeletonTitle: {
+    height: ms(20),
+    width: '60%',
+    borderRadius: rs(4),
+    marginBottom: ms(16),
+  },
+  skeletonField: {
+    marginBottom: ms(16),
+  },
+  skeletonLabel: {
+    height: ms(14),
+    width: '40%',
+    borderRadius: rs(4),
+    marginBottom: ms(8),
+  },
+  skeletonInput: {
+    height: ms(48),
+    borderRadius: rs(8),
   },
 });
 

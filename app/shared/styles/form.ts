@@ -3,7 +3,7 @@ import { COLORS } from '../constants/colors';
 import { fs, ws, hs, ms, rs } from '../utils/scale';
 
 // Form input height config - shared across AppInput and ElementDropdown
-export const FORM_INPUT_HEIGHT = ms(35);
+export const FORM_INPUT_HEIGHT = ms(40);
 
 export const formStyles = StyleSheet.create({
   container: {

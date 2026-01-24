@@ -59,13 +59,15 @@ export interface WeekInfo {
   is_reported: boolean;
 }
 
+export interface GetWeekNumbersData {
+  year: number;
+  month: number;
+  weeks: WeekInfo[];
+}
+
 export interface GetWeekNumbersResponse {
   success: boolean;
-  data: {
-    year: number;
-    month: number;
-    weeks: WeekInfo[];
-  };
+  data: GetWeekNumbersData;
   message: string;
 }
 
@@ -95,15 +97,44 @@ export async function getWeekNumbers(
   year: number,
   month: number,
   churchId: number,
+): Promise<number[]> {
+  try {
+    const response = await api.get<GetWeekNumbersResponse>('/week-numbers', {
+      params: { year, month, church_id: churchId },
+    });
+    // API now returns an object with weeks array containing {week_number, is_reported}
+    const weekData = response.data.data;
+    if (weekData && weekData.weeks && Array.isArray(weekData.weeks)) {
+      const result = weekData.weeks.map(w => w.week_number).sort((a, b) => a - b);
+      return result;
+    }
+    return [];
+  } catch (err: any) {
+    const message = err?.response?.data?.message || err?.message || 'Failed to get week numbers';
+    console.error('Get week numbers error:', message, err);
+    throw new Error(message);
+  }
+}
+
+// Get week info (including is_reported status) for a specific year, month, and church
+export async function getWeekInfo(
+  year: number,
+  month: number,
+  churchId: number,
 ): Promise<WeekInfo[]> {
   try {
     const response = await api.get<GetWeekNumbersResponse>('/week-numbers', {
       params: { year, month, church_id: churchId },
     });
-    return response.data.data?.weeks || [];
+    // API returns an object with weeks array containing {week_number, is_reported}
+    const weekData = response.data.data;
+    if (weekData && weekData.weeks && Array.isArray(weekData.weeks)) {
+      return weekData.weeks.sort((a, b) => a.week_number - b.week_number);
+    }
+    return [];
   } catch (err: any) {
-    const message = err?.response?.data?.message || err?.message || 'Failed to get week numbers';
-    console.error('Get week numbers error:', message);
+    const message = err?.response?.data?.message || err?.message || 'Failed to get week info';
+    console.error('Get week info error:', message);
     throw new Error(message);
   }
 }
@@ -175,3 +206,23 @@ export async function batchCreateOrUpdateWeeklyReports(payloads: BatchWeeklyRepo
   }
 }
 
+// Get worship sessions from a weekly report (they already have the structure)
+export async function getWorshipSessionsFromWeeklyReport(
+  churchId: number,
+  year: number,
+  weekNumber: number,
+): Promise<WorshipSession[]> {
+  try {
+    const response = await api.get<GetWeeklyReportResponse>(
+      `/weekly-reports/churches/${churchId}`,
+      {
+        params: { year, week_number: weekNumber },
+      },
+    );
+    return response.data.data?.worship_sessions || [];
+  } catch (err: any) {
+    console.error('Get worship sessions error:', err?.message);
+    // Return empty array if no data
+    return [];
+  }
+}

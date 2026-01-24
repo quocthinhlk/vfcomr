@@ -149,6 +149,14 @@ export default function DashboardPastorLeaderScreen() {
     const year = date.getFullYear();
     return `${month}, ${year}`;
   };
+  const formatVerifiedDate = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const month = new Intl.DateTimeFormat(localeMap[selectedLanguage as string] || 'en', { month: 'long' }).format(date);
+    const year = date.getFullYear();
+    return `${month} ${year}`;
+  };
 
   const handleToggleStats = () => {
     Animated.parallel([
@@ -175,6 +183,9 @@ export default function DashboardPastorLeaderScreen() {
       // Save selected church_id to AsyncStorage
       if (church?.id) {
         await AsyncStorage.setItem('selectedChurchId', String(church.id));
+      }
+      if (church?.name) {
+        await AsyncStorage.setItem('selectedChurchName', String(church.name));
       }
       
       const res = await api.get('dashboard', { params: { church_id: church?.id } });
@@ -206,6 +217,7 @@ export default function DashboardPastorLeaderScreen() {
       try {
         // Load selected church_id from AsyncStorage
         const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+        const savedChurchName = await AsyncStorage.getItem('selectedChurchName');
         
         // Prepare dashboard API call with church_id if available
         const dashboardParams = savedChurchId ? { church_id: parseInt(savedChurchId, 10) } : undefined;
@@ -231,6 +243,34 @@ export default function DashboardPastorLeaderScreen() {
           const roleId = userData?.role?.id;
           if (typeof roleId === 'number') {
             setCurrentUserRoleId(roleId);
+          }
+
+          // Auto-save church_id to AsyncStorage if not already saved
+          if (!savedChurchId) {
+            // Prefer dashboard_info for initial default selection
+            const dashboardChurchId = dashboardData?.dashboard_info?.church_id;
+            if (dashboardChurchId && typeof dashboardChurchId === 'number') {
+              await AsyncStorage.setItem('selectedChurchId', String(dashboardChurchId));
+              console.log('Auto-saved church_id from dashboard:', dashboardChurchId);
+              if (!savedChurchName && dashboardData?.dashboard_info?.church_name) {
+                await AsyncStorage.setItem('selectedChurchName', String(dashboardData.dashboard_info.church_name));
+              }
+            } else {
+              // Fallback to userData if dashboard_info is missing
+              const userChurchId = userData?.church_id;
+              if (userChurchId && typeof userChurchId === 'number') {
+                await AsyncStorage.setItem('selectedChurchId', String(userChurchId));
+                console.log('Auto-saved church_id from userData:', userChurchId);
+                if (!savedChurchName && userData?.church_name) {
+                  await AsyncStorage.setItem('selectedChurchName', String(userData.church_name));
+                }
+              }
+            }
+          } else if (!savedChurchName) {
+            const dashboardChurchName = dashboardData?.dashboard_info?.church_name;
+            if (dashboardChurchName) {
+              await AsyncStorage.setItem('selectedChurchName', String(dashboardChurchName));
+            }
           }
 
           setUserProfile({
@@ -285,6 +325,23 @@ export default function DashboardPastorLeaderScreen() {
         } catch (error) {
           console.error('Error getting church ID:', error);
           Alert.alert(t('error') || 'Error', t('failedToLoadData') || 'Failed to get Church ID');
+        }
+      } else if (item.routeName === 'MonthlyDataSelect') {
+        try {
+          const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+          if (!savedChurchId) {
+            const dashboardChurchId = dashboardData?.dashboard_info?.church_id;
+            if (dashboardChurchId && typeof dashboardChurchId === 'number') {
+              await AsyncStorage.setItem('selectedChurchId', String(dashboardChurchId));
+              if (dashboardData?.dashboard_info?.church_name) {
+                await AsyncStorage.setItem('selectedChurchName', String(dashboardData.dashboard_info.church_name));
+              }
+            }
+          }
+        } catch (error) {
+          console.error('Error setting default church ID:', error);
+        } finally {
+          navigation.navigate(item.routeName);
         }
       } else {
         navigation.navigate(item.routeName);
@@ -440,6 +497,23 @@ export default function DashboardPastorLeaderScreen() {
             </TouchableOpacity>
           ) : (
             <Image source={require('../../../../app/assets/images/blank-cover.png')} style={styles.bannerImage} />
+          )}
+        </View>
+
+        {/* Verification Status - bên dưới ảnh, không đè lên */}
+        <View style={styles.verificationWrapper}>
+          {dashboardData?.dashboard_info && (
+            <View style={styles.verificationContainer}>
+              {dashboardData.dashboard_info.is_verified ? (
+                <Text style={[styles.verificationText, { color: C.textSecondary }]}>
+                  {t('verifiedBy')} {dashboardData.dashboard_info.verified_by_user_name || ''} {formatVerifiedDate(dashboardData.dashboard_info.verified_date || '')}
+                </Text>
+              ) : (
+                <Text style={[styles.verificationText, { color: C.textSecondary }]}>
+                  {t('needsVerificationVisit')}
+                </Text>
+              )}
+            </View>
           )}
         </View>
 
@@ -668,7 +742,7 @@ const styles = StyleSheet.create({
     position: 'relative',
     height: hs(200),
     marginHorizontal: ms(16),
-    marginBottom: ms(20),
+    marginBottom: ms(4),
     overflow: 'hidden',
   },
   bannerImage: {
@@ -676,11 +750,25 @@ const styles = StyleSheet.create({
     height: '100%',
     resizeMode: 'cover',
   },
+  verificationWrapper: {
+    marginHorizontal: ms(16),
+    marginTop: 0,
+    marginBottom: ms(16),
+    alignItems: 'flex-end',
+  },
+  verificationContainer: {
+    alignItems: 'flex-end',
+  },
+  verificationText: {
+    fontSize: fs(11),
+    textAlign: 'right',
+    fontStyle: 'italic',
+  },
   profileSection: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     paddingHorizontal: ms(15),
-    marginTop: -80,
+    marginTop: -90,
     marginBottom: ms(10),
   },
   profileImage: {
@@ -721,8 +809,8 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   dropdownIcon: {
-    width: ws(15),
-    height: hs(15),
+    width: ws(10),
+    height: hs(10),
     tintColor: '#000',
   },
   locationRow: {
