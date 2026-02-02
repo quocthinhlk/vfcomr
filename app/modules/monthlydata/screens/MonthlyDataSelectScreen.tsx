@@ -6,10 +6,12 @@ import {
   TouchableOpacity,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
-import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
@@ -58,6 +60,7 @@ const getWeekDateRange = (year: number, weekNumber: number): string => {
 
 export default function MonthlyDataSelectScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const {t} = useTranslation();
   const {selectedLanguage: langCode} = useLanguage();
   const C = useThemedColors();
@@ -147,6 +150,15 @@ export default function MonthlyDataSelectScreen() {
     })();
   }, []);
 
+  useEffect(() => {
+    if (route?.params?.resetKey) {
+      setSelectedYear(null);
+      setSelectedMonth(null);
+      setWeekInfos([]);
+      setSelectedWeeks(new Set());
+    }
+  }, [route?.params?.resetKey]);
+
   // Load week info when year and month are selected
   const loadWeekNumbers = useCallback(async () => {
     if (!selectedYear || !selectedMonth || !churchId) return;
@@ -233,7 +245,11 @@ export default function MonthlyDataSelectScreen() {
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background, flex: 1}]}>
+      <KeyboardAvoidingView
+        style={[styles.container, {backgroundColor: C.background, flex: 1}]}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+      >
         <View style={styles.headerWrapper}>
           <Header
             title={t('monthlyData') || 'Monthly Data'}
@@ -244,7 +260,8 @@ export default function MonthlyDataSelectScreen() {
         <ScrollView
           style={[styles.scrollView, {backgroundColor: C.background}]}
           contentContainerStyle={[styles.scrollContent, {backgroundColor: C.background}]}
-          showsVerticalScrollIndicator={false}>
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled">
           
           {churchName ? (
             <View style={[styles.enterDataForContainer, {backgroundColor: C.surface}]}>
@@ -368,7 +385,7 @@ export default function MonthlyDataSelectScreen() {
             />
           </View>
         </ScrollView>
-      </View>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }

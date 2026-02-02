@@ -8,7 +8,7 @@ export const DEFAULT_PAGE_LIMIT = 10;
 export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
-  baseURL: 'https://dev.vfcvn.org/api/v1/',
+  baseURL: 'http://34.126.158.119/api/v1/',
   headers: {
     'Content-Type': 'application/json',
   },

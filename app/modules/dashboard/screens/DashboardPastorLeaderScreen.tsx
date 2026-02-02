@@ -306,6 +306,7 @@ export default function DashboardPastorLeaderScreen() {
     }
   };
 
+
   const handleMenuItemPress = async (item: any) => {
     if (item.routeName) {
       // Handle Edit Church navigation with church_id
@@ -604,6 +605,7 @@ export default function DashboardPastorLeaderScreen() {
             </View>
           </TouchableOpacity>
         </Modal>
+
 
         {/* Fullscreen Image Modal */}
         <Modal

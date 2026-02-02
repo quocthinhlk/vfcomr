@@ -34,6 +34,7 @@ export default function LoginScreen() {
     isLoading,
     showPassword,
     setShowPassword,
+    errorMessage,
     handleLogin,
   } = useLoginForm();
 
@@ -78,7 +79,15 @@ export default function LoginScreen() {
           </TouchableOpacity>
         </View>
 
-        <View style={{ width: '100%', marginTop: ms(15) }}>
+        {errorMessage && (
+          <View style={{ width: '100%', marginTop: ms(10), marginBottom: ms(6) }}>
+            <Text style={[authStyles.errorText, { color: COLORS.danger }]}>
+              {t(errorMessage as any)}
+            </Text>
+          </View>
+        )}
+
+        <View style={{ width: '100%', marginTop: ms(10) }}>
           <SaveButton
             label={isLoading ? t('loggingIn') : t('login')}
             onPress={handleLogin}

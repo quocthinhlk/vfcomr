@@ -14,8 +14,8 @@ export const authStyles = StyleSheet.create({
     marginBottom: ms(40),
   },
   logo: {
-    width: ws(250),
-    height: ws(85),
+    width: ws(220),
+    height: ws(100),
   },
   title: {
     marginTop: ms(20),
@@ -51,6 +51,12 @@ export const authStyles = StyleSheet.create({
     textAlign: 'right',
     color: COLORS.mainColor,
     fontWeight: 'bold',
+  },
+  errorText: {
+    fontSize: fs(12),
+    lineHeight: fs(16),
+    textAlign: 'center',
+    fontWeight: '400',
   },
 });
 
