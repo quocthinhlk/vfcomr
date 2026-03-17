@@ -69,35 +69,86 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
   const avgMonthlyGivingUsd = indicators.avg_monthly_giving_in_usd || 0;
   const avgMonthlyMfpGivingLocal = indicators.avg_monthly_mfp_giving || 0;
   const avgMonthlyMfpGivingUsd = indicators.avg_monthly_mfp_giving_in_usd || 0;
+
+  const tr = (key: string, fallback: string) => (t ? t(key) : fallback);
   
   return [
-    { icon: require('../../../../app/assets/images/people.png'), value: `${(indicators.avg_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`, label: t ? t('people') : 'People' },
-    { icon: require('../../../../app/assets/images/growth.png'), value: `${(indicators.growth || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('growth') : 'Growth' },
+    {
+      icon: require('../../../../app/assets/images/people.png'),
+      value: `${(indicators.avg_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      label: tr('people', 'People'),
+      helpMessage: tr('statInfoPeople', 'The average service attendance over the last 3 months'),
+    },
+    {
+      icon: require('../../../../app/assets/images/growth.png'),
+      value: `${(indicators.growth || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
+      label: tr('growth', 'Growth'),
+      helpMessage: tr('statInfoGrowth', 'The % growth, compared to the same 3 months last year'),
+    },
     { 
       icon: require('../../../../app/assets/images/giving.png'), 
       value: `${currencySymbol} ${formatNumberToM(avgMonthlyGivingLocal)}`,
       secondaryValue: avgMonthlyGivingUsd
         ? `USD $${formatNumberToM(avgMonthlyGivingUsd)}`
         : undefined,
-      label: t ? t('givingTithes') : 'Giving Tithes' 
+      label: tr('giving', 'Giving'),
+      helpMessage: tr('statInfoGiving', 'The average tithes and offerings giving over the last 3 months'),
     },
-    { icon: require('../../../../app/assets/images/plant.png'), value: `${(indicators.total_church_plants || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`, label: t ? t('churchPlants') : 'Church Plants' },
+    {
+      icon: require('../../../../app/assets/images/plant.png'),
+      value: `${(indicators.total_church_plants || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      label: tr('churchPlants', 'Church Plants'),
+      helpTitle: tr('statInfoChurchPlantsTitle', 'Church Planting'),
+      helpMessage: tr(
+        'statInfoChurchPlants',
+        'The number of new churches pioneered by this mother church, in the last 3 years'
+      ),
+    },
     { 
       icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
       value: `${currencySymbol} ${formatNumberToM(avgMonthlyMfpGivingLocal)}`,
       secondaryValue: avgMonthlyMfpGivingUsd
         ? `USD $${formatNumberToM(avgMonthlyMfpGivingUsd)}`
         : undefined,
-      label: t ? t('givingMfp') : 'Giving MFP'
+      label: tr('givingMfp', 'Giving MFP'),
+      helpTitle: tr('statInfoGivingMfpTitle', 'Missions Giving'),
+      helpMessage: tr(
+        'statInfoGivingMfp',
+        'The average Missions Faith Pledge giving and missions giving over the last 3 months. This should include any giving from the churches general fund. Many churches give a % of their income to missions'
+      ),
     },
-    { icon: require('../../../../app/assets/images/cellgroup.png'), value: `${(indicators.avg_cell_group_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('peopleInCgs') : 'People in CG’s' },
-    { icon: require('../../../../app/assets/images/icon/education.png'), value: `${(indicators.avg_liw_students || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`, label: t ? t('peopleInGtLiw') : 'People in GT & LIW' },
-    { icon: require('../../../../app/assets/images/cellgroup.png'), value: `${(indicators.avg_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`, label: t ? t('newDecisions') : 'New Decisions' },
+    {
+      icon: require('../../../../app/assets/images/cellgroup.png'),
+      value: `${(indicators.avg_cell_group_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
+      label: tr('peopleInCgs', 'People in CG’s'),
+      helpMessage: tr(
+        'statInfoPeopleInCgs',
+        'The average Connect Group (Cell Group) attendance over the last 3 months, as a % of the average, adult and youth, weekly service attendance'
+      ),
+    },
+    {
+      icon: require('../../../../app/assets/images/icon/education.png'),
+      value: `${(indicators.avg_liw_students || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
+      label: tr('peopleInGtLiw', 'People in GT/LIW'),
+      helpMessage: tr(
+        'statInfoPeopleInGtLiw',
+        'The average Growth Track and Life In the Word class attendance over the last 3 months, as a % of the average, adult and youth, weekly service attendance'
+      ),
+    },
+    {
+      icon: require('../../../../app/assets/images/cellgroup.png'),
+      value: `${(indicators.avg_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      label: tr('newDecisions', 'New Decisions'),
+      helpMessage: tr(
+        'statInfoNewDecisions',
+        'The number of New Decisions for Christ made over the last 3 Months'
+      ),
+    },
   ];
 };
 
 const menuItems = [
-  { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Monthly Data', routeName: 'MonthlyDataSelect' },
+  { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Add Monthly Data', routeName: 'MonthlyDataSelect' },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch' },
   { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'WorshipServices' },
   { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
@@ -156,6 +207,16 @@ export default function DashboardPastorLeaderScreen() {
     const month = new Intl.DateTimeFormat(localeMap[selectedLanguage as string] || 'en', { month: 'long' }).format(date);
     const year = date.getFullYear();
     return `${month} ${year}`;
+  };
+
+  const formatVisitedMonthYear = (dateString: string) => {
+    if (!dateString) return '';
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    const locale = localeMap[selectedLanguage as string] || 'en';
+    const month = new Intl.DateTimeFormat(locale, { month: 'short' }).format(date);
+    const year2 = String(date.getFullYear()).slice(-2);
+    return `${month}, ${year2}`;
   };
 
   const handleToggleStats = () => {
@@ -506,12 +567,13 @@ export default function DashboardPastorLeaderScreen() {
           {dashboardData?.dashboard_info && (
             <View style={styles.verificationContainer}>
               {dashboardData.dashboard_info.is_verified ? (
-                <Text style={[styles.verificationText, { color: C.textSecondary }]}>
-                  {t('verifiedBy')} {dashboardData.dashboard_info.verified_by_user_name || ''} {formatVerifiedDate(dashboardData.dashboard_info.verified_date || '')}
+                <Text style={[styles.verificationText, { color: '#4da72e' }]}>
+                  {'\u2714\uFE0E'} Visited {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by{' '}
+                  {dashboardData.dashboard_info.verified_by_user_name || ''}
                 </Text>
               ) : (
-                <Text style={[styles.verificationText, { color: C.textSecondary }]}>
-                  {t('needsVerificationVisit')}
+                <Text style={[styles.verificationText, { color: '#e97132' }]}>
+                  {'\u2718\uFE0E'} Needs a Verification Visit
                 </Text>
               )}
             </View>
@@ -693,10 +755,11 @@ export default function DashboardPastorLeaderScreen() {
               >
                 <Image source={item.icon} style={styles.menuIcon} />
                 <Text style={[styles.menuLabel, { color: C.textPrimary }]}>
-                  {item.label === 'Monthly Data' ? t('monthlyData') :
+                  {item.label === 'Add Monthly Data' ? t('addMonthlyData') :
+                   item.label === 'Monthly Data' ? t('monthlyData') :
                    item.label === 'Edit Church' ? t('editChurch') :
                    item.label === 'Worship Services' ? t('worshipServices') :
-                   item.label === 'New Pastor & New Church' ? t('addNewChurchAndPastor') :
+                   item.label === 'Add New Church & New Pastor' ? t('addNewChurchAndPastor') :
                    item.label === 'New Pastor' ? t('addNewPastor') :
                    item.label === 'New Church' ? t('addNewChurch') : item.label}
                 </Text>
@@ -781,7 +844,7 @@ const styles = StyleSheet.create({
     borderColor: '#C4C4C4',
     zIndex: 10,
     marginBottom: ms(12),
-    marginLeft: ms(10),
+    // marginLeft: ms(10),
   },
   profileInfo: {
     width: '100%',
@@ -835,14 +898,14 @@ const styles = StyleSheet.create({
   },
   lastRecordLabel: {
     fontSize: fs(10),
-    color: '#000',
+    color: '#4A6FA5',
     lineHeight: fs(10),
     includeFontPadding: false,
     fontWeight: '400',
   },
   lastRecordValue: {
     fontSize: fs(10),
-    color: '#c00000',
+    color: '#4A6FA5',
     lineHeight: fs(10),
     includeFontPadding: false,
     fontWeight: '400',

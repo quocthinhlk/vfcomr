@@ -50,7 +50,8 @@ export const authStyles = StyleSheet.create({
     paddingTop: ms(15),
     textAlign: 'right',
     color: COLORS.mainColor,
-    fontWeight: 'bold',
+    fontWeight: '600',
+    fontSize: fs(15),
   },
   errorText: {
     fontSize: fs(12),

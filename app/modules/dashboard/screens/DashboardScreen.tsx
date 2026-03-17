@@ -161,7 +161,13 @@ export default function DashboardScreen() {
 
   const handleMenuItemPress = (item: any) => {
     if (item.routeName) {
-      navigation.navigate(item.routeName);
+      if (item.routeName === 'EditProfile') {
+        if (currentUserId) {
+          navigation.navigate('EditProfile', {id: currentUserId});
+        }
+      } else {
+        navigation.navigate(item.routeName);
+      }
     } else if (item.label === 'Logout') {
       handleLogout();
     }
@@ -172,28 +178,28 @@ export default function DashboardScreen() {
 
   const menuItems = [
     {
-      icon: require('../../../../app/assets/images/icon/plus.png'),
+      icon: require('../../../../app/assets/images/icon/car.png'),
       label: t('enterVisits') || 'Enter Visits',
       routeName: 'EnterVisits',
     },
     {
       icon: require('../../../../app/assets/images/icon/edit.png'),
-      label: t('editProfile') || 'Edit Profile',
+      label: t('editMyProfile') || 'Edit My Profile',
       routeName: 'EditProfile',
-      disabled: true,
+      disabled: !currentUserId,
     },
     {
-      icon: require('../../../../app/assets/images/icon/plus.png'),
-      label: t('addNewChurchAndPastor') || 'New Church & New Pastor',
+      icon: require('../../../../app/assets/images/icon/house-user.png'),
+      label: t('addNewChurchAndPastor') || 'Add New Pastor & New Church',
       routeName: 'NewPastorAndChurch',
     },
     {
-      icon: require('../../../../app/assets/images/icon/plus.png'),
+      icon: require('../../../../app/assets/images/icon/user.png'),
       label: t('addNewPastor') || 'New Pastor',
       routeName: 'AddUser',
     },
     {
-      icon: require('../../../../app/assets/images/icon/plus.png'),
+      icon: require('../../../../app/assets/images/icon/home.png'),
       label: t('addNewChurch') || 'New Church',
       routeName: 'AddChurch',
     },
@@ -332,7 +338,7 @@ export default function DashboardScreen() {
         <Animated.View
           style={[
             dashboardStyles.statCardContainer,
-            {opacity: fade, transform: [{translateY}]},
+            {paddingHorizontal: ms(15), opacity: fade, transform: [{translateY}]},
           ]}>
           {(
             [
@@ -340,55 +346,92 @@ export default function DashboardScreen() {
                 icon: require('../../../../app/assets/images/icon/house.png'),
                 value: '40',
                 label: t('churches') || 'Churches',
+                helpMessage: t('indicatorInfoChurches'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/group.png'),
                 value: '500',
                 label: t('people') || 'People',
+                helpMessage: t('indicatorInfoPeople'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/growth.png'),
                 value: '5%',
                 label: t('churchesGrowing') || 'Churches Growing',
+                helpTitle: t('indicatorTitleChurchesGrowing'),
+                helpMessage: t('indicatorInfoChurchesGrowing'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/reporting.png'),
-                value: '20',
+                value: '20%',
                 label: t('churchesReporting') || 'Churches Reporting',
+                helpTitle: t('indicatorTitleChurchesReporting'),
+                helpMessage: t('indicatorInfoChurchesReporting'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/earth.png'),
                 value: '2',
                 label: t('nations') || 'Nations',
+                helpMessage: t('indicatorInfoNations'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/plant.png'),
-                value: '30',
+                value: '30%',
                 label: t('churchesPlanting') || 'Churches Planting',
+                helpTitle: t('indicatorTitleChurchesPlanting'),
+                helpMessage: t('indicatorInfoChurchesPlanting'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/cell-group.png'),
-                value: '500',
+                value: '50%',
                 label: t('churchesWithCgs') || 'Churches with CGs',
+                helpTitle: t('indicatorTitleChurchesWithCgs'),
+                helpMessage: t('indicatorInfoChurchesWithCgs'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/education.png'),
-                value: '300',
+                value: '30%',
                 label: t('churchesWithGtLiw') || 'Churches with GT/LIW',
+                helpTitle: t('indicatorTitleChurchesWithGtLiw'),
+                helpMessage: t('indicatorInfoChurchesWithGtLiw'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
-                value: '20',
+                value: '20%',
                 label: t('churchesWithMfp') || 'Churches with MFP',
+                helpTitle: t('indicatorTitleChurchesWithMfp'),
+                helpMessage: t('indicatorInfoChurchesWithMfp'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/worldwide.png'),
-                value: '530',
+                value: '30%',
                 label: t('churchesVisited') || 'Churches Visited',
+                helpTitle: t('indicatorTitleChurchesVisited'),
+                helpMessage: t('indicatorInfoChurchesVisited'),
               },
-            ] as Array<{icon: any; value: string; label: string}>
+              {
+                icon: require('../../../../app/assets/images/icon/more.png'),
+                value: '10%',
+                label: t('moreChurches') || 'More Churches',
+                helpTitle: t('indicatorTitleMoreChurches'),
+                helpMessage: t('indicatorInfoMoreChurches'),
+              },
+              {
+                icon: require('../../../../app/assets/images/icon/offerings.png'),
+                value: '25%',
+                label: t('churchesWithTithesOfferings') || 'Churches with Tithes & Offerings',
+                helpTitle: t('indicatorTitleChurchesWithTithesOfferings'),
+                helpMessage: t('indicatorInfoChurchesWithTithesOfferings'),
+              },
+            ] as Array<{
+              icon: any;
+              value: string;
+              label: string;
+              helpTitle?: string;
+              helpMessage?: string;
+            }>
           )
-            .slice(0, showLocalAllStats ? 10 : 4)
+            .slice(0, showLocalAllStats ? 12 : 4)
             .map((stat, index) => (
               <DashboardStatCard key={index} {...stat} />
             ))}
@@ -417,7 +460,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         )}
 
-        <View style={{marginTop: ms(8), paddingHorizontal: 0}}>
+        <View style={{marginTop: ms(8), paddingHorizontal: ms(16)}}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -444,9 +487,9 @@ export default function DashboardScreen() {
               <Image
                 source={item.icon}
                 style={{
-                  width: ws(24),
-                  height: ws(24),
-                  marginRight: ms(8),
+                  width: ws(17),
+                  height: hs(17),
+                  marginRight: ms(12),
                   resizeMode: 'contain',
                 }}
               />

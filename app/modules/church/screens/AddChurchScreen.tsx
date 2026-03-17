@@ -87,6 +87,7 @@ export default function AddChurchScreen() {
   const scrollRef = useRef<ScrollView>(null);
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
   const setFieldPos = (key: string, y: number) =>
     setFieldY(prev => (prev[key] === y ? prev : {...prev, [key]: y}));
   const scrollToField = (key: string) => {
@@ -94,6 +95,47 @@ export default function AddChurchScreen() {
     scrollRef.current?.scrollTo({y: Math.max(0, y - ms(20)), animated: true});
   };
   const clearInvalid = (key: string) => setInvalid(prev => ({...prev, [key]: false}));
+  const clearFieldError = (key: string) =>
+    setFieldErrorText(prev => {
+      if (!prev[key]) {
+        return prev;
+      }
+      const next = {...prev};
+      delete next[key];
+      return next;
+    });
+  const requiredFieldMessage = () =>
+    t('fillRequiredFields') || 'Please fill all required fields.';
+  const requiredFieldMessageForKey = (key: string) => {
+    const labelByKey: Record<string, string> = {
+      name: t('churchName') || 'Church Name',
+      is_msc: t('msc') || 'MSC',
+      language_id: t('languageUsedInTheService') || 'Language',
+      church_type_id: t('churchType') || 'Church Type',
+      pastor_id: t('pastorLeader') || 'Pastor Leader',
+      church_network_id: t('churchNetwork') || 'Church Network',
+      church_region_id: t('apostolicRegion') || 'Apostolic Region',
+      geographical_region_id: t('geographicalRegion') || 'Geographical Region',
+      language_region_id: t('languageRegion') || 'Language Region',
+      country_id: t('country') || 'Country',
+      currency_id: t('currency') || 'Currency',
+      email_address: t('emailAddress') || 'Email Address',
+      date_of_birth: t('dob') || 'Date of Birth',
+    };
+    const label = labelByKey[key] || key;
+    return `${label} is a required field`;
+  };
+  const renderFieldError = (key: string) => {
+    const msg = fieldErrorText[key];
+    if (!msg) {
+      return null;
+    }
+    return (
+      <Text style={{marginTop: ms(6), color: '#db2d2d', fontSize: ms(12)}}>
+        {msg}
+      </Text>
+    );
+  };
 
   const loadCities = async (countryId: string | number) => {
     try {
@@ -326,6 +368,7 @@ export default function AddChurchScreen() {
             }}
             onSubmit={async (values) => {
               try {
+                setFieldErrorText({});
                 const newInvalid: Record<string, boolean> = {};
                 newInvalid.name = !values.name;
                 newInvalid.is_msc = !values.is_msc;
@@ -341,6 +384,13 @@ export default function AddChurchScreen() {
                 newInvalid.email_address = !values.email_address;
                 newInvalid.date_of_birth = !values.date_of_birth;
                 setInvalid(newInvalid);
+                const newFieldErrors: Record<string, string> = {};
+                Object.keys(newInvalid).forEach(k => {
+                  if (newInvalid[k]) {
+                    newFieldErrors[k] = requiredFieldMessageForKey(k);
+                  }
+                });
+                setFieldErrorText(newFieldErrors);
                 const firstInvalidKey = [
                   'name',
                   'is_msc',
@@ -358,7 +408,6 @@ export default function AddChurchScreen() {
                 ].find(k => newInvalid[k]);
                 if (firstInvalidKey) {
                   scrollToField(firstInvalidKey);
-                  Alert.alert('Validation', 'Please fill all required fields.');
                   return;
                 }
                 let uploadedPhotoPath: string | null = null;
@@ -431,6 +480,26 @@ export default function AddChurchScreen() {
                 }
                 navigation.navigate('Churches');
               } catch (e: any) {
+                const apiErrors = e?.response?.data?.errors;
+                if (apiErrors && typeof apiErrors === 'object') {
+                  const nextInvalid: Record<string, boolean> = {};
+                  const nextFieldErrors: Record<string, string> = {};
+                  Object.entries(apiErrors).forEach(([key, value]) => {
+                    if (typeof value === 'string' && value.trim()) {
+                      nextInvalid[key] = true;
+                      nextFieldErrors[key] = value;
+                    }
+                  });
+                  if (Object.keys(nextFieldErrors).length > 0) {
+                    setInvalid(prev => ({...prev, ...nextInvalid}));
+                    setFieldErrorText(nextFieldErrors);
+                    const firstKey = Object.keys(nextFieldErrors)[0];
+                    if (firstKey) {
+                      scrollToField(firstKey);
+                    }
+                    return;
+                  }
+                }
                 Alert.alert(
                   'Error',
                   e?.response?.data?.message || e?.message || 'Failed to add church.',
@@ -441,7 +510,7 @@ export default function AddChurchScreen() {
               <Grid>
                 <Row>
                   <Col>
-              <View>
+              <View style={{gap: ms(12)}}>
                 <View
                   onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
                   <View>
@@ -463,10 +532,12 @@ export default function AddChurchScreen() {
                       onChangeText={(t: string) => {
                         setFieldValue('name', t);
                         setInvalid(prev => ({...prev, name: false}));
+                        clearFieldError('name');
                       }}
                       onBlur={handleBlur('name')}
                       error={!!invalid?.name}
                     />
+                    {renderFieldError('name')}
                   </View>
                 </View>
 
@@ -512,11 +583,11 @@ export default function AddChurchScreen() {
                       onChange={v => {
                         setFieldValue('is_msc', (v as string) || '');
                         setInvalid(prev => ({...prev, is_msc: false}));
+                        clearFieldError('is_msc');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.is_msc
                             ? '#db2d2d'
@@ -525,6 +596,7 @@ export default function AddChurchScreen() {
                       }
                       error={!!invalid?.is_msc}
                     />
+                    {renderFieldError('is_msc')}
                   </View>
                 </View>
 
@@ -546,7 +618,6 @@ export default function AddChurchScreen() {
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: C.inputBorder,
                         } as any
@@ -564,7 +635,10 @@ export default function AddChurchScreen() {
                   </View>
                 </View>
 
-                <View>
+                <View
+                  onLayout={e =>
+                    setFieldPos('language_id', e.nativeEvent.layout.y)
+                  }>
                   <View>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text
@@ -580,11 +654,11 @@ export default function AddChurchScreen() {
                       onChange={v => {
                         setFieldValue('language_id', v as any);
                         setInvalid(prev => ({...prev, language_id: false}));
+                        clearFieldError('language_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.language_id
                             ? '#db2d2d'
@@ -607,6 +681,7 @@ export default function AddChurchScreen() {
                       }}
                       error={!!invalid?.language_id}
                     />
+                    {renderFieldError('language_id')}
                   </View>
                 </View>
 
@@ -633,11 +708,11 @@ export default function AddChurchScreen() {
                       onChange={v => {
                         setFieldValue('church_type_id', v as any);
                         setInvalid(prev => ({...prev, church_type_id: false}));
+                        clearFieldError('church_type_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.church_type_id
                             ? '#db2d2d'
@@ -660,6 +735,7 @@ export default function AddChurchScreen() {
                         } catch {}
                       }}
                     />
+                    {renderFieldError('church_type_id')}
                   </View>
                 </View>
 
@@ -686,11 +762,11 @@ export default function AddChurchScreen() {
                       onChange={v => {
                         setFieldValue('pastor_id', v as any);
                         setInvalid(prev => ({...prev, pastor_id: false}));
+                        clearFieldError('pastor_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.pastor_id
                             ? '#db2d2d'
@@ -708,6 +784,7 @@ export default function AddChurchScreen() {
                         }
                       }}
                     />
+                    {renderFieldError('pastor_id')}
                   </View>
                 </View>
 
@@ -737,11 +814,11 @@ export default function AddChurchScreen() {
                           ...prev,
                           church_network_id: false,
                         }));
+                        clearFieldError('church_network_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.church_network_id
                             ? '#db2d2d'
@@ -764,6 +841,7 @@ export default function AddChurchScreen() {
                         } catch {}
                       }}
                     />
+                    {renderFieldError('church_network_id')}
                   </View>
                 </View>
 
@@ -793,11 +871,11 @@ export default function AddChurchScreen() {
                           ...prev,
                           church_region_id: false,
                         }));
+                        clearFieldError('church_region_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.church_region_id
                             ? '#db2d2d'
@@ -820,6 +898,7 @@ export default function AddChurchScreen() {
                         } catch {}
                       }}
                     />
+                    {renderFieldError('church_region_id')}
                   </View>
                 </View>
 
@@ -849,11 +928,11 @@ export default function AddChurchScreen() {
                           ...prev,
                           geographical_region_id: false,
                         }));
+                        clearFieldError('geographical_region_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.geographical_region_id
                             ? '#db2d2d'
@@ -862,6 +941,7 @@ export default function AddChurchScreen() {
                       }
                       error={!!invalid?.geographical_region_id}
                     />
+                    {renderFieldError('geographical_region_id')}
                   </View>
                 </View>
 
@@ -891,11 +971,11 @@ export default function AddChurchScreen() {
                           ...prev,
                           language_region_id: false,
                         }));
+                        clearFieldError('language_region_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.language_region_id
                             ? '#db2d2d'
@@ -904,6 +984,7 @@ export default function AddChurchScreen() {
                       }
                       error={!!invalid?.language_region_id}
                     />
+                    {renderFieldError('language_region_id')}
                   </View>
                 </View>
 
@@ -932,7 +1013,6 @@ export default function AddChurchScreen() {
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: C.inputBorder,
                         } as any
@@ -958,6 +1038,7 @@ export default function AddChurchScreen() {
                       onChange={v => {
                         setFieldValue('country_id', v as any);
                         setInvalid(prev => ({...prev, country_id: false}));
+                        clearFieldError('country_id');
                         const id = v as any;
                         if (id) {
                           loadCities(id);
@@ -966,7 +1047,6 @@ export default function AddChurchScreen() {
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.country_id
                             ? '#db2d2d'
@@ -989,6 +1069,7 @@ export default function AddChurchScreen() {
                         }
                       }}
                     />
+                    {renderFieldError('country_id')}
                   </View>
                 </View>
 
@@ -1020,7 +1101,6 @@ export default function AddChurchScreen() {
                         placeholder={t('selectOption')}
                         containerStyle={
                           {
-                            ...(formStyles.input as any),
                             backgroundColor: C.inputBg,
                             borderColor: C.inputBorder,
                           } as any
@@ -1053,11 +1133,11 @@ export default function AddChurchScreen() {
                       onChange={v => {
                         setFieldValue('currency_id', v as any);
                         setInvalid(prev => ({...prev, currency_id: false}));
+                        clearFieldError('currency_id');
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
                         {
-                          ...(formStyles.input as any),
                           backgroundColor: C.inputBg,
                           borderColor: invalid?.currency_id
                             ? '#db2d2d'
@@ -1083,6 +1163,7 @@ export default function AddChurchScreen() {
                         } catch {}
                       }}
                     />
+                    {renderFieldError('currency_id')}
                   </View>
                 </View>
 
@@ -1193,10 +1274,12 @@ export default function AddChurchScreen() {
                       onChangeText={(t: string) => {
                         setFieldValue('email_address', t);
                         setInvalid(prev => ({...prev, email_address: false}));
+                        clearFieldError('email_address');
                       }}
                       onBlur={handleBlur('email_address')}
                       error={!!invalid?.email_address}
                     />
+                    {renderFieldError('email_address')}
                   </View>
                 </View>
 
@@ -1307,11 +1390,13 @@ export default function AddChurchScreen() {
                       onChange={d => {
                         setFieldValue('date_of_birth', d);
                         setInvalid(prev => ({...prev, date_of_birth: false}));
+                        clearFieldError('date_of_birth');
                       }}
                       yearRange={50}
                       startYear={new Date().getFullYear() - 50}
                       error={!!invalid?.date_of_birth}
                     />
+                    {renderFieldError('date_of_birth')}
                   </View>
                 </View>
 

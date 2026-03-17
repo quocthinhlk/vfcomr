@@ -1,40 +1,69 @@
-import React, { useEffect, useState, useCallback } from 'react';
-import { BackButton } from '../../../shared/components/BackButton';
-import { View, ScrollView, ActivityIndicator, StyleSheet, Image, Linking } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, {useCallback, useEffect, useState} from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text as RNText,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
-import {useRoute, useNavigation} from '@react-navigation/native';
+import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import {getUserById, UserDetailData} from '../services/user.service';
+import {getChurchDetail} from '../../church/services/church.service';
+import api from '../../../config/api';
 import {COLORS} from '../../../shared/constants/colors';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemedColors} from '../../../shared/styles/theme';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
-import api from '../../../config/api';
-import {getChurchDetail} from '../../church/services/church.service';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
-import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+import {globalStyles} from '../../../shared/styles/global';
+import {useThemedColors} from '../../../shared/styles/theme';
+import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 
 const blankAvatar = require('../../../assets/images/blank-avatar.png');
+const editIcon = require('../../../assets/icons/edit.png');
+const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
+const USER_DETAIL_TIMEOUT_MS = 15000;
+const REQUEST_TIMEOUT_ERROR = 'REQUEST_TIMEOUT';
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error(REQUEST_TIMEOUT_ERROR));
+    }, timeoutMs);
+
+    promise
+      .then(result => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+}
 
 export const UserScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const userId: number | undefined = route?.params?.userId;
-  const { t } = useTranslation();
+  const {t} = useTranslation();
   const C = useThemedColors();
 
-  const [loading, setLoading] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [user, setUser] = useState<UserDetailData | null>(null);
   const [avatarError, setAvatarError] = useState<boolean>(false);
   const [roleId, setRoleId] = useState<number | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
   const [pastorChurches, setPastorChurches] = useState<any[]>([]);
   const [loadingChurches, setLoadingChurches] = useState<boolean>(false);
+  const [imageModalVisible, setImageModalVisible] = useState<boolean>(false);
 
   const formatPhoneDisplay = (value?: string | null) => {
     if (!value) return '';
@@ -44,269 +73,286 @@ export const UserScreen = () => {
     return hasPlus ? `+${grouped}` : grouped;
   };
 
-  const load = useCallback(async () => {
-    if (!userId) {
-      setError(t('userIDMissing'));
+  const loadPastorChurches = useCallback(async (ids: number[]) => {
+    if (!Array.isArray(ids) || ids.length === 0) {
+      setPastorChurches([]);
+      setLoadingChurches(false);
       return;
     }
+
+    setLoadingChurches(true);
     try {
-      setError(null);
+      const churches = await Promise.all(
+        ids.map((churchId: number) =>
+          getChurchDetail(churchId).catch(() => null),
+        ),
+      );
+      const validChurches = churches.filter(ch => !!ch);
+      setPastorChurches(validChurches);
+    } catch {
+      setPastorChurches([]);
+    } finally {
+      setLoadingChurches(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    const run = async () => {
       setLoading(true);
-      const res = await getUserById(userId, true);
-      const userData = res?.data ?? null;
-      setUser(userData);
-      
-      // Load pastor churches if pastor_church_ids exists
-      const pastorChurchIds = (userData as any)?.pastor_church_ids;
-      console.log('[UserScreen] pastor_church_ids:', pastorChurchIds);
-      
-      if (userData && pastorChurchIds && Array.isArray(pastorChurchIds) && pastorChurchIds.length > 0) {
-        setLoadingChurches(true);
-        try {
-          const churchPromises = pastorChurchIds.map((churchId: number) => 
-            getChurchDetail(churchId).catch(err => {
-              console.error(`[UserScreen] Error loading church ${churchId}:`, err);
-              return null;
-            })
-          );
-          const churches = await Promise.all(churchPromises);
-          const validChurches = churches.filter(ch => ch !== null && ch !== undefined);
-          console.log('[UserScreen] Loaded churches:', validChurches.length, 'out of', pastorChurchIds.length);
-          setPastorChurches(validChurches);
-        } catch (err) {
-          console.error('[UserScreen] Error loading pastor churches:', err);
-          setPastorChurches([]);
-        } finally {
-          setLoadingChurches(false);
-        }
-      } else {
+      setError(null);
+
+      if (!userId) {
+        if (!active) return;
+        setUser(null);
         setPastorChurches([]);
         setLoadingChurches(false);
+        setError(t('userIDMissing'));
+        setLoading(false);
+        return;
       }
-    } catch (e: any) {
-      setError(e?.message || t('failedToChangePassword'));
-    } finally {
-      setLoading(false);
-    }
-  }, [userId, t]);
+
+      try {
+        const res = await withTimeout(getUserById(Number(userId)), USER_DETAIL_TIMEOUT_MS);
+        if (!active) return;
+
+        const userData = res?.data ?? null;
+        setUser(userData);
+
+        const pastorChurchIds = (userData as any)?.pastor_church_ids;
+        if (Array.isArray(pastorChurchIds) && pastorChurchIds.length > 0) {
+          void loadPastorChurches(pastorChurchIds);
+        } else {
+          setPastorChurches([]);
+          setLoadingChurches(false);
+        }
+      } catch (e: any) {
+        if (!active) return;
+        setUser(null);
+        setPastorChurches([]);
+        setLoadingChurches(false);
+        if (e?.message === REQUEST_TIMEOUT_ERROR) {
+          setError(t('requestTimedOut'));
+        } else {
+          setError(e?.message || t('failedToLoadUserData'));
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void run();
+    return () => {
+      active = false;
+    };
+  }, [loadPastorChurches, userId]);
 
   useEffect(() => {
-    load();
-  }, [load]);
-
-  useEffect(() => {
-    // fetch current logged-in user's role to control permissions (e.g., show delete button)
     (async () => {
       try {
         const res = await api.get('users/me');
-        const userData = res?.data?.data;
-        const r = userData?.role?.id;
-        const currentId = userData?.id;
+        const me = res?.data?.data;
+        const r = me?.role?.id;
+        const currentId = me?.id;
+
         if (typeof r === 'number') setRoleId(r);
         if (typeof currentId === 'number') {
-          setCurrentUserId(currentId);
-          // Check if viewing own profile
-          if (userId === currentId) {
-            setIsOwnProfile(true);
-          }
+          setIsOwnProfile(userId === currentId);
         }
       } catch {}
     })();
   }, [userId]);
 
-  return (
-    <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
-      <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
-      <Header title={t('userDetail')} />
-        <ScrollView showsVerticalScrollIndicator={false}>
+  const churchName = (user as any)?.church_name || (user as any)?.church?.name || '-';
+  const displayName = (() => {
+    const fullName = user?.name?.trim();
+    if (!fullName) return '-';
+    const prefix = ((user as any)?.prefix || '').toString().trim();
+    return prefix ? `${prefix} ${fullName}` : fullName;
+  })();
+  const pastorOfName = pastorChurches?.[0]?.name || churchName;
+  const omrNumberRaw =
+    (user as any)?.omr_number ||
+    (user as any)?.omr_no ||
+    (user as any)?.omr_id ||
+    user?.id;
+  const omrNumber = omrNumberRaw ? `#${omrNumberRaw}` : '-';
+  const oversightAssignment =
+    (user as any)?.oversight_assignment || user?.role?.remarks || '-';
+  const credentialsForm =
+    (user as any)?.credentials_form ||
+    (user as any)?.credentials ||
+    '';
+  const hasMinisterialCredentials = Boolean(credentialsForm);
+  const ministerialCredentials = (() => {
+    if (!hasMinisterialCredentials) return '';
+    const number = user?.credentials_number ? `# ${user.credentials_number}` : '';
+    const expiry = formatDatePretty(user?.credentials_expiry_date);
+    const lines = [credentialsForm, number, expiry ? `${t('expires')}: ${expiry}` : ''].filter(Boolean);
+    return lines.join('\n');
+  })();
+  const avatarUri = user?.photo_url && !avatarError ? user.photo_url : null;
+  const canOpenFullImage = Boolean(avatarUri);
 
-          <View style={[styles.profileCard, { backgroundColor: C.surface, shadowOpacity: 0.15 }] }>
-            <View style={styles.detailsPhotoWrapper}>
+  const openEditScreen = () => {
+    const targetId = Number(userId || user?.id);
+    if (!targetId) return;
+    navigation.navigate('EditProfile', {id: targetId});
+  };
+
+  const renderDetailRow = (
+    label: string,
+    value: string,
+    valueStyle?: any,
+    numberOfLines?: number,
+  ) => (
+    <View style={[styles.detailRow, {borderBottomColor: C.border}]}>
+      <Text style={[styles.detailLabel, {color: C.textPrimary}]}>{label}</Text>
+      <Text
+        style={[styles.detailValue, {color: C.textPrimary}, valueStyle]}
+        numberOfLines={numberOfLines}>
+        {value || '-'}
+      </Text>
+    </View>
+  );
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
+          <Header title={t('pastorLeaderDetails')} />
+          <View style={styles.fullScreenLoading}>
+            <ActivityIndicator size="large" color={COLORS.mainColor} />
+          </View>
+        </Layout>
+      </SafeAreaView>
+    );
+  }
+
+  if (error && !user) {
+    return (
+      <SafeAreaView
+        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
+          <Header title={t('pastorLeaderDetails')} />
+          <View style={styles.fullScreenLoading}>
+            <View style={[styles.errorBox, {backgroundColor: C.surface, borderWidth: 1, borderColor: C.error || '#ff4444'}]}>
+              <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{error}</Text>
+            </View>
+          </View>
+        </Layout>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView
+      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+      edges={['top', 'bottom', 'left', 'right']}>
+      <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
+        <Header title={t('pastorLeaderDetails')} />
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <View style={[styles.profileCard, {backgroundColor: C.surface, borderColor: C.border}]}>
+            <View style={[styles.summaryRow, {borderBottomColor: C.border}]}>
               <Image
-                source={user?.photo_url && !avatarError ? { uri: user.photo_url } : blankAvatar}
-                style={styles.detailsPhoto}
+                source={avatarUri ? {uri: avatarUri} : blankAvatar}
+                style={[styles.detailsPhoto, {borderColor: C.border}]}
                 resizeMode="cover"
                 onError={() => setAvatarError(true)}
               />
-            </View>
-
-            <View style={[styles.detailsTable, { borderTopColor: C.border }]}>
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>
-                  {t('fullName')}
+              <View style={styles.summaryText}>
+                <Text style={[styles.nameText, {color: COLORS.mainColor}]}>
+                  {displayName}
                 </Text>
-                <Text style={[styles.detailValueStrong, { color: COLORS.mainColor }]}>
-                  {user?.name || '-'}
-                </Text>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('ministryTitle')}</Text>
-                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
+                <Text style={[styles.titleText, {color: C.textPrimary}]}>
                   {user?.title || '-'}
                 </Text>
               </View>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[
+                  styles.summaryActionBtn,
+                  styles.fullscreenBtn,
+                  {backgroundColor: C.surface},
+                  !canOpenFullImage && styles.disabledAction,
+                ]}
+                onPress={() => setImageModalVisible(true)}
+                disabled={!canOpenFullImage}>
+                  <Image source={zoomOutIcon} style={styles.editIcon} resizeMode="contain" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                style={[styles.summaryActionBtn, styles.editBtn, {backgroundColor: C.surface}]}
+                onPress={openEditScreen}>
+                <Image source={editIcon} style={styles.editIcon} resizeMode="contain" />
+              </TouchableOpacity>
+            </View>
 
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('omrUsername')}</Text>
-                <Text style={[styles.detailValueLink, { color: '#2e7d32' }]}>
-                  {(user as any)?.username || '-'}
+            <View style={styles.detailsTable}>
+              <View style={[styles.detailRow, {borderBottomColor: C.border}]}>
+                <Text style={[styles.detailLabel, {color: C.textPrimary}]}>
+                  {t('pastorOf')}
                 </Text>
+                {loadingChurches ? (
+                  <ActivityIndicator size="small" color={COLORS.mainColor} style={{flex: 1}} />
+                ) : (
+                  <Text
+                    style={[
+                      styles.detailValue,
+                      styles.detailValueStrong,
+                      {color: C.textPrimary},
+                    ]}>
+                    {pastorOfName}
+                  </Text>
+                )}
               </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('omrStatus')}</Text>
-                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
-                  {user?.role?.name || '-'}
-                </Text>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('language')}</Text>
-                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
-                  {(user as any)?.language_name || (user as any)?.language?.name || '-'}
-                </Text>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('country')}</Text>
-                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
-                  {user?.country_name || '-'}
-                </Text>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('sensitiveNation')}</Text>
-                <Text style={[styles.detailValue, { color: C.textPrimary }]}>
-                  {user?.sensitive_nation ? t('yes') : t('no')}
-                </Text>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('emailAddress')}</Text>
-                <Text
-                  style={[styles.detailValueLink, { color: COLORS.mainColor }]}
-                  onPress={() => user?.email_address && sendEmail(user.email_address)}
-                >
-                  {user?.email_address || '-'}
-                </Text>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('mobilePhone')}</Text>
-                <Text
-                  style={[styles.detailValueLink, { color: COLORS.mainColor }]}
-                  onPress={() => user?.mobile_phone && dialPhone(user.mobile_phone)}
-                >
-                  {user?.mobile_phone ? formatPhoneDisplay(user.mobile_phone) : '-'}
-                </Text>
-              </View>
-
-              <View style={[styles.detailRow, { borderBottomColor: C.border }]}>
-                <Text style={[styles.detailLabel, { color: C.textSecondary }]}>{t('from')}</Text>
-                <Text style={[styles.detailValueLink, { color: COLORS.mainColor }]}>
-                  {(user as any)?.church_name || (user as any)?.church?.name || '-'}
-                </Text>
-              </View>
+              {renderDetailRow(t('from'), churchName)}
+              {renderDetailRow(t('nation'), user?.country_name || '-', styles.detailValueStrong)}
+              {renderDetailRow(
+                t('sensitiveNation'),
+                user?.sensitive_nation ? t('yes') : t('no'),
+                user?.sensitive_nation
+                  ? [styles.redText, {color: C.error || '#c0392b'}]
+                  : undefined,
+              )}
+              {renderDetailRow(
+                t('email'),
+                user?.email_address || '-',
+                user?.email_address ? [styles.linkText, {color: COLORS.mainColor}] : undefined,
+              )}
+              {renderDetailRow(
+                t('mobilePhone'),
+                user?.mobile_phone ? formatPhoneDisplay(user.mobile_phone) : '-',
+              )}
+              {renderDetailRow(
+                t('username'),
+                (user as any)?.username || '-',
+                [styles.greenText, {color: C.textSecondary}],
+              )}
+              {renderDetailRow(t('omrNumber'), omrNumber)}
+              {renderDetailRow(t('omrStatus'), user?.role?.name || '-')}
+              {renderDetailRow(t('oversightAssignment'), oversightAssignment)}
+              {renderDetailRow(
+                t('language'),
+                (user as any)?.language_name || (user as any)?.language?.name || '-',
+              )}
+              {hasMinisterialCredentials ? (
+                <View style={[styles.detailRow, {borderBottomColor: C.border}]}>
+                  <Text style={[styles.detailLabel, {color: C.textPrimary}]}>
+                    {t('ministerialCredentials')}
+                  </Text>
+                  <Text style={[styles.detailValue, {color: C.textPrimary}]}>
+                    {ministerialCredentials}
+                  </Text>
+                </View>
+              ) : null}
             </View>
           </View>
 
-          {user?.credentials ? (
-            <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
-              <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('credentials')}</Text>
-              <View style={[styles.row, { borderBottomColor: C.border }]}>
-                <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentials')}</Text>
-                <Text style={[styles.value, { color: C.textPrimary }]}>{user.credentials || '-'}</Text>
-              </View>
-              <View style={[styles.row, { borderBottomColor: C.border }]}>
-                <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentialsNumber')}</Text>
-                <Text style={[styles.value, { color: C.textPrimary }]}>{user.credentials_number || '-'}</Text>
-              </View>
-              <View style={[styles.row, { borderBottomColor: C.border }]}>
-                <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentialsFrom')}</Text>
-                <Text style={[styles.value, { color: C.textPrimary }]}>{user.credentials_from || '-'}</Text>
-              </View>
-              <View style={[styles.row, { borderBottomColor: C.border }]}>
-                <Text style={[styles.label, { color: C.textSecondary }]}>{t('credentialsExpiry')}</Text>
-                <Text style={[styles.value, { color: C.textPrimary }]}>{formatDateDMY(user.credentials_expiry_date) || '-'}</Text>
-              </View>
-            </View>
-          ) : null}
-
-          {user?.street_address ? (
-            <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
-              <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('address')}</Text>
-              <Text style={[styles.multiline, { color: C.textSecondary }]}>{user.street_address}</Text>
-            </View>
-          ) : null}
-
-          {(pastorChurches.length > 0 || loadingChurches) ? (
-            <View style={[styles.card, { backgroundColor: C.surface, shadowOpacity: 0.15 }]}>
-              <Text style={[styles.cardTitle, { color: C.textPrimary }]}>{t('churches') || 'Churches'}</Text>
-              {loadingChurches ? (
-                <View style={styles.loadingOverlay}>
-                  <ActivityIndicator />
-                </View>
-              ) : pastorChurches.length > 0 ? (
-                pastorChurches.map((church, index) => (
-                  <View key={church.id || index} style={[styles.churchItem, { borderBottomColor: C.border }]}>
-                    <View style={styles.churchHeader}>
-                      {church.photo_url ? (
-                        <Image
-                          source={{ uri: church.photo_url }}
-                          style={styles.churchPhoto}
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View style={[styles.churchPhoto, styles.churchPhotoPlaceholder, { backgroundColor: C.border }]} />
-                      )}
-                      <View style={styles.churchInfo}>
-                        <Text style={[styles.churchName, { color: C.textPrimary }]}>{church.name || '-'}</Text>
-                        {church.language_name ? (
-                          <Text style={[styles.churchDetail, { color: C.textSecondary }]}>
-                            {t('language')}: {church.language_name}
-                          </Text>
-                        ) : null}
-                        {church.country_name ? (
-                          <Text style={[styles.churchDetail, { color: C.textSecondary }]}>
-                            {t('country')}: {church.country_name}
-                          </Text>
-                        ) : null}
-                        {church.email_address ? (
-                          <Text
-                            style={[styles.churchDetail, styles.churchLink, { color: COLORS.mainColor }]}
-                            onPress={() => sendEmail(church.email_address)}
-                          >
-                            {t('emailAddress')}: {church.email_address}
-                          </Text>
-                        ) : null}
-                        {church.office_phone ? (
-                          <Text
-                            style={[styles.churchDetail, styles.churchLink, { color: COLORS.mainColor }]}
-                            onPress={() => dialPhone(church.office_phone)}
-                          >
-                            {t('officePhone') || 'Office Phone'}: {formatPhoneDisplay(church.office_phone)}
-                          </Text>
-                        ) : null}
-                      </View>
-                    </View>
-                  </View>
-                ))
-              ) : null}
-            </View>
-          ) : null}
-
-          {/* {loading ? (
-            <View style={styles.loadingOverlay}>
-              <ActivityIndicator />
-            </View>
-          ) : null} */}
-
-          {error ? (
-            <View style={styles.errorBox}>
-              <Text style={styles.errorText}>{error}</Text>
-            </View>
-          ) : null}
           {isSuperAdmin(roleId) && !isOwnProfile ? (
             <View style={{marginTop: ms(12)}}>
               <AddNewHeaderButton
@@ -323,232 +369,166 @@ export const UserScreen = () => {
             </View>
           ) : null}
         </ScrollView>
+        <Modal
+          visible={imageModalVisible}
+          transparent
+          animationType="fade"
+          onRequestClose={() => setImageModalVisible(false)}>
+          <View style={styles.fullImageBackdrop}>
+            <TouchableOpacity
+              style={styles.fullImageHeader}
+              onPress={() => setImageModalVisible(false)}>
+              <RNText style={styles.fullImageCloseText}>✕</RNText>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.fullImageContent}
+              activeOpacity={1}
+              onPress={() => setImageModalVisible(false)}>
+              {avatarUri ? (
+                <Image source={{uri: avatarUri}} style={styles.fullImage} resizeMode="contain" />
+              ) : null}
+            </TouchableOpacity>
+          </View>
+        </Modal>
       </Layout>
     </SafeAreaView>
   );
 };
 
-const CARD_RADIUS = rs(12);
-
-function dialPhone(phone?: string) {
-  if (!phone) return;
-  const normalized = String(phone).replace(/\s+/g, '');
-  try { Linking.openURL(`tel:${normalized}`); } catch {}
-}
-
-function sendEmail(email?: string) {
-  if (!email) return;
-  const to = encodeURIComponent(String(email).trim());
-  try { Linking.openURL(`mailto:${to}`); } catch {}
-}
-
-function formatDateDMY(value?: any): string {
+function formatDatePretty(value?: any): string {
   if (!value) return '';
   const d = new Date(value);
   if (isNaN(d.getTime())) return '';
   const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const month = d.toLocaleString('en-US', {month: 'short'});
   const yyyy = String(d.getFullYear());
-  return `${dd}.${mm}.${yyyy}`;
+  return `${dd} ${month} ${yyyy}`;
 }
 
 const styles = StyleSheet.create({
   profileCard: {
-    backgroundColor: '#fff',
-    padding: ms(16),
     marginHorizontal: 0,
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 2,
+    borderTopWidth: 0,
+    borderBottomWidth: 0,
+    paddingVertical: ms(8),
+    paddingHorizontal: ms(4),
   },
-  detailsPhotoWrapper: {
+  summaryRow: {
+    flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: ms(12),
+    position: 'relative',
+    paddingHorizontal: ms(12),
+    paddingBottom: ms(18),
+    borderBottomWidth: 1,
+  },
+  summaryText: {
+    flex: 1,
+    marginLeft: ms(14),
+  },
+  nameText: {
+    fontSize: fs(20),
+    fontWeight: '700',
+  },
+  titleText: {
+    marginTop: ms(4),
+    fontSize: fs(16),
+    fontWeight: '500',
   },
   detailsPhoto: {
-    width: '100%',
-    height: hs(180),
+    width: ws(84),
+    height: ws(84),
+    borderRadius: ws(42),
+    borderWidth: 1,
+  },
+  summaryActionBtn: {
+    position: 'absolute',
+    bottom: ms(6),
+    width: ws(24),
+    height: ws(24),
+    borderRadius: rs(4),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fullscreenBtn: {
+    left: ws(92),
+  },
+  editBtn: {
+    right: 0,
+  },
+  editIcon: {
+    width: ws(16),
+    height: ws(16),
+  },
+  disabledAction: {
+    opacity: 0.45,
   },
   detailsTable: {
-    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopWidth: 0,
   },
   detailRow: {
     flexDirection: 'row',
     paddingVertical: ms(8),
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: ms(12),
+    borderBottomWidth: 1,
   },
   detailLabel: {
-    width: ws(120),
-    fontSize: fs(12),
-    flexShrink: 1,
-    flexWrap: 'wrap',
+    width: ws(125),
+    fontSize: fs(14),
+    fontWeight: '500',
+    flexShrink: 0,
   },
   detailValue: {
     flex: 1,
-    fontSize: fs(12),
-    fontWeight: '500',
-    flexShrink: 1,
+    fontSize: fs(14),
+    fontWeight: '600',
+    lineHeight: fs(20),
   },
   detailValueStrong: {
-    flex: 1,
-    fontSize: fs(14),
     fontWeight: '700',
-    flexShrink: 1,
   },
-  detailValueLink: {
-    flex: 1,
-    fontSize: fs(12),
-    fontWeight: '600',
+  redText: {
+    color: '#c0392b',
+    fontWeight: '700',
+  },
+  greenText: {fontWeight: '700'},
+  linkText: {
     textDecorationLine: 'underline',
-    flexShrink: 1,
   },
-  ownProfileBadge: {
-    backgroundColor: COLORS.mainColor,
-    borderRadius: rs(12),
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(4),
-    marginTop: ms(6),
-  },
-  ownProfileBadgeText: {
-    color: '#fff',
-    fontSize: fs(12),
-    fontWeight: '700',
-    textTransform: 'uppercase',
-  },
-  title: {
-    marginTop: 2,
-    color: '#666',
-  },
-  chipsRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  fullScreenLoading: {
+    flex: 1,
     justifyContent: 'center',
-    gap: ms(8),
-    marginTop: ms(10),
+    alignItems: 'center',
   },
-  chip: {
-    backgroundColor: '#F3F4F6',
-    borderRadius: 999,
-    paddingVertical: ms(6),
-    paddingHorizontal: ms(12),
+  fullImageBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
   },
-  chipText: {
-    color: '#111827',
+  fullImageHeader: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: ms(14),
+    paddingVertical: ms(10),
+    marginTop: ms(28),
+  },
+  fullImageCloseText: {
+    color: '#fff',
+    fontSize: fs(24),
     fontWeight: '600',
   },
-  chipPrimary: {
-    backgroundColor: COLORS.mainColor,
-  },
-  chipTextPrimary: {
-    color: '#fff',
-    fontWeight: '700',
-  },
-  chipDanger: {
-    backgroundColor: '#FEE2E2',
-  },
-  chipSuccess: {
-    backgroundColor: '#DCFCE7',
-  },
-  chipTextDanger: {
-    color: '#B91C1C',
-    fontWeight: '700',
-  },
-  chipTextSuccess: {
-    color: '#166534',
-    fontWeight: '700',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: CARD_RADIUS,
-    padding: ms(16),
-    marginTop: ms(12),
-    shadowColor: '#000',
-    shadowOpacity: 0.04,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 3 },
-    elevation: 1,
-  },
-  cardTitle: {
-    fontSize: fs(14),
-    fontWeight: '700',
-    marginBottom: ms(8),
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: ms(6),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  label: {
-    width: ws(180),
-    fontSize: fs(12),
-    flexShrink: 1,
-    flexWrap: 'wrap',
-  },
-  value: {
+  fullImageContent: {
     flex: 1,
-    fontSize: fs(12),
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  link: {
-    color: COLORS.mainColor,
-  },
-  multiline: {
-    flex: 1,
-    fontSize: fs(12),
-    fontWeight: '500',
-    flexShrink: 1,
-  },
-  loadingOverlay: {
-    marginTop: ms(16),
     alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: ms(12),
+    paddingBottom: ms(20),
+  },
+  fullImage: {
+    width: '100%',
+    height: '85%',
   },
   errorBox: {
     marginTop: ms(12),
-    backgroundColor: '#FEF2F2',
     borderRadius: rs(8),
     padding: ms(10),
   },
-  errorText: {
-    color: '#991B1B',
-  },
-  churchItem: {
-    paddingVertical: ms(12),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  churchHeader: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  churchPhoto: {
-    width: ws(80),
-    height: ws(80),
-    borderRadius: rs(8),
-    marginRight: ms(12),
-  },
-  churchPhotoPlaceholder: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  churchInfo: {
-    flex: 1,
-  },
-  churchName: {
-    fontSize: fs(14),
-    fontWeight: '700',
-    marginBottom: ms(4),
-    flexShrink: 1,
-  },
-  churchDetail: {
-    fontSize: fs(12),
-    marginBottom: ms(2),
-    flexShrink: 1,
-  },
-  churchLink: {
-    textDecorationLine: 'underline',
-  },
-}); 
+  errorText: {},
+});

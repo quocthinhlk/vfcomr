@@ -14,7 +14,6 @@ import {globalStyles} from '../../../shared/styles/global';
 import {churchStyles} from '../styles';
 import {formStyles} from '../../../shared/styles/form';
 import {Header} from '../../../shared/components/Header';
-import {BackButton} from '../../../shared/components/BackButton';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
 import {Formik} from 'formik';
@@ -36,7 +35,6 @@ export default function EditChurchScreen() {
   const navigation = useNavigation<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
-  // read id param for edit from EditChurch route
   const route = useRoute<any>();
   const editId: number | null = route?.params?.id ?? null;
 
@@ -53,7 +51,6 @@ export default function EditChurchScreen() {
     localCurrencyOptions,
   } = useFormOptions();
 
-  // Church photo: enforce 16:9 crop ratio (e.g. 1600x900)
   const {imagePath, handleImagePick, clearImage} = useImagePicker({
     width: 1600,
     height: 900,
@@ -62,7 +59,6 @@ export default function EditChurchScreen() {
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
   const PAGE_LIMIT = 10;
 
-  // Lazy-load states for paginated dropdowns
   const [langOptions, setLangOptions] = useState<{label: string; value: string}[]>(languageOptions);
   const [langPage, setLangPage] = useState(1);
   const [langHasNext, setLangHasNext] = useState(false);
@@ -72,6 +68,7 @@ export default function EditChurchScreen() {
   const [motherPage, setMotherPage] = useState(1);
   const [motherHasNext, setMotherHasNext] = useState(false);
   const [motherQuery, setMotherQuery] = useState('');
+  const [selectedMother, setSelectedMother] = useState<{label: string; value: string} | null>(null);
 
   const [pastorOpts, setPastorOpts] = useState<{label: string; value: string}[]>(pastorOptions);
   const [pastorPage, setPastorPage] = useState(1);
@@ -82,11 +79,29 @@ export default function EditChurchScreen() {
   const [countryPage, setCountryPage] = useState(1);
   const [countryHasNext, setCountryHasNext] = useState(false);
   const [countryQuery, setCountryQuery] = useState('');
+  const [churchTypeOpts, setChurchTypeOpts] = useState<{label: string; value: string}[]>(churchTypeOptions);
+  const [churchNetworkOpts, setChurchNetworkOpts] = useState<{label: string; value: string}[]>(
+    churchNetworkOptions,
+  );
+  const [churchRegionOpts, setChurchRegionOpts] = useState<{label: string; value: string}[]>(
+    churchRegionOptions,
+  );
+  const [geographicalRegionOpts, setGeographicalRegionOpts] = useState<
+    {label: string; value: string}[]
+  >(geographicalRegionOptions);
+  const [languageRegionOpts, setLanguageRegionOpts] = useState<{label: string; value: string}[]>(
+    languageRegionOptions,
+  );
+  const [currencyOpts, setCurrencyOpts] = useState<{label: string; value: string}[]>(
+    localCurrencyOptions,
+  );
 
   // Validation + scroll to first invalid
   const scrollRef = useRef<ScrollView>(null);
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
+
   const setFieldPos = (key: string, y: number) =>
     setFieldY(prev => (prev[key] === y ? prev : {...prev, [key]: y}));
   const scrollToField = (key: string) => {
@@ -95,6 +110,48 @@ export default function EditChurchScreen() {
   };
   const clearInvalid = (key: string) =>
     setInvalid(prev => ({...prev, [key]: false}));
+  const clearFieldError = (key: string) =>
+    setFieldErrorText(prev => {
+      if (!prev[key]) {
+        return prev;
+      }
+      const next = {...prev};
+      delete next[key];
+      return next;
+    });
+
+  const requiredFieldMessageForKey = (key: string) => {
+    const labelByKey: Record<string, string> = {
+      name: t('churchName') || 'Church Name',
+      is_msc: t('msc') || 'MSC',
+      enable_cpm: t('houseCp') || 'House C.P.',
+      language_id: t('language') || 'Language',
+      church_type_id: t('churchType') || 'Church Type',
+      pastor_id: t('pastorLeader') || 'Pastor Leader',
+      church_network_id: t('churchNetwork') || 'Church Network',
+      church_region_id: t('apostolicRegion') || 'Apostolic Region',
+      geographical_region_id: t('geographicalRegion') || 'Geographical Region',
+      language_region_id: t('languageRegion') || 'Language Region',
+      country_id: t('country') || 'Country',
+      currency_id: t('currency') || 'Currency',
+      email_address: t('emailAddress') || 'Email Address',
+      date_of_birth: t('dob') || 'Date of Birth',
+    };
+    const label = labelByKey[key] || key;
+    return `${label} is a required field`;
+  };
+
+  const renderFieldError = (key: string) => {
+    const msg = fieldErrorText[key];
+    if (!msg) {
+      return null;
+    }
+    return (
+      <Text style={{marginTop: ms(6), color: '#db2d2d', fontSize: ms(12)}}>
+        {msg}
+      </Text>
+    );
+  };
 
   const loadCities = async (countryId: string | number) => {
     try {
@@ -104,14 +161,29 @@ export default function EditChurchScreen() {
     } catch {}
   };
 
+  const prependOptionIfMissing = (
+    options: {label: string; value: string}[],
+    value?: string | number | null,
+    label?: string | null,
+  ) => {
+    if (value === null || value === undefined || String(value).trim() === '') {
+      return options;
+    }
+    const name = String(label || '').trim();
+    if (!name) {
+      return options;
+    }
+    const normalizedValue = String(value);
+    if (options.some(x => x.value === normalizedValue)) {
+      return options;
+    }
+    return [{label: name, value: normalizedValue}, ...options];
+  };
+
   const loadLanguages = async (page: number, name?: string) => {
     try {
       const res = await api.get('languages', {
-        params: {
-          page,
-          limit: PAGE_LIMIT,
-          ...(name?.trim() ? {name: name.trim()} : {}),
-        },
+        params: {page, limit: PAGE_LIMIT, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -147,11 +219,7 @@ export default function EditChurchScreen() {
   const loadPastors = async (page: number, name?: string) => {
     try {
       const res = await api.get('users/pastors', {
-        params: {
-          page,
-          limit: PAGE_LIMIT,
-          ...(name?.trim() ? {name: name.trim()} : {}),
-        },
+        params: {page, limit: PAGE_LIMIT, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -166,11 +234,7 @@ export default function EditChurchScreen() {
   const loadCountries = async (page: number, name?: string) => {
     try {
       const res = await api.get('countries', {
-        params: {
-          page,
-          limit: 1000,
-          ...(name?.trim() ? {name: name.trim()} : {}),
-        },
+        params: {page, limit: 1000, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -182,7 +246,6 @@ export default function EditChurchScreen() {
     } catch {}
   };
 
-  // Sync base options from useFormOptions into local lazy lists on first load or when not searching
   useEffect(() => {
     if (!langQuery && langPage === 1) {
       setLangOptions(languageOptions);
@@ -190,9 +253,15 @@ export default function EditChurchScreen() {
   }, [languageOptions]);
   useEffect(() => {
     if (!motherQuery && motherPage === 1) {
-      setMotherOptions(motherChurchOptions);
+      setMotherOptions(
+        prependOptionIfMissing(
+          motherChurchOptions,
+          selectedMother?.value,
+          selectedMother?.label,
+        ),
+      );
     }
-  }, [motherChurchOptions]);
+  }, [motherChurchOptions, motherQuery, motherPage, selectedMother]);
   useEffect(() => {
     if (!pastorQuery && pastorPage === 1) {
       setPastorOpts(pastorOptions);
@@ -203,6 +272,24 @@ export default function EditChurchScreen() {
       setCountryOpts(countryOptions);
     }
   }, [countryOptions]);
+  useEffect(() => {
+    setChurchTypeOpts(churchTypeOptions);
+  }, [churchTypeOptions]);
+  useEffect(() => {
+    setChurchNetworkOpts(churchNetworkOptions);
+  }, [churchNetworkOptions]);
+  useEffect(() => {
+    setChurchRegionOpts(churchRegionOptions);
+  }, [churchRegionOptions]);
+  useEffect(() => {
+    setGeographicalRegionOpts(geographicalRegionOptions);
+  }, [geographicalRegionOptions]);
+  useEffect(() => {
+    setLanguageRegionOpts(languageRegionOptions);
+  }, [languageRegionOptions]);
+  useEffect(() => {
+    setCurrencyOpts(localCurrencyOptions);
+  }, [localCurrencyOptions]);
 
   useEffect(() => {
     let mounted = true;
@@ -245,6 +332,38 @@ export default function EditChurchScreen() {
             twitter: d.twitter || '',
             date_of_birth: d.date_of_birth ? new Date(d.date_of_birth) : null,
           });
+          setLangOptions(prev => prependOptionIfMissing(prev, d.language_id, d.language_name));
+          const motherOpt =
+            d.parent_id && d.parent_name
+              ? {value: String(d.parent_id), label: String(d.parent_name)}
+              : null;
+          setSelectedMother(motherOpt);
+          setMotherOptions(prev =>
+            prependOptionIfMissing(prev, motherOpt?.value, motherOpt?.label),
+          );
+          setPastorOpts(prev => prependOptionIfMissing(prev, d.pastor_id, d.pastor_name));
+          setCountryOpts(prev => prependOptionIfMissing(prev, d.country_id, d.country_name));
+          setChurchTypeOpts(prev =>
+            prependOptionIfMissing(prev, d.church_type_id, d.church_type_name),
+          );
+          setChurchNetworkOpts(prev =>
+            prependOptionIfMissing(prev, d.church_network_id, d.church_network_name),
+          );
+          setChurchRegionOpts(prev =>
+            prependOptionIfMissing(prev, d.church_region_id, d.church_region_name),
+          );
+          setGeographicalRegionOpts(prev =>
+            prependOptionIfMissing(
+              prev,
+              d.geographical_region_id,
+              d.geographical_region_name,
+            ),
+          );
+          setLanguageRegionOpts(prev =>
+            prependOptionIfMissing(prev, d.language_region_id, d.language_region_name),
+          );
+          setCurrencyOpts(prev => prependOptionIfMissing(prev, d.currency_id, d.currency_name));
+          setCityOptions(prev => prependOptionIfMissing(prev, d.city_id, d.city_name));
           setExistingPhotoUrl(d.photo_url || null);
           if (d.country_id) {
             await loadCities(d.country_id);
@@ -304,792 +423,900 @@ export default function EditChurchScreen() {
               ? hs(64)
               : (StatusBar.currentHeight || 0) + hs(50)
           }
-          style={{flex: 1}}
-        >
-        <ScrollView
-          ref={scrollRef}
-          showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled"
-          automaticallyAdjustKeyboardInsets
-          contentInsetAdjustmentBehavior="always"
-          contentContainerStyle={{paddingBottom: ms(24)}}>
+          style={{flex: 1}}>
+          <ScrollView
+            ref={scrollRef}
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets
+            contentInsetAdjustmentBehavior="always"
+            contentContainerStyle={{paddingBottom: ms(24)}}>
 
-          <Formik<AddChurchFormValues>
-            enableReinitialize
-            key={editId ? `edit-${editId}` : 'edit'}
-            initialValues={{
-              ...initialFormValues,
-            }}
-            onSubmit={async values => {
-              try {
-                if (!editId) {
-                  Alert.alert('Error', 'Missing church id');
-                  return;
-                }
-                const newInvalid: Record<string, boolean> = {};
-                newInvalid.name = !values.name;
-                newInvalid.is_msc = !values.is_msc;
-                newInvalid.enable_cpm = !values.enable_cpm;
-                newInvalid.language_id = !values.language_id;
-                newInvalid.church_type_id = !values.church_type_id;
-                newInvalid.pastor_id = !values.pastor_id;
-                newInvalid.church_network_id = !values.church_network_id;
-                newInvalid.church_region_id = !values.church_region_id;
-                newInvalid.geographical_region_id = !values.geographical_region_id;
-                newInvalid.language_region_id = !values.language_region_id;
-                newInvalid.country_id = !values.country_id;
-                newInvalid.currency_id = !values.currency_id;
-                newInvalid.email_address = !values.email_address;
-                newInvalid.date_of_birth = !values.date_of_birth;
-                setInvalid(newInvalid);
-                const firstInvalidKey = [
-                  'name',
-                  'is_msc',
-                  'enable_cpm',
-                  'language_id',
-                  'church_type_id',
-                  'pastor_id',
-                  'church_network_id',
-                  'church_region_id',
-                  'geographical_region_id',
-                  'language_region_id',
-                  'country_id',
-                  'currency_id',
-                  'email_address',
-                  'date_of_birth',
-                ].find(k => newInvalid[k]);
-                if (firstInvalidKey) {
-                  Alert.alert('Validation', 'Please fill all required fields.', [
-                    {
-                      text: 'OK',
-                      onPress: () => {
-                        try {
-                          setTimeout(() => scrollToField(firstInvalidKey), 0);
-                        } catch {}
-                      },
-                    },
-                  ]);
-                  return;
-                }
-                let uploadedPhotoPath: string | null = null;
-                if (imagePath) {
-                  const form = new FormData();
-                  const fileName = imagePath.split('/').pop() || 'photo.jpg';
-                  form.append('file', {
-                    // @ts-ignore RN FormData file
-                    uri: imagePath,
-                    name: fileName,
-                    type: 'image/jpeg',
-                  } as any);
-                  form.append('entity_type', 'churches');
-                  form.append('alt_text', values.name || 'church photo');
-                  const uploadRes = await api.post('images/upload', form, {
-                    headers: {'Content-Type': 'multipart/form-data'},
+            <Formik<AddChurchFormValues>
+              enableReinitialize
+              key={editId ? `edit-${editId}` : 'edit'}
+              initialValues={{...initialFormValues}}
+              onSubmit={async values => {
+                try {
+                  if (!editId) {
+                    Alert.alert('Error', 'Missing church id');
+                    return;
+                  }
+                  setFieldErrorText({});
+                  const newInvalid: Record<string, boolean> = {};
+                  newInvalid.name = !values.name;
+                  newInvalid.is_msc = !values.is_msc;
+                  newInvalid.enable_cpm = !values.enable_cpm;
+                  newInvalid.language_id = !values.language_id;
+                  newInvalid.church_type_id = !values.church_type_id;
+                  newInvalid.pastor_id = !values.pastor_id;
+                  newInvalid.church_network_id = !values.church_network_id;
+                  newInvalid.church_region_id = !values.church_region_id;
+                  newInvalid.geographical_region_id = !values.geographical_region_id;
+                  newInvalid.language_region_id = !values.language_region_id;
+                  newInvalid.country_id = !values.country_id;
+                  newInvalid.currency_id = !values.currency_id;
+                  newInvalid.email_address = !values.email_address;
+                  newInvalid.date_of_birth = !values.date_of_birth;
+                  setInvalid(newInvalid);
+
+                  const newFieldErrors: Record<string, string> = {};
+                  Object.keys(newInvalid).forEach(k => {
+                    if (newInvalid[k]) {
+                      newFieldErrors[k] = requiredFieldMessageForKey(k);
+                    }
                   });
-                  uploadedPhotoPath = uploadRes?.data?.data?.path || null;
+                  setFieldErrorText(newFieldErrors);
+
+                  const firstInvalidKey = [
+                    'name',
+                    'is_msc',
+                    'enable_cpm',
+                    'language_id',
+                    'church_type_id',
+                    'pastor_id',
+                    'church_network_id',
+                    'church_region_id',
+                    'geographical_region_id',
+                    'language_region_id',
+                    'country_id',
+                    'currency_id',
+                    'email_address',
+                    'date_of_birth',
+                  ].find(k => newInvalid[k]);
+                  if (firstInvalidKey) {
+                    scrollToField(firstInvalidKey);
+                    return;
+                  }
+
+                  let uploadedPhotoPath: string | null = null;
+                  if (imagePath) {
+                    const form = new FormData();
+                    const fileName = imagePath.split('/').pop() || 'photo.jpg';
+                    form.append('file', {
+                      uri: imagePath,
+                      name: fileName,
+                      type: 'image/jpeg',
+                    } as any);
+                    form.append('entity_type', 'churches');
+                    form.append('alt_text', values.name || 'church photo');
+                    const uploadRes = await api.post('images/upload', form, {
+                      headers: {'Content-Type': 'multipart/form-data'},
+                    });
+                    uploadedPhotoPath = uploadRes?.data?.data?.path || null;
+                  }
+
+                  const payload: any = {
+                    name: values.name,
+                    short_name: values.short_name,
+                    is_msc: values.is_msc === 'Yes',
+                    is_first_msc: false,
+                    enable_cpm: values.enable_cpm ? values.enable_cpm === 'Yes' : false,
+                    parent_id: values.parent_id ? Number(values.parent_id) : null,
+                    language_id: values.language_id ? Number(values.language_id) : null,
+                    church_type_id: values.church_type_id ? Number(values.church_type_id) : null,
+                    pastor_id: values.pastor_id ? Number(values.pastor_id) : null,
+                    church_network_id: values.church_network_id ? Number(values.church_network_id) : null,
+                    church_region_id: values.church_region_id ? Number(values.church_region_id) : null,
+                    country_id: values.country_id ? Number(values.country_id) : null,
+                    city_id: values.city_id ? Number(values.city_id) : null,
+                    currency_id: values.currency_id ? Number(values.currency_id) : null,
+                    sensitive_nation: values.sensitive_nation === 'Yes',
+                    service_address_street: values.service_address_street,
+                    service_address_postal_code: values.service_address_postal_code,
+                    mailing_address_postal_code: values.mailing_address_postal_code,
+                    office_address_street: values.office_address_street,
+                    office_address_postal_code: values.office_address_postal_code,
+                    office_phone: values.office_phone,
+                    office_fax: values.office_fax,
+                    email_address: values.email_address,
+                    website: values.website,
+                    facebook: values.facebook,
+                    twitter: values.twitter,
+                    date_of_birth: values.date_of_birth
+                      ? `${values.date_of_birth.getFullYear()}-${String(
+                          values.date_of_birth.getMonth() + 1,
+                        ).padStart(2, '0')}-${String(
+                          values.date_of_birth.getDate(),
+                        ).padStart(2, '0')}`
+                      : null,
+                    service_venue: '',
+                    church_planting_projection_id: 0,
+                    msc_parent_id: 0,
+                    geographical_region_id: values.geographical_region_id
+                      ? Number(values.geographical_region_id)
+                      : 0,
+                    language_region_id: values.language_region_id
+                      ? Number(values.language_region_id)
+                      : 0,
+                    photo_dir: values.photo_dir,
+                    mailing_address_street: '',
+                    property: '',
+                  };
+                  if (uploadedPhotoPath) {
+                    payload.photo = uploadedPhotoPath;
+                  }
+
+                  await updateChurch(editId, payload as any);
+                  Alert.alert('Success', 'Church updated successfully!');
+                  navigation.navigate('Churches');
+                } catch (e: any) {
+                  const apiErrors = e?.response?.data?.errors;
+                  if (apiErrors && typeof apiErrors === 'object') {
+                    const nextInvalid: Record<string, boolean> = {};
+                    const nextFieldErrors: Record<string, string> = {};
+                    Object.entries(apiErrors).forEach(([key, value]) => {
+                      if (typeof value === 'string' && value.trim()) {
+                        nextInvalid[key] = true;
+                        nextFieldErrors[key] = value;
+                      }
+                    });
+                    if (Object.keys(nextFieldErrors).length > 0) {
+                      setInvalid(prev => ({...prev, ...nextInvalid}));
+                      setFieldErrorText(nextFieldErrors);
+                      const firstKey = Object.keys(nextFieldErrors)[0];
+                      if (firstKey) {
+                        scrollToField(firstKey);
+                      }
+                      return;
+                    }
+                  }
+                  Alert.alert(
+                    'Error',
+                    e?.response?.data?.message || e?.message || 'Failed to update church.',
+                  );
                 }
-                const payload: any = {
-                  name: values.name,
-                  short_name: values.short_name,
-                  is_msc: values.is_msc === 'Yes',
-                  is_first_msc: false,
-                  enable_cpm: values.enable_cpm ? values.enable_cpm === 'Yes' : false,
-                  parent_id: values.parent_id ? Number(values.parent_id) : null,
-                  language_id: values.language_id ? Number(values.language_id) : null,
-                  church_type_id: values.church_type_id ? Number(values.church_type_id) : null,
-                  pastor_id: values.pastor_id ? Number(values.pastor_id) : null,
-                  church_network_id: values.church_network_id ? Number(values.church_network_id) : null,
-                  church_region_id: values.church_region_id ? Number(values.church_region_id) : null,
-                  country_id: values.country_id ? Number(values.country_id) : null,
-                  city_id: values.city_id ? Number(values.city_id) : null,
-                  currency_id: values.currency_id ? Number(values.currency_id) : null,
-                  sensitive_nation: values.sensitive_nation === 'Yes',
-                  service_address_street: values.service_address_street,
-                  service_address_postal_code: values.service_address_postal_code,
-                  mailing_address_postal_code: values.mailing_address_postal_code,
-                  office_address_street: values.office_address_street,
-                  office_address_postal_code: values.office_address_postal_code,
-                  office_phone: values.office_phone,
-                  office_fax: values.office_fax,
-                  email_address: values.email_address,
-                  website: values.website,
-                  facebook: values.facebook,
-                  twitter: values.twitter,
-                  date_of_birth: values.date_of_birth
-                    ? `${values.date_of_birth.getFullYear()}-${String(
-                        values.date_of_birth.getMonth() + 1,
-                      ).padStart(2, '0')}-${String(
-                        values.date_of_birth.getDate(),
-                      ).padStart(2, '0')}`
-                    : null,
-                  service_venue: '',
-                  church_planting_projection_id: 0,
-                  msc_parent_id: 0,
-                  geographical_region_id: values.geographical_region_id ? Number(values.geographical_region_id) : 0,
-                  language_region_id: values.language_region_id ? Number(values.language_region_id) : 0,
-                  photo_dir: values.photo_dir,
-                  mailing_address_street: '',
-                  property: '',
-                };
-                // Only include photo if a new one was uploaded (preserve existing otherwise)
-                if (uploadedPhotoPath) {
-                  payload.photo = uploadedPhotoPath;
-                }
-                await updateChurch(editId, payload as any);
-                Alert.alert('Success', 'Church updated successfully!');
-                navigation.navigate('Churches');
-              } catch (e: any) {
-                Alert.alert('Error', e?.response?.data?.message || e?.message || 'Failed to update church.');
-              }
-            }}
-          >
-            {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
-              <Grid>
-                <Row>
-                  <Col>
-              <View>
-                <View onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('churchName')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('churchName')}
-                        message={t('helpChurchName')}
-                      />
+              }}>
+              {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
+                <Grid>
+                  <Row>
+                    <Col>
+                  <View style={{gap: ms(12)}}>
+
+                    {/* Church Name */}
+                    <View onLayout={e => setFieldPos('name', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('churchName')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('churchName')} message={t('helpChurchName')} />
+                        </View>
+                        <AppInput
+                          autoCapitalize="words"
+                          value={values.name}
+                          onChangeText={v => {
+                            setFieldValue('name', v);
+                            setInvalid(prev => ({...prev, name: false}));
+                            clearFieldError('name');
+                          }}
+                          onBlur={handleBlur('name')}
+                          error={!!invalid?.name}
+                        />
+                        {renderFieldError('name')}
+                      </View>
                     </View>
-                    <AppInput
-                      autoCapitalize="words"
-                      value={values.name}
-                      onChangeText={t => {
-                        setFieldValue('name', t);
-                        setInvalid(prev => ({...prev, name: false}));
-                      }}
-                      onBlur={handleBlur('name')}
-                      error={!!invalid?.name}
-                    />
-                  </View>
-                </View>
 
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text
-                        style={[formStyles.label, {color: C.textSecondary}]}
-                        category="label">
-                        {t('shortName')}
-                        <Text style={formStyles.subLabel}>
-                          {' '}
-                          [{t('only10Chars')}]
-                        </Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('shortName')}
-                        message={t('helpShortName')}
-                      />
-                    </View>
-                    <AppInput
-                      autoCapitalize="none"
-                      value={values.short_name}
-                      onChangeText={handleChange('short_name')}
-                      onBlur={handleBlur('short_name')}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('msc')}? <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon title={t('msc')} message={t('helpIsMsc')} />
-                    </View>
-                    <ElementDropdown
-                      data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
-                      value={values.is_msc as any}
-                      onChange={v => { setFieldValue('is_msc', (v as string) || ''); setInvalid(prev => ({...prev, is_msc: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.is_msc ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.is_msc}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('houseCp')}? <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('houseCp')}
-                        message={t('helpEnableCp')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
-                      value={values.enable_cpm as any}
-                      onChange={v => { setFieldValue('enable_cpm', (v as string) || ''); setInvalid(prev => ({...prev, enable_cpm: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.enable_cpm ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.enable_cpm}
-                    />
-                  </View>
-                </View>
-
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('language')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('language')}
-                        message={t('helpLanguage')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={langOptions}
-                      value={values.language_id as any}
-                      onChange={v => { setFieldValue('language_id', v as any); setInvalid(prev => ({...prev, language_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.language_id ? '#db2d2d' : C.inputBorder } as any}
-                      onFocus={async () => { if (langOptions.length === 0) await loadLanguages(1); }}
-                      onSearchText={async text => {
-                        setLangQuery(text);
-                        await loadLanguages(1, text);
-                      }}
-                      onEndReached={async () => { if (langHasNext) await loadLanguages(langPage + 1, langQuery); }}
-                      error={!!invalid?.language_id}
-                    />
-                  </View>
-                </View>
-
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('motherChurch')}
-                      </Text>
-                      <HelpIcon
-                        title={t('motherChurch')}
-                        message={t('helpMotherChurch')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={motherOptions}
-                      value={values.parent_id as any}
-                      onChange={v => setFieldValue('parent_id', v as any)}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any}
-                      onSearchText={async text => {
-                        setMotherQuery(text);
-                        await loadMothers(1, text);
-                      }}
-                      onEndReached={async () => { if (motherHasNext) await loadMothers(motherPage + 1, motherQuery); }}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('church_type_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('churchType')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('churchType')}
-                        message={t('helpChurchType')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={churchTypeOptions}
-                      value={values.church_type_id as any}
-                      onChange={v => { setFieldValue('church_type_id', v as any); setInvalid(prev => ({...prev, church_type_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.church_type_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.church_type_id}
-                      onSearchText={async text => {
-                        try {
-                          const res = await api.get('church-types');
-                          const items = ((res.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-                          // @ts-ignore
-                          churchTypeOptions.splice(0, churchTypeOptions.length, ...items);
-                        } catch {}
-                      }}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('pastor_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('pastorLeader')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('pastorLeader')}
-                        message={t('helpPastorLeader')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={pastorOpts}
-                      value={values.pastor_id as any}
-                      onChange={v => { setFieldValue('pastor_id', v as any); setInvalid(prev => ({...prev, pastor_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.pastor_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.pastor_id}
-                      onSearchText={async text => {
-                        setPastorQuery(text);
-                        await loadPastors(1, text);
-                      }}
-                      onEndReached={async () => { if (pastorHasNext) await loadPastors(pastorPage + 1, pastorQuery); }}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('church_network_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('churchNetwork')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('churchNetwork')}
-                        message={t('helpChurchNetwork')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={churchNetworkOptions}
-                      value={values.church_network_id as any}
-                      onChange={v => { setFieldValue('church_network_id', v as any); setInvalid(prev => ({...prev, church_network_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.church_network_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.church_network_id}
-                      onSearchText={async _text => {
-                        try {
-                          const res = await api.get('church-networks');
-                          const items = ((res.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-                          // @ts-ignore
-                          churchNetworkOptions.splice(0, churchNetworkOptions.length, ...items);
-                        } catch {}
-                      }}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('church_region_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('apostolicRegion')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('apostolicRegion')}
-                        message={t('helpApostolicRegion')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={churchRegionOptions}
-                      value={values.church_region_id as any}
-                      onChange={v => { setFieldValue('church_region_id', v as any); setInvalid(prev => ({...prev, church_region_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.church_region_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.church_region_id}
-                      onSearchText={async _text => {
-                        try {
-                          const res = await api.get('church-regions');
-                          const items = ((res.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-                          // @ts-ignore
-                          churchRegionOptions.splice(0, churchRegionOptions.length, ...items);
-                        } catch {}
-                      }}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('geographical_region_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('geographicalRegion')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('geographicalRegion')}
-                        message={t('helpGeographicalRegion')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={geographicalRegionOptions}
-                      value={values.geographical_region_id as any}
-                      onChange={v => { setFieldValue('geographical_region_id', v as any); setInvalid(prev => ({...prev, geographical_region_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.geographical_region_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.geographical_region_id}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('language_region_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('languageRegion')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('languageRegion')}
-                        message={t('helpLanguageRegion')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={languageRegionOptions}
-                      value={values.language_region_id as any}
-                      onChange={v => { setFieldValue('language_region_id', v as any); setInvalid(prev => ({...prev, language_region_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.language_region_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.language_region_id}
-                    />
-                  </View>
-                </View>
-
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('sensitiveNation')}?
-                      </Text>
-                      <HelpIcon
-                        title={t('sensitiveNation')}
-                        message={t('helpSensitiveNation')}
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={[{ label: t('yes'), value: 'Yes' }, { label: t('no'), value: 'No' }]}
-                      value={values.sensitive_nation as any}
-                      onChange={v => setFieldValue('sensitive_nation', (v as string) || '')}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any}
-                    />
-                  </View>
-                </View>
-
-                <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <Text style={formStyles.label} category="label">
-                      {t('country')}{' '}
-                      <Text style={{color: '#c00000'}}>*</Text>
-                    </Text>
-                    <ElementDropdown
-                      data={countryOpts}
-                      value={values.country_id as any}
-                      onChange={v => { setFieldValue('country_id', v as any); setInvalid(prev => ({...prev, country_id: false})); const id = v as any; if (id) loadCities(id); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.country_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.country_id}
-                      onFocus={async () => { if (countryOpts.length === 0) await loadCountries(1); }}
-                      onSearchText={async text => {
-                        setCountryQuery(text);
-                        await loadCountries(1, text);
-                      }}
-                      onEndReached={async () => {
-                        if (countryHasNext) {
-                          await loadCountries(countryPage + 1, countryQuery);
-                        }
-                      }}
-                    />
-                  </View>
-                </View>
-
-                {values.country_id ? (
-                  <View>
+                    {/* Short Name */}
                     <View>
-                      <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                        <Text style={formStyles.label} category="label">
-                          {t('city')}
-                        </Text>
-                        <HelpIcon
-                          title="City / Town / Village"
-                          message="Select city"
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('shortName')}
+                            <Text style={formStyles.subLabel}> [{t('only10Chars')}]</Text>
+                          </Text>
+                          <HelpIcon title={t('shortName')} message={t('helpShortName')} />
+                        </View>
+                        <AppInput
+                          autoCapitalize="none"
+                          value={values.short_name}
+                          onChangeText={handleChange('short_name')}
+                          onBlur={handleBlur('short_name')}
                         />
                       </View>
-                      <ElementDropdown
-                        data={cityOptions}
-                        value={values.city_id as any}
-                        onChange={v => setFieldValue('city_id', v as any)}
-                        placeholder={t('selectOption')}
-                        containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: C.inputBorder } as any}
-                      />
                     </View>
-                  </View>
-                ) : null}
 
-                <View onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('currency')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title="Local Currency"
-                        message="Select the monetary currency used"
-                      />
-                    </View>
-                    <ElementDropdown
-                      data={localCurrencyOptions}
-                      value={values.currency_id as any}
-                      onChange={v => { setFieldValue('currency_id', v as any); setInvalid(prev => ({...prev, currency_id: false})); }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{ ...(formStyles.input as any), backgroundColor: C.inputBg, borderColor: invalid?.currency_id ? '#db2d2d' : C.inputBorder } as any}
-                      error={!!invalid?.currency_id}
-                      onSearchText={async _text => {
-                        try {
-                          const res = await api.get('currencies');
-                          const items = ((res.data?.data?.items ?? []) as any[]).map((i: any) => ({ label: `${i.name} (${i.three_letter_code})`, value: String(i.id) }));
-                          // @ts-ignore
-                          localCurrencyOptions.splice(0, localCurrencyOptions.length, ...items);
-                        } catch {}
-                      }}
-                    />
-                  </View>
-                </View>
-
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('churchPhoto')}
-                      </Text>
-                      <HelpIcon
-                        title="Church Picture"
-                        message="Photo of the Church congregation"
-                      />
-                    </View>
-                    <TouchableOpacity
-                      onPress={() => handleImagePick()}
-                      style={
-                        [
-                          churchStyles.avatarSquare as any,
-                          {backgroundColor: C.inputBg, borderColor: C.inputBorder},
-                        ] as any
-                      }>
-                      {imagePath ? (
-                        <>
-                          <Image
-                            source={{uri: imagePath}}
-                            style={churchStyles.avatarImage as any}
-                            resizeMode="cover"
-                          />
-                          <TouchableOpacity
-                            onPress={clearImage}
-                            style={churchStyles.avatarClose as any}>
-                            <Text style={{color: '#fff'}}>✗</Text>
-                          </TouchableOpacity>
-                        </>
-                      ) : existingPhotoUrl ? (
-                        <>
-                          <Image
-                            source={{uri: existingPhotoUrl}}
-                            style={churchStyles.avatarImage as any}
-                            resizeMode="cover"
-                          />
-                        </>
-                      ) : (
-                        <>
-                          <Text
-                            style={
-                              [
-                                formStyles.avatarPlus as any,
-                                {color: C.textSecondary},
-                              ] as any
-                            }>
-                            +
+                    {/* MSC */}
+                    <View onLayout={e => setFieldPos('is_msc', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('msc')}? <Text style={{color: '#c00000'}}>*</Text>
                           </Text>
-                        </>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-                </View>
+                          <HelpIcon title={t('msc')} message={t('helpIsMsc')} />
+                        </View>
+                        <ElementDropdown
+                          data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
+                          value={values.is_msc as any}
+                          onChange={v => {
+                            setFieldValue('is_msc', (v as string) || '');
+                            setInvalid(prev => ({...prev, is_msc: false}));
+                            clearFieldError('is_msc');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.is_msc ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.is_msc}
+                        />
+                        {renderFieldError('is_msc')}
+                      </View>
+                    </View>
 
-                <View>
-                  <View>
-                    <Text style={formStyles.label} category="label">
-                      {t('serviceAddress')}
-                    </Text>
-                    <AppInput
-                      autoCapitalize="none"
-                      value={values.service_address_street}
-                      onChangeText={handleChange('service_address_street')}
-                      onBlur={handleBlur('service_address_street')}
-                    />
-                  </View>
-                </View>
-                <View>
-                  <View>
-                    <Text style={formStyles.label} category="label">
-                      {t('servicePostalCode')}
-                    </Text>
-                    <AppInput
-                      autoCapitalize="none"
-                      value={values.service_address_postal_code}
-                      onChangeText={handleChange('service_address_postal_code')}
-                      onBlur={handleBlur('service_address_postal_code')}
-                    />
-                  </View>
-                </View>
+                    {/* House C.P. */}
+                    <View onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('houseCp')}? <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('houseCp')} message={t('helpEnableCp')} />
+                        </View>
+                        <ElementDropdown
+                          data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
+                          value={values.enable_cpm as any}
+                          onChange={v => {
+                            setFieldValue('enable_cpm', (v as string) || '');
+                            setInvalid(prev => ({...prev, enable_cpm: false}));
+                            clearFieldError('enable_cpm');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.enable_cpm ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.enable_cpm}
+                        />
+                        {renderFieldError('enable_cpm')}
+                      </View>
+                    </View>
 
-                <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('emailAddress')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon
-                        title={t('emailAddress')}
-                        message={t('infoEmailAddress')}
-                      />
+                    {/* Mother Church */}
+                    <View>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('motherChurch')}
+                          </Text>
+                          <HelpIcon title={t('motherChurch')} message={t('helpMotherChurch')} />
+                        </View>
+                        <ElementDropdown
+                          data={motherOptions}
+                          value={values.parent_id as any}
+                          onChange={v => setFieldValue('parent_id', v as any)}
+                          placeholder={t('selectOption')}
+                          containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
+                          onSearchText={async text => {
+                            setMotherQuery(text);
+                            await loadMothers(1, text);
+                          }}
+                          onEndReached={async () => {
+                            if (motherHasNext) {
+                              await loadMothers(motherPage + 1, motherQuery);
+                            }
+                          }}
+                        />
+                      </View>
                     </View>
-                    <AppInput
-                      autoCapitalize="none"
-                      keyboardType="email-address"
-                      value={values.email_address}
-                      onChangeText={t => {
-                        setFieldValue('email_address', t);
-                        setInvalid(prev => ({...prev, email_address: false}));
-                      }}
-                      onBlur={handleBlur('email_address')}
-                      error={!!invalid?.email_address}
-                    />
-                  </View>
-                </View>
 
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('website')}
-                      </Text>
-                      <HelpIcon
-                        title="Website"
-                        message="The Church's Website URL"
-                      />
+                    {/* Language */}
+                    <View onLayout={e => setFieldPos('language_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('language')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('language')} message={t('helpLanguage')} />
+                        </View>
+                        <ElementDropdown
+                          data={langOptions}
+                          value={values.language_id as any}
+                          onChange={v => {
+                            setFieldValue('language_id', v as any);
+                            setInvalid(prev => ({...prev, language_id: false}));
+                            clearFieldError('language_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.language_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          onFocus={async () => {
+                            if (langOptions.length === 0) {
+                              await loadLanguages(1);
+                            }
+                          }}
+                          onSearchText={async text => {
+                            setLangQuery(text);
+                            await loadLanguages(1, text);
+                          }}
+                          onEndReached={async () => {
+                            if (langHasNext) {
+                              await loadLanguages(langPage + 1, langQuery);
+                            }
+                          }}
+                          error={!!invalid?.language_id}
+                        />
+                        {renderFieldError('language_id')}
+                      </View>
                     </View>
-                    <AppInput
-                      autoCapitalize="none"
-                      value={values.website}
-                      onChangeText={handleChange('website')}
-                      onBlur={handleBlur('website')}
-                    />
-                  </View>
-                </View>
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        Facebook
-                      </Text>
-                      <HelpIcon
-                        title="Facebook"
-                        message="The Church's Facebook URL"
-                      />
-                    </View>
-                    <AppInput
-                      autoCapitalize="none"
-                      value={values.facebook}
-                      onChangeText={handleChange('facebook')}
-                      onBlur={handleBlur('facebook')}
-                    />
-                  </View>
-                </View>
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        Instagram
-                      </Text>
-                      <HelpIcon
-                        title="Instagram"
-                        message="The Church's Instagram URL"
-                      />
-                    </View>
-                    <AppInput
-                      autoCapitalize="none"
-                      value={values.instagram}
-                      onChangeText={handleChange('instagram')}
-                      onBlur={handleBlur('instagram')}
-                    />
-                  </View>
-                </View>
-                <View>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        X
-                      </Text>
-                      <HelpIcon
-                        title="X"
-                        message="The Church's X (Twitter) URL"
-                      />
-                    </View>
-                    <AppInput
-                      autoCapitalize="none"
-                      value={values.twitter}
-                      onChangeText={handleChange('twitter')}
-                      onBlur={handleBlur('twitter')}
-                    />
-                  </View>
-                </View>
 
-                <View onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
-                  <View>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={formStyles.label} category="label">
-                        {t('dob')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon title={t('dob')} message={t('helpDob')} />
+                    {/* Church Type */}
+                    <View onLayout={e => setFieldPos('church_type_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('churchType')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('churchType')} message={t('helpChurchType')} />
+                        </View>
+                        <ElementDropdown
+                          data={churchTypeOpts}
+                          value={values.church_type_id as any}
+                          onChange={v => {
+                            setFieldValue('church_type_id', v as any);
+                            setInvalid(prev => ({...prev, church_type_id: false}));
+                            clearFieldError('church_type_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.church_type_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.church_type_id}
+                          onSearchText={async text => {
+                            try {
+                              const res = await api.get('church-types');
+                              const items = ((res.data?.data ?? []) as any[]).map(i => ({
+                                label: i.name,
+                                value: String(i.id),
+                              }));
+                              // @ts-ignore
+                              churchTypeOptions.splice(0, churchTypeOptions.length, ...items);
+                            } catch {}
+                          }}
+                        />
+                        {renderFieldError('church_type_id')}
+                      </View>
                     </View>
-                    <DateTripleDropdown
-                      value={values.date_of_birth}
-                      onChange={d => {
-                        setFieldValue('date_of_birth', d);
-                        setInvalid(prev => ({...prev, date_of_birth: false}));
-                      }}
-                      yearRange={50}
-                      startYear={new Date().getFullYear() - 50}
-                      error={!!invalid?.date_of_birth}
-                    />
-                  </View>
-                </View>
 
-                <AppButton
-                  onPress={() => handleSubmit()}
-                  variant="primary"
-                  style={globalStyles.mainButton}>
-                  {t('save')}
-                </AppButton>
-              </View>
-                  </Col>
-                </Row>
-              </Grid>
-            )}
-          </Formik>
-        </ScrollView>
+                    {/* Pastor Leader */}
+                    <View onLayout={e => setFieldPos('pastor_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('pastorLeader')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('pastorLeader')} message={t('helpPastorLeader')} />
+                        </View>
+                        <ElementDropdown
+                          data={pastorOpts}
+                          value={values.pastor_id as any}
+                          onChange={v => {
+                            setFieldValue('pastor_id', v as any);
+                            setInvalid(prev => ({...prev, pastor_id: false}));
+                            clearFieldError('pastor_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.pastor_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.pastor_id}
+                          onSearchText={async text => {
+                            setPastorQuery(text);
+                            await loadPastors(1, text);
+                          }}
+                          onEndReached={async () => {
+                            if (pastorHasNext) {
+                              await loadPastors(pastorPage + 1, pastorQuery);
+                            }
+                          }}
+                        />
+                        {renderFieldError('pastor_id')}
+                      </View>
+                    </View>
+
+                    {/* Church Network */}
+                    <View onLayout={e => setFieldPos('church_network_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('churchNetwork')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('churchNetwork')} message={t('helpChurchNetwork')} />
+                        </View>
+                        <ElementDropdown
+                          data={churchNetworkOpts}
+                          value={values.church_network_id as any}
+                          onChange={v => {
+                            setFieldValue('church_network_id', v as any);
+                            setInvalid(prev => ({...prev, church_network_id: false}));
+                            clearFieldError('church_network_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.church_network_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.church_network_id}
+                          onSearchText={async _text => {
+                            try {
+                              const res = await api.get('church-networks');
+                              const items = ((res.data?.data ?? []) as any[]).map(i => ({
+                                label: i.name,
+                                value: String(i.id),
+                              }));
+                              // @ts-ignore
+                              churchNetworkOptions.splice(0, churchNetworkOptions.length, ...items);
+                            } catch {}
+                          }}
+                        />
+                        {renderFieldError('church_network_id')}
+                      </View>
+                    </View>
+
+                    {/* Apostolic Region */}
+                    <View onLayout={e => setFieldPos('church_region_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('apostolicRegion')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('apostolicRegion')} message={t('helpApostolicRegion')} />
+                        </View>
+                        <ElementDropdown
+                          data={churchRegionOpts}
+                          value={values.church_region_id as any}
+                          onChange={v => {
+                            setFieldValue('church_region_id', v as any);
+                            setInvalid(prev => ({...prev, church_region_id: false}));
+                            clearFieldError('church_region_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.church_region_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.church_region_id}
+                          onSearchText={async _text => {
+                            try {
+                              const res = await api.get('church-regions');
+                              const items = ((res.data?.data ?? []) as any[]).map(i => ({
+                                label: i.name,
+                                value: String(i.id),
+                              }));
+                              // @ts-ignore
+                              churchRegionOptions.splice(0, churchRegionOptions.length, ...items);
+                            } catch {}
+                          }}
+                        />
+                        {renderFieldError('church_region_id')}
+                      </View>
+                    </View>
+
+                    {/* Geographical Region */}
+                    <View onLayout={e => setFieldPos('geographical_region_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('geographicalRegion')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('geographicalRegion')} message={t('helpGeographicalRegion')} />
+                        </View>
+                        <ElementDropdown
+                          data={geographicalRegionOpts}
+                          value={values.geographical_region_id as any}
+                          onChange={v => {
+                            setFieldValue('geographical_region_id', v as any);
+                            setInvalid(prev => ({...prev, geographical_region_id: false}));
+                            clearFieldError('geographical_region_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.geographical_region_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.geographical_region_id}
+                        />
+                        {renderFieldError('geographical_region_id')}
+                      </View>
+                    </View>
+
+                    {/* Language Region */}
+                    <View onLayout={e => setFieldPos('language_region_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('languageRegion')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('languageRegion')} message={t('helpLanguageRegion')} />
+                        </View>
+                        <ElementDropdown
+                          data={languageRegionOpts}
+                          value={values.language_region_id as any}
+                          onChange={v => {
+                            setFieldValue('language_region_id', v as any);
+                            setInvalid(prev => ({...prev, language_region_id: false}));
+                            clearFieldError('language_region_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.language_region_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.language_region_id}
+                        />
+                        {renderFieldError('language_region_id')}
+                      </View>
+                    </View>
+
+                    {/* Sensitive Nation */}
+                    <View>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('sensitiveNation')}?
+                          </Text>
+                          <HelpIcon title={t('sensitiveNation')} message={t('helpSensitiveNation')} />
+                        </View>
+                        <ElementDropdown
+                          data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
+                          value={values.sensitive_nation as any}
+                          onChange={v => setFieldValue('sensitive_nation', (v as string) || '')}
+                          placeholder={t('selectOption')}
+                          containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Country */}
+                    <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                          {t('country')}{' '}
+                          <Text style={{color: '#c00000'}}>*</Text>
+                        </Text>
+                        <ElementDropdown
+                          data={countryOpts}
+                          value={values.country_id as any}
+                          onChange={v => {
+                            setFieldValue('country_id', v as any);
+                            setInvalid(prev => ({...prev, country_id: false}));
+                            clearFieldError('country_id');
+                            const id = v as any;
+                            if (id) {
+                              loadCities(id);
+                            }
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.country_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.country_id}
+                          onFocus={async () => {
+                            if (countryOpts.length === 0) {
+                              await loadCountries(1);
+                            }
+                          }}
+                          onSearchText={async text => {
+                            setCountryQuery(text);
+                            await loadCountries(1, text);
+                          }}
+                          onEndReached={async () => {
+                            if (countryHasNext) {
+                              await loadCountries(countryPage + 1, countryQuery);
+                            }
+                          }}
+                        />
+                        {renderFieldError('country_id')}
+                      </View>
+                    </View>
+
+                    {/* City */}
+                    {values.country_id ? (
+                      <View>
+                        <View>
+                          <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                            <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                              {t('city')}
+                            </Text>
+                            <HelpIcon title="City / Town / Village" message="Select city" />
+                          </View>
+                          <ElementDropdown
+                            data={cityOptions}
+                            value={values.city_id as any}
+                            onChange={v => setFieldValue('city_id', v as any)}
+                            placeholder={t('selectOption')}
+                            containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
+                          />
+                        </View>
+                      </View>
+                    ) : null}
+
+                    {/* Currency */}
+                    <View onLayout={e => setFieldPos('currency_id', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('currency')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title="Local Currency" message="Select the monetary currency used" />
+                        </View>
+                        <ElementDropdown
+                          data={currencyOpts}
+                          value={values.currency_id as any}
+                          onChange={v => {
+                            setFieldValue('currency_id', v as any);
+                            setInvalid(prev => ({...prev, currency_id: false}));
+                            clearFieldError('currency_id');
+                          }}
+                          placeholder={t('selectOption')}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.currency_id ? '#db2d2d' : C.inputBorder,
+                          } as any}
+                          error={!!invalid?.currency_id}
+                          onSearchText={async _text => {
+                            try {
+                              const res = await api.get('currencies');
+                              const items = ((res.data?.data?.items ?? []) as any[]).map((i: any) => ({
+                                label: `${i.name} (${i.three_letter_code})`,
+                                value: String(i.id),
+                              }));
+                              // @ts-ignore
+                              localCurrencyOptions.splice(0, localCurrencyOptions.length, ...items);
+                            } catch {}
+                          }}
+                        />
+                        {renderFieldError('currency_id')}
+                      </View>
+                    </View>
+
+                    {/* Church Photo */}
+                    <View>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('churchPhoto')}
+                          </Text>
+                          <HelpIcon title="Church Picture" message="Photo of the Church congregation" />
+                        </View>
+                        <TouchableOpacity
+                          onPress={() => handleImagePick()}
+                          style={[
+                            churchStyles.avatarSquare as any,
+                            {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+                          ] as any}>
+                          {imagePath ? (
+                            <>
+                              <Image
+                                source={{uri: imagePath}}
+                                style={churchStyles.avatarImage as any}
+                                resizeMode="cover"
+                              />
+                              <TouchableOpacity
+                                onPress={clearImage}
+                                style={churchStyles.avatarClose as any}>
+                                <Text style={{color: '#fff'}}>✗</Text>
+                              </TouchableOpacity>
+                            </>
+                          ) : existingPhotoUrl ? (
+                            <Image
+                              source={{uri: existingPhotoUrl}}
+                              style={churchStyles.avatarImage as any}
+                              resizeMode="cover"
+                            />
+                          ) : (
+                            <Text
+                              style={[formStyles.avatarPlus as any, {color: C.textSecondary}] as any}>
+                              +
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      </View>
+                    </View>
+
+                    {/* Service Address */}
+                    <View>
+                      <View>
+                        <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                          {t('serviceAddress')}
+                        </Text>
+                        <AppInput
+                          autoCapitalize="none"
+                          value={values.service_address_street}
+                          onChangeText={handleChange('service_address_street')}
+                          onBlur={handleBlur('service_address_street')}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Service Postal Code */}
+                    <View>
+                      <View>
+                        <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                          {t('servicePostalCode')}
+                        </Text>
+                        <AppInput
+                          autoCapitalize="none"
+                          value={values.service_address_postal_code}
+                          onChangeText={handleChange('service_address_postal_code')}
+                          onBlur={handleBlur('service_address_postal_code')}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Email Address */}
+                    <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('emailAddress')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('emailAddress')} message={t('infoEmailAddress')} />
+                        </View>
+                        <AppInput
+                          autoCapitalize="none"
+                          keyboardType="email-address"
+                          value={values.email_address}
+                          onChangeText={v => {
+                            setFieldValue('email_address', v);
+                            setInvalid(prev => ({...prev, email_address: false}));
+                            clearFieldError('email_address');
+                          }}
+                          onBlur={handleBlur('email_address')}
+                          error={!!invalid?.email_address}
+                        />
+                        {renderFieldError('email_address')}
+                      </View>
+                    </View>
+
+                    {/* Website */}
+                    <View>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('website')}
+                          </Text>
+                          <HelpIcon title="Website" message="The Church's Website URL" />
+                        </View>
+                        <AppInput
+                          autoCapitalize="none"
+                          value={values.website}
+                          onChangeText={handleChange('website')}
+                          onBlur={handleBlur('website')}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Facebook */}
+                    <View>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            Facebook
+                          </Text>
+                          <HelpIcon title="Facebook" message="The Church's Facebook URL" />
+                        </View>
+                        <AppInput
+                          autoCapitalize="none"
+                          value={values.facebook}
+                          onChangeText={handleChange('facebook')}
+                          onBlur={handleBlur('facebook')}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Instagram */}
+                    <View>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            Instagram
+                          </Text>
+                          <HelpIcon title="Instagram" message="The Church's Instagram URL" />
+                        </View>
+                        <AppInput
+                          autoCapitalize="none"
+                          value={values.instagram}
+                          onChangeText={handleChange('instagram')}
+                          onBlur={handleBlur('instagram')}
+                        />
+                      </View>
+                    </View>
+
+                    {/* X (Twitter) */}
+                    <View>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            X
+                          </Text>
+                          <HelpIcon title="X" message="The Church's X (Twitter) URL" />
+                        </View>
+                        <AppInput
+                          autoCapitalize="none"
+                          value={values.twitter}
+                          onChangeText={handleChange('twitter')}
+                          onBlur={handleBlur('twitter')}
+                        />
+                      </View>
+                    </View>
+
+                    {/* Date of Birth */}
+                    <View onLayout={e => setFieldPos('date_of_birth', e.nativeEvent.layout.y)}>
+                      <View>
+                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                            {t('dob')}{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <HelpIcon title={t('dob')} message={t('helpDob')} />
+                        </View>
+                        <DateTripleDropdown
+                          value={values.date_of_birth}
+                          onChange={d => {
+                            setFieldValue('date_of_birth', d);
+                            setInvalid(prev => ({...prev, date_of_birth: false}));
+                            clearFieldError('date_of_birth');
+                          }}
+                          yearRange={50}
+                          startYear={new Date().getFullYear() - 50}
+                          error={!!invalid?.date_of_birth}
+                        />
+                        {renderFieldError('date_of_birth')}
+                      </View>
+                    </View>
+
+                    <AppButton
+                      onPress={() => handleSubmit()}
+                      variant="primary"
+                      style={globalStyles.mainButton}>
+                      {t('save')}
+                    </AppButton>
+
+                  </View>
+                    </Col>
+                  </Row>
+                </Grid>
+              )}
+            </Formik>
+          </ScrollView>
         </KeyboardAvoidingView>
       </Layout>
     </SafeAreaView>
   );
 }
-
-

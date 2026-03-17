@@ -95,9 +95,13 @@ export default function LoginScreen() {
             style={{ flex: 0 }}
           />
         </View>
-        {/* <TouchableOpacity style={authStyles.forgotPassword} onPress={() => navigate('ForgotPassword')}>
+        <TouchableOpacity
+          style={authStyles.forgotPassword}
+          onPress={() => navigate('ForgotPassword')}
+          activeOpacity={0.7}
+        >
           <Text style={authStyles.forgotPasswordTxt}>Forgot your password?</Text>
-        </TouchableOpacity> */}
+        </TouchableOpacity>
         <View style={styles.bottomSection}>
           <View style={styles.languageSelect}>
             <TouchableOpacity
@@ -122,6 +126,9 @@ export default function LoginScreen() {
               onSelectLanguage={(code) => { setLanguage(code); setLangDropdownVisible(false); }}
             />
           </View>
+          <Text style={[styles.versionText, { color: C.textSecondary }]}>
+            OMR version 4.0 Beta 1
+          </Text>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -130,9 +137,9 @@ export default function LoginScreen() {
 
 const styles = StyleSheet.create({
   bottomSection: {
-    flexDirection: 'row',
+    flexDirection: 'column',
     justifyContent: 'flex-end',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     marginTop: ms(16),
   },
   languageSelect: {
@@ -141,6 +148,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     width: '100%'
+  },
+  versionText: {
+    marginTop: ms(12),
+    fontSize: fs(10),
+    fontStyle: 'italic',
   },
   languageButton: {},
   languageButtonContent: {

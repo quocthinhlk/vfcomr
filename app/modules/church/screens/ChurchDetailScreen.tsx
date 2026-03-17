@@ -1,9 +1,18 @@
 import React, {useEffect, useState} from 'react';
-import {View, Image, StyleSheet, ScrollView, Linking} from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  Linking,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text as RNText,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
 import {Header} from '../../../shared/components/Header';
-import {BackButton} from '../../../shared/components/BackButton';
 import {globalStyles} from '../../../shared/styles/global';
 import {useNavigation, useRoute, useFocusEffect} from '@react-navigation/native';
 import api from '../../../config/api';
@@ -14,6 +23,10 @@ import {isSuperAdmin} from '../../../shared/utils/permissions';
 import AppButton from '../../../shared/components/AppButton';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 
+const blankChurch = require('../../../assets/images/church.png');
+const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
+const editIcon = require('../../../assets/icons/edit.png');
+
 export default function ChurchDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -23,6 +36,8 @@ export default function ChurchDetailScreen() {
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
+  const [imageModalVisible, setImageModalVisible] = useState<boolean>(false);
+  const [imageError, setImageError] = useState<boolean>(false);
 
   const fetchChurch = async () => {
     if (!churchId) {
@@ -80,6 +95,69 @@ export default function ChurchDetailScreen() {
   }, []);
 
   const isSuperAdminUser = isSuperAdmin(currentUserRoleId || undefined);
+  const imageUri = data?.photo_url && !imageError ? String(data.photo_url) : null;
+  const canOpenFullImage = Boolean(imageUri);
+  const omrMapUrl =
+    data?.omr_map_location ||
+    data?.omr_map_url ||
+    data?.map_location ||
+    data?.map_url ||
+    data?.google_map ||
+    '';
+  const websiteUrl = normalizeUrl(data?.website);
+  const emailAddress = String(data?.email_address || '').trim();
+  const serviceAddressLine = [data?.service_address_street, data?.service_address_postal_code]
+    .filter(Boolean)
+    .join('\n');
+  const mailingAddressLine = [data?.mailing_address_street, data?.mailing_address_postal_code]
+    .filter(Boolean)
+    .join('\n');
+  const serviceTimeDay = [data?.service_time, data?.service_day]
+    .filter(Boolean)
+    .join(', ');
+  const churchBirthday = formatDateWithAge(data?.date_of_birth);
+  const attributeItems = [
+    data?.is_mother_church ? {key: 'mother', label: t('mother')} : null,
+    data?.is_msc ? {key: 'msc', label: t('msc')} : null,
+    omrMapUrl ? {key: 'map', label: 'On Map'} : null,
+  ].filter(Boolean) as Array<{key: 'mother' | 'msc' | 'map'; label: string}>;
+  const socialItems = [
+    {label: 'f', url: normalizeUrl(data?.facebook)},
+    {label: 'ig', url: normalizeUrl(data?.instagram)},
+    {label: 'x', url: normalizeUrl(data?.twitter)},
+    {label: 'yt', url: normalizeUrl(data?.youtube)},
+    {label: 'tt', url: normalizeUrl(data?.tiktok)},
+  ].filter(item => !!item.url);
+
+  const openLink = (url?: string) => {
+    if (!url) return;
+    Linking.openURL(url).catch(() => {});
+  };
+
+  const renderRow = (
+    label: string,
+    value: string,
+    opts?: {
+      link?: string;
+      valueStyle?: any;
+      noDivider?: boolean;
+      press?: () => void;
+    },
+  ) => (
+    <View style={[styles.row, {borderBottomColor: C.border}, opts?.noDivider && styles.noDivider]}>
+      <Text style={[styles.rowLabel, {color: C.textPrimary}]}>{label}</Text>
+      <Text
+        style={[
+          styles.rowValue,
+          {color: C.textPrimary},
+          opts?.link ? [styles.rowLink, {color: COLORS.mainColor}] : null,
+          opts?.valueStyle,
+        ]}
+        onPress={opts?.press || (opts?.link ? () => openLink(opts.link) : undefined)}>
+        {value || '-'}
+      </Text>
+    </View>
+  );
 
   return (
     <SafeAreaView
@@ -91,289 +169,184 @@ export default function ChurchDetailScreen() {
           showsVerticalScrollIndicator={false}
           contentContainerStyle={{paddingBottom: ms(24)}}>
           {loading ? (
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('loading')}...
-            </Text>
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="large" color={COLORS.mainColor} />
+            </View>
           ) : !data ? (
             <Text style={[styles.loading, {color: C.textPrimary}]}>
-              No data
+              {t('noDataFound')}
             </Text>
           ) : (
             <>
-              {/* Hero */}
-              <View style={styles.hero}>
-                {data.photo_url ? (
-                  <Image
-                    source={{uri: data.photo_url}}
-                    style={styles.heroImg}
-                  />
-                ) : (
-                  <View style={[styles.heroImg, styles.heroPlaceholder]} />
-                )}
-                <View style={styles.heroOverlay} />
-                <View style={styles.heroContent}>
-                  <Text category="h5" style={styles.heroTitle}>
-                    {data.name}
-                  </Text>
-                  {!!data.short_name && (
-                    <Text appearance="hint" style={styles.heroSub}>
-                      {data.short_name}
-                    </Text>
-                  )}
-                </View>
-              </View>
-
-              {/* Badges */}
-              <View style={styles.badgesRow}>
-                {data.is_mother_church ? <Badge label={t('mother')} /> : null}
-                {data.is_msc ? <Badge label={t('msc')} /> : null}
-                {data.disabled ? (
-                  <Badge label={t('disabled')} danger />
-                ) : (
-                  <Badge label={t('active')} success />
-                )}
-              </View>
-
-              {/* Info Cards */}
-              <View style={styles.section}>
-                <Text
-                  category="s1"
-                  style={[styles.sectionTitle, {color: C.textPrimary}]}>
+              <View style={[styles.sectionHeader, {borderColor: C.border}]}>
+                <Text style={[styles.sectionHeaderText, {color: C.textPrimary}]}>
                   {t('overview')}
                 </Text>
-                <View
-                  style={[
-                    styles.card,
-                    {backgroundColor: C.surface, borderColor: C.surfaceBorder},
-                  ]}>
-                  {renderRow(t('country'), data.country_name, true, C)}
-                  {renderRow(t('city'), data.city_name, false, C)}
-                  {renderRow(t('language'), data.language_name, true, C)}
-                  {renderRow(t('churchType'), data.church_type_name, false, C)}
-                  {renderRow(t('network'), data.church_network_name, true, C)}
-                  {renderRow(t('apostolicRegion'), data.church_region_name, false, C)}
-                  {renderRow(t('churchParent'), data.parent_name, true, C)}
-                  {renderRow(t('currency'), data.currency_name, false, C)}
-                  {renderRow(
-                    t('firstMsc'),
-                    data.is_first_msc ? t('yes') : t('no'),
-                    true,
-                    C,
-                  )}
-                  {renderRow(
-                    t('houseCp'),
-                    data.enable_cpm ? t('yes') : t('no'),
-                    false,
-                    C,
-                  )}
-                  {renderRow(t('dob'), formatDateDMY(data.date_of_birth), true, C)}
-                  {renderRow(
-                    t('sensitiveNation'),
-                    data.sensitive_nation ? t('yes') : t('no'),
-                    false,
-                    C,
-                  )}
-                </View>
               </View>
 
-              <View style={styles.section}>
-                <Text
-                  category="s1"
-                  style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                  {t('contacts')}
-                </Text>
-                <View
-                  style={[
-                    styles.card,
-                    {backgroundColor: C.surface, borderColor: C.surfaceBorder},
-                  ]}>
-                  <View
+              <View style={[styles.summaryRow, {borderColor: C.border}]}>
+                <View style={styles.summaryPhotoWrap}>
+                  <Image
+                    source={imageUri ? {uri: imageUri} : blankChurch}
+                    style={[styles.summaryPhoto, {borderColor: C.border}]}
+                    resizeMode="cover"
+                    onError={() => setImageError(true)}
+                  />
+                  <TouchableOpacity
                     style={[
-                      styles.rowBetween,
-                      styles.rowDivider,
-                      {
-                        alignItems: 'flex-start',
-                        borderBottomColor: C?.surfaceBorder,
-                      },
-                    ]}>
-                    <Text
-                      appearance="hint"
-                      style={[styles.label, {color: C?.textSecondary}]}>
-                      {t('pastorLeader')}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.link,
-                        styles.valueWrap,
-                        {color: C?.textPrimary},
-                      ]}
-                      onPress={() =>
-                        data.pastor_id &&
+                      styles.iconBtn,
+                      styles.zoomBtn,
+                      {backgroundColor: C.surface},
+                      !canOpenFullImage && styles.disabledBtn,
+                    ]}
+                    onPress={() => setImageModalVisible(true)}
+                    disabled={!canOpenFullImage}>
+                    <Image source={zoomOutIcon} style={styles.iconImg} resizeMode="contain" />
+                  </TouchableOpacity>
+                </View>
+                <View style={styles.summaryText}>
+                  <Text style={[styles.summaryName, {color: COLORS.mainColor}]}>
+                    {data.name || '-'}
+                  </Text>
+                  {/* <Text style={[styles.summarySub, {color: C.textPrimary}]}>
+                    {data.short_name || '-'}
+                  </Text> */}
+                </View>
+                <TouchableOpacity
+                  style={[styles.iconBtn, styles.editBtn]}
+                  onPress={() => navigation.navigate('EditChurch', {id: churchId})}>
+                  <Image source={editIcon} style={styles.iconImg} resizeMode="contain" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={[styles.table, {borderColor: C.border}]}>
+                {renderRow('City, Town', data.city_name || '-', {valueStyle: styles.boldValue})}
+                {renderRow(t('nation'), data.country_name || '-', {
+                  valueStyle: styles.boldValue,
+                })}
+                {renderRow(
+                  'Service Address &\nPostal Code',
+                  serviceAddressLine || '-',
+                )}
+                {renderRow('Service Time &\nDay', serviceTimeDay || '-', {valueStyle: styles.normalValue})}
+                {renderRow(t('language'), data.language_name || '-', {valueStyle: styles.normalValue})}
+                {renderRow('We are\nmeeting', prettyMeetingVenue(data.service_venue))}
+                {renderRow('Church’s\nBirthday', churchBirthday || '-', {valueStyle: styles.normalValue})}
+                {renderRow('Mother\nChurch', data.parent_name || '-', {
+                  valueStyle: styles.normalValue,
+                  link: data.parent_id ? `church:${data.parent_id}` : '',
+                  press: data.parent_id
+                    ? () =>
+                        navigation.navigate('ChurchDetail' as any, {
+                          id: data.parent_id,
+                        })
+                    : undefined,
+                })}
+              </View>
+
+              <View style={[styles.sectionHeader, {borderColor: C.border}]}>
+                <Text style={[styles.sectionHeaderText, {color: C.textPrimary}]}>
+                  Contact Details
+                </Text>
+              </View>
+
+              <View style={[styles.table, {borderColor: C.border}]}>
+                {renderRow('Pastor', data.pastor_name || '-', {
+                  press: data.pastor_id
+                    ? () =>
                         navigation.navigate('User' as any, {
                           userId: data.pastor_id,
                         })
-                      }>
-                      {data.pastor_name || '-'}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.rowBetween,
-                      styles.rowDivider,
-                      {
-                        alignItems: 'flex-start',
-                        borderBottomColor: C?.surfaceBorder,
-                      },
-                    ]}>
-                    <Text
-                      appearance="hint"
-                      style={[styles.label, {color: C?.textSecondary}]}>
-                      {t('email')}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.link,
-                        styles.valueWrap,
-                        {color: C?.textPrimary},
-                      ]}
-                      onPress={() =>
-                        data.email_address &&
-                        Linking.openURL(
-                          `mailto:${String(data.email_address).trim()}`,
-                        )
-                      }>
-                      {data.email_address || '-'}
-                    </Text>
-                  </View>
-                  {renderRow(t('phone'), data.office_phone, true, C)}
-                  {/* Fax removed as requested */}
-                  <View
-                    style={[
-                      styles.rowBetween,
-                      styles.rowDivider,
-                      {
-                        alignItems: 'flex-start',
-                        borderBottomColor: C?.surfaceBorder,
-                      },
-                    ]}>
-                    <Text
-                      appearance="hint"
-                      style={[styles.label, {color: C?.textSecondary}]}>
-                      {t('website')}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.link,
-                        styles.valueWrap,
-                        {color: C?.textPrimary},
-                      ]}
-                      onPress={() =>
-                        data.website && Linking.openURL(String(data.website))
-                      }>
-                      {data.website || '-'}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.rowBetween,
-                      styles.rowDivider,
-                      {
-                        alignItems: 'flex-start',
-                        borderBottomColor: C?.surfaceBorder,
-                      },
-                    ]}>
-                    <Text
-                      appearance="hint"
-                      style={[styles.label, {color: C?.textSecondary}]}>
-                      Facebook
-                    </Text>
-                    <Text
-                      style={[
-                        styles.link,
-                        styles.valueWrap,
-                        {color: C?.textPrimary},
-                      ]}
-                      onPress={() =>
-                        data.facebook && Linking.openURL(String(data.facebook))
-                      }>
-                      {data.facebook || '-'}
-                    </Text>
-                  </View>
-                  <View
-                    style={[
-                      styles.rowBetween,
-                      styles.rowDivider,
-                      {
-                        alignItems: 'flex-start',
-                        borderBottomColor: C?.surfaceBorder,
-                      },
-                    ]}>
-                    <Text
-                      appearance="hint"
-                      style={[styles.label, {color: C?.textSecondary}]}>
-                      X
-                    </Text>
-                    <Text
-                      style={[
-                        styles.link,
-                        styles.valueWrap,
-                        {color: C?.textPrimary},
-                      ]}
-                      onPress={() =>
-                        data.twitter && Linking.openURL(String(data.twitter))
-                      }>
-                      {data.twitter || '-'}
-                    </Text>
+                    : undefined,
+                  valueStyle: {color: COLORS.mainColor, fontWeight: '700'},
+                })}
+                {renderRow('Church e-mail', emailAddress || '-', {
+                  link: emailAddress ? `mailto:${emailAddress}` : '',
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow('Church Phone', data.office_phone || '-', {valueStyle: styles.normalValue})}
+                {renderRow(t('website'), websiteUrl || '-', {link: websiteUrl || '', valueStyle: styles.normalValue})}
+                <View style={[styles.row, {borderBottomColor: C.border}]}>
+                  <Text style={[styles.rowLabel, {color: C.textPrimary}]}>Social Media</Text>
+                  <View style={styles.socialWrap}>
+                    {socialItems.length ? (
+                      socialItems.map(item => (
+                        <TouchableOpacity
+                          key={item.label}
+                          onPress={() => openLink(item.url)}
+                          style={[styles.socialChip, {borderColor: C.border}]}>
+                          <Text style={[styles.socialLabel, {color: C.textPrimary}]}>
+                            {item.label}
+                          </Text>
+                        </TouchableOpacity>
+                      ))
+                    ) : (
+                      <Text style={[styles.rowValue, {color: C.textPrimary}]}>-</Text>
+                    )}
                   </View>
                 </View>
+                {renderRow('Mailing\nAddress &\nPostal Code', mailingAddressLine || '-', {
+                  noDivider: true,
+                })}
               </View>
 
-              <View style={styles.section}>
-                <Text
-                  category="s1"
-                  style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                  {t('addresses')}
+              <View style={[styles.sectionHeader, {borderColor: C.border}]}>
+                <Text style={[styles.sectionHeaderText, {color: C.textPrimary}]}>
+                  OMR Details
                 </Text>
-                <View
-                  style={[
-                    styles.card,
-                    {backgroundColor: C.surface, borderColor: C.surfaceBorder},
-                  ]}>
-                  {!!data.service_address_street && (
-                    <View style={styles.block}>
-                      <Text appearance="hint" style={styles.label}>
-                        {t('serviceAddress')}
-                      </Text>
-                      <Text style={styles.valueBlock}>
-                        {data.service_address_street}
-                      </Text>
-                    </View>
-                  )}
-                  {renderRow(
-                    t('servicePostalCode'),
-                    data.service_address_postal_code,
-                  )}
-                  {!!data.office_address_street && (
-                    <View style={styles.block}>
-                      <Text appearance="hint" style={styles.label}>
-                        {t('officeAddress')}
-                      </Text>
-                      <Text style={styles.valueBlock}>
-                        {data.office_address_street}
-                      </Text>
-                    </View>
-                  )}
-                  {!!data.mailing_address_street && (
-                    <View style={styles.block}>
-                      <Text appearance="hint" style={styles.label}>
-                        {t('mailingAddress')}
-                      </Text>
-                      <Text style={styles.valueBlock}>
-                        {data.mailing_address_street}
-                      </Text>
-                    </View>
-                  )}
+              </View>
+
+              <View style={[styles.table, {borderColor: C.border}]}>
+                {renderRow(t('omrNumber'), data.omr_number ? `#${data.omr_number}` : '-', {
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow('Geographic\nRegion', data.geographical_region_name || '-', {
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow(t('churchNetwork'), data.church_network_name || '-', {
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow(t('apostolicRegion'), data.church_region_name || '-', {
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow(t('languageRegion'), data.language_region_name || '-', {
+                  valueStyle: styles.normalValue,
+                })}
+                <View style={[styles.row, {borderBottomColor: C.border}]}>
+                  <Text style={[styles.rowLabel, {color: C.textPrimary}]}>Attributes</Text>
+                  <View style={styles.attributeWrap}>
+                    {attributeItems.length ? (
+                      attributeItems.map(item => (
+                        <Text
+                          key={item.key}
+                          style={[
+                            styles.attributeToken,
+                            item.key === 'mother' && styles.attributeTokenMother,
+                            item.key === 'msc' && styles.attributeTokenMsc,
+                            item.key === 'map' && styles.attributeTokenMap,
+                          ]}>
+                          {item.label}
+                        </Text>
+                      ))
+                    ) : (
+                      <Text style={[styles.rowValue, styles.normalValue, {color: C.textPrimary}]}>-</Text>
+                    )}
+                  </View>
                 </View>
+                {renderRow(t('churchType'), data.church_type_name || '-', {
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow(t('sensitiveNation'), data.sensitive_nation ? t('yes') : t('no'), {
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow(t('currency'), data.currency_name || '-', {
+                  valueStyle: styles.normalValue,
+                })}
+                {renderRow('OMR Map\nLocation', omrMapUrl || '-', {
+                  noDivider: true,
+                  link: omrMapUrl || '',
+                  valueStyle: styles.normalValue,
+                })}
               </View>
 
               {isSuperAdminUser ? (
@@ -409,6 +382,28 @@ export default function ChurchDetailScreen() {
                   )}
                 </View>
               ) : null}
+
+              <Modal
+                visible={imageModalVisible}
+                transparent
+                animationType="fade"
+                onRequestClose={() => setImageModalVisible(false)}>
+                <View style={styles.fullImageBackdrop}>
+                  <TouchableOpacity
+                    style={styles.fullImageHeader}
+                    onPress={() => setImageModalVisible(false)}>
+                    <RNText style={styles.fullImageCloseText}>✕</RNText>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.fullImageContent}
+                    activeOpacity={1}
+                    onPress={() => setImageModalVisible(false)}>
+                    {imageUri ? (
+                      <Image source={{uri: imageUri}} style={styles.fullImage} resizeMode="contain" />
+                    ) : null}
+                  </TouchableOpacity>
+                </View>
+              </Modal>
             </>
           )}
         </ScrollView>
@@ -418,163 +413,235 @@ export default function ChurchDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  loadingWrap: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: ms(24),
+  },
   loading: {
     padding: ms(16),
     fontSize: fs(14),
   },
-  hero: {
-    position: 'relative',
-    height: hs(200),
-    marginHorizontal: 0,
+  sectionHeader: {
+    borderTopWidth: 0,
+    borderBottomWidth: 1,
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(6),
     marginTop: ms(8),
-    marginBottom: ms(12),
-    borderRadius: rs(12),
-    overflow: 'hidden',
-    backgroundColor: '#f0f0f0',
   },
-  heroImg: {width: '100%', height: '100%'},
-  heroPlaceholder: {backgroundColor: '#e9eef5'},
-  heroOverlay: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    height: hs(80),
-    backgroundColor: 'rgba(0,0,0,0.25)',
-  },
-  heroContent: {
-    position: 'absolute',
-    left: ms(16),
-    right: ms(16),
-    bottom: ms(12),
-  },
-  heroTitle: {
-    color: '#fff',
+  sectionHeaderText: {
+    fontSize: fs(14),
     fontWeight: '700',
-    fontSize: fs(16),
   },
-  heroSub: {
-    color: '#f2f2f2',
-    fontSize: fs(12),
-  },
-
-  section: {paddingHorizontal: 0, marginBottom: ms(16)},
-  sectionTitle: {marginBottom: ms(8), fontSize: fs(14)},
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: rs(12),
-    borderWidth: 1,
-    borderColor: '#eef1f6',
-    padding: ms(14),
-    gap: ms(10),
-  },
-  cardShadow: {
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: rs(6),
-    shadowOffset: {width: 0, height: hs(3)},
-    elevation: 2,
-  },
-
-  rowBetween: {
+  summaryRow: {
+    position: 'relative',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(10),
+    borderBottomWidth: 1,
+    borderWidth: 0,
+  },
+  summaryPhoto: {
+    width: ws(54),
+    height: ws(54),
+    borderRadius: rs(4),
+    borderWidth: 1,
+  },
+  summaryPhotoWrap: {
+    width: ws(54),
+    height: ws(54),
+    position: 'relative',
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  rowDivider: {
-    paddingBottom: ms(6),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#f1f3f7',
-  },
-  label: {
-    color: '#7a7a7a',
-    fontSize: fs(12),
-  },
-  value: {
-    fontWeight: '600',
-    fontSize: fs(12),
-  },
-  valueWrap: {
+  summaryText: {
     flex: 1,
     marginLeft: ms(12),
-    textAlign: 'right',
-    flexShrink: 1,
+    paddingRight: ws(44),
   },
-  link: {color: '#3563e9', fontSize: fs(12)},
-
-  block: {marginTop: ms(8)},
-  valueBlock: {marginTop: ms(4), fontSize: fs(12)},
-  badgesRow: {
-    flexDirection: 'row',
-    gap: ms(8),
-    paddingHorizontal: 0,
+  summaryName: {
+    fontSize: fs(16),
+    fontWeight: '700',
+  },
+  summarySub: {
+    fontSize: fs(12),
+    marginTop: ms(2),
+  },
+  iconBtn: {
+    position: 'absolute',
+    bottom: ms(8),
+    width: ws(20),
+    height: ws(20),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  zoomBtn: {
+    right: ms(-25),
+    bottom: ms(-10),
+    borderRadius: rs(3),
+  },
+  editBtn: {
+    right: ms(10),
+  },
+  iconImg: {
+    width: ws(16),
+    height: ws(16),
+  },
+  disabledBtn: {
+    opacity: 0.45,
+  },
+  table: {
+    borderWidth: 0,
+    borderTopWidth: 0,
+    borderLeftWidth: 0,
+    borderRightWidth: 0,
+    borderBottomWidth: 0,
     marginBottom: ms(10),
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: ms(6),
+    paddingHorizontal: ms(10),
+    borderBottomWidth: 1,
+  },
+  noDivider: {
+    borderBottomWidth: 0,
+  },
+  rowLabel: {
+    width: ws(92),
+    fontSize: fs(11.5),
+    fontWeight: '400',
+    lineHeight: fs(16),
+  },
+  rowValue: {
+    flex: 1,
+    fontSize: fs(11.5),
+    fontWeight: '600',
+    marginLeft: ms(8),
+    lineHeight: fs(16),
+  },
+  boldValue: {
+    fontWeight: '700',
+  },
+  normalValue: {
+    fontWeight: '400',
+  },
+  rowLink: {
+    textDecorationLine: 'none',
+  },
+  socialWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginLeft: ms(8),
+    gap: ms(6),
+  },
+  socialChip: {
+    minWidth: ws(18),
+    height: ws(18),
+    borderWidth: 1,
+    borderRadius: rs(9),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: ms(4),
+  },
+  socialLabel: {
+    fontSize: fs(10),
+    fontWeight: '700',
+  },
+  attributeWrap: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginLeft: ms(8),
+    gap: ms(6),
+  },
+  attributeToken: {
+    fontSize: fs(11.5),
+    fontWeight: '400',
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(2),
+    borderWidth: 1,
+    borderRadius: rs(6),
+  },
+  attributeTokenMother: {
+    color: '#6EA43D',
+    backgroundColor: '#DEEAD4',
+    borderColor: '#BCD4A7',
+  },
+  attributeTokenMsc: {
+    color: '#B65C16',
+    backgroundColor: '#F1E0D1',
+    borderColor: '#E3BE9D',
+  },
+  attributeTokenMap: {
+    color: '#3E68B5',
+    backgroundColor: '#DDE5F4',
+    borderColor: '#B8C9E8',
+  },
+  fullImageBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.92)',
+  },
+  fullImageHeader: {
+    alignSelf: 'flex-end',
+    paddingHorizontal: ms(14),
+    paddingVertical: ms(10),
+    marginTop: ms(28),
+  },
+  fullImageCloseText: {
+    color: '#fff',
+    fontSize: fs(24),
+    fontWeight: '600',
+  },
+  fullImageContent: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: ms(12),
+    paddingBottom: ms(20),
+  },
+  fullImage: {
+    width: '100%',
+    height: '85%',
   },
 });
 
-function renderRow(label: string, value?: string, _emphasize?: boolean, C?: any) {
-  return (
-    <View
-      style={{
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'flex-start',
-      }}>
-      <Text
-        appearance="hint"
-        style={{color: C?.textSecondary, fontSize: fs(12)}}>
-        {label}
-      </Text>
-      <Text
-        style={{
-          fontWeight: '600',
-          flex: 1,
-          marginLeft: ms(12),
-          textAlign: 'right',
-          flexShrink: 1,
-          color: C?.textPrimary,
-          fontSize: fs(12),
-        }}>
-        {value || '-'}
-      </Text>
-    </View>
-  );
-}
-
-function formatDateDMY(value?: any): string {
+function formatDateWithAge(value?: any): string {
   if (!value) return '';
   const d = new Date(value);
   if (isNaN(d.getTime())) return '';
   const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const month = d.toLocaleString('en-US', {month: 'long'});
   const yyyy = String(d.getFullYear());
-  return `${dd}.${mm}.${yyyy}`;
+  const age = getAge(d);
+  return `${dd} ${month} ${yyyy}${age ? `\n[${age} years old]` : ''}`;
 }
 
-function Badge({
-  label,
-  success,
-  danger,
-}: {
-  label: string;
-  success?: boolean;
-  danger?: boolean;
-}) {
-  const bg = danger
-    ? 'rgba(219,45,45,0.1)'
-    : success
-    ? 'rgba(46,125,50,0.12)'
-    : 'rgba(53,99,233,0.1)';
-  const color = danger ? '#db2d2d' : success ? '#2e7d32' : '#3563e9';
-  return (
-    <View
-      style={{
-        backgroundColor: bg,
-        paddingHorizontal: ms(10),
-        paddingVertical: ms(6),
-        borderRadius: rs(999),
-      }}>
-      <Text style={{color, fontWeight: '700', fontSize: fs(12)}}>{label}</Text>
-    </View>
-  );
+function getAge(date: Date): number {
+  const now = new Date();
+  let age = now.getFullYear() - date.getFullYear();
+  const m = now.getMonth() - date.getMonth();
+  if (m < 0 || (m === 0 && now.getDate() < date.getDate())) {
+    age--;
+  }
+  return age > 0 ? age : 0;
+}
+
+function normalizeUrl(value?: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
+  if (/^https?:\/\//i.test(raw)) return raw;
+  return `https://${raw}`;
+}
+
+function prettyMeetingVenue(value?: string): string {
+  const raw = String(value || '').trim();
+  if (!raw) return '-';
+  return raw
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .replace(/\b\w/g, c => c.toUpperCase());
 }

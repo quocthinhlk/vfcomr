@@ -7,7 +7,7 @@ export const LANGUAGES = [
   {
     code: 'pt',
     label: 'Português',
-    flag: require('../assets/images/flags/portugal.png'),
+    flag: require('../assets/images/flags/brazil.png'),
   },
   {
     code: 'es',

@@ -21,7 +21,6 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
-import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
@@ -35,6 +34,8 @@ interface VisitFormItem {
 
 export const AddVisitsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  // Screen chưa hoàn thiện → tạm thời khóa các CTA chính để tránh user thao tác.
+  const screenDisabled = true;
   const [visits, setVisits] = useState<VisitFormItem[]>([
     {
       year: new Date().getFullYear(),
@@ -113,6 +114,9 @@ export const AddVisitsScreen: React.FC = () => {
   }, [navigation, t]);
 
   const addVisit = () => {
+    if (screenDisabled) {
+      return;
+    }
     setVisits([
       ...visits,
       {
@@ -124,6 +128,9 @@ export const AddVisitsScreen: React.FC = () => {
   };
 
   const removeVisit = (index: number) => {
+    if (screenDisabled) {
+      return;
+    }
     if (visits.length > 1) {
       setVisits(visits.filter((_, i) => i !== index));
       setInvalid(prev => {
@@ -154,6 +161,9 @@ export const AddVisitsScreen: React.FC = () => {
   };
 
   const onSave = async () => {
+    if (screenDisabled) {
+      return;
+    }
     if (!churchId || !userId) {
       Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
       return;
@@ -231,6 +241,19 @@ export const AddVisitsScreen: React.FC = () => {
               </View>
             ) : null}
 
+            {screenDisabled ? (
+              <View
+                style={[
+                  styles.devNotice,
+                  {backgroundColor: 'rgba(219,45,45,0.08)', borderColor: COLORS.dangerColor},
+                ]}>
+                <Text style={[styles.devNoticeText, {color: COLORS.dangerColor}]}>
+                  {t('featureUnderDevelopment') ||
+                    'Tính năng này đang được hoàn thiện. Vui lòng quay lại sau.'}
+                </Text>
+              </View>
+            ) : null}
+
             <ScrollView
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
@@ -246,7 +269,12 @@ export const AddVisitsScreen: React.FC = () => {
                       {visits.length > 1 && (
                         <TouchableOpacity
                           onPress={() => removeVisit(index)}
-                          style={[styles.removeBtn, {backgroundColor: COLORS.dangerColor}]}>
+                          disabled={screenDisabled}
+                          style={[
+                            styles.removeBtn,
+                            {backgroundColor: COLORS.dangerColor},
+                            screenDisabled ? styles.disabledTouchable : null,
+                          ]}>
                           <Text style={styles.removeBtnText}>×</Text>
                         </TouchableOpacity>
                       )}
@@ -312,7 +340,12 @@ export const AddVisitsScreen: React.FC = () => {
 
                 <TouchableOpacity
                   onPress={addVisit}
-                  style={[styles.addBtn, {backgroundColor: C.surface, borderColor: C.border}]}>
+                  disabled={screenDisabled}
+                  style={[
+                    styles.addBtn,
+                    {backgroundColor: C.surface, borderColor: C.border},
+                    screenDisabled ? styles.disabledTouchable : null,
+                  ]}>
                   <Text style={[styles.addBtnText, {color: C.textPrimary}]}>
                     + {t('addVisit') || 'Add Visit'}
                   </Text>
@@ -329,7 +362,7 @@ export const AddVisitsScreen: React.FC = () => {
               <SaveButton
                 label={t('save') || 'Save'}
                 onPress={onSave}
-                disabled={submitting}
+                disabled={screenDisabled || submitting}
               />
             </View>
           </View>
@@ -363,6 +396,17 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
     fontWeight: '600',
     flex: 1,
+  },
+  devNotice: {
+    marginBottom: ms(12),
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(12),
+    borderRadius: rs(8),
+    borderWidth: 1,
+  },
+  devNoticeText: {
+    fontSize: fs(13),
+    fontWeight: '600',
   },
   scrollContent: {
     paddingBottom: ms(24),
@@ -401,6 +445,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: fs(20),
     fontWeight: 'bold',
+  },
+  disabledTouchable: {
+    opacity: 0.45,
   },
   field: {
     marginBottom: ms(12),

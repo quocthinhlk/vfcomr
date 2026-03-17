@@ -252,7 +252,7 @@ export default function MonthlyDataSelectScreen() {
       >
         <View style={styles.headerWrapper}>
           <Header
-            title={t('monthlyData') || 'Monthly Data'}
+            title={t('addMonthlyData') || 'Add Monthly Data'}
             showMenu={false}
           />
         </View>

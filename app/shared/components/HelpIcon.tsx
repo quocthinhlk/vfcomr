@@ -39,7 +39,7 @@ export default function HelpIcon({
   color = COLORS.mainColor,
   marginLeft = 10,
   offsetY = -2,
-  backgroundColor = 'rgba(53,99,233,0.12)',
+  backgroundColor = 'transparent',
   containerStyle,
 }: Props) {
   const C = useThemedColors();
@@ -68,9 +68,9 @@ export default function HelpIcon({
             width: size,
             height: size,
             borderRadius: size,
-            borderWidth: 1,
-            borderColor: color,
-            backgroundColor,
+            borderWidth: 0,
+            borderColor: 'transparent',
+            backgroundColor: 'transparent',
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -82,7 +82,7 @@ export default function HelpIcon({
               fontSize: Math.max(fs(10), Math.round(size * 0.55)),
             }}
           >
-            i
+            ⓘ
           </Text>
         </View>
       </TouchableOpacity>
@@ -166,8 +166,8 @@ const helpIconStyles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: ms(8),
-    marginBottom: ms(8),
+    paddingBottom: ms(6),
+    marginBottom: ms(6),
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#E5E7EB',
   },
@@ -186,7 +186,7 @@ const helpIconStyles = StyleSheet.create({
   },
   bodyContainer: {
     maxHeight: hs(220),
-    paddingTop: ms(2),
+    paddingTop: ms(0),
   },
   body: {
     fontSize: fs(12),

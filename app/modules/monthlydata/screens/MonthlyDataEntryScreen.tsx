@@ -1281,7 +1281,7 @@ export default function MonthlyDataEntryScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
       >
         <View style={styles.headerWrapper}>
-          <Header title={t('monthlyData') || 'Monthly Data'} showMenu={false} />
+          <Header title={t('addMonthlyData') || 'Add Monthly Data'} showMenu={false} />
         </View>
 
         {showSkeleton ? (
