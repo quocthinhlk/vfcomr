@@ -138,7 +138,7 @@ export default function EditProfileScreen() {
       const data = await getChurchesList({
         page,
         limit: DEFAULT_PAGE_LIMIT,
-        name: query && query.trim() ? query.trim() : undefined,
+        search: query && query.trim() ? query.trim() : undefined,
       });
       const items = (data?.items ?? []).map((c: any) => ({id: c.id, name: c.name}));
       setChurchItems(prev => (page === 1 ? items : [...prev, ...items]));

@@ -23,7 +23,7 @@ export interface ListLanguagesResponse {
 export interface ListLanguagesParams {
   page?: number;
   limit?: number;
-  name?: string;
+  search?: string;
 }
 
 export async function listLanguages(params: ListLanguagesParams = {}) {

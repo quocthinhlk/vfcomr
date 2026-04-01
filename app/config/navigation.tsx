@@ -49,7 +49,11 @@ export type RootStackParamList = {
   EditLanguage: { languageId: number } | undefined;
   DeleteLanguage: { languageId: number } | undefined;
   Resources: undefined;
-  Relating: undefined;
+  AddNewResource: undefined;
+  EditAddTopicList: undefined;
+  RelatingSearch: undefined;
+  RelatingDetails: undefined;
+  RelatingMultiUserRestrictions: undefined;
   FAQ: undefined;
   FAQs: undefined;
   SearchFAQ: undefined;
@@ -158,8 +162,12 @@ import LanguagesScreen from '../modules/language/screens/LanguagesScreen';
 import AddLanguageScreen from '../modules/language/screens/AddLanguageScreen';
 import EditLanguageScreen from '../modules/language/screens/EditLanguageScreen';
 import DeleteLanguageScreen from '../modules/language/screens/DeleteLanguageScreen';
-import { ResourcesScreen } from '../modules/dashboard/screens/ResourcesScreen';
-import { RelatingScreen } from '../modules/dashboard/screens/RelatingScreen';
+import SearchResourcesScreen from '../modules/resources/screens/SearchResourcesScreen';
+import AddNewResourceScreen from '../modules/resources/screens/AddNewResourceScreen';
+import EditAddTopicListScreen from '../modules/resources/screens/EditAddTopicListScreen';
+import RelatingSearchScreen from '../modules/relating/screens/RelatingSearchScreen';
+import RelatingDetailsScreen from '../modules/relating/screens/RelatingDetailsScreen';
+import RelatingMultiUserRestrictionsScreen from '../modules/relating/screens/RelatingMultiUserRestrictionsScreen';
 import { FAQScreen } from '../modules/dashboard/screens/FAQScreen';
 import FAQsScreen from '../modules/faq/screens/FAQsScreen';
 import SearchFAQScreen from '../modules/faq/screens/SearchFAQScreen';
@@ -304,8 +312,15 @@ export default function Navigation() {
               <Stack.Screen name="AddLanguage" component={AddLanguageScreen} />
               <Stack.Screen name="EditLanguage" component={EditLanguageScreen} />
               <Stack.Screen name="DeleteLanguage" component={DeleteLanguageScreen} />
-              <Stack.Screen name="Resources" component={ResourcesScreen} />
-              <Stack.Screen name="Relating" component={RelatingScreen} />
+              <Stack.Screen name="Resources" component={SearchResourcesScreen} />
+              <Stack.Screen name="AddNewResource" component={AddNewResourceScreen} />
+              <Stack.Screen name="EditAddTopicList" component={EditAddTopicListScreen} />
+              <Stack.Screen name="RelatingSearch" component={RelatingSearchScreen} />
+              <Stack.Screen name="RelatingDetails" component={RelatingDetailsScreen} />
+              <Stack.Screen
+                name="RelatingMultiUserRestrictions"
+                component={RelatingMultiUserRestrictionsScreen}
+              />
               <Stack.Screen name="FAQ" component={FAQScreen} />
               <Stack.Screen name="FAQs" component={FAQsScreen} />
               <Stack.Screen name="SearchFAQ" component={SearchFAQScreen} />

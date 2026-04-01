@@ -50,7 +50,7 @@ export const LanguagesScreen: React.FC = () => {
           return;
         }
         setLoading(true);
-        const res = await listLanguages({name: query});
+        const res = await listLanguages({search: query});
         const full = res?.data?.items ?? [];
         const filtered = query
           ? full.filter(i =>

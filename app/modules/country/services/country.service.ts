@@ -23,7 +23,7 @@ export interface ListCountriesResponse {
 export interface ListCountriesParams {
   page?: number;
   limit?: number;
-  name?: string;
+  search?: string;
 }
 
 export async function listCountries(params: ListCountriesParams = {}) {

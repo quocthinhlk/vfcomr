@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
@@ -86,7 +86,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
       helpMessage: tr('statInfoGrowth', 'The % growth, compared to the same 3 months last year'),
     },
     { 
-      icon: require('../../../../app/assets/images/giving.png'), 
+      icon: require('../../../../app/assets/images/icon/dollar-bill.png'), 
       value: `${currencySymbol} ${formatNumberToM(avgMonthlyGivingLocal)}`,
       secondaryValue: avgMonthlyGivingUsd
         ? `USD $${formatNumberToM(avgMonthlyGivingUsd)}`
@@ -95,7 +95,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
       helpMessage: tr('statInfoGiving', 'The average tithes and offerings giving over the last 3 months'),
     },
     {
-      icon: require('../../../../app/assets/images/plant.png'),
+      icon: require('../../../../app/assets/images/icon/access.png'),
       value: `${(indicators.total_church_plants || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
       label: tr('churchPlants', 'Church Plants'),
       helpTitle: tr('statInfoChurchPlantsTitle', 'Church Planting'),
@@ -127,21 +127,21 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
       ),
     },
     {
+      icon: require('../../../../app/assets/images/icon/angel.png'),
+      value: `${(indicators.avg_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      label: tr('newDecisions', 'New Decisions'),
+      helpMessage: tr(
+        'statInfoNewDecisions',
+        'The number of New Decisions for Christ made over the last 3 Months'
+      ),
+    },
+    {
       icon: require('../../../../app/assets/images/icon/education.png'),
       value: `${(indicators.avg_liw_students || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
       label: tr('peopleInGtLiw', 'People in GT/LIW'),
       helpMessage: tr(
         'statInfoPeopleInGtLiw',
         'The average Growth Track and Life In the Word class attendance over the last 3 months, as a % of the average, adult and youth, weekly service attendance'
-      ),
-    },
-    {
-      icon: require('../../../../app/assets/images/cellgroup.png'),
-      value: `${(indicators.avg_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
-      label: tr('newDecisions', 'New Decisions'),
-      helpMessage: tr(
-        'statInfoNewDecisions',
-        'The number of New Decisions for Christ made over the last 3 Months'
       ),
     },
   ];
@@ -180,6 +180,14 @@ export default function DashboardPastorLeaderScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
+  const [churchPictureExpanded, setChurchPictureExpanded] = useState(false);
+  const [churchPicturesLoading, setChurchPicturesLoading] = useState(false);
+  const [churchPicturesLoaded, setChurchPicturesLoaded] = useState(false);
+  const [churchPictures, setChurchPictures] = useState<string[]>([]);
+  const [churchPicturesError, setChurchPicturesError] = useState<string | null>(null);
+  const [organizationRowWidth, setOrganizationRowWidth] = useState(0);
+  const [organizationFirstLineWidth, setOrganizationFirstLineWidth] = useState(0);
+  const [organizationChevronLeft, setOrganizationChevronLeft] = useState(0);
 
   useEffect(() => {
     Animated.timing(rotation, {
@@ -198,7 +206,7 @@ export default function DashboardPastorLeaderScreen() {
     if (isNaN(date.getTime())) return '-';
     const month = new Intl.DateTimeFormat(localeMap[selectedLanguage as string] || 'en', { month: 'long' }).format(date);
     const year = date.getFullYear();
-    return `${month}, ${year}`;
+    return `${month} ${year}`;
   };
   const formatVerifiedDate = (dateString: string) => {
     if (!dateString) return '';
@@ -240,6 +248,10 @@ export default function DashboardPastorLeaderScreen() {
       setBannerError(false);
       setProfileError(false);
       setLogoError(false);
+      setChurchPictureExpanded(false);
+      setChurchPictures([]);
+      setChurchPicturesLoaded(false);
+      setChurchPicturesError(null);
       
       // Save selected church_id to AsyncStorage
       if (church?.id) {
@@ -335,7 +347,9 @@ export default function DashboardPastorLeaderScreen() {
           }
 
           setUserProfile({
+            prefix: userData.prefix || '',
             name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+            title: userData.title || '',
             organization: dashboardData.dashboard_info?.church_name || '',
             location: dashboardData.dashboard_info?.country_name || '',
             profileImage: userData.photo_url || '',
@@ -417,6 +431,99 @@ export default function DashboardPastorLeaderScreen() {
   const handleChangeLanguage = (lang: string) => {
     setLanguage(lang);
   };
+
+  const extractChurchPictures = (payload: any): string[] => {
+    const data = payload?.data?.data ?? payload?.data ?? payload;
+    const sources = [
+      data?.photos,
+      data?.images,
+      data?.church_pictures,
+      data?.church_images,
+      data?.gallery,
+      data?.photo_urls,
+      data?.pictures,
+    ];
+    const fromArrays = sources.flatMap((source: any) => {
+      if (!Array.isArray(source)) return [];
+      return source
+        .map((item: any) => {
+          if (typeof item === 'string') return item;
+          if (!item || typeof item !== 'object') return '';
+          return item.url || item.photo_url || item.image_url || item.image || item.path || '';
+        })
+        .filter((url: string) => typeof url === 'string' && url.trim() !== '');
+    });
+    const single = typeof data?.photo_url === 'string' ? [data.photo_url] : [];
+    return Array.from(new Set([...fromArrays, ...single]));
+  };
+
+  const getCurrentChurchId = async (): Promise<number | null> => {
+    try {
+      const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+      if (savedChurchId) {
+        const parsed = parseInt(savedChurchId, 10);
+        if (!isNaN(parsed)) return parsed;
+      }
+    } catch (error) {
+      console.log('Failed to read selectedChurchId:', error);
+    }
+    const dashboardChurchId = dashboardData?.dashboard_info?.church_id;
+    return typeof dashboardChurchId === 'number' ? dashboardChurchId : null;
+  };
+
+  const handleToggleChurchPictures = async () => {
+    const nextExpanded = !churchPictureExpanded;
+    setChurchPictureExpanded(nextExpanded);
+    if (!nextExpanded || churchPicturesLoaded || churchPicturesLoading) {
+      return;
+    }
+    try {
+      setChurchPicturesLoading(true);
+      setChurchPicturesError(null);
+      const churchId = await getCurrentChurchId();
+      if (!churchId) {
+        setChurchPictures([]);
+        setChurchPicturesLoaded(true);
+        return;
+      }
+      const response = await api.get(`churches/${churchId}`);
+      const pictureUrls = extractChurchPictures(response);
+      setChurchPictures(pictureUrls);
+      setChurchPicturesLoaded(true);
+    } catch (error) {
+      console.error('Failed to load church pictures:', error);
+      setChurchPicturesError(t('failedToLoadData'));
+    } finally {
+      setChurchPicturesLoading(false);
+    }
+  };
+
+  const handleOrganizationTextLayout = (event: any) => {
+    const lines = event?.nativeEvent?.lines || [];
+    if (!Array.isArray(lines) || lines.length === 0) {
+      return;
+    }
+    const firstLineWidth = Number(lines[0]?.width || 0);
+    if (Math.abs(firstLineWidth - organizationFirstLineWidth) > 1) {
+      setOrganizationFirstLineWidth(firstLineWidth);
+    }
+  };
+
+  useEffect(() => {
+    const iconWidth = ws(10);
+    const desiredLeft = organizationFirstLineWidth + ms(4);
+    const maxLeft = Math.max(0, organizationRowWidth - iconWidth);
+    const nextLeft = Math.min(desiredLeft, maxLeft);
+    if (!Number.isNaN(nextLeft) && Math.abs(nextLeft - organizationChevronLeft) > 1) {
+      setOrganizationChevronLeft(nextLeft);
+    }
+  }, [organizationFirstLineWidth, organizationRowWidth]);
+
+  useEffect(() => {
+    // reset and let layout recalculate for new organization text
+    setOrganizationFirstLineWidth(0);
+    setOrganizationChevronLeft(0);
+  }, [userProfile?.organization]);
 
   const handleDownloadImage = async () => {
     if (!selectedImage) return;
@@ -541,71 +648,52 @@ export default function DashboardPastorLeaderScreen() {
           />
         </View>
 
-        {/* Banner Image */}
-        <View style={styles.bannerContainer}>
-          {userProfile.bannerImage && !bannerError ? (
-            <TouchableOpacity
-              activeOpacity={0.9}
-              onPress={() => {
-                setSelectedImage(userProfile.bannerImage);
-                setImageModalVisible(true);
-              }}
-            >
-              <Image
-                source={{ uri: userProfile.bannerImage }}
-                style={styles.bannerImage}
-                onError={() => setBannerError(true)}
-              />
-            </TouchableOpacity>
-          ) : (
-            <Image source={require('../../../../app/assets/images/blank-cover.png')} style={styles.bannerImage} />
-          )}
-        </View>
-
-        {/* Verification Status - bên dưới ảnh, không đè lên */}
-        <View style={styles.verificationWrapper}>
-          {dashboardData?.dashboard_info && (
-            <View style={styles.verificationContainer}>
-              {dashboardData.dashboard_info.is_verified ? (
-                <Text style={[styles.verificationText, { color: '#4da72e' }]}>
-                  {'\u2714\uFE0E'} Visited {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by{' '}
-                  {dashboardData.dashboard_info.verified_by_user_name || ''}
-                </Text>
-              ) : (
-                <Text style={[styles.verificationText, { color: '#e97132' }]}>
-                  {'\u2718\uFE0E'} Needs a Verification Visit
-                </Text>
-              )}
-            </View>
-          )}
-        </View>
-
         {/* Profile Section */}
         <View style={styles.profileSection}>
+          {/* Row 1: Organization + dropdown */}
           <TouchableOpacity
-            activeOpacity={0.9}
-            disabled={!userProfile.profileImage || profileError}
-            onPress={() => {
-              if (userProfile.profileImage && !profileError) {
-                setSelectedImage(userProfile.profileImage);
-                setImageModalVisible(true);
-              }
-            }}
+            style={styles.organizationRow}
+            onPress={() => setOrgModalVisible(true)}
+            onLayout={(event) => setOrganizationRowWidth(event.nativeEvent.layout.width)}
           >
-            {userProfile.profileImage && !profileError ? (
-              <Image
-                source={{ uri: userProfile.profileImage }}
-                style={styles.profileImage}
-                onError={() => setProfileError(true)}
-              />
-            ) : (
-              <Image
-                source={require('../../../../app/assets/images/blank-avatar.png')}
-                style={styles.profileImage}
-              />
-            )}
+            <RNText style={[styles.organizationText, { color: C.textPrimary }]} onTextLayout={handleOrganizationTextLayout}>
+              {userProfile.organization}
+            </RNText>
+            <Image
+              source={require('../../../../app/assets/images/icon/arrow-down-bold.png')}
+              style={[
+                styles.dropdownIcon,
+                {
+                  tintColor: C.textPrimary,
+                  left: organizationChevronLeft,
+                },
+              ]}
+            />
           </TouchableOpacity>
-          <View style={styles.profileInfo}>
+
+          {/* Row 2-3: Location left | Last Report + Verification right */}
+          <View style={styles.locationRow}>
+            <Text style={[styles.locationText, { color: C.textSecondary }]}>{userProfile.location}</Text>
+            <View style={styles.reportVerifyColumn}>
+              <Text style={styles.lastRecordValue}>
+                {t('lastMonthlyRecord')}: {formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}
+              </Text>
+              {dashboardData?.dashboard_info && (
+                dashboardData.dashboard_info.is_verified ? (
+                  <Text style={[styles.verificationText, { color: '#4da72e' }]}>
+                    {'\u2714\uFE0E'} Visited {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by {dashboardData.dashboard_info.verified_by_user_name || ''}
+                  </Text>
+                ) : (
+                  <Text style={[styles.verificationText, { color: '#e97132' }]}>
+                    Needs a Verification Visit
+                  </Text>
+                )
+              )}
+            </View>
+          </View>
+
+          {/* Row 4: Name (left) + Avatar (center) */}
+          <View style={styles.namePhotoRow}>
             <TouchableOpacity
               onPress={() => {
                 if (currentUserId) {
@@ -614,30 +702,41 @@ export default function DashboardPastorLeaderScreen() {
               }}
               activeOpacity={0.7}
               disabled={!currentUserId}
+              style={styles.nameBlock}
             >
-              <Text style={[styles.profileName, { color: C.textPrimary }]}>{userProfile.name}</Text>
+              <Text style={styles.profileNameLink} numberOfLines={1} ellipsizeMode="tail">
+                {userProfile.prefix ? `${userProfile.prefix} ${userProfile.name}` : userProfile.name}
+              </Text>
+              {userProfile.title ? (
+                <Text style={[styles.titleText, { color: C.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
+                  {userProfile.title}
+                </Text>
+              ) : null}
             </TouchableOpacity>
-            <TouchableOpacity style={styles.organizationRow} onPress={() => setOrgModalVisible(true)}>
-              <Text style={[styles.organizationText, { color: C.textPrimary }]}>{userProfile.organization}</Text>
-              <Image source={require('../../../../app/assets/images/icon/arrow-down-bold.png')} style={[styles.dropdownIcon, { tintColor: C.textPrimary }]} />
+            <TouchableOpacity
+              activeOpacity={0.9}
+              style={styles.avatarWrapper}
+              disabled={!userProfile.profileImage || profileError}
+              onPress={() => {
+                if (userProfile.profileImage && !profileError) {
+                  setSelectedImage(userProfile.profileImage);
+                  setImageModalVisible(true);
+                }
+              }}
+            >
+              {userProfile.profileImage && !profileError ? (
+                <Image
+                  source={{ uri: userProfile.profileImage }}
+                  style={styles.profileImage}
+                  onError={() => setProfileError(true)}
+                />
+              ) : (
+                <Image
+                  source={require('../../../../app/assets/images/blank-avatar.png')}
+                  style={styles.profileImage}
+                />
+              )}
             </TouchableOpacity>
-            <View style={styles.locationRow}>
-              <Grid>
-                <Row>
-                  <Col size={40}>
-                    <Text style={[styles.locationText, { color: C.textSecondary }]}>{userProfile.location}</Text>
-                  </Col>
-                  <Col size={60}>
-                    <View style={styles.lastRecordContainer}>
-                      <Text style={[styles.lastRecordLabel, { color: C.textPrimary }]}>{t('lastMonthlyRecord')}: </Text>
-                      <Text style={styles.lastRecordValue}>
-                        {formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}
-                      </Text>
-                    </View>
-                  </Col>
-                </Row>
-              </Grid>
-            </View>
           </View>
         </View>
 
@@ -746,25 +845,80 @@ export default function DashboardPastorLeaderScreen() {
         <View style={styles.menuContainer}>
           {menuItems.map((item, index) => {
             const isDisabled = (item as any).disabled === true;
+            const isNewChurchItem = item.label === 'New Church';
             return (
-              <TouchableOpacity
-                key={index}
-                style={[styles.menuItem, { borderBottomColor: C.border }, isDisabled ? { opacity: 0.5 } : null]}
-                onPress={() => { if (!isDisabled) handleMenuItemPress(item); }}
-                activeOpacity={isDisabled ? 1 : 0.7}
-              >
-                <Image source={item.icon} style={styles.menuIcon} />
-                <Text style={[styles.menuLabel, { color: C.textPrimary }]}>
-                  {item.label === 'Add Monthly Data' ? t('addMonthlyData') :
-                   item.label === 'Monthly Data' ? t('monthlyData') :
-                   item.label === 'Edit Church' ? t('editChurch') :
-                   item.label === 'Worship Services' ? t('worshipServices') :
-                   item.label === 'Add New Church & New Pastor' ? t('addNewChurchAndPastor') :
-                   item.label === 'New Pastor' ? t('addNewPastor') :
-                   item.label === 'New Church' ? t('addNewChurch') : item.label}
-                </Text>
-                <Image source={require('../../../../app/assets/images/icon-down.png')} style={styles.menuArrow} />
-              </TouchableOpacity>
+              <React.Fragment key={index}>
+                <TouchableOpacity
+                  style={[styles.menuItem, { borderBottomColor: C.border }, isDisabled ? { opacity: 0.5 } : null]}
+                  onPress={() => { if (!isDisabled) handleMenuItemPress(item); }}
+                  activeOpacity={isDisabled ? 1 : 0.7}
+                >
+                  <Image source={item.icon} style={styles.menuIcon} />
+                  <Text
+                    style={[
+                      styles.menuLabel,
+                      { color: item.label === 'Add Monthly Data' ? COLORS.mainColor : C.textPrimary },
+                    ]}
+                  >
+                    {item.label === 'Add Monthly Data' ? t('addMonthlyData') :
+                     item.label === 'Monthly Data' ? t('monthlyData') :
+                     item.label === 'Edit Church' ? t('editChurch') :
+                     item.label === 'Worship Services' ? t('worshipServices') :
+                     item.label === 'Add New Church & New Pastor' ? t('addNewChurchAndPastor') :
+                     item.label === 'New Pastor' ? t('addNewPastor') :
+                     item.label === 'New Church' ? t('addNewChurch') : item.label}
+                  </Text>
+                  <Image source={require('../../../../app/assets/images/icon-down.png')} style={styles.menuArrow} />
+                </TouchableOpacity>
+
+                {isNewChurchItem ? (
+                  <>
+                    <TouchableOpacity
+                      style={[styles.menuItem, styles.subMenuItem, { borderBottomColor: C.border }]}
+                      onPress={handleToggleChurchPictures}
+                      activeOpacity={0.7}
+                    >
+                      <Image source={require('../../../../app/assets/images/icon/image.png')} style={styles.menuIcon} />
+                      <Text style={[styles.menuLabel, { color: C.textPrimary }]}>{t('churchPicture')}</Text>
+                      <Image
+                        source={require('../../../../app/assets/images/icon-down.png')}
+                        style={[styles.menuArrow, churchPictureExpanded ? styles.menuArrowExpanded : null]}
+                      />
+                    </TouchableOpacity>
+                    {churchPictureExpanded ? (
+                      <View style={[styles.churchPicturesContainer, { borderBottomColor: C.border }]}>
+                        {churchPicturesLoading ? (
+                          <Text style={[styles.churchPictureStatusText, { color: C.textSecondary }]}>{t('loading')}...</Text>
+                        ) : churchPicturesError ? (
+                          <Text style={[styles.churchPictureStatusText, { color: C.error || '#ff4444' }]}>{churchPicturesError}</Text>
+                        ) : churchPictures.length === 0 ? (
+                          <Text style={[styles.churchPictureStatusText, { color: C.textSecondary }]}>{t('noDataFound')}</Text>
+                        ) : (
+                          <View style={styles.churchPicturesList}>
+                            {churchPictures.map((url, pictureIndex) => (
+                              <TouchableOpacity
+                                key={`${url}-${pictureIndex}`}
+                                style={styles.churchPictureItem}
+                                activeOpacity={0.85}
+                                onPress={() => {
+                                  setSelectedImage(url);
+                                  setImageModalVisible(true);
+                                }}
+                              >
+                                <Image
+                                  source={{ uri: url }}
+                                  style={[styles.churchPictureThumb, { borderColor: C.border }]}
+                                  resizeMode="cover"
+                                />
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ) : null}
+                  </>
+                ) : null}
+              </React.Fragment>
             );
           })}
         </View>
@@ -803,85 +957,93 @@ const styles = StyleSheet.create({
     width: ws(40),
     height: ws(40),
   },
-  bannerContainer: {
-    position: 'relative',
-    height: hs(200),
-    marginHorizontal: ms(16),
-    marginBottom: ms(4),
-    overflow: 'hidden',
-  },
-  bannerImage: {
-    width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
-  },
-  verificationWrapper: {
-    marginHorizontal: ms(16),
-    marginTop: 0,
-    marginBottom: ms(16),
-    alignItems: 'flex-end',
-  },
-  verificationContainer: {
-    alignItems: 'flex-end',
-  },
   verificationText: {
     fontSize: fs(11),
     textAlign: 'right',
     fontStyle: 'italic',
+    marginTop: ms(2),
   },
   profileSection: {
     flexDirection: 'column',
     alignItems: 'flex-start',
     paddingHorizontal: ms(15),
-    marginTop: -90,
+    paddingTop: ms(12),
     marginBottom: ms(10),
   },
   profileImage: {
-    width: ws(100),
-    height: ws(100),
-    borderRadius: 75,
-    borderWidth: 3,
+    width: ws(80),
+    height: ws(80),
+    borderRadius: 60,
+    borderWidth: 2,
     borderColor: '#C4C4C4',
-    zIndex: 10,
-    marginBottom: ms(12),
-    // marginLeft: ms(10),
   },
-  profileInfo: {
-    width: '100%',
-    alignItems: 'flex-start',
-    marginTop: 0,
-    marginLeft: 0,
+  avatarWrapper: {
+    position: 'absolute',
+    left: '50%',
+    top: 0,
+    transform: [{ translateX: -ws(40) }],
+    width: ws(80),
+    height: ws(80),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  profileName: {
-    fontSize: fs(14),
-    fontWeight: '500',
-    color: '#000',
-    marginBottom: ms(6),
-    textAlign: 'left',
-  },
-  organizationRow: {
+  namePhotoRow: {
+    position: 'relative',
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    marginTop: ms(10),
+    minHeight: ws(80),
+  },
+  nameBlock: {
+    width: '50%',
+    paddingRight: ms(8),
+    marginTop: -ms(4),
+  },
+  profileNameLink: {
+    fontSize: fs(15),
+    fontWeight: '700',
+    color: COLORS.mainColor,
+  },
+  profileNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  profileName: {
+    fontSize: fs(18),
+    fontWeight: '700',
+    color: '#000',
+  },
+  titleText: {
+    fontSize: fs(13),
+    marginTop: ms(2),
+  },
+  organizationRow: {
+    position: 'relative',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
     justifyContent: 'flex-start',
     marginBottom: ms(6),
-    flexWrap: 'wrap',
+    width: '100%',
   },
   organizationText: {
     fontSize: fs(15),
     fontWeight: 'bold',
     color: '#000',
-    marginRight: ms(4),
-    flexShrink: 1,
+    flex: 1,
+    lineHeight: fs(22),
   },
   dropdownIcon: {
     width: ws(10),
     height: hs(10),
+    position: 'absolute',
+    top: ms(7),
     tintColor: '#000',
   },
   locationRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     marginBottom: ms(4),
     width: '100%',
   },
@@ -891,24 +1053,18 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     flex: 1,
   },
-  lastRecordContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-  },
-  lastRecordLabel: {
-    fontSize: fs(10),
-    color: '#4A6FA5',
-    lineHeight: fs(10),
-    includeFontPadding: false,
-    fontWeight: '400',
+  reportVerifyColumn: {
+    flex: 1,
+    maxWidth: '58%',
+    alignItems: 'flex-end',
+    marginLeft: ms(8),
   },
   lastRecordValue: {
-    fontSize: fs(10),
+    fontSize: fs(11),
     color: '#4A6FA5',
-    lineHeight: fs(10),
-    includeFontPadding: false,
+    textAlign: 'right',
     fontWeight: '400',
+    flexShrink: 1,
   },
   statsContainer: {
     flexDirection: 'row',
@@ -983,6 +1139,36 @@ const styles = StyleSheet.create({
     width: ws(12),
     height: hs(12),
     transform: [{ rotate: '-90deg' }],
+  },
+  menuArrowExpanded: {
+    transform: [{ rotate: '0deg' }],
+  },
+  subMenuItem: {
+    paddingLeft: 0,
+  },
+  churchPicturesContainer: {
+    borderBottomWidth: 1,
+    paddingBottom: ms(12),
+    paddingLeft: 0,
+    paddingRight: 0,
+    paddingTop: ms(8),
+  },
+  churchPicturesList: {
+    width: '100%',
+  },
+  churchPictureItem: {
+    marginBottom: ms(10),
+  },
+  churchPictureStatusText: {
+    fontSize: fs(12),
+    marginTop: ms(4),
+  },
+  churchPictureThumb: {
+    width: '100%',
+    height: ws(180),
+    borderRadius: 8,
+    borderWidth: 1,
+    backgroundColor: '#f5f5f5',
   },
   modalBackdrop: {
     flex: 1,

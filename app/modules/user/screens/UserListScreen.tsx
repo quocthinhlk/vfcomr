@@ -19,7 +19,6 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {COLORS} from '../../../shared/constants/colors';
 import {globalStyles} from '../../../shared/styles/global';
-import {EditSvgIcon} from '../../../shared/components/icons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -81,7 +80,7 @@ export const UserListScreen: React.FC = () => {
         const res = await listUsers({
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
-          name: query,
+          search: query,
         });
         const nextItems = res?.data?.items ?? [];
         setTotalPages(res?.data?.total_pages ?? 1);
@@ -131,10 +130,6 @@ export const UserListScreen: React.FC = () => {
     fetchData(targetPage, true);
   };
 
-  const handleEdit = (user: ListUsersItem) => {
-    navigation.navigate('EditProfile', {id: user.id});
-  };
-
   const openActions = (user: ListUsersItem) => {
     setSelectedUser(user);
     setActionsVisible(true);
@@ -146,60 +141,85 @@ export const UserListScreen: React.FC = () => {
 
   // open animation is inside ActionSheetModal; close is instant
 
+  const blankAvatar = require('../../../assets/icons/avatar_blank.png');
+  const BASE_URL = 'http://34.126.158.119/storage';
+
   const renderItem = ({item}: {item: ListUsersItem}) => {
-    const name = item.name || '';
-    const initials = name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map(s => s[0]?.toUpperCase())
-      .join('') || 'U';
+    const displayName = [item.prefix, item.name].filter(Boolean).join(' ');
+    const photoUri = item.photo_url
+      ? item.photo_url
+      : item.photo_url === undefined && (item as any).user_photo
+      ? `${BASE_URL}${(item as any).user_photo}`
+      : null;
+    const locationParts = [item.city, item.country_name].filter(Boolean);
+
     return (
       <TouchableOpacity
         style={listStyles.itemCard as any}
         onPress={() => navigation.navigate('User', {userId: item.id})}
         onLongPress={() => openActions(item)}
         delayLongPress={300}>
-        <View style={listStyles.itemRow as any}>
-          <View style={listStyles.avatarWrap as any}>
-            <View style={listStyles.avatar as any}>
-              <Text style={listStyles.avatarText as any}>{initials}</Text>
-            </View>
+        <View style={styles.itemRow}>
+          {/* Avatar */}
+          <View style={styles.avatarWrap}>
+            <Image
+              source={photoUri ? {uri: photoUri} : blankAvatar}
+              style={styles.avatar}
+              resizeMode="cover"
+            />
           </View>
+
+          {/* Content */}
           <View style={styles.itemCol}>
-            <Text
-              style={[styles.name, {color: C.textPrimary}]}
-              numberOfLines={1}>
-              {name}
+            {/* Name */}
+            <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={1}>
+              {displayName}
             </Text>
-            <Text
-              style={[styles.meta, {color: C.textSecondary}]}
-              numberOfLines={1}>
-              {item.role_name} · {item.country_name}
-            </Text>
+
+            {/* Role + [Title] */}
+            {(!!item.role_name || !!item.title) && (
+              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+                {[item.role_name, item.title ? `[${item.title}]` : ''].filter(Boolean).join('   ')}
+              </Text>
+            )}
+
+            {/* Church name */}
+            {!!item.church_name && (
+              <Text style={[styles.churchName, {color: C.textPrimary}]} numberOfLines={1}>
+                {item.church_name}
+              </Text>
+            )}
+
+            {/* Location */}
+            {locationParts.length > 0 && (
+              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+                {locationParts.join(', ')}
+              </Text>
+            )}
+
+            {/* Phone */}
             {!!item.mobile_phone && (
-              <Text
-                style={[styles.meta, {color: C.textSecondary}]}
-                numberOfLines={1}>
-                {formatPhoneDisplay(item.mobile_phone)}
+              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+                {`m: ${formatPhoneDisplay(item.mobile_phone)}`}
               </Text>
             )}
+
+            {/* Email + ID */}
             {!!item.email && (
-              <Text
-                style={[styles.meta, {color: C.textSecondary}]}
-                numberOfLines={1}>
-                {item.email}
+              <View style={styles.emailRow}>
+                <Text style={[styles.meta, {color: C.textSecondary, flex: 1}]} numberOfLines={1}>
+                  {`e: ${item.email}`}
+                </Text>
+                <Text style={[styles.userId, {color: C.textSecondary}]}>
+                  {`#${item.id}`}
+                </Text>
+              </View>
+            )}
+            {!item.email && (
+              <Text style={[styles.userId, {color: C.textSecondary, textAlign: 'right'}]}>
+                {`#${item.id}`}
               </Text>
             )}
-          </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={ws(15)} height={ws(15)} />
-              </TouchableOpacity>
-            </View>
           </View>
         </View>
       </TouchableOpacity>
@@ -405,42 +425,41 @@ const styles = StyleSheet.create({
   },
   itemRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: 2,
-    alignItems: 'center',
+    alignItems: 'flex-start',
+  },
+  avatarWrap: {
+    marginRight: ms(12),
+  },
+  avatar: {
+    width: ws(52),
+    height: ws(52),
+    borderRadius: rs(26),
   },
   itemCol: {
     flex: 1,
-    paddingRight: 8,
-  },
-  itemColRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: 8,
-    width: 72,
   },
   name: {
-    fontSize: fs(16),
-    fontWeight: '600',
+    fontSize: fs(14),
+    fontWeight: '700',
     marginBottom: ms(2),
+  },
+  churchName: {
+    fontSize: fs(13),
+    fontWeight: '600',
+    marginBottom: ms(1),
   },
   meta: {
     fontSize: fs(12),
-    color: '#666',
+    marginBottom: ms(1),
   },
-  actionRow: {
+  emailRow: {
     flexDirection: 'row',
-    gap: ms(6),
-  },
-  actionBtn: {
-    width: ws(25),
-    height: ws(25),
-    borderRadius: rs(3),
-    justifyContent: 'center',
     alignItems: 'center',
   },
-  editBtn: {
-    backgroundColor: COLORS.successColor,
+  userId: {
+    fontSize: fs(11),
+    fontWeight: '500',
+    marginLeft: ms(4),
   },
   deleteBtn: {
     backgroundColor: COLORS.dangerColor,
@@ -492,17 +511,6 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E5E7EB',
     shadowColor: '#000',
-  },
-  avatarWrap: {
-    marginRight: ms(12),
-  },
-  avatar: {
-    width: ws(40),
-    height: ws(40),
-    borderRadius: rs(20),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
   },
   avatarText: {
     fontWeight: '700',

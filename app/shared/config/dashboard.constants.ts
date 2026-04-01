@@ -180,24 +180,24 @@ export const getTranslatedMenuItems = (languageCode: LanguageCode = 'en', userRo
         ],
       },
     ] : []),
-    // {
-    //   label: t('resources'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('search'), routeName: 'Resources' },
-    //     { label: t('addNewResource'), routeName: 'Resources' },
-    //     { label: t('editAddTopicList'), routeName: 'Resources' },
-    //   ],
-    // },
-    // {
-    //   label: t('relating'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('search'), routeName: 'Relating' },
-    //     { label: t('viewEditMyRelatingDetails'), routeName: 'Relating' },
-    //     { label: t('multiUserRestrictions'), routeName: 'Relating' },
-    //   ],
-    // },
+    {
+      label: t('resources'),
+      children: [
+        { label: t('search'), routeName: 'Resources' },
+        { label: t('addNewResource'), routeName: 'AddNewResource' },
+        { label: t('editAddTopicList'), routeName: 'EditAddTopicList' },
+      ],
+    },
+    {
+      label: t('relating'),
+      children: [
+        {label: t('search'), routeName: 'RelatingSearch'},
+        {label: t('viewEditMyRelatingDetails'), routeName: 'RelatingDetails'},
+        ...(isSuperAdminUser
+          ? [{label: t('multiUserRestrictions'), routeName: 'RelatingMultiUserRestrictions'}]
+          : []),
+      ],
+    },
     {
       label: t('faq'),
       children: [

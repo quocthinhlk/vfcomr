@@ -175,7 +175,7 @@ export interface ChurchListData {
 }
 
 export interface ChurchListParams {
-  name?: string;
+  search?: string;
   country_id?: number;
   page?: number;
   limit?: number;

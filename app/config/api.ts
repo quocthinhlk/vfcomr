@@ -3,8 +3,10 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const DEFAULT_PAGE_LIMIT = 10;
+const APP_LANGUAGE_STORAGE_KEY = 'appLanguage';
+const DEFAULT_LANGUAGE = 'en';
 
-// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzQzNDcyMzgsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NzY4fQ.Vk8BsCNMZHfm9ENQ9mUkz5Iib_73yvTrhHMmxUVCUKY";
+// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODkzNzQ1MzQsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NDUwfQ.oH5eRvElBNThPtwq8_2nhgtAOWAhgudiK0qzRtsLhzY";
 export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
@@ -17,6 +19,18 @@ const api = axios.create({
 api.interceptors.request.use(async config => {
   try {
     const token = TOKEN_FOR_TEST || (await AsyncStorage.getItem('token')) || '';
+    const language =
+      (await AsyncStorage.getItem(APP_LANGUAGE_STORAGE_KEY))?.trim() || DEFAULT_LANGUAGE;
+
+    if (config.headers && typeof (config.headers as any).set === 'function') {
+      (config.headers as any).set('Accept-Language', language);
+    } else {
+      config.headers = {
+        ...(config.headers as Record<string, string> | undefined),
+        'Accept-Language': language,
+      } as any;
+    }
+
     if (token) {
       if (config.headers && typeof (config.headers as any).set === 'function') {
         (config.headers as any).set('Authorization', `Bearer ${token}`);

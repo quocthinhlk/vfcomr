@@ -24,7 +24,7 @@ export interface ListChurchNetworksResponse {
 export interface ListChurchNetworksParams {
   page?: number;
   limit?: number;
-  name?: string;
+  search?: string;
 }
 
 export async function listChurchNetworks(params: ListChurchNetworksParams = {}) {

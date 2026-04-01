@@ -64,7 +64,7 @@ export const ChurchesListScreen: React.FC = () => {
           limit: DEFAULT_PAGE_LIMIT,
           sort_by: 'id',
           sort_desc: true,
-          name: query && query.trim() ? query.trim() : undefined,
+          search: query && query.trim() ? query.trim() : undefined,
           disabled: true,
         });
         const nextItems = (data?.items ?? []) as ChurchListItem[];

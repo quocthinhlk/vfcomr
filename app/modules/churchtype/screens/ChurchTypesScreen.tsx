@@ -54,7 +54,7 @@ export const ChurchTypesScreen: React.FC = () => {
           return;
         }
         setLoading(true);
-        const res = await listChurchTypes({name: query});
+        const res = await listChurchTypes({search: query});
         const full = res?.data?.items ?? [];
         const filtered = query
           ? full.filter(i =>

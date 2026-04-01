@@ -55,7 +55,7 @@ export const CountriesScreen: React.FC = () => {
         const res = await listCountries({
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
-          name: query,
+          search: query,
         });
         const nextItems = res?.data?.items ?? [];
         setTotalPages(res?.data?.total_pages ?? 1);

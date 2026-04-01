@@ -61,11 +61,12 @@ export const DashboardStatCard: React.FC<DashboardStatCardProps> = ({
             <HelpIcon
               title={resolvedHelpTitle}
               message={resolvedHelpMessage}
-              size={12}
+              size={15}
               color={C.textSecondary}
               backgroundColor="transparent"
-              marginLeft={6}
+              marginLeft={8}
               offsetY={0}
+              hitSlopSize={10}
             />
           ) : null}
         </View>

@@ -23,7 +23,7 @@ export interface ListChurchTypesResponse {
 export interface ListChurchTypesParams {
   page?: number;
   limit?: number;
-  name?: string;
+  search?: string;
 }
 
 export async function listChurchTypes(params: ListChurchTypesParams = {}) {

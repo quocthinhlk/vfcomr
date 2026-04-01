@@ -119,7 +119,7 @@ export async function updateUser(id: number, payload: Partial<AddUserPayload>) {
 export interface ListUsersParams {
   page?: number;
   limit?: number;
-  name?: string;
+  search?: string;
 }
 
 export interface ListUsersItem {
@@ -129,6 +129,12 @@ export interface ListUsersItem {
   email: string;
   role_name: string;
   country_name: string;
+  // Extended fields returned by the list API
+  prefix?: string;
+  title?: string;
+  church_name?: string;
+  city?: string;
+  photo_url?: string;
 }
 
 export interface ListUsersResponse {
@@ -153,11 +159,11 @@ export async function listUsers(params: ListUsersParams = {}) {
 
   const page = params.page ?? 1;
   const limit = params.limit ?? DEFAULT_PAGE_LIMIT;
-  const name = params.name ?? '';
+  const search = params.search ?? '';
 
   try {
     const response = await api.get<ListUsersResponse>(`/users`, {
-      params: { page, limit, name },
+      params: { page, limit, search },
       headers: {
         'Authorization': `Bearer ${token}`,
       },

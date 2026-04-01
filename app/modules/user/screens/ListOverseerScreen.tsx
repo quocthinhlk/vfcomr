@@ -67,7 +67,7 @@ export const ListOverseerScreen: React.FC = () => {
           params: {
             page: targetPage,
             limit: DEFAULT_PAGE_LIMIT,
-            ...(query?.trim() ? {name: query.trim()} : {}),
+            ...(query?.trim() ? {search: query.trim()} : {}),
           },
         });
         const data = res?.data?.data;

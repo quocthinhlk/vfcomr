@@ -29,6 +29,7 @@ type Props = {
   offsetY?: number;
   backgroundColor?: string;
   containerStyle?: ViewStyle;
+  hitSlopSize?: number;
 };
 
 export default function HelpIcon({
@@ -41,6 +42,7 @@ export default function HelpIcon({
   offsetY = -2,
   backgroundColor = 'transparent',
   containerStyle,
+  hitSlopSize = 0,
 }: Props) {
   const C = useThemedColors();
   const [visible, setVisible] = useState(false);
@@ -59,6 +61,11 @@ export default function HelpIcon({
     <>
       <TouchableOpacity
         onPress={handlePress}
+        hitSlop={
+          hitSlopSize > 0
+            ? {top: hitSlopSize, bottom: hitSlopSize, left: hitSlopSize, right: hitSlopSize}
+            : undefined
+        }
         style={[
           {marginLeft: ms(marginLeft), transform: [{translateY: ms(offsetY)}]},
           containerStyle,
