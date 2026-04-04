@@ -37,203 +37,301 @@ const iconPlanting = require('../../assets/images/planting.png');
 const iconRecording = require('../../assets/images/record.png');
 const iconEdit = require('../../assets/images/edit.png');
 
+type TFunc = (key: TranslationKey) => string;
+
+const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
+  {
+    label: t('myChurchProfile'),
+    children: [
+      {label: t('churchAttendanceChart'), routeName: 'Dashboard'},
+      {label: t('churchGivingChart'), routeName: 'Dashboard'},
+      {label: t('last4WeeksDetails'), routeName: 'Dashboard'},
+      {label: t('multiServiceChurchDetails'), routeName: 'Dashboard'},
+      {label: t('daughterChurchesList'), routeName: 'Dashboard'},
+      {label: t('otherPastorLeadersInChurch'), routeName: 'Dashboard'},
+      {label: t('churchPlantingProjections'), routeName: 'ChurchPlantingProjections'},
+      {label: t('geographicLocationOnMap'), routeName: 'Dashboard'},
+      {label: t('attachments'), routeName: 'Dashboard'},
+    ],
+  },
+  {
+    label: t('pastorsLeadersListMenu'),
+    children: [
+      {label: t('all'), routeName: 'UserList'},
+      {label: t('overseers'), routeName: 'Overseers'},
+      {label: t('addNewPastor'), routeName: 'AddUser'},
+      {label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch'},
+    ],
+  },
+  {
+    label: t('churchesListMenu'),
+    children: [
+      {label: t('list'), routeName: 'Churches'},
+      {label: t('addNewChurch'), routeName: 'AddChurch'},
+      {label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch'},
+      {label: t('addNewClonedChurch'), routeName: 'CloneChurch'},
+      {label: t('disabledChurches'), routeName: 'DisableChurches'},
+    ],
+  },
+  {
+    label: t('generateReports'),
+    children: [
+      {label: t('churchReports'), routeName: 'GenerateReports'},
+      {label: t('churchesReportingStatus'), routeName: 'GenerateReports'},
+      {label: t('multiChurchReports'), routeName: 'GenerateReports'},
+      {label: t('leadersSpreadsheetReports'), routeName: 'GenerateReports'},
+      {label: t('leadersGraphReports'), routeName: 'GenerateReports'},
+      {label: t('myDirectory'), routeName: 'GenerateReports'},
+      {label: t('uaogPublicSearchLog'), routeName: 'GenerateReports'},
+      {label: t('overseerRegGoalsOnly'), routeName: 'GenerateReports'},
+      {label: t('overseerGoalsActuals'), routeName: 'GenerateReports'},
+      {label: t('overseerGoals3Year'), routeName: 'GenerateReports'},
+      {label: t('overseerGoalsActuals3Yrs'), routeName: 'GenerateReports'},
+      {label: t('overseerAccessRightsReport'), routeName: 'GenerateReports'},
+      {label: t('visitReports'), routeName: 'GenerateReports'},
+    ],
+  },
+  {
+    label: t('relating'),
+    children: [
+      {label: t('search'), routeName: 'RelatingSearch'},
+      {label: t('viewEditMyRelatingDetails'), routeName: 'RelatingDetails'},
+    ],
+  },
+  {
+    label: t('resources'),
+    children: [
+      {label: t('search'), routeName: 'Resources'},
+      {label: t('addNewResource'), routeName: 'AddNewResource'},
+      {label: t('editAddTopicList'), routeName: 'EditAddTopicList'},
+    ],
+  },
+  {
+    label: t('faq'),
+    children: [
+      {label: t('searchFaq'), routeName: 'SearchFAQ'},
+      {label: t('listFaq'), routeName: 'FAQs'},
+    ],
+  },
+  {
+    label: t('settings'),
+    children: [
+      {label: t('general'), routeName: 'SettingsGeneral'},
+      {label: t('bibleVerse'), routeName: 'SettingsBibleVerse'},
+    ],
+  },
+  {label: t('omrSupport'), routeName: 'OmrSupport'},
+  {label: t('aboutOmr'), routeName: 'AboutOmr'},
+];
+
+const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
+  {label: t('myDashboard'), routeName: 'Dashboard'},
+  {
+    label: t('users'),
+    children: [
+      {label: t('all'), routeName: 'UserList'},
+      {label: t('overseers'), routeName: 'Overseers'},
+      {label: t('addNewPastor'), routeName: 'AddUser'},
+      {label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch'},
+    ],
+  },
+  {
+    label: t('churches'),
+    children: [
+      {label: t('list'), routeName: 'Churches'},
+      {label: t('addNewChurch'), routeName: 'AddChurch'},
+      {label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch'},
+      {label: t('addNewClonedChurch'), routeName: 'CloneChurch'},
+      {label: t('disabledChurches'), routeName: 'DisableChurches'},
+    ],
+  },
+  {
+    label: t('generateReports'),
+    children: [
+      {label: t('churchReports'), routeName: 'GenerateReports'},
+      {label: t('churchesReportingStatus'), routeName: 'GenerateReports'},
+      {label: t('multiChurchReports'), routeName: 'GenerateReports'},
+      {label: t('leadersSpreadsheetReports'), routeName: 'GenerateReports'},
+      {label: t('leadersGraphReports'), routeName: 'GenerateReports'},
+      {label: t('myDirectory'), routeName: 'GenerateReports'},
+      {label: t('uaogPublicSearchLog'), routeName: 'GenerateReports'},
+      {label: t('overseerRegGoalsOnly'), routeName: 'GenerateReports'},
+      {label: t('overseerGoalsActuals'), routeName: 'GenerateReports'},
+      {label: t('overseerGoals3Year'), routeName: 'GenerateReports'},
+      {label: t('overseerGoalsActuals3Yrs'), routeName: 'GenerateReports'},
+      {label: t('overseerAccessRightsReport'), routeName: 'GenerateReports'},
+      {label: t('visitReports'), routeName: 'GenerateReports'},
+    ],
+  },
+  {
+    label: t('churchNetworks'),
+    children: [
+      {label: t('list'), routeName: 'ChurchNetworks'},
+      {label: t('addNew'), routeName: 'AddChurchNetwork'},
+    ],
+  },
+  {
+    label: t('churchTypes'),
+    children: [
+      {label: t('list'), routeName: 'ChurchTypes'},
+      {label: t('addNew'), routeName: 'AddChurchType'},
+    ],
+  },
+  {
+    label: t('churchApostolicRegions'),
+    children: [
+      {label: t('list'), routeName: 'ChurchRegions'},
+      {label: t('addNew'), routeName: 'AddChurchRegion'},
+    ],
+  },
+  {
+    label: t('languageRegions'),
+    children: [
+      {label: t('list'), routeName: 'LanguageRegions'},
+      {label: t('addNew'), routeName: 'AddLanguageRegion'},
+    ],
+  },
+  {
+    label: t('countries'),
+    children: [
+      {label: t('list'), routeName: 'Countries'},
+      {label: t('addNew'), routeName: 'AddCountry'},
+    ],
+  },
+  {
+    label: t('languages'),
+    children: [
+      {label: t('list'), routeName: 'Languages'},
+      {label: t('addNew'), routeName: 'AddLanguage'},
+    ],
+  },
+  {
+    label: t('resources'),
+    children: [
+      {label: t('search'), routeName: 'Resources'},
+      {label: t('addNewResource'), routeName: 'AddNewResource'},
+      {label: t('editAddTopicList'), routeName: 'EditAddTopicList'},
+    ],
+  },
+  {
+    label: t('relating'),
+    children: [
+      {label: t('search'), routeName: 'RelatingSearch'},
+      {label: t('viewEditMyRelatingDetails'), routeName: 'RelatingDetails'},
+      {label: t('multiUserRestrictions'), routeName: 'RelatingMultiUserRestrictions'},
+    ],
+  },
+  {
+    label: t('faq'),
+    children: [
+      {label: t('createFaq'), routeName: 'AddFAQ'},
+      {label: t('searchFaq'), routeName: 'SearchFAQ'},
+      {label: t('listFaq'), routeName: 'FAQs'},
+    ],
+  },
+  {
+    label: t('eventType'),
+    children: [
+      {label: t('addNew') || 'Add New', routeName: 'AddEventType'},
+      {label: t('list') || 'List', routeName: 'EventTypes'},
+    ],
+  },
+  {
+    label: t('settings'),
+    children: [
+      {label: t('general'), routeName: 'SettingsGeneral'},
+      {label: t('bibleVerse'), routeName: 'SettingsBibleVerse'},
+    ],
+  },
+];
+
+const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
+  {label: t('myDashboard'), routeName: 'Dashboard'},
+  {
+    label: t('users'),
+    children: [
+      {label: t('all'), routeName: 'UserList'},
+      {label: t('overseers'), routeName: 'Overseers'},
+      {label: t('addNewPastor'), routeName: 'AddUser'},
+      {label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch'},
+    ],
+  },
+  {
+    label: t('churches'),
+    children: [
+      {label: t('list'), routeName: 'Churches'},
+      {label: t('addNewChurch'), routeName: 'AddChurch'},
+      {label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch'},
+      {label: t('addNewClonedChurch'), routeName: 'CloneChurch'},
+      {label: t('disabledChurches'), routeName: 'DisableChurches'},
+    ],
+  },
+  {
+    label: t('generateReports'),
+    children: [
+      {label: t('churchReports'), routeName: 'GenerateReports'},
+      {label: t('churchesReportingStatus'), routeName: 'GenerateReports'},
+      {label: t('multiChurchReports'), routeName: 'GenerateReports'},
+      {label: t('leadersSpreadsheetReports'), routeName: 'GenerateReports'},
+      {label: t('leadersGraphReports'), routeName: 'GenerateReports'},
+      {label: t('myDirectory'), routeName: 'GenerateReports'},
+      {label: t('uaogPublicSearchLog'), routeName: 'GenerateReports'},
+      {label: t('overseerRegGoalsOnly'), routeName: 'GenerateReports'},
+      {label: t('overseerGoalsActuals'), routeName: 'GenerateReports'},
+      {label: t('overseerGoals3Year'), routeName: 'GenerateReports'},
+      {label: t('overseerGoalsActuals3Yrs'), routeName: 'GenerateReports'},
+      {label: t('overseerAccessRightsReport'), routeName: 'GenerateReports'},
+      {label: t('visitReports'), routeName: 'GenerateReports'},
+    ],
+  },
+  {
+    label: t('resources'),
+    children: [
+      {label: t('search'), routeName: 'Resources'},
+      {label: t('addNewResource'), routeName: 'AddNewResource'},
+      {label: t('editAddTopicList'), routeName: 'EditAddTopicList'},
+    ],
+  },
+  {
+    label: t('relating'),
+    children: [
+      {label: t('search'), routeName: 'RelatingSearch'},
+      {label: t('viewEditMyRelatingDetails'), routeName: 'RelatingDetails'},
+    ],
+  },
+  {
+    label: t('faq'),
+    children: [
+      {label: t('searchFaq'), routeName: 'SearchFAQ'},
+      {label: t('listFaq'), routeName: 'FAQs'},
+    ],
+  },
+  {
+    label: t('settings'),
+    children: [
+      {label: t('general'), routeName: 'SettingsGeneral'},
+      {label: t('bibleVerse'), routeName: 'SettingsBibleVerse'},
+    ],
+  },
+];
+
 // Function to get translated menu items
-export const getTranslatedMenuItems = (languageCode: LanguageCode = 'en', userRoleId?: number): CommonMenuItem[] => {
+export const getTranslatedMenuItems = (
+  languageCode: LanguageCode = 'en',
+  userRoleId?: number,
+): CommonMenuItem[] => {
   const t = (key: TranslationKey): string => {
     const dict = translations[languageCode] as Record<string, string>;
     return dict[key] || translations.en[key] || key;
   };
 
-  const isSuperAdminUser = isSuperAdmin(userRoleId);
-  const isPastorUser = isPastorLeader(userRoleId);
-
-  return [
-    { label: t('myDashboard'), routeName: 'Dashboard' },
-    {
-      label: t('users'),
-      children: [
-        { label: t('all'), routeName: 'UserList' },
-        // Overseers item will be conditionally displayed in MenuPopup by permission
-        { label: t('overseers'), routeName: 'Overseers' },
-        { label: t('addNewPastor'), routeName: 'AddUser' },
-        { label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch' },
-      ],
-    },
-    // {
-    //   label: t('userRoles'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('list'), routeName: 'UserRoles' },
-    //     { label: t('addNew'), routeName: 'UserRoles' },
-    //   ],
-    // },
-    // { label: t('switchUser'), disabled: true, routeName: 'SwitchUser' },
-    {
-      label: t('churches'),
-      children: [
-        { label: t('list'), routeName: 'Churches' },
-        { label: t('addNewChurch'), routeName: 'AddChurch' },
-        { label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch' },
-        { label: t('addNewClonedChurch'), routeName: 'CloneChurch' },
-        { label: t('disabledChurches'), routeName: 'DisableChurches' },
-        // { label: t('townDescriptorReport'), routeName: 'GenerateReports' },
-
-      ],
-    },
-    ...(isPastorUser ? [
-      {
-        label: t('churchPlantingProjections') || 'Church Planting Projections',
-        children: [
-          { label: t('addProjections'), routeName: 'AddChurchPlantingProjection' },
-          { label: t('viewProjections'), routeName: 'ChurchPlantingProjections' },
-
-        ],
-      },
-    ] : []),
-    // {
-    //   label: t('watchList'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('viewMyWatchlists'), routeName: 'WatchList' },
-    //     { label: t('addNewWatchlist'), routeName: 'WatchList' },
-    //     { label: t('generateReports'), routeName: 'GenerateReports' },
-    //   ],
-    // },
-    // {
-    //   label: t('overseerGoals'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('add'), routeName: 'OverseerGoals' },
-    //     { label: t('list'), routeName: 'OverseerGoals' },
-    //     { label: t('editDefaults'), routeName: 'OverseerGoals' },
-    //   ],
-    // },
-    {
-      label: t('generateReports'),
-      children: [
-        { label: t('churchReports'), routeName: 'GenerateReports' },
-        { label: t('churchesReportingStatus'), routeName: 'GenerateReports' },
-        { label: t('multiChurchReports'), routeName: 'GenerateReports' },
-        { label: t('leadersSpreadsheetReports'), routeName: 'GenerateReports' },
-        { label: t('leadersGraphReports'), routeName: 'GenerateReports' },
-        { label: t('myDirectory'), routeName: 'GenerateReports' },
-        { label: t('uaogPublicSearchLog'), routeName: 'GenerateReports' },
-        { label: t('overseerRegGoalsOnly'), routeName: 'GenerateReports' },
-        { label: t('overseerGoalsActuals'), routeName: 'GenerateReports' },
-        { label: t('overseerGoals3Year'), routeName: 'GenerateReports' },
-        { label: t('overseerGoalsActuals3Yrs'), routeName: 'GenerateReports' },
-        { label: t('overseerAccessRightsReport'), routeName: 'GenerateReports' },
-        { label: t('visitReports'), routeName: 'GenerateReports' },
-      ],
-    },
-    ...(isSuperAdminUser ? [
-      {
-        label: t('churchNetworks'),
-        children: [
-          { label: t('list'), routeName: 'ChurchNetworks' },
-          { label: t('addNew'), routeName: 'AddChurchNetwork' },
-        ],
-      },
-      {
-        label: t('churchTypes'),
-        children: [
-          { label: t('list'), routeName: 'ChurchTypes' },
-          { label: t('addNew'), routeName: 'AddChurchType' },
-        ],
-      },
-      {
-        label: t('churchApostolicRegions'),
-        children: [
-          { label: t('list'), routeName: 'ChurchRegions' },
-          { label: t('addNew'), routeName: 'AddChurchRegion' },
-        ],
-      },
-    ] : []),
-    // {
-    //   label: t('geographicalRegions'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('list'), routeName: 'ChurchApostolicRegions' },
-    //     { label: t('addNew'), routeName: 'ChurchApostolicRegions' },
-    //   ],
-    // },
-    ...(isSuperAdminUser ? [
-      {
-        label: t('languageRegions'),
-        children: [
-          { label: t('list'), routeName: 'LanguageRegions' },
-          { label: t('addNew'), routeName: 'AddLanguageRegion' },
-        ],
-      },
-      {
-        label: t('countries'),
-        children: [
-          { label: t('list'), routeName: 'Countries' },
-          { label: t('addNew'), routeName: 'AddCountry' },
-        ],
-      },
-      {
-        label: t('languages'),
-        children: [
-          { label: t('list'), routeName: 'Languages' },
-          { label: t('addNew'), routeName: 'AddLanguage' },
-        ],
-      },
-    ] : []),
-    {
-      label: t('resources'),
-      children: [
-        { label: t('search'), routeName: 'Resources' },
-        { label: t('addNewResource'), routeName: 'AddNewResource' },
-        { label: t('editAddTopicList'), routeName: 'EditAddTopicList' },
-      ],
-    },
-    {
-      label: t('relating'),
-      children: [
-        {label: t('search'), routeName: 'RelatingSearch'},
-        {label: t('viewEditMyRelatingDetails'), routeName: 'RelatingDetails'},
-        ...(isSuperAdminUser
-          ? [{label: t('multiUserRestrictions'), routeName: 'RelatingMultiUserRestrictions'}]
-          : []),
-      ],
-    },
-    {
-      label: t('faq'),
-      children: [
-        ...(isSuperAdminUser ? [
-          { label: t('createFaq'), routeName: 'AddFAQ' },
-        ] : []),
-        { label: t('searchFaq'), routeName: 'SearchFAQ' },
-        { label: t('listFaq'), routeName: 'FAQs' },
-      ],
-    },
-    ...(isSuperAdminUser ? [
-      {
-        label: t('eventType'),
-        children: [
-          { label: t('addNew') || 'Add New', routeName: 'AddEventType' },
-          { label: t('list') || 'List', routeName: 'EventTypes' },
-        ],
-      },
-    ] : []),
-    // {
-    //   label: t('pushMail'),
-    //   disabled: true,
-    //   children: [
-    //     { label: t('search'), routeName: 'PushMail' },
-    //   ],
-    // },
-    // { label: t('support'), disabled: true, routeName: 'Support' },
-    {
-      label: t('settings'),
-      children: [
-        { label: t('general'), routeName: 'SettingsGeneral' },
-        { label: t('bibleVerse'), routeName: 'SettingsBibleVerse' },
-        // { label: t('rationalisingTownNames'), routeName: 'SettingsRationalising' },
-      ],
-    },
-  ];
+  if (isPastorLeader(userRoleId)) {
+    return getPastorMenuItems(t);
+  }
+  if (isSuperAdmin(userRoleId)) {
+    return getSuperAdminMenuItems(t);
+  }
+  return getDefaultMenuItems(t);
 };
 
 export const dashboardMenuItems: CommonMenuItem[] = [

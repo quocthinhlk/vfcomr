@@ -75,6 +75,8 @@ export type RootStackParamList = {
   Profile: undefined;
   SwitchUser: undefined;
   Support: undefined;
+  OmrSupport: undefined;
+  AboutOmr: undefined;
   UserList: undefined;
   DeleteUser: { userId: number } | undefined;
   EditCountry: { countryId: number } | undefined;
@@ -189,6 +191,8 @@ import RationalisingScreen from '../modules/setting/screens/RationalisingScreen'
 import { ProfileScreen } from '../modules/user/screens/ProfileScreen';
 import { SwitchUserScreen } from '../modules/user/screens/SwitchUserScreen';
 import { SupportScreen } from '../modules/dashboard/screens/SupportScreen';
+import { OmrSupportScreen } from '../modules/omrsupport/screens/OmrSupportScreen';
+import { AboutOmrScreen } from '../modules/aboutomr/screens/AboutOmrScreen';
 import { UserListScreen } from '../modules/user/screens/UserListScreen';
 import DeleteUserScreen from '../modules/user/screens/DeleteUserScreen';
 import EditCountryScreen from '../modules/country/screens/EditCountryScreen';
@@ -336,6 +340,8 @@ export default function Navigation() {
               <Stack.Screen name="DeleteEventType" component={DeleteEventTypeScreen} />
               <Stack.Screen name="PushMail" component={PushMailScreen} />
               <Stack.Screen name="Support" component={SupportScreen} />
+              <Stack.Screen name="OmrSupport" component={OmrSupportScreen} />
+              <Stack.Screen name="AboutOmr" component={AboutOmrScreen} />
               <Stack.Screen name="Settings" component={SettingsScreen} />
               <Stack.Screen name="SettingsGeneral" component={GeneralScreen} />
               <Stack.Screen name="SettingsBibleVerse" component={BibleVerseScreen} />

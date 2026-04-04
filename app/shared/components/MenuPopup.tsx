@@ -172,7 +172,11 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
                     return (
                       <View key={idx}>
                         <TouchableOpacity
-                          style={[styles.menuItem, item.disabled && styles.disabledMenuItem]}
+                          style={[
+                            styles.menuItem,
+                            hasChildren && styles.menuItemParent,
+                            item.disabled && styles.disabledMenuItem,
+                          ]}
                           disabled={item.disabled}
                           onPress={() => {
                             if (item.disabled) return;
@@ -199,6 +203,7 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
                               <TouchableOpacity
                                 key={`${idx}-${cIdx}`}
                                 style={styles.subMenuItem}
+                                activeOpacity={0.75}
                                 onPress={() => onMenuItemPress(child)}>
                                 {child.icon && (
                                   <Image source={child.icon} style={styles.subMenuIcon} />
@@ -320,8 +325,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: ms(10),
+    paddingHorizontal: 0,
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(255,255,255,0.08)',
+  },
+  menuItemParent: {
+    marginTop: 0,
   },
   menuIcon: {
     width: ws(24),
@@ -331,7 +340,7 @@ const styles = StyleSheet.create({
   },
   menuBulletText: {
     color: '#fff',
-    fontSize: fs(12),
+    fontSize: fs(13),
     lineHeight: fs(12),
     marginRight: ms(6),
   },
@@ -339,6 +348,7 @@ const styles = StyleSheet.create({
     fontSize: fs(16),
     color: '#fff',
     flex: 1,
+    fontWeight: '600',
   },
   expandIndicator: {
     color: '#fff',
@@ -346,14 +356,18 @@ const styles = StyleSheet.create({
     fontSize: fs(16),
   },
   subMenuList: {
-    paddingLeft: ms(8),
+    marginLeft: ms(14),
+    marginTop: ms(1),
+    marginBottom: ms(2),
+    paddingLeft: 0,
+    borderLeftWidth: 0,
   },
   subMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: ms(10),
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.06)',
+    paddingVertical: ms(8),
+    paddingRight: ms(6),
+    borderBottomWidth: 0,
   },
   subMenuIcon: {
     width: ws(18),
@@ -362,14 +376,14 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   subMenuBulletText: {
-    color: '#fff',
-    fontSize: fs(9),
-    lineHeight: fs(11),
-    marginRight: ms(6),
+    color: 'rgba(255,255,255,0.7)',
+    fontSize: fs(10),
+    lineHeight: fs(10),
+    marginRight: ms(8),
   },
   subMenuLabel: {
-    fontSize: fs(16),
-    color: '#fff',
+    fontSize: fs(14),
+    color: 'rgba(255,255,255,0.88)',
   },
 
   logoutButton: {
