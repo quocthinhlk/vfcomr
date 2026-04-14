@@ -1,12 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {ActivityIndicator, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {globalStyles} from '../../../shared/styles/global';
@@ -16,9 +9,10 @@ import {Header} from '../../../shared/components/Header';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {COLORS} from '../../../shared/constants/colors';
-import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
+import {fs, ms, rs} from '../../../shared/utils/scale';
 import {
   getResourceCategories,
+  getResourceDetail,
   getResources,
   getResourceTypes,
   ResourceCategoryItem,
@@ -42,11 +36,16 @@ export default function SearchResourcesScreen() {
   const [types, setTypes] = useState<ResourceTypeItem[]>([]);
   const [topics, setTopics] = useState<ResourceCategoryItem[]>([]);
   const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
-  const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
+  const [selectedResourceDetail, setSelectedResourceDetail] =
+    useState<ResourceItem | null>(null);
+  const [filteredResults, setFilteredResults] = useState<ResourceItem[] | null>(null);
   const [loadingInit, setLoadingInit] = useState(true);
   const [loadingTopic, setLoadingTopic] = useState(false);
+  const [loadingResourceDetail, setLoadingResourceDetail] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [screenError, setScreenError] = useState<string>('');
   const topicDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadTopics = useCallback(async (keyword?: string) => {
@@ -68,30 +67,33 @@ export default function SearchResourcesScreen() {
   const loadInitialData = useCallback(async () => {
     try {
       setLoadingInit(true);
-      const [resourceRes, typeRes] = await Promise.allSettled([getResources(), getResourceTypes()]);
+      setScreenError('');
       const errors: string[] = [];
+      const [resourceRes, typeRes] = await Promise.allSettled([
+        getResources(),
+        getResourceTypes(),
+      ]);
 
       if (resourceRes.status === 'fulfilled') {
         setResources(resourceRes.value);
       } else {
         setResources([]);
-        errors.push(`Resources: ${getErrorMessage(resourceRes.reason)}`);
+        errors.push(getErrorMessage(resourceRes.reason));
       }
 
       if (typeRes.status === 'fulfilled') {
         setTypes(typeRes.value);
       } else {
         setTypes([]);
-        errors.push(`Types: ${getErrorMessage(typeRes.reason)}`);
+        errors.push(getErrorMessage(typeRes.reason));
       }
 
       await loadTopics('');
-
-      if (errors.length) {
-        Alert.alert('Error', `Some data could not be loaded.\n${errors.join('\n')}`);
+      if (errors.length > 0) {
+        setScreenError(errors[0]);
       }
     } catch (error) {
-      Alert.alert('Error', getErrorMessage(error));
+      setScreenError(getErrorMessage(error));
     } finally {
       setLoadingInit(false);
     }
@@ -110,31 +112,19 @@ export default function SearchResourcesScreen() {
   }, []);
 
   const resourceOptions = useMemo(
-    () =>
-      resources.map(item => ({
-        label: item.name,
-        value: item.id,
-      })),
+    () => resources.map(item => ({label: item.name, value: item.id})),
     [resources],
   );
 
-  const topicOptions = useMemo(
-    () =>
-      topics.map(item => ({
-        label: item.name,
-        value: item.id,
-      })),
-    [topics],
+  const typeOptions = useMemo(
+    () => types.map(item => ({label: item.name, value: item.id})),
+    [types],
   );
 
-  const leftTypes = useMemo(() => types.filter((_, index) => index % 2 === 0), [types]);
-  const rightTypes = useMemo(() => types.filter((_, index) => index % 2 !== 0), [types]);
-
-  const onToggleType = (typeId: number) => {
-    setSelectedTypeIds(prev =>
-      prev.includes(typeId) ? prev.filter(item => item !== typeId) : [...prev, typeId],
-    );
-  };
+  const topicOptions = useMemo(
+    () => topics.map(item => ({label: item.name, value: item.id})),
+    [topics],
+  );
 
   const onSearchTopic = (keyword: string) => {
     if (topicDebounceRef.current) {
@@ -145,41 +135,60 @@ export default function SearchResourcesScreen() {
     }, 300);
   };
 
-  const handleNext = async () => {
-    setSubmitting(true);
+  const onSelectResource = async (value: string | number | null) => {
+    const resourceId = typeof value === 'number' ? value : null;
+    setSelectedResourceId(resourceId);
+    setFilteredResults(null);
+    setScreenError('');
+
+    if (!resourceId) {
+      setSelectedResourceDetail(null);
+      return;
+    }
+
     try {
-      Alert.alert('Success', 'Search criteria applied.');
+      setLoadingResourceDetail(true);
+      const detail = await getResourceDetail(resourceId);
+      setSelectedResourceDetail(detail);
+      if (detail?.type_id) {
+        setSelectedTypeId(detail.type_id);
+      }
+      if (detail?.topic_id) {
+        setSelectedTopicId(detail.topic_id);
+      }
+    } catch (error) {
+      setSelectedResourceDetail(null);
+      setScreenError(getErrorMessage(error));
+    } finally {
+      setLoadingResourceDetail(false);
+    }
+  };
+
+  const onSubmitSearch = async () => {
+    if (selectedResourceId) {
+      return;
+    }
+
+    if (!selectedTypeId && !selectedTopicId) {
+      setScreenError(t('resourceSelectTypeOrTopic'));
+      return;
+    }
+
+    try {
+      setSubmitting(true);
+      setScreenError('');
+      const data = await getResources({
+        typeId: selectedTypeId,
+        topicId: selectedTopicId,
+      });
+      setFilteredResults(data);
+    } catch (error) {
+      setFilteredResults([]);
+      setScreenError(getErrorMessage(error));
     } finally {
       setSubmitting(false);
     }
   };
-
-  const renderTypeColumn = (items: ResourceTypeItem[]) => (
-    <View style={styles.typeColumn}>
-      {items.map(item => {
-        const selected = selectedTypeIds.includes(item.id);
-        return (
-          <TouchableOpacity
-            key={item.id}
-            onPress={() => onToggleType(item.id)}
-            activeOpacity={0.8}
-            style={styles.typeRow}>
-            <View
-              style={[
-                styles.checkbox,
-                {
-                  borderColor: selected ? COLORS.mainColor : '#d1d1d1',
-                  backgroundColor: selected ? COLORS.mainColor : '#fff',
-                },
-              ]}>
-              {selected ? <Text style={styles.checkboxText}>✓</Text> : null}
-            </View>
-            <Text style={[styles.typeName, {color: C.textPrimary}]}>{item.name}</Text>
-          </TouchableOpacity>
-        );
-      })}
-    </View>
-  );
 
   return (
     <SafeAreaView
@@ -190,7 +199,7 @@ export default function SearchResourcesScreen() {
 
         {loadingInit ? (
           <View style={styles.loadingWrap}>
-            <ActivityIndicator size="large" color={COLORS.mainColor} />
+            <ActivityIndicator color={COLORS.mainColor} />
           </View>
         ) : (
           <ScrollView
@@ -198,68 +207,112 @@ export default function SearchResourcesScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}>
-            <View style={styles.panel}>
-              <View style={styles.panelHeader}>
-                <Text style={styles.panelTitle}>Search Resources by name</Text>
-              </View>
-              <View style={styles.panelBody}>
-                <View style={styles.formGroup}>
-                  <Text style={[styles.formLabel, {color: C.textSecondary}]}>
-                    Select the Resource you are looking for
-                  </Text>
-                  <ElementDropdown
-                    data={resourceOptions}
-                    value={selectedResourceId}
-                    onChange={value => setSelectedResourceId((value as number) ?? null)}
-                    placeholder="Please select..."
-                    search
-                    containerStyle={styles.dropdown}
-                  />
-                </View>
-              </View>
+            <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
+              <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
+                {t('resourceSearchByName')}
+              </Text>
+              <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                {t('resourceSelectResourceLabel')}
+              </Text>
+              <ElementDropdown
+                data={resourceOptions}
+                value={selectedResourceId}
+                onChange={onSelectResource}
+                placeholder={t('resourcePlaceholderSelect')}
+                search
+              />
+              {loadingResourceDetail ? (
+                <Text style={[styles.helperText, {color: C.textSecondary}]}>
+                  {t('loading')}...
+                </Text>
+              ) : null}
             </View>
 
-            <View style={styles.panel}>
-              <View style={styles.panelHeader}>
-                <Text style={styles.panelTitle}>Search Resources by Type and or Topic</Text>
-              </View>
-              <View style={styles.panelBody}>
-                <Text style={[styles.sectionLabel, {color: C.textSecondary}]}>
-                  Select the Type of Resources you are looking for
+            <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
+              <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
+                {t('resourceSearchByTypeOrTopic')}
+              </Text>
+
+              <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                {t('resourceSelectTypeLabel')}
+              </Text>
+              <ElementDropdown
+                data={typeOptions}
+                value={selectedTypeId}
+                onChange={value => setSelectedTypeId((value as number) ?? null)}
+                placeholder={t('resourcePlaceholderSelect')}
+                search
+              />
+
+              <Text style={[styles.fieldLabel, styles.spacingTop, {color: C.textSecondary}]}>
+                {t('resourceSelectTopicLabel')}
+              </Text>
+              <ElementDropdown
+                data={topicOptions}
+                value={selectedTopicId}
+                onChange={value => setSelectedTopicId((value as number) ?? null)}
+                placeholder={t('resourcePlaceholderSelect')}
+                search
+                onSearchText={onSearchTopic}
+              />
+              {loadingTopic ? (
+                <Text style={[styles.helperText, {color: C.textSecondary}]}>
+                  {t('loading')}...
                 </Text>
+              ) : null}
 
-                <View style={styles.typeGrid}>
-                  {renderTypeColumn(leftTypes)}
-                  {renderTypeColumn(rightTypes)}
-                </View>
-
-                <View style={[styles.separator, {borderTopColor: C.inputBorder}]} />
-
-                <View style={styles.formGroup}>
-                  <Text style={[styles.formLabel, {color: C.textSecondary}]}>Select the Topics of interest</Text>
-                  <ElementDropdown
-                    data={topicOptions}
-                    value={selectedTopicId}
-                    onChange={value => setSelectedTopicId((value as number) ?? null)}
-                    placeholder="Please select..."
-                    search
-                    onSearchText={onSearchTopic}
-                    containerStyle={styles.dropdown}
-                  />
-                </View>
-
+              {!selectedResourceId ? (
                 <View style={styles.buttonRow}>
                   <SaveButton
-                    label={submitting ? 'Loading...' : 'NEXT'}
-                    onPress={handleNext}
+                    label={submitting ? `${t('loading')}...` : t('next')}
+                    onPress={onSubmitSearch}
                     disabled={submitting}
                     style={styles.nextButton}
                   />
                 </View>
-              </View>
+              ) : null}
             </View>
 
-            {loadingTopic ? <Text style={[styles.loadingText, {color: C.textSecondary}]}>Loading topics...</Text> : null}
+            {screenError ? (
+              <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>
+                {screenError}
+              </Text>
+            ) : null}
+
+            {selectedResourceDetail ? (
+              <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
+                <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
+                  {t('resourceDetailTitle')}
+                </Text>
+                <Text style={[styles.resultTitle, {color: C.textPrimary}]}>
+                  {selectedResourceDetail.name}
+                </Text>
+                <Text style={[styles.resultDescription, {color: C.textSecondary}]}>
+                  {selectedResourceDetail.short_description ||
+                    selectedResourceDetail.description ||
+                    t('noDataFound')}
+                </Text>
+              </View>
+            ) : null}
+
+            {filteredResults ? (
+              <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
+                <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
+                  {t('resourceFilteredResults')}
+                </Text>
+                {filteredResults.length === 0 ? (
+                  <Text style={[styles.resultDescription, {color: C.textSecondary}]}>
+                    {t('resourceNoResults')}
+                  </Text>
+                ) : (
+                  filteredResults.map(item => (
+                    <Text key={item.id} style={[styles.resultItem, {color: C.textPrimary}]}>
+                      {`\u2022 ${item.name}`}
+                    </Text>
+                  ))
+                )}
+              </View>
+            ) : null}
           </ScrollView>
         )}
       </View>
@@ -284,99 +337,54 @@ const styles = StyleSheet.create({
     paddingTop: ms(8),
     paddingBottom: ms(20),
   },
-  panel: {
+  card: {
     borderWidth: 1,
-    borderColor: '#d8dce3',
-    backgroundColor: '#fff',
     borderRadius: rs(10),
-    marginBottom: ms(14),
-    overflow: 'hidden',
-  },
-  panelHeader: {
-    minHeight: hs(42),
-    borderBottomWidth: 1,
-    borderBottomColor: '#e4e7ec',
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: ms(12),
-    backgroundColor: '#f7f8fa',
-  },
-  panelTitle: {
-    color: '#1f2937',
-    fontSize: fs(14),
-    fontWeight: '700',
-  },
-  panelBody: {
     paddingHorizontal: ms(12),
     paddingVertical: ms(12),
+    marginBottom: ms(12),
   },
-  formGroup: {
-    marginBottom: ms(4),
+  cardTitle: {
+    fontSize: fs(14),
+    fontWeight: '700',
+    marginBottom: ms(10),
   },
-  formLabel: {
+  fieldLabel: {
     fontSize: fs(13),
     fontWeight: '600',
     marginBottom: ms(8),
   },
-  dropdown: {
-    backgroundColor: '#fff',
-    borderColor: '#d1d1d1',
+  spacingTop: {
+    marginTop: ms(12),
   },
-  sectionLabel: {
-    fontSize: fs(13),
-    fontWeight: '600',
-    marginBottom: ms(10),
-  },
-  typeGrid: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  typeColumn: {
-    width: '48%',
-  },
-  typeRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    marginBottom: ms(12),
-  },
-  checkbox: {
-    width: ws(20),
-    height: ws(20),
-    borderWidth: 1,
-    borderRadius: rs(4),
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginRight: ms(8),
-    marginTop: ms(1),
-  },
-  checkboxText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: fs(11),
-  },
-  typeName: {
-    flex: 1,
-    fontSize: fs(13),
-    lineHeight: fs(18),
-  },
-  separator: {
-    marginTop: ms(4),
-    marginBottom: ms(12),
-    borderTopWidth: 1,
+  helperText: {
+    fontSize: fs(12),
+    marginTop: ms(6),
   },
   buttonRow: {
-    marginTop: ms(8),
+    marginTop: ms(12),
     flexDirection: 'row',
     justifyContent: 'center',
   },
   nextButton: {
     width: '100%',
-    maxWidth: ws(220),
-    flex: 1,
   },
-  loadingText: {
+  errorText: {
     fontSize: fs(12),
-    marginTop: ms(-2),
-    marginBottom: ms(8),
+    marginBottom: ms(12),
+  },
+  resultTitle: {
+    fontSize: fs(14),
+    fontWeight: '600',
+    marginBottom: ms(6),
+  },
+  resultDescription: {
+    fontSize: fs(13),
+    lineHeight: fs(18),
+  },
+  resultItem: {
+    fontSize: fs(13),
+    lineHeight: fs(20),
+    marginBottom: ms(4),
   },
 });

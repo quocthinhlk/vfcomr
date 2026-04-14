@@ -1,5 +1,4 @@
 import api from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface ResourceItem {
   id: number;
@@ -26,24 +25,21 @@ export interface ResourceFileFormatItem {
   description?: string | null;
 }
 
-const getAuthHeaders = async () => {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
+export async function getResources(params?: {
+  typeId?: number | null;
+  topicId?: number | null;
+}): Promise<ResourceItem[]> {
+  const typeId = params?.typeId;
+  const topicId = params?.topicId;
+  const query: Record<string, number> = {};
+  if (typeof typeId === 'number') {
+    query.type_id = typeId;
   }
-  return {
-    Authorization: `Bearer ${token}`,
-  };
-};
-
-export async function getResources(): Promise<ResourceItem[]> {
-  const headers = await getAuthHeaders();
+  if (typeof topicId === 'number') {
+    query.topic_id = topicId;
+  }
   const response = await api.get('resources', {
-    headers,
-    params: {
-      page: 1,
-      limit: 200,
-    },
+    ...(Object.keys(query).length > 0 ? {params: query} : {}),
   });
   const payload = response?.data?.data;
   if (Array.isArray(payload)) {
@@ -56,9 +52,7 @@ export async function getResources(): Promise<ResourceItem[]> {
 }
 
 export async function getResourceTypes(): Promise<ResourceTypeItem[]> {
-  const headers = await getAuthHeaders();
   const response = await api.get('resources/types', {
-    headers,
     params: {
       page: 1,
       limit: 200,
@@ -79,10 +73,8 @@ export async function getResourceCategories(params?: {
   page?: number;
   name?: string;
 }): Promise<ResourceCategoryItem[]> {
-  const headers = await getAuthHeaders();
   const normalizedName = (params?.name ?? '').trim();
   const response = await api.get('resources/categories', {
-    headers,
     params: {
       page: params?.page ?? 1,
       limit: params?.limit ?? 10,
@@ -93,13 +85,11 @@ export async function getResourceCategories(params?: {
 }
 
 export async function getResourceFileFormats(): Promise<ResourceFileFormatItem[]> {
-  const headers = await getAuthHeaders();
-  const response = await api.get('resources/files/formats', {headers});
+  const response = await api.get('resources/files/formats');
   return (response?.data?.data ?? []) as ResourceFileFormatItem[];
 }
 
 export async function getResourceDetail(resourceId: number): Promise<ResourceItem | null> {
-  const headers = await getAuthHeaders();
-  const response = await api.get(`resources/${resourceId}`, {headers});
+  const response = await api.get(`resources/${resourceId}`);
   return (response?.data?.data ?? null) as ResourceItem | null;
 }

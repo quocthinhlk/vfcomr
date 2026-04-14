@@ -59,6 +59,26 @@ const formatNumberToM = (num: number): string => {
   return parseFloat(millions.toFixed(2)).toString() + 'M';
 };
 
+const REQUEST_TIMEOUT_MS = 15000;
+
+const withTimeout = <T,>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS) => {
+  return new Promise<T>((resolve, reject) => {
+    const timeoutId = setTimeout(() => {
+      reject(new Error('REQUEST_TIMEOUT'));
+    }, timeoutMs);
+
+    promise
+      .then(result => {
+        clearTimeout(timeoutId);
+        resolve(result);
+      })
+      .catch(error => {
+        clearTimeout(timeoutId);
+        reject(error);
+      });
+  });
+};
+
 // Stats data will be populated from API
 const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
   if (!dashboardData?.dashboard_indicators) return [];
@@ -261,7 +281,9 @@ export default function DashboardPastorLeaderScreen() {
         await AsyncStorage.setItem('selectedChurchName', String(church.name));
       }
       
-      const res = await api.get('dashboard', { params: { church_id: church?.id } });
+      const res = await withTimeout(
+        api.get('dashboard', { params: { church_id: church?.id } }),
+      );
       const data = res?.data?.data;
       if (data) {
         // use top-level formatLastRecord
@@ -295,10 +317,15 @@ export default function DashboardPastorLeaderScreen() {
         // Prepare dashboard API call with church_id if available
         const dashboardParams = savedChurchId ? { church_id: parseInt(savedChurchId, 10) } : undefined;
         
-        const [userRes, dashboardRes] = await Promise.all([
-          api.get('users/me'),
-          api.get('dashboard', dashboardParams ? { params: dashboardParams } : undefined)
-        ]);
+        const [userRes, dashboardRes] = await withTimeout(
+          Promise.all([
+            api.get('users/me'),
+            api.get(
+              'dashboard',
+              dashboardParams ? { params: dashboardParams } : undefined,
+            ),
+          ]),
+        );
         if (!mounted) return;
         
         const userData = userRes?.data?.data;
@@ -418,6 +445,32 @@ export default function DashboardPastorLeaderScreen() {
           console.error('Error setting default church ID:', error);
         } finally {
           navigation.navigate(item.routeName);
+        }
+      } else if (item.routeName === 'ChurchAttendanceChart') {
+        try {
+          const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+          const parsedChurchId = savedChurchId ? parseInt(savedChurchId, 10) : NaN;
+          if (!isNaN(parsedChurchId) && parsedChurchId > 0) {
+            navigation.navigate('ChurchAttendanceChart', {churchId: parsedChurchId});
+          } else {
+            navigation.navigate('ChurchAttendanceChart');
+          }
+        } catch (error) {
+          console.error('Error getting selected church ID for attendance chart:', error);
+          navigation.navigate('ChurchAttendanceChart');
+        }
+      } else if (item.routeName === 'ChurchGivingChart') {
+        try {
+          const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+          const parsedChurchId = savedChurchId ? parseInt(savedChurchId, 10) : NaN;
+          if (!isNaN(parsedChurchId) && parsedChurchId > 0) {
+            navigation.navigate('ChurchGivingChart', {churchId: parsedChurchId});
+          } else {
+            navigation.navigate('ChurchGivingChart');
+          }
+        } catch (error) {
+          console.error('Error getting selected church ID for chart:', error);
+          navigation.navigate('ChurchGivingChart');
         }
       } else {
         navigation.navigate(item.routeName);
@@ -675,46 +728,31 @@ export default function DashboardPastorLeaderScreen() {
           <View style={styles.locationRow}>
             <Text style={[styles.locationText, { color: C.textSecondary }]}>{userProfile.location}</Text>
             <View style={styles.reportVerifyColumn}>
-              <Text style={styles.lastRecordValue}>
-                {t('lastMonthlyRecord')}: {formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}
+              <Text style={styles.lastRecordDate} numberOfLines={1}>
+                {`${t('lastMonthlyRecord')}: `}
+                <Text style={styles.lastRecordDateValue}>
+                  {formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}
+                </Text>
               </Text>
               {dashboardData?.dashboard_info && (
                 dashboardData.dashboard_info.is_verified ? (
-                  <Text style={[styles.verificationText, { color: '#4da72e' }]}>
+                  <Text style={[styles.verificationText, { color: '#1e7e34' }]}>
                     {'\u2714\uFE0E'} Visited {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by {dashboardData.dashboard_info.verified_by_user_name || ''}
                   </Text>
                 ) : (
-                  <Text style={[styles.verificationText, { color: '#e97132' }]}>
-                    Needs a Verification Visit
+                  <Text style={[styles.verificationText, { color: '#c0392b' }]}>
+                    {t('needsVerificationVisit')}
                   </Text>
                 )
               )}
             </View>
           </View>
 
-          {/* Row 4: Name (left) + Avatar (center) */}
+          {/* Row 4: Avatar (left) + Name (right) */}
           <View style={styles.namePhotoRow}>
+            {/* Avatar — tappable to view full image */}
             <TouchableOpacity
-              onPress={() => {
-                if (currentUserId) {
-                  navigation.navigate('User', { userId: currentUserId });
-                }
-              }}
-              activeOpacity={0.7}
-              disabled={!currentUserId}
-              style={styles.nameBlock}
-            >
-              <Text style={styles.profileNameLink} numberOfLines={1} ellipsizeMode="tail">
-                {userProfile.prefix ? `${userProfile.prefix} ${userProfile.name}` : userProfile.name}
-              </Text>
-              {userProfile.title ? (
-                <Text style={[styles.titleText, { color: C.textSecondary }]} numberOfLines={1} ellipsizeMode="tail">
-                  {userProfile.title}
-                </Text>
-              ) : null}
-            </TouchableOpacity>
-            <TouchableOpacity
-              activeOpacity={0.9}
+              activeOpacity={0.85}
               style={styles.avatarWrapper}
               disabled={!userProfile.profileImage || profileError}
               onPress={() => {
@@ -724,18 +762,37 @@ export default function DashboardPastorLeaderScreen() {
                 }
               }}
             >
-              {userProfile.profileImage && !profileError ? (
-                <Image
-                  source={{ uri: userProfile.profileImage }}
-                  style={styles.profileImage}
-                  onError={() => setProfileError(true)}
-                />
-              ) : (
-                <Image
-                  source={require('../../../../app/assets/images/blank-avatar.png')}
-                  style={styles.profileImage}
-                />
-              )}
+              <View style={[styles.avatarRing, { borderColor: COLORS.mainColor + '55' }]}>
+                {userProfile.profileImage && !profileError ? (
+                  <Image
+                    source={{ uri: userProfile.profileImage }}
+                    style={styles.profileImage}
+                    onError={() => setProfileError(true)}
+                  />
+                ) : (
+                  <Image
+                    source={require('../../../../app/assets/images/blank-avatar.png')}
+                    style={styles.profileImage}
+                  />
+                )}
+              </View>
+            </TouchableOpacity>
+
+            {/* Name & title — tappable to view profile */}
+            <TouchableOpacity
+              onPress={() => { if (currentUserId) navigation.navigate('User', { userId: currentUserId }); }}
+              activeOpacity={0.7}
+              disabled={!currentUserId}
+              style={styles.nameBlock}
+            >
+              <Text style={styles.profileNameLink} numberOfLines={2}>
+                {userProfile.prefix ? `${userProfile.prefix} ${userProfile.name}` : userProfile.name}
+              </Text>
+              {userProfile.title ? (
+                <Text style={[styles.titleText, { color: C.textSecondary }]} numberOfLines={1}>
+                  {userProfile.title}
+                </Text>
+              ) : null}
             </TouchableOpacity>
           </View>
         </View>
@@ -958,10 +1015,11 @@ const styles = StyleSheet.create({
     height: ws(40),
   },
   verificationText: {
-    fontSize: fs(11),
+    fontSize: fs(12),
     textAlign: 'right',
-    fontStyle: 'italic',
-    marginTop: ms(2),
+    fontWeight: '600',
+    marginTop: ms(3),
+    flexShrink: 1,
   },
   profileSection: {
     flexDirection: 'column',
@@ -971,34 +1029,45 @@ const styles = StyleSheet.create({
     marginBottom: ms(10),
   },
   profileImage: {
-    width: ws(80),
-    height: ws(80),
-    borderRadius: 60,
-    borderWidth: 2,
-    borderColor: '#C4C4C4',
+    width: ws(72),
+    height: ws(72),
+    borderRadius: ws(36),
+  },
+  namePhotoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+    marginTop: ms(12),
+  },
+  nameBlock: {
+    flex: 1,
+    paddingLeft: ms(14),
   },
   avatarWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  avatarRing: {
+    borderWidth: 2.5,
+    borderRadius: ws(46),
+    padding: ms(2),
+  },
+  avatarBadge: {
     position: 'absolute',
-    left: '50%',
-    top: 0,
-    transform: [{ translateX: -ws(40) }],
-    width: ws(80),
-    height: ws(80),
+    bottom: ms(1),
+    right: ms(1),
+    width: ms(20),
+    height: ms(20),
+    borderRadius: ms(10),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  namePhotoRow: {
-    position: 'relative',
-    flexDirection: 'row',
-    alignItems: 'center',
-    width: '100%',
-    marginTop: ms(10),
-    minHeight: ws(80),
-  },
-  nameBlock: {
-    width: '50%',
-    paddingRight: ms(8),
-    marginTop: -ms(4),
+  avatarBadgeText: {
+    color: '#fff',
+    fontSize: fs(10),
+    fontWeight: '700',
   },
   profileNameLink: {
     fontSize: fs(15),
@@ -1059,12 +1128,17 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     marginLeft: ms(8),
   },
-  lastRecordValue: {
-    fontSize: fs(11),
-    color: '#4A6FA5',
+  lastRecordDate: {
+    fontSize: fs(12),
+    color: COLORS.mainColor,
     textAlign: 'right',
-    fontWeight: '400',
+    fontWeight: '600',
     flexShrink: 1,
+  },
+  lastRecordDateValue: {
+    fontSize: fs(12),
+    color: COLORS.mainColor,
+    fontWeight: '700',
   },
   statsContainer: {
     flexDirection: 'row',

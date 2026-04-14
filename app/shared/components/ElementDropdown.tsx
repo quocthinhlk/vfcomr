@@ -56,7 +56,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       },
       dropdownContainer: {
         borderColor: C.inputBorder,
-        backgroundColor: C.surface,
+        backgroundColor: C.inputBg,
       },
       searchInput: {
         paddingHorizontal: ms(12),
@@ -65,7 +65,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         color: C.inputText,
         borderBottomColor: C.surfaceBorder,
         borderBottomWidth: 1,
-        backgroundColor: C.surface,
+        backgroundColor: C.inputBg,
       },
       downArrow: {
         fontSize: fs(16),
@@ -78,7 +78,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       selectedText: { fontSize: fs(14), color: C.textPrimary },
       placeholderText: { fontSize: fs(14), color: C.textSecondary, lineHeight: fs(14) },
       itemText: { fontSize: fs(14), color: C.textPrimary, lineHeight: fs(15) },
-      itemContainer: { paddingVertical: ms(1), minHeight: hs(32), justifyContent: 'center', backgroundColor: C.surface },
+      itemContainer: { paddingVertical: ms(1), minHeight: hs(32), justifyContent: 'center', backgroundColor: C.inputBg },
     })
   , [C]);
   const renderRightIcon = () => {

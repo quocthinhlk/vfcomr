@@ -31,9 +31,20 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {HamburgerMenuIcon} from '../../../shared/components/HamburgerMenuIcon';
 import {MenuPopup} from '../../../shared/components/MenuPopup';
-import {isPastorLeader} from '../../../shared/utils/permissions';
+import {isOverseer, isPastorLeader} from '../../../shared/utils/permissions';
 import DashboardPastorLeaderScreen from './DashboardPastorLeaderScreen';
+import OverseerDashboardScreen from './OverseerDashboardScreen';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+
+const resolveRoleId = (userData: any): number | null => {
+  const rawRoleId =
+    userData?.role?.id ??
+    userData?.role_id ??
+    userData?.roleID ??
+    userData?.roleId;
+  const parsedRoleId = Number(rawRoleId);
+  return Number.isFinite(parsedRoleId) ? parsedRoleId : null;
+};
 
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
@@ -102,9 +113,9 @@ export default function DashboardScreen() {
           return;
         }
         const userData = res?.data?.data;
-        const r = userData?.role?.id;
+        const r = resolveRoleId(userData);
         const userId = userData?.id;
-        if (typeof r === 'number') {
+        if (r != null) {
           setCurrentUserRoleId(r);
         }
         if (typeof userId === 'number') {
@@ -145,6 +156,11 @@ export default function DashboardScreen() {
   // If user is Pastor Leader, show the Pastor Leader Dashboard
   if (!loading && isPastorLeader(currentUserRoleId)) {
     return <DashboardPastorLeaderScreen />;
+  }
+
+  // If user is Overseer, show the Overseer Dashboard
+  if (!loading && isOverseer(currentUserRoleId)) {
+    return <OverseerDashboardScreen />;
   }
 
   const handleLogout = async () => {

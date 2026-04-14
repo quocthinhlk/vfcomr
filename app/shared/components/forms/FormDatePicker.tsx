@@ -2,7 +2,6 @@ import React from 'react';
 import {Datepicker, Text} from '@ui-kitten/components';
 import {View, StyleSheet} from 'react-native';
 import {useThemedColors} from '../../styles/theme';
-import {useThemeMode} from '../../context/ThemeContext';
 import {fs, ms, rs} from '../../utils/scale';
 
 interface FormDatePickerProps {
@@ -19,7 +18,6 @@ export default function FormDatePicker({
   error,
 }: FormDatePickerProps) {
   const C = useThemedColors();
-  const {theme} = useThemeMode();
   return (
     <View style={styles.wrapper}>
       <Datepicker
@@ -29,7 +27,7 @@ export default function FormDatePicker({
         status={error ? 'danger' : 'basic'}
         style={{backgroundColor: 'transparent'}}
         controlStyle={{
-          backgroundColor: theme === 'dark' ? C.inputBg : '#fff',
+          backgroundColor: C.inputBg,
           borderColor: C.inputBorder,
           borderWidth: 1,
           borderRadius: rs(6),

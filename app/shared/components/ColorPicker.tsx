@@ -204,7 +204,10 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
       <TouchableOpacity
         style={[
           styles.colorButton,
-          {borderColor: error ? '#db2d2d' : C.inputBorder},
+          {
+            backgroundColor: C.inputBg,
+            borderColor: error ? '#db2d2d' : C.inputBorder,
+          },
           height ? {height, paddingVertical: 0} : {},
         ]}
         onPress={() => {

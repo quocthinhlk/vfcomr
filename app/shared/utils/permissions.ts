@@ -1,6 +1,6 @@
 export const ROLES = {
   SUPER_ADMIN: 1,
-  OVERSEER: 2,
+  OVERSEER: 8,
   PASTOR_LEADER: 3,
 } as const;
 

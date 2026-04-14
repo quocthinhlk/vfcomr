@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text as RNText, ViewStyle, TextStyle } from 'react-native';
 import { SelectList } from 'react-native-dropdown-select-list';
+import { useThemedColors } from '../styles/theme';
 
 export interface SelectListItem { key: number | string; value: string }
 
@@ -29,6 +30,7 @@ export const SelectListWithClear: React.FC<SelectListWithClearProps> = ({
   onLoadMore,
   onSearchText,
 }) => {
+  const C = useThemedColors();
   const [selectKey, setSelectKey] = useState(0);
   const [hasSelection, setHasSelection] = useState<boolean>(selectedId != null);
 
@@ -38,9 +40,23 @@ export const SelectListWithClear: React.FC<SelectListWithClearProps> = ({
     return map;
   }, [data]);
 
-  const computedBoxStyle: ViewStyle = { ...styles.box, ...(boxStyles || {}) };
-  const computedDropdownStyle: ViewStyle = { ...styles.dropdown, ...(dropdownStyles || {}) };
-  const computedInputStyle: TextStyle = { ...styles.input, ...(inputStyles || {}) };
+  const computedBoxStyle: ViewStyle = {
+    ...styles.box,
+    backgroundColor: C.inputBg,
+    borderColor: C.inputBorder,
+    ...(boxStyles || {}),
+  };
+  const computedDropdownStyle: ViewStyle = {
+    ...styles.dropdown,
+    backgroundColor: C.inputBg,
+    borderColor: C.inputBorder,
+    ...(dropdownStyles || {}),
+  };
+  const computedInputStyle: TextStyle = {
+    ...styles.input,
+    color: C.inputText,
+    ...(inputStyles || {}),
+  };
   const defaultOption = selectedId != null ? { key: selectedId as any, value: labelById.get(selectedId) || '' } : undefined;
 
   return (
@@ -79,7 +95,7 @@ export const SelectListWithClear: React.FC<SelectListWithClearProps> = ({
             setSelectKey(k => k + 1);
           }}
         >
-          <RNText style={styles.clearIconText}>×</RNText>
+          <RNText style={[styles.clearIconText, {color: C.textSecondary}]}>×</RNText>
         </TouchableOpacity>
       ) : null}
     </View>

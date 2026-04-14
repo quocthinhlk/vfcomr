@@ -25,7 +25,7 @@ export const THEME: Record<ThemeMode, ThemeColors> = {
     textPrimary: '#111',
     textSecondary: '#666',
     border: '#ddd',
-    inputBg: '#fff',
+    inputBg: '#f9f9f9',
     inputText: '#000',
     inputBorder: '#ddd',
     overlay: 'rgba(0,0,0,0.3)',

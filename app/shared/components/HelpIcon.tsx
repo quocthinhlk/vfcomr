@@ -1,12 +1,14 @@
-import React, {useState} from 'react';
+import React, {useState, useRef, useCallback} from 'react';
 import {
-  TouchableOpacity,
+  Pressable,
   View,
   Text,
   ViewStyle,
   Modal,
   StyleSheet,
   ScrollView,
+  Animated,
+  TouchableOpacity,
 } from 'react-native';
 import {COLORS} from '../constants/colors';
 import {useThemedColors} from '../styles/theme';
@@ -14,14 +16,7 @@ import {fs, hs, ms, rs} from '../utils/scale';
 
 type Props = {
   onPress?: () => void;
-  /**
-   * Optional title to show in a built-in help popup.
-   * If provided together with `message`, HelpIcon will show a modal instead of using Alert.
-   */
   title?: string;
-  /**
-   * Optional body text to show in the built-in help popup.
-   */
   message?: string;
   size?: number;
   color?: string;
@@ -36,170 +31,251 @@ export default function HelpIcon({
   onPress,
   title,
   message,
-  size = 13,
+  size = 15,
   color = COLORS.mainColor,
-  marginLeft = 10,
-  offsetY = -2,
-  backgroundColor = 'transparent',
+  marginLeft = 6,
+  offsetY = 0,
   containerStyle,
-  hitSlopSize = 0,
 }: Props) {
   const C = useThemedColors();
   const [visible, setVisible] = useState(false);
 
+  // Animation values
+  const scaleAnim = useRef(new Animated.Value(0.85)).current;
+  const opacityAnim = useRef(new Animated.Value(0)).current;
+  // Button press scale
+  const btnScale = useRef(new Animated.Value(1)).current;
+
   const hasPopupContent = !!title && !!message;
+
+  const openPopup = useCallback(() => {
+    setVisible(true);
+    scaleAnim.setValue(0.85);
+    opacityAnim.setValue(0);
+    Animated.parallel([
+      Animated.spring(scaleAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+        tension: 200,
+        friction: 18,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 1,
+        duration: 180,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [scaleAnim, opacityAnim]);
+
+  const closePopup = useCallback(() => {
+    Animated.parallel([
+      Animated.timing(scaleAnim, {
+        toValue: 0.88,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+      Animated.timing(opacityAnim, {
+        toValue: 0,
+        duration: 140,
+        useNativeDriver: true,
+      }),
+    ]).start(() => setVisible(false));
+  }, [scaleAnim, opacityAnim]);
 
   const handlePress = () => {
     if (hasPopupContent) {
-      setVisible(true);
+      openPopup();
     } else if (onPress) {
       onPress();
     }
   };
 
+  const onPressIn = () => {
+    Animated.spring(btnScale, {
+      toValue: 0.82,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const onPressOut = () => {
+    Animated.spring(btnScale, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 40,
+      bounciness: 6,
+    }).start();
+  };
+
   return (
     <>
-      <TouchableOpacity
+      <Pressable
         onPress={handlePress}
-        hitSlop={
-          hitSlopSize > 0
-            ? {top: hitSlopSize, bottom: hitSlopSize, left: hitSlopSize, right: hitSlopSize}
-            : undefined
-        }
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}
         style={[
           {marginLeft: ms(marginLeft), transform: [{translateY: ms(offsetY)}]},
           containerStyle,
-        ]}>
-        <View
-          style={{
-            width: size,
-            height: size,
-            borderRadius: size,
-            borderWidth: 0,
-            borderColor: 'transparent',
-            backgroundColor: 'transparent',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
+        ]}
+      >
+        <Animated.View
+          style={[
+            helpStyles.iconCircle,
+            {
+              backgroundColor: `${color}18`,
+              transform: [{scale: btnScale}],
+            },
+          ]}
         >
-          <Text
-            style={{
-              color,
-              fontWeight: '700',
-              fontSize: Math.max(fs(10), Math.round(size * 0.55)),
-            }}
-          >
+          <Text style={[helpStyles.iconText, {color, fontSize: fs(size)}]}>
             ⓘ
           </Text>
-        </View>
-      </TouchableOpacity>
+        </Animated.View>
+      </Pressable>
 
       {hasPopupContent && (
         <Modal
           visible={visible}
           transparent
-          animationType="fade"
-          onRequestClose={() => setVisible(false)}
+          animationType="none"
+          onRequestClose={closePopup}
+          statusBarTranslucent
         >
-          <TouchableOpacity
-            activeOpacity={1}
-            style={helpIconStyles.backdrop}
-            onPress={() => setVisible(false)}>
-            <TouchableOpacity
-              activeOpacity={1}
-              style={[helpIconStyles.card, { backgroundColor: C.surface }]}
-              onPress={() => {}}
+          <Pressable style={helpStyles.backdrop} onPress={closePopup}>
+            <Animated.View
+              style={[
+                helpStyles.card,
+                {
+                  backgroundColor: C.surface,
+                  transform: [{scale: scaleAnim}],
+                  opacity: opacityAnim,
+                },
+              ]}
             >
-              <View style={helpIconStyles.header}>
-                <Text
-                  style={[helpIconStyles.title, {color: C.textPrimary}]}
-                  numberOfLines={2}
-                >
-                  {title}
-                </Text>
+              <Pressable onPress={() => {}}>
+                {/* Header */}
+                <View style={[helpStyles.header, {borderBottomColor: C.border}]}>
+                  <Text
+                    style={[helpStyles.title, {color: C.textPrimary}]}
+                    numberOfLines={2}
+                  >
+                    {title}
+                  </Text>
+                  <TouchableOpacity
+                    onPress={closePopup}
+                    hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                    style={helpStyles.closeBtn}
+                  >
+                    <Text style={[helpStyles.closeText, {color: C.textSecondary}]}>
+                      ✕
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Body */}
+                <View style={helpStyles.bodyWrap}>
+                  <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    bounces={false}
+                  >
+                    <Text style={[helpStyles.body, {color: C.textSecondary}]}>
+                      {message}
+                    </Text>
+                  </ScrollView>
+                </View>
+
+                {/* Footer */}
                 <TouchableOpacity
-                  onPress={() => setVisible(false)}
-                  style={helpIconStyles.closeButton}
+                  onPress={closePopup}
+                  activeOpacity={0.75}
+                  style={[helpStyles.gotItBtn, {backgroundColor: COLORS.mainColor}]}
                 >
-                  <Text
-                    style={[helpIconStyles.closeText, {color: C.textPrimary}]}>
-                    ✕
-                  </Text>
+                  <Text style={helpStyles.gotItText}>Got it</Text>
                 </TouchableOpacity>
-              </View>
-              <View style={helpIconStyles.bodyContainer}>
-                <ScrollView
-                  showsVerticalScrollIndicator={false}
-                  bounces={false}
-                >
-                  <Text
-                    style={[helpIconStyles.body, {color: C.textSecondary}]}>
-                    {message}
-                  </Text>
-                </ScrollView>
-              </View>
-            </TouchableOpacity>
-          </TouchableOpacity>
+              </Pressable>
+            </Animated.View>
+          </Pressable>
         </Modal>
       )}
     </>
   );
 }
 
-const helpIconStyles = StyleSheet.create({
+const helpStyles = StyleSheet.create({
+  iconCircle: {
+    width: ms(26),
+    height: ms(26),
+    borderRadius: ms(13),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  iconText: {
+    fontWeight: '700',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
+  },
   backdrop: {
     flex: 1,
-    backgroundColor: 'rgba(15,23,42,0.45)',
+    backgroundColor: 'rgba(10,20,40,0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: ms(20),
-    paddingVertical: ms(24),
+    paddingHorizontal: ms(24),
   },
   card: {
-    width: '80%',
-    maxWidth: 360,
-    maxHeight: '70%',
+    width: '100%',
+    maxWidth: 380,
+    borderRadius: rs(14),
     paddingHorizontal: ms(18),
-    paddingVertical: ms(14),
+    paddingTop: ms(16),
+    paddingBottom: ms(12),
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: rs(16),
+    shadowOpacity: 0.18,
+    shadowRadius: rs(20),
     shadowOffset: {width: 0, height: hs(8)},
-    elevation: 6,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E5E7EB',
+    elevation: 8,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingBottom: ms(6),
-    marginBottom: ms(6),
+    paddingBottom: ms(10),
+    marginBottom: ms(8),
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#E5E7EB',
   },
   title: {
     flex: 1,
-    fontSize: fs(12),
-    fontWeight: '600',
+    fontSize: fs(14),
+    fontWeight: '700',
     paddingRight: ms(8),
   },
-  closeButton: {
-    paddingHorizontal: ms(4),
-    paddingVertical: ms(2),
+  closeBtn: {
+    width: ms(28),
+    height: ms(28),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   closeText: {
-    fontSize: fs(14),
+    fontSize: fs(16),
+    fontWeight: '500',
   },
-  bodyContainer: {
-    maxHeight: hs(220),
-    paddingTop: ms(0),
+  bodyWrap: {
+    maxHeight: hs(200),
   },
   body: {
-    fontSize: fs(12),
-    lineHeight: fs(18),
-    textAlign: 'left',
+    fontSize: fs(13),
+    lineHeight: fs(20),
+  },
+  gotItBtn: {
+    marginTop: ms(14),
+    paddingVertical: ms(10),
+    borderRadius: rs(8),
+    alignItems: 'center',
+  },
+  gotItText: {
+    color: '#fff',
+    fontSize: fs(14),
+    fontWeight: '600',
   },
 });
-
-

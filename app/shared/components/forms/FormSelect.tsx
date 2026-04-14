@@ -1,6 +1,7 @@
 import React from 'react';
 import {Select, SelectItem, Text} from '@ui-kitten/components';
 import {View, StyleSheet} from 'react-native';
+import {useThemedColors} from '../../styles/theme';
 import {fs, ms} from '../../utils/scale';
 
 interface Option {
@@ -25,6 +26,8 @@ export default function FormSelect({
   valueLabel,
   error,
 }: FormSelectProps) {
+  const C = useThemedColors();
+
   return (
     <View style={styles.wrapper}>
       <Text category="label" style={styles.label}>{label}</Text>
@@ -33,6 +36,13 @@ export default function FormSelect({
         onSelect={onSelect}
         value={valueLabel}
         status={error ? 'danger' : 'basic'}
+        style={[
+          styles.control,
+          {
+            backgroundColor: C.inputBg,
+            borderColor: C.inputBorder,
+          },
+        ]}
       >
         {options.map((opt, i) => (
           <SelectItem key={i} title={opt.label} />
@@ -50,6 +60,9 @@ const styles = StyleSheet.create({
   },
   label: {
     marginBottom: ms(4),
+  },
+  control: {
+    borderRadius: 6,
   },
   errorText: {
     fontSize: fs(12),

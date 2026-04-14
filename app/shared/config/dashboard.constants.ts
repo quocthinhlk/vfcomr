@@ -43,8 +43,8 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
   {
     label: t('myChurchProfile'),
     children: [
-      {label: t('churchAttendanceChart'), routeName: 'Dashboard'},
-      {label: t('churchGivingChart'), routeName: 'Dashboard'},
+      {label: t('churchAttendanceChart'), routeName: 'ChurchAttendanceChart'},
+      {label: t('churchGivingChart'), routeName: 'ChurchGivingChart'},
       {label: t('last4WeeksDetails'), routeName: 'Dashboard'},
       {label: t('multiServiceChurchDetails'), routeName: 'Dashboard'},
       {label: t('daughterChurchesList'), routeName: 'Dashboard'},
@@ -75,21 +75,7 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
   },
   {
     label: t('generateReports'),
-    children: [
-      {label: t('churchReports'), routeName: 'GenerateReports'},
-      {label: t('churchesReportingStatus'), routeName: 'GenerateReports'},
-      {label: t('multiChurchReports'), routeName: 'GenerateReports'},
-      {label: t('leadersSpreadsheetReports'), routeName: 'GenerateReports'},
-      {label: t('leadersGraphReports'), routeName: 'GenerateReports'},
-      {label: t('myDirectory'), routeName: 'GenerateReports'},
-      {label: t('uaogPublicSearchLog'), routeName: 'GenerateReports'},
-      {label: t('overseerRegGoalsOnly'), routeName: 'GenerateReports'},
-      {label: t('overseerGoalsActuals'), routeName: 'GenerateReports'},
-      {label: t('overseerGoals3Year'), routeName: 'GenerateReports'},
-      {label: t('overseerGoalsActuals3Yrs'), routeName: 'GenerateReports'},
-      {label: t('overseerAccessRightsReport'), routeName: 'GenerateReports'},
-      {label: t('visitReports'), routeName: 'GenerateReports'},
-    ],
+    routeName: 'GenerateReports',
   },
   {
     label: t('relating'),
@@ -102,8 +88,6 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
     label: t('resources'),
     children: [
       {label: t('search'), routeName: 'Resources'},
-      {label: t('addNewResource'), routeName: 'AddNewResource'},
-      {label: t('editAddTopicList'), routeName: 'EditAddTopicList'},
     ],
   },
   {
@@ -146,23 +130,14 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
     ],
   },
   {
-    label: t('generateReports'),
+    label: t('overseerGoals'),
     children: [
-      {label: t('churchReports'), routeName: 'GenerateReports'},
-      {label: t('churchesReportingStatus'), routeName: 'GenerateReports'},
-      {label: t('multiChurchReports'), routeName: 'GenerateReports'},
-      {label: t('leadersSpreadsheetReports'), routeName: 'GenerateReports'},
-      {label: t('leadersGraphReports'), routeName: 'GenerateReports'},
-      {label: t('myDirectory'), routeName: 'GenerateReports'},
-      {label: t('uaogPublicSearchLog'), routeName: 'GenerateReports'},
-      {label: t('overseerRegGoalsOnly'), routeName: 'GenerateReports'},
-      {label: t('overseerGoalsActuals'), routeName: 'GenerateReports'},
-      {label: t('overseerGoals3Year'), routeName: 'GenerateReports'},
-      {label: t('overseerGoalsActuals3Yrs'), routeName: 'GenerateReports'},
-      {label: t('overseerAccessRightsReport'), routeName: 'GenerateReports'},
-      {label: t('visitReports'), routeName: 'GenerateReports'},
+      {label: t('addNew'), routeName: 'AddOverseerGoals'},
+      {label: t('list'), routeName: 'OverseerGoals'},
+      {label: t('editDefaults'), routeName: 'EditOverseerGoalDefaults'},
     ],
   },
+  {label: t('generateReports'), routeName: 'GenerateReports'},
   {
     label: t('churchNetworks'),
     children: [
@@ -268,21 +243,7 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
   },
   {
     label: t('generateReports'),
-    children: [
-      {label: t('churchReports'), routeName: 'GenerateReports'},
-      {label: t('churchesReportingStatus'), routeName: 'GenerateReports'},
-      {label: t('multiChurchReports'), routeName: 'GenerateReports'},
-      {label: t('leadersSpreadsheetReports'), routeName: 'GenerateReports'},
-      {label: t('leadersGraphReports'), routeName: 'GenerateReports'},
-      {label: t('myDirectory'), routeName: 'GenerateReports'},
-      {label: t('uaogPublicSearchLog'), routeName: 'GenerateReports'},
-      {label: t('overseerRegGoalsOnly'), routeName: 'GenerateReports'},
-      {label: t('overseerGoalsActuals'), routeName: 'GenerateReports'},
-      {label: t('overseerGoals3Year'), routeName: 'GenerateReports'},
-      {label: t('overseerGoalsActuals3Yrs'), routeName: 'GenerateReports'},
-      {label: t('overseerAccessRightsReport'), routeName: 'GenerateReports'},
-      {label: t('visitReports'), routeName: 'GenerateReports'},
-    ],
+    routeName: 'GenerateReports',
   },
   {
     label: t('resources'),

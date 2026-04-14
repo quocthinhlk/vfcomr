@@ -89,8 +89,8 @@ export const dashboardStyles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
-    // paddingHorizontal: 15,
-    marginTop: ms(20),
+    marginTop: ms(6),
+    gap: ms(1),
   },
   statCard: {
     width: '48%',
