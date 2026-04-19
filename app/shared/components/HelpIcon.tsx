@@ -10,7 +10,6 @@ import {
   Animated,
   TouchableOpacity,
 } from 'react-native';
-import {COLORS} from '../constants/colors';
 import {useThemedColors} from '../styles/theme';
 import {fs, hs, ms, rs} from '../utils/scale';
 
@@ -32,13 +31,14 @@ export default function HelpIcon({
   title,
   message,
   size = 15,
-  color = COLORS.mainColor,
   marginLeft = 6,
   offsetY = 0,
   containerStyle,
+  hitSlopSize = 12,
 }: Props) {
   const C = useThemedColors();
   const [visible, setVisible] = useState(false);
+  const iconColor = C.textSecondary || '#8a8f98';
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
@@ -114,7 +114,7 @@ export default function HelpIcon({
         onPress={handlePress}
         onPressIn={onPressIn}
         onPressOut={onPressOut}
-        hitSlop={{top: 12, bottom: 12, left: 12, right: 12}}
+        hitSlop={{top: hitSlopSize, bottom: hitSlopSize, left: hitSlopSize, right: hitSlopSize}}
         style={[
           {marginLeft: ms(marginLeft), transform: [{translateY: ms(offsetY)}]},
           containerStyle,
@@ -124,12 +124,12 @@ export default function HelpIcon({
           style={[
             helpStyles.iconCircle,
             {
-              backgroundColor: `${color}18`,
+              backgroundColor: 'transparent',
               transform: [{scale: btnScale}],
             },
           ]}
         >
-          <Text style={[helpStyles.iconText, {color, fontSize: fs(size)}]}>
+          <Text style={[helpStyles.iconText, {color: iconColor, fontSize: fs(size)}]}>
             ⓘ
           </Text>
         </Animated.View>
@@ -186,14 +186,6 @@ export default function HelpIcon({
                   </ScrollView>
                 </View>
 
-                {/* Footer */}
-                <TouchableOpacity
-                  onPress={closePopup}
-                  activeOpacity={0.75}
-                  style={[helpStyles.gotItBtn, {backgroundColor: COLORS.mainColor}]}
-                >
-                  <Text style={helpStyles.gotItText}>Got it</Text>
-                </TouchableOpacity>
               </Pressable>
             </Animated.View>
           </Pressable>
@@ -266,16 +258,5 @@ const helpStyles = StyleSheet.create({
   body: {
     fontSize: fs(13),
     lineHeight: fs(20),
-  },
-  gotItBtn: {
-    marginTop: ms(14),
-    paddingVertical: ms(10),
-    borderRadius: rs(8),
-    alignItems: 'center',
-  },
-  gotItText: {
-    color: '#fff',
-    fontSize: fs(14),
-    fontWeight: '600',
   },
 });

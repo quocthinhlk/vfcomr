@@ -34,7 +34,7 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
           if (!mounted) {
             return;
           }
-          setName(res?.data?.name || 'this Worship Service');
+          setName(res?.data?.name || 'this worship service');
         })
         .catch(() => {});
     }
@@ -48,13 +48,10 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
     try {
       setSubmitting(true);
       await deleteWorshipService(worshipServiceId);
-      Alert.alert(
-        t('success') || 'Success',
-        `${t('delete') || 'Delete'} ${t('worshipService') || 'Worship Service'} ${t('success') || 'success'}`,
-      );
+      Alert.alert(t('success') || 'Success', `${t('delete')} ${t('worshipService') || 'Worship Service'} ${t('success')}`);
       navigation.navigate('WorshipServices', {reload: true});
     } catch (e) {
-      Alert.alert(t('error') || 'Error', t('failedToDeleteWorshipService') || 'Failed to delete Worship Service');
+      Alert.alert(t('error') || 'Error', 'Failed to delete worship service');
     } finally {
       setSubmitting(false);
     }
@@ -66,20 +63,18 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={{flex: 1, backgroundColor: C.background}}>
         <View style={styles.container}>
-          <Header
-            title={`${t('delete') || 'Delete'} ${t('worshipService') || 'Worship Service'}`}
-          />
+          <Header title={`${t('delete')} ${t('worshipService') || 'Worship Service'}`} />
           <Text style={[styles.desc, {color: C.textSecondary}]}>
-            {`${t('delete') || 'Delete'} ${t('worshipService') || 'Worship Service'} "${name}"?`}
+            {`${t('delete')} "${name}"?`}
           </Text>
           <View style={styles.row}>
             <CancelButton
-              label={t('cancel') || 'Cancel'}
+              label={t('cancel')}
               onPress={() => navigation.goBack()}
               disabled={submitting}
             />
             <DeleteButton
-              label={t('delete') || 'Delete'}
+              label={t('delete')}
               onPress={onConfirm}
               disabled={submitting}
             />
@@ -99,7 +94,6 @@ const styles = StyleSheet.create({
   desc: {
     color: '#555',
     fontSize: fs(14),
-    marginTop: ms(16),
   },
   row: {
     flexDirection: 'row',

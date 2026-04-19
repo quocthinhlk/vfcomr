@@ -752,7 +752,7 @@ export default function AddUserScreen() {
                         setFieldValue('credentials', (v as string) || '');
                         clearInvalid('credentials');
                       }}
-                      placeholder={t('selectOption')}
+                      placeholder={t('no')}
                       containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
                     />
                   </View>

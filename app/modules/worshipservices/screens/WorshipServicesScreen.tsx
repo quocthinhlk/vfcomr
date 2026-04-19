@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   FlatList,
+  Image,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -25,11 +26,9 @@ import ActionSheetModal, {
 } from '../../../shared/components/ActionSheetModal';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
-import {EditSvgIcon} from '../../../shared/components/icons';
+const editIcon = require('../../../assets/icons/edit.png');
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
-import {COLORS} from '../../../shared/constants/colors';
-
 export const WorshipServicesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
@@ -156,9 +155,9 @@ export const WorshipServicesScreen: React.FC = () => {
           <View style={styles.itemColRight}>
             <View style={styles.actionRow}>
               <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
+                style={[styles.actionBtn, styles.editBtn, {backgroundColor: C.surface}]}
                 onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={fs(15)} height={fs(15)} />
+                <Image source={editIcon} style={styles.editIcon} resizeMode="contain" />
               </TouchableOpacity>
             </View>
           </View>
@@ -179,9 +178,6 @@ export const WorshipServicesScreen: React.FC = () => {
 
           {churchName ? (
             <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
-              <Text style={[styles.churchNameLabel, {color: C.textPrimary}]}>
-                {t('church') || 'Church'}:{' '}
-              </Text>
               <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
                 {churchName}
               </Text>
@@ -293,6 +289,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
     alignItems: 'center',
     marginTop: ms(8),
+    marginBottom: ms(12),
   },
   itemCol: {
     flex: 1,
@@ -333,7 +330,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   editBtn: {
-    backgroundColor: COLORS.successColor,
+  },
+  editIcon: {
+    width: ws(16),
+    height: ws(16),
   },
 });
 

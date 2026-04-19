@@ -1,15 +1,14 @@
 import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, ScrollView} from 'react-native';
+import {View, StyleSheet, ScrollView, TouchableOpacity} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
-import {getWorshipServiceById} from '../services/worshipService.service';
+import {getWorshipServiceById, WorshipServiceItem} from '../services/worshipService.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
-import {WorshipServiceItem} from '../services/worshipService.service';
 
 export const WorshipServiceDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -43,6 +42,10 @@ export const WorshipServiceDetailScreen: React.FC = () => {
       mounted = false;
     };
   }, [worshipServiceId]);
+
+  const handleDelete = () => {
+    navigation.navigate('DeleteWorshipService', {worshipServiceId});
+  };
 
   const formatTime = (timeString: string) => {
     if (!timeString) return '-';
@@ -108,6 +111,15 @@ export const WorshipServiceDetailScreen: React.FC = () => {
                     </Text>
                   </View>
                 </View>
+
+                <TouchableOpacity
+                  style={styles.deleteBtn}
+                  onPress={handleDelete}
+                  activeOpacity={0.8}>
+                  <Text style={styles.deleteBtnText}>
+                    {t('delete') || 'Delete'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
           )}
@@ -159,6 +171,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: ms(40),
     fontSize: fs(14),
+  },
+  deleteBtn: {
+    marginTop: ms(8),
+    paddingVertical: ms(14),
+    borderRadius: rs(8),
+    backgroundColor: '#db2d2d',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  deleteBtnText: {
+    color: '#fff',
+    fontSize: fs(15),
+    fontWeight: '600',
   },
 });
 

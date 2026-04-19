@@ -1,5 +1,5 @@
 import React, { useState, useContext, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
@@ -17,6 +17,7 @@ import { dashboardActions, dashboardIcons, dashboardMenuItems, dashboardStats, g
 import api from '../../../config/api';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
+import { useThemeMode } from '../../../shared/context/ThemeContext';
 import { Col, Row, Grid } from 'react-native-easy-grid';
 import RNFS from 'react-native-fs';
 import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
@@ -170,7 +171,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
 const menuItems = [
   { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Add Monthly Data', routeName: 'MonthlyDataSelect' },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch' },
-  { icon: require('../../../../app/assets/images/icon/worship.png'), label: 'Worship Services', routeName: 'WorshipServices' },
+  { icon: require('../../../../app/assets/images/icon/worship1.png'), label: 'Worship Services', routeName: 'WorshipServices' },
   { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
   { icon: require('../../../../app/assets/images/icon/user.png'), label: 'New Pastor', routeName: 'AddUser' },
   { icon: require('../../../../app/assets/images/icon/home.png'), label: 'New Church', routeName: 'AddChurch' },
@@ -182,6 +183,9 @@ export default function DashboardPastorLeaderScreen() {
   const { selectedLanguage, setLanguage } = useLanguage();
   const { t } = useTranslation();
   const C = useThemedColors();
+  const { theme } = useThemeMode();
+  const isDark = theme === 'dark';
+  const gradientBase = isDark ? '0,0,0' : '255,255,255';
   const [menuVisible, setMenuVisible] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
@@ -224,7 +228,8 @@ export default function DashboardPastorLeaderScreen() {
     if (!dateString) return '-';
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return '-';
-    const month = new Intl.DateTimeFormat(localeMap[selectedLanguage as string] || 'en', { month: 'long' }).format(date);
+    const locale = localeMap[selectedLanguage as string] || 'en';
+    const month = new Intl.DateTimeFormat(locale, { month: 'short' }).format(date);
     const year = date.getFullYear();
     return `${month} ${year}`;
   };
@@ -243,8 +248,8 @@ export default function DashboardPastorLeaderScreen() {
     if (isNaN(date.getTime())) return '';
     const locale = localeMap[selectedLanguage as string] || 'en';
     const month = new Intl.DateTimeFormat(locale, { month: 'short' }).format(date);
-    const year2 = String(date.getFullYear()).slice(-2);
-    return `${month}, ${year2}`;
+    const year = date.getFullYear();
+    return `${month} ${year}`;
   };
 
   const handleToggleStats = () => {
@@ -551,6 +556,28 @@ export default function DashboardPastorLeaderScreen() {
     }
   };
 
+  useEffect(() => {
+    const churchId = dashboardData?.dashboard_info?.church_id;
+    if (!churchId || churchPicturesLoaded || churchPicturesLoading) return;
+    let mounted = true;
+    (async () => {
+      try {
+        setChurchPicturesLoading(true);
+        setChurchPicturesError(null);
+        const response = await api.get(`churches/${churchId}`);
+        if (!mounted) return;
+        const pictureUrls = extractChurchPictures(response);
+        setChurchPictures(pictureUrls);
+        setChurchPicturesLoaded(true);
+      } catch {
+        // silent fail – user can still manually expand to retry
+      } finally {
+        if (mounted) setChurchPicturesLoading(false);
+      }
+    })();
+    return () => { mounted = false; };
+  }, [dashboardData]);
+
   const handleOrganizationTextLayout = (event: any) => {
     const lines = event?.nativeEvent?.lines || [];
     if (!Array.isArray(lines) || lines.length === 0) {
@@ -728,16 +755,10 @@ export default function DashboardPastorLeaderScreen() {
           <View style={styles.locationRow}>
             <Text style={[styles.locationText, { color: C.textSecondary }]}>{userProfile.location}</Text>
             <View style={styles.reportVerifyColumn}>
-              <Text style={styles.lastRecordDate} numberOfLines={1}>
-                {`${t('lastMonthlyRecord')}: `}
-                <Text style={styles.lastRecordDateValue}>
-                  {formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}
-                </Text>
-              </Text>
               {dashboardData?.dashboard_info && (
                 dashboardData.dashboard_info.is_verified ? (
                   <Text style={[styles.verificationText, { color: '#1e7e34' }]}>
-                    {'\u2714\uFE0E'} Visited {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by {dashboardData.dashboard_info.verified_by_user_name || ''}
+                    {'\u2714\uFE0E'} {t('visited')} {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by {dashboardData.dashboard_info.verified_by_user_name || ''}
                   </Text>
                 ) : (
                   <Text style={[styles.verificationText, { color: '#c0392b' }]}>
@@ -745,6 +766,12 @@ export default function DashboardPastorLeaderScreen() {
                   </Text>
                 )
               )}
+              <Text style={styles.lastRecordDate} numberOfLines={1}>
+                {`${t('lastMonthlyRecord')}: `}
+                <Text style={styles.lastRecordDateValue}>
+                  {formatLastRecord(dashboardData?.dashboard_info?.last_report_date || '')}
+                </Text>
+              </Text>
             </View>
           </View>
 
@@ -921,7 +948,7 @@ export default function DashboardPastorLeaderScreen() {
                      item.label === 'Monthly Data' ? t('monthlyData') :
                      item.label === 'Edit Church' ? t('editChurch') :
                      item.label === 'Worship Services' ? t('worshipServices') :
-                     item.label === 'Add New Church & New Pastor' ? t('addNewChurchAndPastor') :
+                     item.label === 'New Pastor & New Church' ? t('newPastorAndNewChurch') :
                      item.label === 'New Pastor' ? t('addNewPastor') :
                      item.label === 'New Church' ? t('addNewChurch') : item.label}
                   </Text>
@@ -931,7 +958,7 @@ export default function DashboardPastorLeaderScreen() {
                 {isNewChurchItem ? (
                   <>
                     <TouchableOpacity
-                      style={[styles.menuItem, styles.subMenuItem, { borderBottomColor: C.border }]}
+                      style={[styles.menuItem, styles.subMenuItem, { borderBottomColor: C.border, borderBottomWidth: (!churchPictureExpanded && churchPictures.length > 0) ? 0 : 1 }]}
                       onPress={handleToggleChurchPictures}
                       activeOpacity={0.7}
                     >
@@ -945,25 +972,28 @@ export default function DashboardPastorLeaderScreen() {
                     {churchPictureExpanded ? (
                       <View style={[styles.churchPicturesContainer, { borderBottomColor: C.border }]}>
                         {churchPicturesLoading ? (
-                          <Text style={[styles.churchPictureStatusText, { color: C.textSecondary }]}>{t('loading')}...</Text>
+                          <ActivityIndicator size="small" color={C.textSecondary} style={{ marginVertical: ms(12) }} />
                         ) : churchPicturesError ? (
                           <Text style={[styles.churchPictureStatusText, { color: C.error || '#ff4444' }]}>{churchPicturesError}</Text>
-                        ) : churchPictures.length === 0 ? (
-                          <Text style={[styles.churchPictureStatusText, { color: C.textSecondary }]}>{t('noDataFound')}</Text>
                         ) : (
                           <View style={styles.churchPicturesList}>
-                            {churchPictures.map((url, pictureIndex) => (
+                            {(churchPictures.length === 0
+                              ? [null]
+                              : churchPictures
+                            ).map((url, pictureIndex) => (
                               <TouchableOpacity
-                                key={`${url}-${pictureIndex}`}
+                                key={url ? `${url}-${pictureIndex}` : 'default'}
                                 style={styles.churchPictureItem}
-                                activeOpacity={0.85}
+                                activeOpacity={url ? 0.85 : 1}
                                 onPress={() => {
-                                  setSelectedImage(url);
-                                  setImageModalVisible(true);
+                                  if (url) {
+                                    setSelectedImage(url);
+                                    setImageModalVisible(true);
+                                  }
                                 }}
                               >
                                 <Image
-                                  source={{ uri: url }}
+                                  source={url ? { uri: url } : require('../../../../app/assets/images/group-user.jpg')}
                                   style={[styles.churchPictureThumb, { borderColor: C.border }]}
                                   resizeMode="cover"
                                 />
@@ -972,7 +1002,44 @@ export default function DashboardPastorLeaderScreen() {
                           </View>
                         )}
                       </View>
-                    ) : null}
+                    ) : churchPicturesLoading ? (
+                      <ActivityIndicator size="small" color={C.textSecondary} style={{ marginVertical: ms(10) }} />
+                    ) : (
+                      <TouchableOpacity
+                        activeOpacity={0.88}
+                        style={styles.churchPicturePeek}
+                        onPress={handleToggleChurchPictures}
+                      >
+                        <View style={[styles.churchPicturePeekFrame, { backgroundColor: C.border }]}>
+                          <Image
+                            source={churchPictures.length > 0 ? { uri: churchPictures[0] } : require('../../../../app/assets/images/group-user.jpg')}
+                            style={styles.churchPicturePeekImg}
+                            resizeMode="cover"
+                          />
+                          {/* 25 lát mỏng không chồng, opacity theo easing cubic – mượt tối đa */}
+                          {Array.from({ length: 25 }, (_, i) => {
+                            const t = i / 24;
+                            const opacity = Math.pow(1 - t, 2);
+                            return (
+                              <View
+                                key={i}
+                                pointerEvents="none"
+                                style={{
+                                  position: 'absolute',
+                                  bottom: ms(18 + i * 3),
+                                  left: 0,
+                                  right: 0,
+                                  height: ms(3),
+                                  backgroundColor: `rgba(${gradientBase},${opacity.toFixed(3)})`,
+                                }}
+                              />
+                            );
+                          })}
+                          {/* solid đáy */}
+                          <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ms(20), backgroundColor: `rgba(${gradientBase},1)` }} />
+                        </View>
+                      </TouchableOpacity>
+                    )}
                   </>
                 ) : null}
               </React.Fragment>
@@ -1026,7 +1093,7 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     paddingHorizontal: ms(15),
     paddingTop: ms(12),
-    marginBottom: ms(10),
+    marginBottom: ms(4),
   },
   profileImage: {
     width: ws(72),
@@ -1038,7 +1105,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
-    marginTop: ms(12),
+    marginTop: ms(0),
   },
   nameBlock: {
     flex: 1,
@@ -1084,8 +1151,9 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   titleText: {
-    fontSize: fs(13),
+    fontSize: fs(15),
     marginTop: ms(2),
+    fontWeight: '500',
   },
   organizationRow: {
     position: 'relative',
@@ -1117,14 +1185,13 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   locationText: {
-    fontSize: fs(13),
+    fontSize: fs(15),
     color: '#000',
     textAlign: 'left',
-    flex: 1,
+    width: '35%',
   },
   reportVerifyColumn: {
-    flex: 1,
-    maxWidth: '58%',
+    width: '65%',
     alignItems: 'flex-end',
     marginLeft: ms(8),
   },
@@ -1175,7 +1242,6 @@ const styles = StyleSheet.create({
   viewMoreButton: {
     alignItems: 'flex-end',
     fontSize: fs(12),
-    marginBottom: ms(20),
     paddingHorizontal: ms(16),
   },
   viewMoreText: {
@@ -1200,8 +1266,8 @@ const styles = StyleSheet.create({
     borderBottomColor: '#f0f0f0',
   },
   menuIcon: {
-    width: ws(17),
-    height: hs(17),
+    width: ws(23),
+    height: ws(23),
     marginRight: ms(12),
   },
   menuLabel: {
@@ -1243,6 +1309,25 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     backgroundColor: '#f5f5f5',
+  },
+  churchPicturePeek: {
+    paddingTop: ms(4),
+    paddingBottom: ms(8),
+  },
+  churchPicturePeekFrame: {
+    width: '100%',
+    height: ms(60),
+    borderRadius: 8,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  churchPicturePeekImg: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    width: '100%',
+    height: ws(180),
   },
   modalBackdrop: {
     flex: 1,

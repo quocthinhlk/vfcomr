@@ -93,9 +93,9 @@ export type RootStackParamList = {
   ChurchRegions: undefined;
   WorshipServices: undefined;
   WorshipServiceDetail: { worshipServiceId: number } | undefined;
+  DeleteWorshipService: { worshipServiceId: number } | undefined;
   AddWorshipService: undefined;
   EditWorshipService: { worshipServiceId: number } | undefined;
-  DeleteWorshipService: { worshipServiceId: number } | undefined;
   AddChurchRegion: undefined;
   EditChurchRegion: { churchRegionId: number } | undefined;
   DeleteChurchRegion: { churchRegionId: number } | undefined;
@@ -210,9 +210,9 @@ import DeleteCountryScreen from '../modules/country/screens/DeleteCountryScreen'
 import AddCountryScreen from '../modules/country/screens/AddCountryScreen';
 import WorshipServicesScreen from '../modules/worshipservices/screens/WorshipServicesScreen';
 import WorshipServiceDetailScreen from '../modules/worshipservices/screens/WorshipServiceDetailScreen';
+import DeleteWorshipServiceScreen from '../modules/worshipservices/screens/DeleteWorshipServiceScreen';
 import AddWorshipServiceScreen from '../modules/worshipservices/screens/AddWorshipServiceScreen';
 import EditWorshipServiceScreen from '../modules/worshipservices/screens/EditWorshipServiceScreen';
-import DeleteWorshipServiceScreen from '../modules/worshipservices/screens/DeleteWorshipServiceScreen';
 import ChurchPlantingProjectionsScreen from '../modules/churchplantingprojections/screens/ChurchPlantingProjectionsScreen';
 import ChurchPlantingProjectionDetailScreen from '../modules/churchplantingprojections/screens/ChurchPlantingProjectionDetailScreen';
 import AddChurchPlantingProjectionScreen from '../modules/churchplantingprojections/screens/AddChurchPlantingProjectionScreen';
@@ -382,9 +382,9 @@ export default function Navigation() {
               <Stack.Screen name="AddCountry" component={AddCountryScreen} />
               <Stack.Screen name="WorshipServices" component={WorshipServicesScreen} />
               <Stack.Screen name="WorshipServiceDetail" component={WorshipServiceDetailScreen} />
+              <Stack.Screen name="DeleteWorshipService" component={DeleteWorshipServiceScreen} />
               <Stack.Screen name="AddWorshipService" component={AddWorshipServiceScreen} />
               <Stack.Screen name="EditWorshipService" component={EditWorshipServiceScreen} />
-              <Stack.Screen name="DeleteWorshipService" component={DeleteWorshipServiceScreen} />
               <Stack.Screen name="ChurchPlantingProjections" component={ChurchPlantingProjectionsScreen} />
               <Stack.Screen name="ChurchPlantingProjectionDetail" component={ChurchPlantingProjectionDetailScreen} />
               <Stack.Screen name="AddChurchPlantingProjection" component={AddChurchPlantingProjectionScreen} />

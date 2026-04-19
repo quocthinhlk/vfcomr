@@ -456,8 +456,8 @@ const styles = StyleSheet.create({
     right: 0,
   },
   editIcon: {
-    width: ws(16),
-    height: ws(16),
+    width: ws(20),
+    height: ws(20),
   },
   disabledAction: {
     opacity: 0.45,

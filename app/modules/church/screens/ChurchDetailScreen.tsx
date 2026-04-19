@@ -201,7 +201,7 @@ export default function ChurchDetailScreen() {
                     ]}
                     onPress={() => setImageModalVisible(true)}
                     disabled={!canOpenFullImage}>
-                    <Image source={zoomOutIcon} style={styles.iconImg} resizeMode="contain" />
+                    <Image source={zoomOutIcon} style={styles.zoomIcon} resizeMode="contain" />
                   </TouchableOpacity>
                 </View>
                 <View style={styles.summaryText}>
@@ -461,11 +461,11 @@ const styles = StyleSheet.create({
     paddingRight: ws(44),
   },
   summaryName: {
-    fontSize: fs(16),
+    fontSize: fs(20),
     fontWeight: '700',
   },
   summarySub: {
-    fontSize: fs(12),
+    fontSize: fs(16),
     marginTop: ms(2),
   },
   iconBtn: {
@@ -484,9 +484,13 @@ const styles = StyleSheet.create({
   editBtn: {
     right: ms(10),
   },
-  iconImg: {
+  zoomIcon: {
     width: ws(16),
     height: ws(16),
+  },
+  iconImg: {
+    width: ws(20),
+    height: ws(20),
   },
   disabledBtn: {
     opacity: 0.45,
@@ -511,16 +515,16 @@ const styles = StyleSheet.create({
   },
   rowLabel: {
     width: ws(92),
-    fontSize: fs(11.5),
+    fontSize: fs(14),
     fontWeight: '400',
-    lineHeight: fs(16),
+    lineHeight: fs(20),
   },
   rowValue: {
     flex: 1,
-    fontSize: fs(11.5),
+    fontSize: fs(14),
     fontWeight: '600',
     marginLeft: ms(8),
-    lineHeight: fs(16),
+    lineHeight: fs(20),
   },
   boldValue: {
     fontWeight: '700',
@@ -548,7 +552,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(4),
   },
   socialLabel: {
-    fontSize: fs(10),
+    fontSize: fs(12),
     fontWeight: '700',
   },
   attributeWrap: {
@@ -559,7 +563,7 @@ const styles = StyleSheet.create({
     gap: ms(6),
   },
   attributeToken: {
-    fontSize: fs(11.5),
+    fontSize: fs(14),
     fontWeight: '400',
     paddingHorizontal: ms(8),
     paddingVertical: ms(2),

@@ -425,7 +425,6 @@ export default function NewPastorAndChurchScreen() {
             ref={scrollRef}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"
             style={{backgroundColor: C.background}}
             contentContainerStyle={{paddingBottom: ms(24)}}>
@@ -1486,7 +1485,7 @@ export default function NewPastorAndChurchScreen() {
                                     data={credentialOptions.map(c => ({label: c, value: c}))}
                                     value={values.credentials as any}
                                     onChange={v => setFieldValue('credentials', (v as string) || '')}
-                                    placeholder={t('selectOption')}
+                                    placeholder={t('no')}
                                     containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
                                   />
                                 </View>

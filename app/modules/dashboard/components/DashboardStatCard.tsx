@@ -109,8 +109,8 @@ const cardStyles = StyleSheet.create({
     flexShrink: 0,
   },
   icon: {
-    width: ws(19),
-    height: ws(19),
+    width: ws(23),
+    height: ws(23),
   },
   textBlock: {
     flex: 1,
@@ -130,7 +130,8 @@ const cardStyles = StyleSheet.create({
     marginTop: ms(0.5),
   },
   label: {
-    fontSize: fs(11),
+    fontSize: fs(12),
+    fontWeight: '500',
     flex: 1,
     lineHeight: fs(14),
   },
