@@ -2,7 +2,6 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Image,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
@@ -26,8 +25,6 @@ import {
   OverseerGoalPeriodItem,
 } from '../services/overseerGoals.service';
 import {fs, ms, rs, ws} from '../../../shared/utils/scale';
-
-const editIcon = require('../../../assets/icons/edit.png');
 
 export const OverseerGoalsScreen = () => {
   const navigation = useNavigation<any>();
@@ -177,59 +174,46 @@ export const OverseerGoalsScreen = () => {
           styles.cardBody,
         ]}>
         <View style={styles.cardHeader}>
-          <View style={styles.titleContent}>
-            <View
-              style={[
-                styles.periodBadge,
-                {
-                  borderColor: C.inputBorder,
-                },
-              ]}>
-              <Text style={[styles.periodBadgeText, {color: C.textSecondary}]}>
-                {periodText}
-              </Text>
-            </View>
-            <Text
-              style={[styles.nationName, {color: C.textPrimary}]}
-              numberOfLines={1}>
-              {nationName}
+          <Text
+            style={[styles.nationName, {color: C.textPrimary}]}
+            numberOfLines={1}>
+            {nationName}
+          </Text>
+          <View
+            style={[
+              styles.periodBadge,
+              {
+                borderColor: C.inputBorder,
+                backgroundColor: C.background,
+              },
+            ]}>
+            <Text style={[styles.periodBadgeText, {color: C.textSecondary}]}>
+              {periodText}
             </Text>
           </View>
 
-          <TouchableOpacity
-            activeOpacity={0.85}
-            disabled
-            style={[
-              styles.editButton,
-              {backgroundColor: C.surface},
-            ]}>
-            <Image source={editIcon} style={styles.editIcon} resizeMode="contain" />
-          </TouchableOpacity>
         </View>
 
-        <View style={styles.detailsCard}>
-          <View style={[styles.detailRow, {borderBottomColor: C.inputBorder}]}>
-            <Text style={[styles.infoLabel, {color: C.textSecondary}]}>
-              {t('church')}
+        <View
+          style={[
+            styles.infoList,
+            {borderTopColor: C.inputBorder},
+          ]}>
+          <View style={styles.infoLine}>
+            <Text style={[styles.infoLabelInline, {color: C.textSecondary}]}>
+              {t('church')}:
             </Text>
-            <Text
-              style={[styles.infoValue, {color: C.textPrimary}]}
-              numberOfLines={2}>
+            <Text style={[styles.infoValueInline, {color: C.textPrimary}]}>
               {churchName}
             </Text>
           </View>
 
-          <View
-            style={[
-              styles.detailRow,
-              styles.detailRowLast,
-              {borderBottomColor: C.inputBorder},
-            ]}>
-            <Text style={[styles.infoLabel, {color: C.textSecondary}]}>
-              {t('assignedTo')}
+          <View style={styles.infoLine}>
+            <Text style={[styles.infoLabelInline, {color: C.textSecondary}]}>
+              {t('assignedTo')}:
             </Text>
             <Text
-              style={[styles.infoValue, {color: C.textPrimary}]}
+              style={[styles.infoValueInline, {color: C.textPrimary}]}
               numberOfLines={1}>
               {assignedTo}
             </Text>
@@ -237,9 +221,6 @@ export const OverseerGoalsScreen = () => {
         </View>
 
         <View style={styles.metaRow}>
-          <Text style={[styles.metaText, {color: C.textSecondary}]}>
-            {`${t('period')}: ${periodText}`}
-          </Text>
           <Text style={[styles.metaText, {color: C.textSecondary}]}>
             {`#${item.id}`}
           </Text>
@@ -325,23 +306,25 @@ export const OverseerGoalsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: ms(16),
+    paddingHorizontal: ms(12),
   },
   listContent: {
-    paddingBottom: ms(8),
+    paddingBottom: ms(4),
   },
   itemCard: {
+    padding: ms(10),
+    marginBottom: ms(8),
     shadowColor: '#000',
-    shadowRadius: ms(6),
-    shadowOffset: {width: 0, height: 2},
-    elevation: 2,
+    shadowRadius: ms(4),
+    shadowOffset: {width: 0, height: 1},
+    elevation: 1,
   },
   cardBody: {
     flex: 1,
   },
   addButtonRow: {
     alignItems: 'flex-end',
-    marginBottom: ms(10),
+    marginBottom: ms(8),
   },
   addButton: {
     marginTop: 0,
@@ -349,79 +332,58 @@ const styles = StyleSheet.create({
   },
   cardHeader: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  titleContent: {
-    flex: 1,
-    paddingRight: ms(12),
   },
   nationName: {
-    fontSize: fs(16),
+    fontSize: fs(15),
     fontWeight: '700',
-    marginTop: ms(8),
+    flex: 1,
+    marginRight: ms(8),
   },
   periodBadge: {
-    alignSelf: 'flex-start',
     borderWidth: 1,
     borderRadius: ms(999),
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(5),
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(3),
   },
   periodBadgeText: {
-    fontSize: fs(11),
+    fontSize: fs(10.5),
     fontWeight: '700',
   },
-  editButton: {
-    width: ws(24),
-    height: ws(24),
-    borderRadius: rs(4),
-    alignItems: 'center',
-    justifyContent: 'center',
+  infoList: {
+    marginTop: ms(8),
+    paddingTop: ms(6),
+    borderTopWidth: StyleSheet.hairlineWidth,
   },
-  editIcon: {
-    width: ws(16),
-    height: ws(16),
-  },
-  detailsCard: {
-    marginTop: ms(12),
-  },
-  detailRow: {
+  infoLine: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: ms(12),
-    paddingVertical: ms(8),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: COLORS.lightGray,
+    paddingVertical: ms(3),
   },
-  detailRowLast: {
-    borderBottomWidth: 0,
-  },
-  infoLabel: {
-    width: '28%',
-    fontSize: fs(12),
+  infoLabelInline: {
+    fontSize: fs(11),
     fontWeight: '700',
+    marginRight: ms(6),
   },
-  infoValue: {
+  infoValueInline: {
     flex: 1,
-    fontSize: fs(13),
+    fontSize: fs(12.5),
     fontWeight: '600',
-    textAlign: 'right',
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginTop: ms(12),
+    justifyContent: 'flex-end',
+    marginTop: ms(6),
   },
   metaText: {
-    fontSize: fs(11),
+    fontSize: fs(10.5),
   },
   subTitle: {
-    marginTop: ms(6),
-    marginBottom: ms(10),
-    fontSize: fs(12),
+    marginTop: ms(4),
+    marginBottom: ms(8),
+    fontSize: fs(11.5),
   },
   emptyWrap: {
     alignItems: 'center',
@@ -447,7 +409,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   pagination: {
-    paddingVertical: ms(12),
+    paddingVertical: ms(8),
     alignItems: 'flex-end',
   },
 });

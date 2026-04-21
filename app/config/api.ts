@@ -6,8 +6,8 @@ export const DEFAULT_PAGE_LIMIT = 10;
 const APP_LANGUAGE_STORAGE_KEY = 'appLanguage';
 const DEFAULT_LANGUAGE = 'en';
 
-// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODkzNzQ1MzQsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NDUwfQ.oH5eRvElBNThPtwq8_2nhgtAOWAhgudiK0qzRtsLhzY";
-export const TOKEN_FOR_TEST = '';
+export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODkzNzQ1MzQsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NDUwfQ.oH5eRvElBNThPtwq8_2nhgtAOWAhgudiK0qzRtsLhzY";
+// export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
   baseURL: 'http://34.126.158.119/api/v1/',

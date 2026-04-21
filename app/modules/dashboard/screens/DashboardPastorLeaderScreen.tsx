@@ -757,7 +757,10 @@ export default function DashboardPastorLeaderScreen() {
             <View style={styles.reportVerifyColumn}>
               {dashboardData?.dashboard_info && (
                 dashboardData.dashboard_info.is_verified ? (
-                  <Text style={[styles.verificationText, { color: '#1e7e34' }]}>
+                  <Text
+                    style={[styles.verificationText, { color: '#1e7e34' }]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit>
                     {'\u2714\uFE0E'} {t('visited')} {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by {dashboardData.dashboard_info.verified_by_user_name || ''}
                   </Text>
                 ) : (
@@ -1179,7 +1182,6 @@ const styles = StyleSheet.create({
   },
   locationRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'flex-start',
     marginBottom: ms(4),
     width: '100%',
@@ -1188,12 +1190,15 @@ const styles = StyleSheet.create({
     fontSize: fs(15),
     color: '#000',
     textAlign: 'left',
-    width: '35%',
+    flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   reportVerifyColumn: {
-    width: '65%',
+    flex: 1,
     alignItems: 'flex-end',
     marginLeft: ms(8),
+    minWidth: 0,
   },
   lastRecordDate: {
     fontSize: fs(12),

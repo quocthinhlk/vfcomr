@@ -1,5 +1,13 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {ActivityIndicator, ScrollView, StyleSheet, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Image,
+  ScrollView,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import {useNavigation} from '@react-navigation/native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {globalStyles} from '../../../shared/styles/global';
@@ -9,7 +17,7 @@ import {Header} from '../../../shared/components/Header';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {COLORS} from '../../../shared/constants/colors';
-import {fs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import {
   getResourceCategories,
   getResourceDetail,
@@ -20,23 +28,27 @@ import {
   ResourceTypeItem,
 } from '../services/resource.service';
 
-const getErrorMessage = (error: any): string => {
+const getErrorMessage = (
+  error: any,
+  fallbackMessage: string,
+): string => {
   const status = error?.response?.status;
   const apiMessage = error?.response?.data?.message;
   if (status && apiMessage) return `(${status}) ${apiMessage}`;
   if (status) return `Request failed with status ${status}`;
   if (apiMessage) return String(apiMessage);
-  return error?.message || 'Unknown error';
+  return error?.message || fallbackMessage;
 };
 
 export default function SearchResourcesScreen() {
+  const navigation = useNavigation<any>();
   const C = useThemedColors();
   const {t} = useTranslation();
   const [resources, setResources] = useState<ResourceItem[]>([]);
   const [types, setTypes] = useState<ResourceTypeItem[]>([]);
   const [topics, setTopics] = useState<ResourceCategoryItem[]>([]);
   const [selectedResourceId, setSelectedResourceId] = useState<number | null>(null);
-  const [selectedTypeId, setSelectedTypeId] = useState<number | null>(null);
+  const [selectedTypeIds, setSelectedTypeIds] = useState<number[]>([]);
   const [selectedTopicId, setSelectedTopicId] = useState<number | null>(null);
   const [selectedResourceDetail, setSelectedResourceDetail] =
     useState<ResourceItem | null>(null);
@@ -78,14 +90,14 @@ export default function SearchResourcesScreen() {
         setResources(resourceRes.value);
       } else {
         setResources([]);
-        errors.push(getErrorMessage(resourceRes.reason));
+        errors.push(getErrorMessage(resourceRes.reason, t('unknownError')));
       }
 
       if (typeRes.status === 'fulfilled') {
         setTypes(typeRes.value);
       } else {
         setTypes([]);
-        errors.push(getErrorMessage(typeRes.reason));
+        errors.push(getErrorMessage(typeRes.reason, t('unknownError')));
       }
 
       await loadTopics('');
@@ -93,7 +105,7 @@ export default function SearchResourcesScreen() {
         setScreenError(errors[0]);
       }
     } catch (error) {
-      setScreenError(getErrorMessage(error));
+      setScreenError(getErrorMessage(error, t('unknownError')));
     } finally {
       setLoadingInit(false);
     }
@@ -116,15 +128,50 @@ export default function SearchResourcesScreen() {
     [resources],
   );
 
-  const typeOptions = useMemo(
-    () => types.map(item => ({label: item.name, value: item.id})),
-    [types],
-  );
-
   const topicOptions = useMemo(
     () => topics.map(item => ({label: item.name, value: item.id})),
     [topics],
   );
+
+  const typeNameById = useMemo(
+    () => new Map(types.map(item => [item.id, item.name] as const)),
+    [types],
+  );
+
+  const topicNameById = useMemo(
+    () => new Map(topics.map(item => [item.id, item.name] as const)),
+    [topics],
+  );
+
+  const groupedFilteredResults = useMemo(() => {
+    if (!filteredResults) {
+      return [];
+    }
+
+    const grouped = new Map<number, ResourceItem[]>();
+    filteredResults.forEach(item => {
+      const typeId = item.type_id ?? -1;
+      const current = grouped.get(typeId) ?? [];
+      current.push(item);
+      grouped.set(typeId, current);
+    });
+
+    return Array.from(grouped.entries()).map(([typeId, items]) => ({
+      typeId,
+      title:
+        (typeId !== -1 ? typeNameById.get(typeId) : undefined) ||
+        t('resourceSelectTypeLabel'),
+      items,
+    }));
+  }, [filteredResults, t, typeNameById]);
+
+  const toggleTypeSelection = (typeId: number) => {
+    setSelectedTypeIds(current =>
+      current.includes(typeId)
+        ? current.filter(id => id !== typeId)
+        : [...current, typeId],
+    );
+  };
 
   const onSearchTopic = (keyword: string) => {
     if (topicDebounceRef.current) {
@@ -133,6 +180,10 @@ export default function SearchResourcesScreen() {
     topicDebounceRef.current = setTimeout(() => {
       loadTopics(keyword.trim());
     }, 300);
+  };
+
+  const handleOpenResourceDetail = (resourceId: number) => {
+    navigation.navigate('ResourceDetail', {resourceId});
   };
 
   const onSelectResource = async (value: string | number | null) => {
@@ -151,14 +202,17 @@ export default function SearchResourcesScreen() {
       const detail = await getResourceDetail(resourceId);
       setSelectedResourceDetail(detail);
       if (detail?.type_id) {
-        setSelectedTypeId(detail.type_id);
+        setSelectedTypeIds([detail.type_id]);
+      } else {
+        setSelectedTypeIds([]);
       }
       if (detail?.topic_id) {
         setSelectedTopicId(detail.topic_id);
       }
+      handleOpenResourceDetail(resourceId);
     } catch (error) {
       setSelectedResourceDetail(null);
-      setScreenError(getErrorMessage(error));
+      setScreenError(getErrorMessage(error, t('unknownError')));
     } finally {
       setLoadingResourceDetail(false);
     }
@@ -169,7 +223,7 @@ export default function SearchResourcesScreen() {
       return;
     }
 
-    if (!selectedTypeId && !selectedTopicId) {
+    if (selectedTypeIds.length === 0 && !selectedTopicId) {
       setScreenError(t('resourceSelectTypeOrTopic'));
       return;
     }
@@ -177,14 +231,33 @@ export default function SearchResourcesScreen() {
     try {
       setSubmitting(true);
       setScreenError('');
-      const data = await getResources({
-        typeId: selectedTypeId,
-        topicId: selectedTopicId,
-      });
-      setFilteredResults(data);
+      const requests =
+        selectedTypeIds.length > 0
+          ? selectedTypeIds.map(typeId =>
+              getResources({
+                typeId,
+                topicId: selectedTopicId,
+              }),
+            )
+          : [
+              getResources({
+                topicId: selectedTopicId,
+              }),
+            ];
+
+      const responses = await Promise.all(requests);
+      const uniqueResults = Array.from(
+        new Map(
+          responses
+            .flat()
+            .map(item => [item.id, item] as const),
+        ).values(),
+      );
+
+      setFilteredResults(uniqueResults);
     } catch (error) {
       setFilteredResults([]);
-      setScreenError(getErrorMessage(error));
+      setScreenError(getErrorMessage(error, t('unknownError')));
     } finally {
       setSubmitting(false);
     }
@@ -232,17 +305,37 @@ export default function SearchResourcesScreen() {
               <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
                 {t('resourceSearchByTypeOrTopic')}
               </Text>
-
               <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
                 {t('resourceSelectTypeLabel')}
               </Text>
-              <ElementDropdown
-                data={typeOptions}
-                value={selectedTypeId}
-                onChange={value => setSelectedTypeId((value as number) ?? null)}
-                placeholder={t('resourcePlaceholderSelect')}
-                search
-              />
+              <View style={styles.typeGrid}>
+                {types.map(item => {
+                  const isSelected = selectedTypeIds.includes(item.id);
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      style={styles.typeItem}
+                      activeOpacity={0.7}
+                      onPress={() => toggleTypeSelection(item.id)}>
+                      <View
+                        style={[
+                          styles.checkbox,
+                          {
+                            borderColor: isSelected ? COLORS.mainColor : C.inputBorder,
+                            backgroundColor: isSelected ? COLORS.mainColor : 'transparent',
+                          },
+                        ]}>
+                        {isSelected ? <Text style={styles.checkmark}>✓</Text> : null}
+                      </View>
+                      <Text
+                        style={[styles.typeItemLabel, {color: C.textPrimary}]}
+                        numberOfLines={3}>
+                        {item.name}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
               <Text style={[styles.fieldLabel, styles.spacingTop, {color: C.textSecondary}]}>
                 {t('resourceSelectTopicLabel')}
@@ -284,14 +377,41 @@ export default function SearchResourcesScreen() {
                 <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
                   {t('resourceDetailTitle')}
                 </Text>
-                <Text style={[styles.resultTitle, {color: C.textPrimary}]}>
-                  {selectedResourceDetail.name}
-                </Text>
-                <Text style={[styles.resultDescription, {color: C.textSecondary}]}>
-                  {selectedResourceDetail.short_description ||
-                    selectedResourceDetail.description ||
-                    t('noDataFound')}
-                </Text>
+                <TouchableOpacity
+                  activeOpacity={0.8}
+                  onPress={() => handleOpenResourceDetail(selectedResourceDetail.id)}
+                  style={[
+                    styles.detailCard,
+                    {borderColor: C.inputBorder, backgroundColor: C.background},
+                  ]}>
+                  {selectedResourceDetail.graphic_url ? (
+                    <Image
+                      source={{uri: selectedResourceDetail.graphic_url}}
+                      style={styles.detailImage}
+                      resizeMode="cover"
+                    />
+                  ) : (
+                    <View
+                      style={[
+                        styles.detailImagePlaceholder,
+                        {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+                      ]}>
+                      <Text style={[styles.resultImagePlaceholderText, {color: C.textSecondary}]}>
+                        {t('noDataFound')}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.detailContent}>
+                    <Text style={[styles.resultTitle, {color: C.textPrimary}]}>
+                      {selectedResourceDetail.name}
+                    </Text>
+                    <Text style={[styles.resultDescription, {color: C.textSecondary}]} numberOfLines={4}>
+                      {selectedResourceDetail.short_description ||
+                        selectedResourceDetail.description ||
+                        t('noDataFound')}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             ) : null}
 
@@ -305,11 +425,98 @@ export default function SearchResourcesScreen() {
                     {t('resourceNoResults')}
                   </Text>
                 ) : (
-                  filteredResults.map(item => (
-                    <Text key={item.id} style={[styles.resultItem, {color: C.textPrimary}]}>
-                      {`\u2022 ${item.name}`}
-                    </Text>
-                  ))
+                  <View style={styles.resultsGroupWrap}>
+                    {groupedFilteredResults.map(group => (
+                      <View key={group.typeId} style={styles.resultGroup}>
+                        <View style={styles.resultGroupHeader}>
+                          <Text style={[styles.resultGroupTitle, {color: C.textPrimary}]}>
+                            {group.title}
+                          </Text>
+                          <View style={[styles.groupCountBadge, {backgroundColor: C.bgSelectedOption}]}>
+                            <Text style={[styles.groupCountText, {color: COLORS.mainColor}]}>
+                              {group.items.length}
+                            </Text>
+                          </View>
+                        </View>
+                        {group.items.map(item => {
+                          const topicLabel = item.topic_id
+                            ? topicNameById.get(item.topic_id) ||
+                              (item.topic_id === selectedTopicId
+                                ? topicOptions.find(option => option.value === selectedTopicId)
+                                    ?.label
+                                : undefined)
+                            : undefined;
+
+                          return (
+                            <TouchableOpacity
+                              key={item.id}
+                              activeOpacity={0.82}
+                              onPress={() => handleOpenResourceDetail(item.id)}
+                              style={[
+                                styles.resultCard,
+                                {
+                                  borderColor: C.inputBorder,
+                                  backgroundColor: C.background,
+                                  shadowColor: '#000',
+                                },
+                              ]}>
+                              {item.graphic_url ? (
+                                <Image
+                                  source={{uri: item.graphic_url}}
+                                  style={styles.resultImage}
+                                  resizeMode="cover"
+                                />
+                              ) : (
+                                <View
+                                  style={[
+                                    styles.resultImagePlaceholder,
+                                    {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+                                  ]}>
+                                  <Text
+                                    style={[
+                                      styles.resultImagePlaceholderText,
+                                      {color: C.textSecondary},
+                                    ]}>
+                                    {t('resourceNoImageAvailable')}
+                                  </Text>
+                                </View>
+                              )}
+
+                              <View style={styles.resultContent}>
+                                {topicLabel ? (
+                                  <View
+                                    style={[
+                                      styles.resultTopicBadge,
+                                      {backgroundColor: C.bgSelectedOption},
+                                    ]}>
+                                    <Text
+                                      style={[
+                                        styles.resultTopicBadgeText,
+                                        {color: COLORS.mainColor},
+                                      ]}
+                                      numberOfLines={1}>
+                                      {topicLabel}
+                                    </Text>
+                                  </View>
+                                ) : null}
+
+                                <Text style={[styles.resultLinkTitle, {color: C.textPrimary}]}>
+                                  {item.name}
+                                </Text>
+                                <Text
+                                  style={[styles.resultDescription, {color: C.textSecondary}]}
+                                  numberOfLines={3}>
+                                  {item.short_description ||
+                                    item.description ||
+                                    t('noDataFound')}
+                                </Text>
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
                 )}
               </View>
             ) : null}
@@ -361,6 +568,37 @@ const styles = StyleSheet.create({
     fontSize: fs(12),
     marginTop: ms(6),
   },
+  typeGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+  },
+  typeItem: {
+    width: '48%',
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: ms(12),
+  },
+  checkbox: {
+    width: ws(20),
+    height: ws(20),
+    borderRadius: rs(4),
+    borderWidth: 2,
+    marginRight: ms(10),
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: ms(1),
+  },
+  checkmark: {
+    color: '#fff',
+    fontSize: fs(12),
+    fontWeight: '700',
+  },
+  typeItemLabel: {
+    flex: 1,
+    fontSize: fs(13),
+    lineHeight: fs(18),
+  },
   buttonRow: {
     marginTop: ms(12),
     flexDirection: 'row',
@@ -375,16 +613,111 @@ const styles = StyleSheet.create({
   },
   resultTitle: {
     fontSize: fs(14),
-    fontWeight: '600',
+    fontWeight: '700',
+    marginBottom: ms(6),
+  },
+  detailCard: {
+    borderWidth: 1,
+    borderRadius: rs(12),
+    overflow: 'hidden',
+  },
+  detailImage: {
+    width: '100%',
+    height: ws(160),
+  },
+  detailImagePlaceholder: {
+    width: '100%',
+    height: ws(160),
+    borderBottomWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  detailContent: {
+    padding: ms(12),
+  },
+  resultsGroupWrap: {
+    gap: ms(18),
+  },
+  resultGroup: {
+    marginBottom: ms(4),
+  },
+  resultGroupHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: ms(10),
+  },
+  resultGroupTitle: {
+    fontSize: fs(18),
+    fontWeight: '700',
+  },
+  groupCountBadge: {
+    minWidth: ws(28),
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(4),
+    borderRadius: rs(999),
+    alignItems: 'center',
+  },
+  groupCountText: {
+    fontSize: fs(11),
+    fontWeight: '700',
+  },
+  resultCard: {
+    borderWidth: 1,
+    borderRadius: rs(12),
+    padding: ms(10),
+    marginBottom: ms(12),
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: {width: 0, height: 4},
+    elevation: 2,
+  },
+  resultContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  resultImage: {
+    width: ws(88),
+    height: ws(88),
+    borderRadius: rs(10),
+    marginRight: ms(12),
+  },
+  resultImagePlaceholder: {
+    width: ws(88),
+    height: ws(88),
+    borderWidth: 1,
+    borderRadius: rs(10),
+    marginRight: ms(12),
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: ms(6),
+  },
+  resultImagePlaceholderText: {
+    fontSize: fs(11),
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  resultTopicBadge: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(4),
+    borderRadius: rs(999),
+    marginBottom: ms(8),
+    maxWidth: '100%',
+  },
+  resultTopicBadgeText: {
+    fontSize: fs(11),
+    fontWeight: '700',
+  },
+  resultLinkTitle: {
+    fontSize: fs(14),
+    fontWeight: '700',
     marginBottom: ms(6),
   },
   resultDescription: {
     fontSize: fs(13),
     lineHeight: fs(18),
-  },
-  resultItem: {
-    fontSize: fs(13),
-    lineHeight: fs(20),
-    marginBottom: ms(4),
   },
 });

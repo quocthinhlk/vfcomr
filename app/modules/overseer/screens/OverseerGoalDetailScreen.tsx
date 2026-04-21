@@ -274,38 +274,24 @@ const OverseerGoalDetailScreen = () => {
                   shadowOpacity: 0.08,
                 },
               ]}>
-              <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
-                {t('editParameters')}
-              </Text>
               <View style={styles.parametersList}>
-                {parameterItems.map((item, index) => (
+                {parameterItems.map(item => (
                   <View
                     key={item.label}
                     style={[
                       styles.parameterRow,
                       {
-                        backgroundColor: C.background,
-                        borderColor: C.inputBorder,
                         borderBottomColor: C.border,
                       },
                     ]}>
-                    <View style={styles.parameterRowLeft}>
-                      <Text
-                        style={[styles.parameterLabel, {color: C.textSecondary}]}>
-                        {item.label}
+                    <Text style={styles.parameterLine}>
+                      <Text style={[styles.parameterLabel, {color: C.textSecondary}]}>
+                        {item.label}:{' '}
                       </Text>
                       <Text style={[styles.parameterValue, {color: C.textPrimary}]}>
                         {item.value || '-'}
                       </Text>
-                    </View>
-                    {index !== parameterItems.length - 1 ? (
-                      <View
-                        style={[
-                          styles.parameterDivider,
-                          {backgroundColor: C.border},
-                        ]}
-                      />
-                    ) : null}
+                    </Text>
                   </View>
                 ))}
               </View>
@@ -325,10 +311,10 @@ const OverseerGoalDetailScreen = () => {
                 <View style={styles.sectionHeader}>
                   <View style={styles.sectionHeaderText}>
                     <Text style={[styles.summaryTitle, {color: C.textPrimary}]}>
-                      {section.title}
+                      {t(section.titleKey as any)}
                     </Text>
                     <Text style={[styles.summaryMeta, {color: C.textSecondary}]}>
-                      {`${section.periods} periods`}
+                      {`${section.periods} ${t('periodsLabel')}`}
                     </Text>
                   </View>
                   <View style={styles.badgesRow}>
@@ -374,51 +360,56 @@ const OverseerGoalDetailScreen = () => {
                   </View>
                 </View>
 
-                {section.rows.map(row => (
-                  <View
-                    key={`${section.key}-${row.id}`}
-                    style={[
-                      styles.periodRow,
-                      {
-                        borderBottomColor: C.border,
-                        backgroundColor: C.background,
-                      },
-                    ]}>
-                    <View style={styles.periodRowMain}>
-                      <Text style={[styles.periodRowTitle, {color: C.textPrimary}]}>
-                        {formatGoalRangeLabel(row)}
-                      </Text>
-                      <Text style={[styles.periodRowMeta, {color: C.textSecondary}]}>
-                        {`${countFilledGoalMetrics(row)} ${t('filledMetrics')}`}
-                      </Text>
-                    </View>
+                {section.rows.map(row => {
+                  const filledMetrics = countFilledGoalMetrics(row);
+                  const redMetrics = countRedGoalMetrics(row);
+
+                  return (
                     <View
+                      key={`${section.key}-${row.id}`}
                       style={[
-                        styles.rowStatusPill,
+                        styles.periodRow,
                         {
-                          backgroundColor:
-                            countRedGoalMetrics(row) > 0
-                              ? COLORS.dangerColor + '14'
-                              : COLORS.mainColor + '12',
+                          borderColor: C.inputBorder,
+                          backgroundColor: C.background,
                         },
                       ]}>
-                      <Text
+                      <View style={styles.periodRowMain}>
+                        <Text style={[styles.periodRowTitle, {color: C.textPrimary}]}>
+                          {formatGoalRangeLabel(row)}
+                        </Text>
+                        <Text style={[styles.periodRowMeta, {color: C.textSecondary}]}>
+                          {`${filledMetrics} ${t('filledMetrics')}`}
+                        </Text>
+                      </View>
+                      <View
                         style={[
-                          styles.rowStatusPillText,
+                          styles.rowStatusPill,
                           {
-                            color:
-                              countRedGoalMetrics(row) > 0
-                                ? COLORS.dangerColor
-                                : COLORS.mainColor,
+                            backgroundColor:
+                              redMetrics > 0
+                                ? COLORS.dangerColor + '14'
+                                : COLORS.mainColor + '12',
                           },
                         ]}>
-                        {countRedGoalMetrics(row) > 0
-                          ? `${countRedGoalMetrics(row)} ${t('redFlags')}`
-                          : 'OK'}
-                      </Text>
+                        <Text
+                          style={[
+                            styles.rowStatusPillText,
+                            {
+                              color:
+                                redMetrics > 0
+                                  ? COLORS.dangerColor
+                                  : COLORS.mainColor,
+                            },
+                          ]}>
+                          {redMetrics > 0
+                            ? `${redMetrics} ${t('redFlags')}`
+                            : t('ok')}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                ))}
+                  );
+                })}
               </View>
             ))}
           </ScrollView>
@@ -442,15 +433,16 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
   },
   scrollContent: {
+    paddingTop: ms(6),
     paddingBottom: ms(24),
     gap: ms(12),
   },
   detailCard: {
     borderWidth: 1,
-    borderRadius: rs(12),
+    borderRadius: rs(14),
     padding: ms(14),
     shadowColor: '#000',
-    shadowRadius: rs(8),
+    shadowRadius: rs(6),
     shadowOffset: {width: 0, height: 2},
     elevation: 2,
   },
@@ -480,29 +472,30 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   heroTitle: {
-    fontSize: fs(20),
+    fontSize: fs(18),
     fontWeight: '700',
-    marginTop: ms(12),
+    marginTop: ms(10),
   },
   heroSubtitle: {
     fontSize: fs(12),
     marginTop: ms(4),
+    lineHeight: fs(18),
   },
   statsRow: {
     flexDirection: 'row',
-    gap: ms(10),
-    marginTop: ms(14),
+    gap: ms(8),
+    marginTop: ms(12),
   },
   statBox: {
     flex: 1,
     borderWidth: 1,
     borderRadius: rs(10),
-    paddingVertical: ms(10),
-    paddingHorizontal: ms(8),
+    paddingVertical: ms(9),
+    paddingHorizontal: ms(6),
     alignItems: 'center',
   },
   statValue: {
-    fontSize: fs(18),
+    fontSize: fs(17),
     fontWeight: '800',
   },
   statLabel: {
@@ -512,12 +505,12 @@ const styles = StyleSheet.create({
   },
   actionRow: {
     flexDirection: 'row',
-    gap: ms(10),
+    gap: ms(8),
   },
   primaryButton: {
     flex: 1,
-    minHeight: ms(40),
-    borderRadius: rs(6),
+    minHeight: ms(38),
+    borderRadius: rs(8),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: ms(12),
@@ -529,8 +522,8 @@ const styles = StyleSheet.create({
   },
   secondaryButton: {
     flex: 1,
-    minHeight: ms(40),
-    borderRadius: rs(6),
+    minHeight: ms(38),
+    borderRadius: rs(8),
     borderWidth: 1,
     alignItems: 'center',
     justifyContent: 'center',
@@ -542,51 +535,39 @@ const styles = StyleSheet.create({
   },
   parametersCard: {
     borderWidth: 1,
-    borderRadius: rs(12),
+    borderRadius: rs(14),
     padding: ms(14),
     shadowColor: '#000',
-    shadowRadius: rs(8),
+    shadowRadius: rs(6),
     shadowOffset: {width: 0, height: 2},
     elevation: 2,
   },
-  cardTitle: {
-    fontSize: fs(15),
-    fontWeight: '700',
-    marginBottom: ms(10),
-  },
   parametersList: {
-    gap: ms(8),
+    gap: 0,
   },
   parameterRow: {
-    borderWidth: 1,
-    borderRadius: rs(10),
-    paddingHorizontal: ms(12),
-    paddingVertical: ms(10),
+    paddingVertical: ms(9),
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  parameterRowLeft: {
-    flex: 1,
+  parameterLine: {
+    fontSize: fs(13),
+    lineHeight: fs(19),
   },
   parameterLabel: {
     fontSize: fs(11),
     fontWeight: '700',
-    marginBottom: ms(4),
-    textTransform: 'uppercase',
   },
   parameterValue: {
     fontSize: fs(13),
     fontWeight: '600',
     lineHeight: fs(18),
   },
-  parameterDivider: {
-    height: StyleSheet.hairlineWidth,
-    marginTop: ms(10),
-  },
   summaryCard: {
     borderWidth: 1,
-    borderRadius: rs(12),
+    borderRadius: rs(14),
     padding: ms(14),
     shadowColor: '#000',
-    shadowRadius: rs(8),
+    shadowRadius: rs(6),
     shadowOffset: {width: 0, height: 2},
     elevation: 2,
   },
@@ -598,7 +579,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    gap: ms(10),
+    gap: ms(8),
     marginBottom: ms(10),
   },
   sectionHeaderText: {
@@ -625,12 +606,12 @@ const styles = StyleSheet.create({
   periodRow: {
     paddingVertical: ms(10),
     paddingHorizontal: ms(10),
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderWidth: 1,
     borderRadius: rs(10),
     marginBottom: ms(8),
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: ms(10),
   },
   periodRowMain: {
@@ -642,12 +623,13 @@ const styles = StyleSheet.create({
   },
   periodRowMeta: {
     fontSize: fs(11),
-    marginTop: ms(4),
+    marginTop: ms(3),
   },
   rowStatusPill: {
     borderRadius: rs(999),
     paddingHorizontal: ms(10),
-    paddingVertical: ms(6),
+    paddingVertical: ms(5),
+    marginTop: ms(1),
   },
   rowStatusPillText: {
     fontSize: fs(10),

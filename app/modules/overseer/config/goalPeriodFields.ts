@@ -4,71 +4,101 @@ import {
   GoalSectionKey,
 } from '../services/overseerGoals.service';
 
+export type GoalSectionTitleKey =
+  | 'goalSectionOverseerHomeChurch'
+  | 'goalSectionHomeChurchesChurchPlanting'
+  | 'goalSectionNationalGoals'
+  | 'goalSectionOverseerRegions';
+
+export type GoalMetricLabelKey =
+  | 'goalMetric1ChurchPlanting'
+  | 'goalMetric2NewChurchPlants'
+  | 'goalMetric3ReportingOnOmr'
+  | 'goalMetric4HavingMfp'
+  | 'goalMetric5GivingConferenceFund'
+  | 'goalMetric6LiwClasses'
+  | 'goalMetric7LifeGroups'
+  | 'goalMetric71LifeGroups50To69'
+  | 'goalMetric72LifeGroups70To89'
+  | 'goalMetric73LifeGroups90To100'
+  | 'goalMetric8ChurchesGrowing'
+  | 'goalMetric81Growing10To19'
+  | 'goalMetric82Growing20To100'
+  | 'goalMetric9ChildrensProgrammes'
+  | 'goalMetric10ChildrensOutreaches'
+  | 'goalMetric11TrainingLeaders';
+
 export const GOAL_SECTION_OPTIONS: Array<{
   key: GoalSectionKey;
-  title: string;
+  titleKey: GoalSectionTitleKey;
 }> = [
-  {key: 'home_church_goals', title: 'Home Church Goals'},
-  {key: 'home_church_planting_goals', title: 'Home Church Planting Goals'},
-  {key: 'nation_goals', title: 'Nation Goals'},
-  {key: 'region_goals', title: 'Region Goals'},
+  {key: 'home_church_goals', titleKey: 'goalSectionOverseerHomeChurch'},
+  {
+    key: 'home_church_planting_goals',
+    titleKey: 'goalSectionHomeChurchesChurchPlanting',
+  },
+  {key: 'nation_goals', titleKey: 'goalSectionNationalGoals'},
+  {key: 'region_goals', titleKey: 'goalSectionOverseerRegions'},
 ];
 
 export const GOAL_METRIC_OPTIONS: Array<{
   key: GoalMetricField;
-  label: string;
+  labelKey: GoalMetricLabelKey;
 }> = [
   {
     key: 'percent_of_churches_doing_church_planting',
-    label: '% Churches Doing Church Planting',
+    labelKey: 'goalMetric1ChurchPlanting',
   },
-  {key: 'percent_new_church_plants', label: '% New Church Plants'},
+  {key: 'percent_new_church_plants', labelKey: 'goalMetric2NewChurchPlants'},
   {
     key: 'percent_of_churches_reporting_on_omr',
-    label: '% Churches Reporting on OMR',
+    labelKey: 'goalMetric3ReportingOnOmr',
   },
-  {key: 'percent_of_churches_mfp', label: '% Churches MFP'},
+  {key: 'percent_of_churches_mfp', labelKey: 'goalMetric4HavingMfp'},
   {
     key: 'percent_of_churches_giving_conference_fund',
-    label: '% Churches Giving Conference Fund',
+    labelKey: 'goalMetric5GivingConferenceFund',
   },
   {
     key: 'percent_of_churches_liw_classes',
-    label: '% Churches with LIW Classes',
+    labelKey: 'goalMetric6LiwClasses',
   },
-  {key: 'percent_of_churches_cell_groups', label: '% Churches with Cell Groups'},
+  {
+    key: 'percent_of_churches_cell_groups',
+    labelKey: 'goalMetric7LifeGroups',
+  },
   {
     key: 'percent_of_churches_50_69_percent_in_cell_groups',
-    label: '% Churches 50-69% in Cell Groups',
+    labelKey: 'goalMetric71LifeGroups50To69',
   },
   {
     key: 'percent_of_churches_70_89_percent_in_cell_groups',
-    label: '% Churches 70-89% in Cell Groups',
+    labelKey: 'goalMetric72LifeGroups70To89',
   },
   {
     key: 'percent_of_churches_90_100_percent_in_cell_groups',
-    label: '% Churches 90-100% in Cell Groups',
+    labelKey: 'goalMetric73LifeGroups90To100',
   },
-  {key: 'percent_of_churches_growing', label: '% Churches Growing'},
+  {key: 'percent_of_churches_growing', labelKey: 'goalMetric8ChurchesGrowing'},
   {
     key: 'percent_of_churches_growing_by_10_19_percent',
-    label: '% Churches Growing by 10-19%',
+    labelKey: 'goalMetric81Growing10To19',
   },
   {
     key: 'percent_of_churches_growing_by_20_100_percent',
-    label: '% Churches Growing by 20-100%',
+    labelKey: 'goalMetric82Growing20To100',
   },
   {
     key: 'percent_of_churches_childrens_programmes',
-    label: "% Churches with Children's Programmes",
+    labelKey: 'goalMetric9ChildrensProgrammes',
   },
   {
     key: 'percent_of_churches_childrens_outreaches',
-    label: "% Churches with Children's Outreaches",
+    labelKey: 'goalMetric10ChildrensOutreaches',
   },
   {
     key: 'percent_of_churches_training_leaders',
-    label: '% Churches Training Leaders',
+    labelKey: 'goalMetric11TrainingLeaders',
   },
 ];
 

@@ -51,6 +51,11 @@ const EditOverseerGoalDefaultsScreen = () => {
   const clearInvalid = (key: string) =>
     setInvalid(prev => ({...prev, [key]: false}));
 
+  const normalizePositiveNumberInput = (text: string) => {
+    const digitsOnly = text.replace(/[^0-9]/g, '');
+    return digitsOnly;
+  };
+
   const loadChurches = async (search = '') => {
     const res = await api.get('churches', {
       params: {page: 1, limit: 50, ...(search ? {search} : {})},
@@ -119,11 +124,13 @@ const EditOverseerGoalDefaultsScreen = () => {
   }, [goalPeriodId]);
 
   const onSave = async () => {
+    const startYearNumber = Number(startYear);
+    const endYearNumber = Number(endYear);
     const nextInvalid: Record<string, boolean> = {
       localChurchId: !localChurchId,
       nationId: !nationId,
-      startYear: !startYear.trim(),
-      endYear: !endYear.trim(),
+      startYear: !startYear.trim() || !Number.isFinite(startYearNumber) || startYearNumber <= 0,
+      endYear: !endYear.trim() || !Number.isFinite(endYearNumber) || endYearNumber <= 0,
     };
     setInvalid(nextInvalid);
 
@@ -136,8 +143,8 @@ const EditOverseerGoalDefaultsScreen = () => {
       await updateOverseerGoalPeriodParameters(goalPeriodId, {
         local_church_id: Number(localChurchId),
         nation_id: Number(nationId),
-        start_year: Number(startYear),
-        end_year: Number(endYear),
+        start_year: startYearNumber,
+        end_year: endYearNumber,
       });
       Alert.alert(t('success'), t('goalParametersUpdatedSuccess'));
       navigation.replace('OverseerGoalDetail', {goalPeriodId});
@@ -222,7 +229,7 @@ const EditOverseerGoalDefaultsScreen = () => {
                     <AppInput
                       value={startYear}
                       onChangeText={text => {
-                        setStartYear(text);
+                        setStartYear(normalizePositiveNumberInput(text));
                         clearInvalid('startYear');
                       }}
                       placeholder={t('startYear')}
@@ -238,7 +245,7 @@ const EditOverseerGoalDefaultsScreen = () => {
                     <AppInput
                       value={endYear}
                       onChangeText={text => {
-                        setEndYear(text);
+                        setEndYear(normalizePositiveNumberInput(text));
                         clearInvalid('endYear');
                       }}
                       placeholder={t('endYear')}

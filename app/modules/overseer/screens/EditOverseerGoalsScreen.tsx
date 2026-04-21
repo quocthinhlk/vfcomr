@@ -4,7 +4,7 @@ import {
   Alert,
   ScrollView,
   StyleSheet,
-  Switch,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -15,10 +15,9 @@ import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {COLORS} from '../../../shared/constants/colors';
-import {formStyles} from '../../../shared/styles/form';
-import {SaveButton} from '../../../shared/components/ActionButtons';
+import {CancelButton, SaveButton} from '../../../shared/components/ActionButtons';
 import AppInput from '../../../shared/components/AppInput';
-import {fs, hs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import {
   getOverseerGoalPeriodDetail,
   GoalPeriodBatchUpdatePayload,
@@ -170,87 +169,127 @@ const EditOverseerGoalsScreen = () => {
                     styles.sectionCard,
                     {
                       backgroundColor: C.surface,
-                      borderColor: C.inputBorder,
                     },
                   ]}>
                   <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                    {section.title}
+                    {t(section.titleKey as any)}
                   </Text>
 
-                  {detail[section.key].map((row, rowIndex) => (
+                  {GOAL_METRIC_OPTIONS.map(metric => (
                     <View
-                      key={`${section.key}-${row.id}`}
+                      key={`${section.key}-${metric.key}`}
                       style={[
-                        styles.periodCard,
+                        styles.metricCard,
                         {
                           backgroundColor: C.background,
-                          borderColor: C.border,
+                          borderColor: C.inputBorder,
                         },
                       ]}>
-                      <Text style={[styles.periodTitle, {color: C.textPrimary}]}>
-                        {formatGoalRangeLabel(row)}
+                      <Text style={[styles.metricTitle, {color: C.textPrimary}]}>
+                        {t(metric.labelKey as any)}
                       </Text>
 
-                      {GOAL_METRIC_OPTIONS.map(metric => (
-                        <View
-                          key={`${row.id}-${metric.key}`}
-                          style={[
-                            styles.metricBlock,
-                            {borderBottomColor: C.border},
-                          ]}>
-                          <Text style={[styles.metricLabel, {color: C.textSecondary}]}>
-                            {metric.label}
-                          </Text>
-                          <View style={styles.metricControls}>
-                            <View style={styles.metricInputWrap}>
-                              <AppInput
-                                value={
-                                  row[metric.key] === null
-                                    ? ''
-                                    : String(row[metric.key])
-                                }
-                                onChangeText={text => {
-                                  const trimmed = text.trim();
-                                  updateRowField(
-                                    section.key,
-                                    rowIndex,
-                                    metric.key,
-                                    trimmed === '' ? null : Number(trimmed),
-                                  );
-                                }}
-                                keyboardType="numeric"
-                                placeholder="0"
-                              />
-                            </View>
-                            <View style={styles.switchWrap}>
-                              <Text
-                                style={[
-                                  styles.switchLabel,
-                                  {color: C.textSecondary},
-                                ]}>
-                                Red
-                              </Text>
-                              <Switch
-                                style={{transform: [{scaleX: 0.9}, {scaleY: 0.9}]}}
-                                value={row[`${metric.key}_is_red`]}
-                                onValueChange={value => {
+                      <View style={styles.periodsList}>
+                        {detail[section.key].map((row, rowIndex) => {
+                          const isAoGoal = row[`${metric.key}_is_red`];
+                          const isLast = rowIndex === detail[section.key].length - 1;
+
+                          return (
+                          <View
+                            key={`${row.id}-${metric.key}`}
+                            style={[
+                              styles.periodEditorItem,
+                              {
+                                backgroundColor: C.surface,
+                                borderBottomColor: C.border,
+                              },
+                            ]}>
+                            <Text
+                              style={[styles.periodEditorTitle, {color: C.textSecondary}]}>
+                              {formatGoalRangeLabel(row)}
+                            </Text>
+
+                            <View style={styles.metricEditorRow}>
+                              <View style={styles.metricInputRow}>
+                                <AppInput
+                                  value={
+                                    row[metric.key] === null
+                                      ? ''
+                                      : String(row[metric.key])
+                                  }
+                                  onChangeText={text => {
+                                    const normalized = text.replace(/[^0-9.]/g, '');
+                                    updateRowField(
+                                      section.key,
+                                      rowIndex,
+                                      metric.key,
+                                      normalized === '' ? null : Number(normalized),
+                                    );
+                                  }}
+                                  keyboardType="numeric"
+                                  placeholder="0"
+                                  containerStyle={styles.metricInputContainer}
+                                />
+                                <Text
+                                  style={[
+                                    styles.metricSuffix,
+                                    {color: C.textSecondary},
+                                  ]}>
+                                  %
+                                </Text>
+                              </View>
+                              <TouchableOpacity
+                                activeOpacity={0.75}
+                                style={styles.checkboxRow}
+                                onPress={() => {
                                   updateRowField(
                                     section.key,
                                     rowIndex,
                                     `${metric.key}_is_red`,
-                                    value,
+                                    !isAoGoal,
                                   );
-                                }}
-                                thumbColor={COLORS.white}
-                                trackColor={{
-                                  false: C.border,
-                                  true: COLORS.mainColor,
-                                }}
-                              />
+                                }}>
+                                <View
+                                  style={[
+                                    styles.checkbox,
+                                    {
+                                      borderColor: isAoGoal
+                                        ? COLORS.mainColor
+                                        : C.inputBorder,
+                                      backgroundColor: isAoGoal
+                                        ? COLORS.mainColor
+                                        : 'transparent',
+                                    },
+                                  ]}>
+                                  {isAoGoal ? (
+                                    <Text style={styles.checkboxCheckmark}>✓</Text>
+                                  ) : null}
+                                </View>
+                                <Text
+                                  style={[
+                                    styles.checkboxLabel,
+                                    {
+                                      color: isAoGoal
+                                        ? COLORS.dangerColor
+                                        : C.textSecondary,
+                                    },
+                                  ]}>
+                                  {t('aosGoal')}
+                                </Text>
+                              </TouchableOpacity>
                             </View>
+                            {!isLast ? (
+                              <View
+                                style={[
+                                  styles.periodDivider,
+                                  {backgroundColor: C.border},
+                                ]}
+                              />
+                            ) : null}
                           </View>
-                        </View>
-                      ))}
+                        );
+                        })}
+                      </View>
                     </View>
                   ))}
                 </View>
@@ -258,11 +297,18 @@ const EditOverseerGoalsScreen = () => {
             </ScrollView>
 
             <View style={styles.footer}>
-              <SaveButton
-                label={submitting ? t('saving') : t('save')}
-                onPress={onSave}
-                disabled={submitting}
-              />
+              <View style={styles.footerButtons}>
+                <CancelButton
+                  label={t('cancel')}
+                  onPress={() => navigation.goBack()}
+                  disabled={submitting}
+                />
+                <SaveButton
+                  label={submitting ? t('saving') : t('save')}
+                  onPress={onSave}
+                  disabled={submitting}
+                />
+              </View>
             </View>
           </>
         )}
@@ -289,55 +335,90 @@ const styles = StyleSheet.create({
     gap: ms(12),
   },
   sectionCard: {
-    borderWidth: 1,
     borderRadius: rs(12),
-    padding: ms(12),
+    paddingVertical: ms(12),
   },
   sectionTitle: {
     fontSize: fs(15),
     fontWeight: '700',
     marginBottom: ms(10),
   },
-  periodCard: {
+  metricCard: {
     borderWidth: 1,
     borderRadius: rs(10),
     padding: ms(10),
     marginBottom: ms(10),
   },
-  periodTitle: {
+  metricTitle: {
     fontSize: fs(13),
     fontWeight: '700',
     marginBottom: ms(8),
   },
-  metricBlock: {
-    paddingVertical: ms(8),
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  periodsList: {
+    gap: 0,
   },
-  metricLabel: {
-    fontSize: fs(12),
-    fontWeight: '600',
+  periodEditorItem: {
+    paddingVertical: ms(8),
+  },
+  periodEditorTitle: {
+    fontSize: fs(11),
+    fontWeight: '700',
+    lineHeight: fs(16),
     marginBottom: ms(6),
   },
-  metricControls: {
+  metricEditorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: ms(12),
+    justifyContent: 'space-between',
+    gap: ms(10),
   },
-  metricInputWrap: {
+  metricInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     flex: 1,
   },
-  switchWrap: {
-    minWidth: ms(82),
+  metricInputContainer: {
+    flex: 1,
+  },
+  metricSuffix: {
+    marginLeft: ms(6),
+    fontSize: fs(13),
+    fontWeight: '600',
+  },
+  checkboxRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minWidth: ws(98),
+    justifyContent: 'flex-end',
+  },
+  checkbox: {
+    width: ws(20),
+    height: ws(20),
+    borderWidth: 2,
+    borderRadius: rs(4),
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: ms(8),
   },
-  switchLabel: {
+  checkboxCheckmark: {
+    color: '#fff',
+    fontSize: fs(12),
+    fontWeight: '700',
+  },
+  checkboxLabel: {
     fontSize: fs(11),
-    marginBottom: ms(2),
+  },
+  periodDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginTop: ms(8),
   },
   footer: {
     paddingTop: ms(10),
     paddingBottom: ms(14),
+  },
+  footerButtons: {
+    flexDirection: 'row',
+    gap: ms(10),
   },
 });
 

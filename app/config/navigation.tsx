@@ -53,6 +53,7 @@ export type RootStackParamList = {
   EditLanguage: { languageId: number } | undefined;
   DeleteLanguage: { languageId: number } | undefined;
   Resources: undefined;
+  ResourceDetail: { resourceId: number } | undefined;
   AddNewResource: undefined;
   EditAddTopicList: undefined;
   RelatingSearch: undefined;
@@ -175,6 +176,7 @@ import AddLanguageScreen from '../modules/language/screens/AddLanguageScreen';
 import EditLanguageScreen from '../modules/language/screens/EditLanguageScreen';
 import DeleteLanguageScreen from '../modules/language/screens/DeleteLanguageScreen';
 import SearchResourcesScreen from '../modules/resources/screens/SearchResourcesScreen';
+import ResourceDetailScreen from '../modules/resources/screens/ResourceDetailScreen';
 import AddNewResourceScreen from '../modules/resources/screens/AddNewResourceScreen';
 import EditAddTopicListScreen from '../modules/resources/screens/EditAddTopicListScreen';
 import RelatingSearchScreen from '../modules/relating/screens/RelatingSearchScreen';
@@ -342,6 +344,7 @@ export default function Navigation() {
               <Stack.Screen name="EditLanguage" component={EditLanguageScreen} />
               <Stack.Screen name="DeleteLanguage" component={DeleteLanguageScreen} />
               <Stack.Screen name="Resources" component={SearchResourcesScreen} />
+              <Stack.Screen name="ResourceDetail" component={ResourceDetailScreen} />
               <Stack.Screen name="AddNewResource" component={AddNewResourceScreen} />
               <Stack.Screen name="EditAddTopicList" component={EditAddTopicListScreen} />
               <Stack.Screen name="RelatingSearch" component={RelatingSearchScreen} />
