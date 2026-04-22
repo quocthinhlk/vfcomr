@@ -108,7 +108,6 @@ const styles = StyleSheet.create({
     paddingRight: ms(16),
   },
   desc: {
-    color: '#555',
     fontSize: fs(14),
     marginTop: ms(16),
   },

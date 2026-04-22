@@ -266,13 +266,16 @@ export default function MonthlyDataSelectScreen() {
           {churchName ? (
             <View style={[styles.enterDataForContainer, {backgroundColor: C.surface}]}>
               <Text style={[styles.enterDataForText, {color: C.textPrimary}]}>
-                {t('enterDataFor') || 'Enter data for'}: {churchName}
+                {t('enterDataFor') || 'Enter data for'}:
+              </Text>
+              <Text style={[styles.churchNameStrong, {color: C.textPrimary}]} numberOfLines={2}>
+                {churchName}
               </Text>
             </View>
           ) : null}
 
           {/* Select Year and Month Section */}
-          <View style={styles.section}>
+          <View style={[styles.section, styles.sectionTightBottom]}>
             <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
               {t('selectYearAndMonth') || 'Select Year and Month'}
             </Text>
@@ -310,7 +313,7 @@ export default function MonthlyDataSelectScreen() {
 
           {/* Week Selection Section */}
           {selectedYear && selectedMonth && (
-            <View style={styles.section}>
+            <View style={[styles.section, styles.sectionTightTop]}>
               <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
                 {t('week') || 'Week'}
               </Text>
@@ -358,7 +361,7 @@ export default function MonthlyDataSelectScreen() {
                               styles.weekText,
                               {color: C.textPrimary},
                             ]}>
-                            {t('week') || 'Week'} {weekNumber} ({weekRange})
+                            {weekRange}
                           </Text>
                           {isReported ? (
                             <Text style={[styles.weekStatusCheck, {color: COLORS.mainColor}]}>✓</Text>
@@ -401,36 +404,49 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingVertical: ms(8),
+    paddingVertical: ms(6),
     paddingHorizontal: ms(16),
   },
   enterDataForContainer: {
     padding: ms(12),
     borderRadius: rs(8),
-    marginBottom: ms(16),
+    marginBottom: ms(10),
   },
   enterDataForText: {
     fontSize: fs(12),
     textAlign: 'center',
     fontWeight: '500',
   },
+  churchNameStrong: {
+    fontSize: fs(12),
+    fontWeight: '700',
+    textAlign: 'center',
+    marginTop: ms(2),
+  },
   section: {
-    paddingVertical: ms(16),
+    paddingTop: ms(10),
+    paddingBottom: ms(10),
     borderRadius: rs(8),
+  },
+  sectionTightBottom: {
+    paddingBottom: ms(4),
+  },
+  sectionTightTop: {
+    paddingTop: ms(4),
   },
   sectionTitle: {
     fontSize: fs(14),
     fontWeight: '600',
-    marginBottom: ms(16),
+    marginBottom: ms(10),
   },
   fieldContainer: {
-    marginBottom: ms(16),
+    marginBottom: ms(10),
   },
   loadingWeeksContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: ms(20),
+    paddingVertical: ms(12),
   },
   loadingWeeksText: {
     marginLeft: ms(8),
@@ -440,7 +456,7 @@ const styles = StyleSheet.create({
     padding: ms(12),
     borderRadius: rs(3),
     borderWidth: 1,
-    marginBottom: ms(8),
+    marginBottom: ms(6),
   },
   checkboxContainer: {
     flexDirection: 'row',
@@ -481,10 +497,10 @@ const styles = StyleSheet.create({
   },
   noWeeksText: {
     textAlign: 'center',
-    paddingVertical: ms(20),
+    paddingVertical: ms(12),
     fontSize: fs(14),
   },
   nextButtonContainer: {
-    paddingBottom: ms(20),
+    paddingBottom: ms(12),
   },
 });

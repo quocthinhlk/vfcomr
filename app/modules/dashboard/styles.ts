@@ -7,7 +7,7 @@ export const dashboardStyles = StyleSheet.create({
     flex: 1,
     // justifyContent: 'center',
     // alignItems: 'center',
-    paddingHorizontal: ms(15),
+    paddingHorizontal: ms(16),
     backgroundColor: '#fff',
   },
   button: {

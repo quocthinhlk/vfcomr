@@ -25,6 +25,7 @@ import {
   formatGoalRangeLabel,
   GOAL_SECTION_OPTIONS,
 } from '../config/goalPeriodFields';
+import {DeleteButton} from '../../../shared/components/ActionButtons';
 
 const OverseerGoalDetailScreen = () => {
   const navigation = useNavigation<any>();
@@ -241,28 +242,30 @@ const OverseerGoalDetailScreen = () => {
               </View>
             </View>
 
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.primaryButton, {backgroundColor: COLORS.mainColor}]}
-                activeOpacity={0.85}
-                onPress={() =>
-                  navigation.navigate('EditOverseerGoals', {goalPeriodId})
-                }>
-                <Text style={styles.primaryButtonText}>{t('editGoals')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.secondaryButton,
-                  {backgroundColor: C.surface, borderColor: C.inputBorder},
-                ]}
-                activeOpacity={0.85}
-                onPress={() =>
-                  navigation.navigate('EditOverseerGoalDefaults', {goalPeriodId})
-                }>
-                <Text style={[styles.secondaryButtonText, {color: C.textPrimary}]}>
-                  {t('editParameters')}
-                </Text>
-              </TouchableOpacity>
+            <View style={styles.actionButtons}>
+              <View style={styles.actionRow}>
+                <TouchableOpacity
+                  style={[styles.primaryButton, {backgroundColor: COLORS.mainColor}]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    navigation.navigate('EditOverseerGoals', {goalPeriodId})
+                  }>
+                  <Text style={styles.primaryButtonText}>{t('editGoals')}</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.secondaryButton,
+                    {backgroundColor: C.surface, borderColor: C.inputBorder},
+                  ]}
+                  activeOpacity={0.85}
+                  onPress={() =>
+                    navigation.navigate('EditOverseerGoalDefaults', {goalPeriodId})
+                  }>
+                  <Text style={[styles.secondaryButtonText, {color: C.textPrimary}]}>
+                    {t('editParameters')}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
             <View
@@ -412,6 +415,14 @@ const OverseerGoalDetailScreen = () => {
                 })}
               </View>
             ))}
+
+            <DeleteButton
+              label={t('delete')}
+              onPress={() =>
+                navigation.navigate('DeleteOverseerGoalPeriod', {goalPeriodId})
+              }
+              style={styles.deleteButton}
+            />
           </ScrollView>
         )}
       </View>
@@ -507,6 +518,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: ms(8),
   },
+  actionButtons: {
+    gap: ms(8),
+  },
   primaryButton: {
     flex: 1,
     minHeight: ms(38),
@@ -532,6 +546,9 @@ const styles = StyleSheet.create({
   secondaryButtonText: {
     fontSize: fs(13),
     fontWeight: '700',
+  },
+  deleteButton: {
+    flex: 0,
   },
   parametersCard: {
     borderWidth: 1,

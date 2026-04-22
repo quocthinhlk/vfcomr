@@ -47,9 +47,14 @@ type OverseerIndicatorData = {
   total_churches?: number;
   avg_people_3_months?: number;
   percent_churches_reporting?: number;
+  percent_growth_churches_number?: number;
+  percent_churches_growing?: number;
   countries_count?: number;
   percent_churches_planted?: number;
   percent_churches_with_cg?: number;
+  percent_churches_with_gt_liw?: number;
+  percent_churches_with_giving?: number;
+  percent_churches_with_mfp?: number;
   percent_churches_visited_2_years?: number;
   church_ids?: number[];
 };
@@ -69,7 +74,19 @@ const formatInteger = (value?: number) => {
   return Math.round(value).toLocaleString('en-US');
 };
 
-const formatPercent = (value?: number) => `${formatInteger(value)}%`;
+const formatNumber = (value?: number, maximumFractionDigits = 2) => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return '0';
+  }
+
+  return value.toLocaleString('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  });
+};
+
+const formatPercent = (value?: number, maximumFractionDigits = 2) =>
+  `${formatNumber(value, maximumFractionDigits)}%`;
 
 const REQUEST_TIMEOUT_MS = 15000;
 
@@ -228,44 +245,88 @@ export default function OverseerDashboardScreen() {
   const statItems = useMemo(
     () => [
       {
-        icon: require('../../../../app/assets/images/icon/access.png'),
+        icon: require('../../../../app/assets/images/icon/house.png'),
         value: formatInteger(indicatorData.total_churches),
         label: t('churches') || 'Churches',
+        helpTitle: t('churches') || 'Churches',
+        helpMessage: t('indicatorInfoChurches'),
       },
       {
-        icon: require('../../../../app/assets/images/people.png'),
+        icon: require('../../../../app/assets/images/icon/group.png'),
         value: formatInteger(indicatorData.avg_people_3_months),
         label: t('people') || 'People',
+        helpTitle: t('people') || 'People',
+        helpMessage: t('indicatorInfoPeople'),
       },
       {
-        icon: require('../../../../app/assets/images/growth.png'),
+        icon: require('../../../../app/assets/images/icon/reporting.png'),
         value: formatPercent(indicatorData.percent_churches_reporting),
         label: t('churchesReporting') || 'Churches Reporting',
+        helpTitle: t('indicatorTitleChurchesReporting'),
+        helpMessage: t('indicatorInfoChurchesReporting'),
       },
       {
-        icon: require('../../../../app/assets/images/icon/angel.png'),
+        icon: require('../../../../app/assets/images/icon/more.png'),
+        value: formatPercent(indicatorData.percent_growth_churches_number),
+        label: t('moreChurches') || 'More Churches',
+        helpTitle: t('indicatorTitleMoreChurches'),
+        helpMessage: t('indicatorInfoMoreChurches'),
+      },
+      {
+        icon: require('../../../../app/assets/images/icon/growth.png'),
+        value: formatPercent(indicatorData.percent_churches_growing),
+        label: t('churchesGrowing') || 'Churches Growing',
+        helpTitle: t('indicatorTitleChurchesGrowing'),
+        helpMessage: t('indicatorInfoChurchesGrowing'),
+      },
+      {
+        icon: require('../../../../app/assets/images/icon/earth.png'),
         value: formatInteger(indicatorData.countries_count),
         label: t('nations') || 'Nations',
+        helpTitle: t('nations') || 'Nations',
+        helpMessage: t('indicatorInfoNations'),
       },
       {
         icon: require('../../../../app/assets/images/icon/plant.png'),
         value: formatPercent(indicatorData.percent_churches_planted),
         label: t('churchesPlanting') || 'Churches Planting',
+        helpTitle: t('indicatorTitleChurchesPlanting'),
+        helpMessage: t('indicatorInfoChurchesPlanting'),
       },
       {
         icon: require('../../../../app/assets/images/icon/cell-group.png'),
         value: formatPercent(indicatorData.percent_churches_with_cg),
         label: t('churchesWithCgs') || 'Churches with CGs',
+        helpTitle: t('indicatorTitleChurchesWithCgs'),
+        helpMessage: t('indicatorInfoChurchesWithCgs'),
       },
       {
         icon: require('../../../../app/assets/images/icon/education.png'),
-        value: formatPercent(indicatorData.percent_churches_visited_2_years),
-        label: t('churchesVisited') || 'Churches Visited',
+        value: formatPercent(indicatorData.percent_churches_with_gt_liw),
+        label: t('churchesWithGtLiw') || 'Churches with GT/LIW',
+        helpTitle: t('indicatorTitleChurchesWithGtLiw'),
+        helpMessage: t('indicatorInfoChurchesWithGtLiw'),
       },
       {
         icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
-        value: formatInteger(indicatorData.church_ids?.length),
-        label: t('churches') || 'Churches',
+        value: formatPercent(indicatorData.percent_churches_with_giving),
+        label: t('churchesWithTithesOfferings') || 'Churches with Tithes & Offerings',
+        helpTitle: t('indicatorTitleChurchesWithTithesOfferings'),
+        helpMessage: t('indicatorInfoChurchesWithTithesOfferings'),
+      },
+      {
+        icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
+        value: formatPercent(indicatorData.percent_churches_with_mfp),
+        label: t('churchesWithMfp') || 'Churches with MFP',
+        helpTitle: t('indicatorTitleChurchesWithMfp'),
+        helpMessage: t('indicatorInfoChurchesWithMfp'),
+      },
+      {
+        icon: require('../../../../app/assets/images/icon/worldwide.png'),
+        value: formatPercent(indicatorData.percent_churches_visited_2_years),
+        label: t('churchesVisited') || 'Churches Visited',
+        helpTitle: t('indicatorTitleChurchesVisited'),
+        helpMessage: t('indicatorInfoChurchesVisited'),
       },
     ],
     [indicatorData, t],
@@ -349,9 +410,9 @@ export default function OverseerDashboardScreen() {
         <Animated.View
           style={[
             dashboardStyles.statCardContainer,
-            {paddingHorizontal: ms(15), opacity: fade, transform: [{translateY}]},
+            {opacity: fade, transform: [{translateY}]},
           ]}>
-          {statItems.slice(0, showAllStats ? 12 : 4).map((stat, index) => (
+          {statItems.slice(0, showAllStats ? statItems.length : 4).map((stat, index) => (
             <DashboardStatCard key={index} {...stat} />
           ))}
         </Animated.View>
@@ -371,7 +432,7 @@ export default function OverseerDashboardScreen() {
           </Text>
         </TouchableOpacity>
 
-        <View style={{marginTop: ms(8), paddingHorizontal: ms(16)}}>
+        <View style={{marginTop: ms(8)}}>
           {actionItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -389,7 +450,7 @@ export default function OverseerDashboardScreen() {
               activeOpacity={item?.disabled ? 1 : 0.7}>
               <Image
                 source={item.icon}
-                style={{width: ws(17), height: hs(17), marginRight: ms(12), resizeMode: 'contain'}}
+                style={styles.menuItemIcon}
               />
               <Text style={{flex: 1, color: C.textPrimary, fontSize: fs(14)}}>{item.label}</Text>
               <Image
@@ -405,6 +466,12 @@ export default function OverseerDashboardScreen() {
 }
 
 const styles = StyleSheet.create({
+  menuItemIcon: {
+    width: ws(23),
+    height: hs(23),
+    marginRight: ms(12),
+    resizeMode: 'contain',
+  },
   menuArrow: {
     width: ws(12),
     height: ws(12),

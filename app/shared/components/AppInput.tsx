@@ -25,7 +25,7 @@ export default function AppInput(props: Props) {
       styles.container,
       {
         backgroundColor: C.inputBg,
-        borderColor: error ? '#db2d2d' : C.inputBorder,
+        borderColor: error ? C.error || '#ff4444' : C.inputBorder,
       },
       containerStyle,
     ]}>

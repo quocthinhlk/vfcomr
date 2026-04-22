@@ -39,6 +39,18 @@ export interface CreateVisitPayload {
   number_of_days: number;
 }
 
+export interface CreateEventBulkPayload {
+  name: string;
+  event_type_id: number;
+  user_id: number;
+  attendance?: number;
+  country_id: number;
+  number_of_days: number;
+  year: number;
+  week_number: number;
+  meeting_with?: number;
+}
+
 export interface ListVisitsParams {
   church_id?: number;
   user_id?: number;
@@ -65,6 +77,17 @@ export async function createVisitsBulk(payloads: CreateVisitPayload[]) {
   } catch (err: any) {
     const message = err?.response?.data?.message || err?.message || 'Create Visits failed';
     console.error('Create Visits error:', message);
+    throw new Error(message);
+  }
+}
+
+export async function createEventsBulk(payloads: CreateEventBulkPayload[]) {
+  try {
+    const response = await api.post('/events/bulk', payloads);
+    return response.data;
+  } catch (err: any) {
+    const message = err?.response?.data?.message || err?.message || 'Create Events failed';
+    console.error('Create Events error:', message);
     throw new Error(message);
   }
 }

@@ -150,3 +150,8 @@ export async function updateOverseerGoalPeriodDetailsBatch(
   const response = await api.patch(`goal-periods/${id}/details-batch`, payload);
   return response.data;
 }
+
+export async function deleteOverseerGoalPeriod(id: number) {
+  const response = await api.delete(`goal-periods/${id}`);
+  return response.data;
+}

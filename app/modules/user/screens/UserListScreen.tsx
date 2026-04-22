@@ -176,10 +176,12 @@ export const UserListScreen: React.FC = () => {
               {displayName}
             </Text>
 
-            {/* Role + [Title] */}
+            {/* Title + [Role] */}
             {(!!item.role_name || !!item.title) && (
               <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
-                {[item.role_name, item.title ? `[${item.title}]` : ''].filter(Boolean).join('   ')}
+                {[item.title, item.role_name ? `[${item.role_name}]` : '']
+                  .filter(Boolean)
+                  .join('   ')}
               </Text>
             )}
 

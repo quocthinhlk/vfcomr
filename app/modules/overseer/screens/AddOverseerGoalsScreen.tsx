@@ -45,6 +45,11 @@ const AddOverseerGoalsScreen = () => {
   const clearInvalid = (key: string) =>
     setInvalid(prev => ({...prev, [key]: false}));
 
+  const normalizePositiveNumberInput = (text: string) => {
+    const digitsOnly = text.replace(/[^0-9]/g, '');
+    return digitsOnly;
+  };
+
   const loadUsers = async (search = '') => {
     const res = await api.get('users/overseers', {
       params: {page: 1, limit: 50, ...(search ? {search} : {})},
@@ -91,12 +96,18 @@ const AddOverseerGoalsScreen = () => {
   }, []);
 
   const onSave = async () => {
+    const startYearNumber = Number(startYear);
+    const endYearNumber = Number(endYear);
     const nextInvalid: Record<string, boolean> = {
       userId: !userId,
       localChurchId: !localChurchId,
       nationId: !nationId,
-      startYear: !startYear.trim(),
-      endYear: !endYear.trim(),
+      startYear:
+        !startYear.trim() ||
+        !Number.isFinite(startYearNumber) ||
+        startYearNumber <= 0,
+      endYear:
+        !endYear.trim() || !Number.isFinite(endYearNumber) || endYearNumber <= 0,
     };
     setInvalid(nextInvalid);
 
@@ -110,8 +121,8 @@ const AddOverseerGoalsScreen = () => {
         user_id: Number(userId),
         local_church_id: Number(localChurchId),
         nation_id: Number(nationId),
-        start_year: Number(startYear),
-        end_year: Number(endYear),
+        start_year: startYearNumber,
+        end_year: endYearNumber,
       });
       const createdId =
         response?.data?.goal_period?.id ?? response?.data?.id ?? response?.goal_period?.id;
@@ -207,7 +218,7 @@ const AddOverseerGoalsScreen = () => {
                   <AppInput
                     value={startYear}
                     onChangeText={text => {
-                      setStartYear(text);
+                      setStartYear(normalizePositiveNumberInput(text));
                       clearInvalid('startYear');
                     }}
                     placeholder={t('startYear')}
@@ -223,7 +234,7 @@ const AddOverseerGoalsScreen = () => {
                   <AppInput
                     value={endYear}
                     onChangeText={text => {
-                      setEndYear(text);
+                      setEndYear(normalizePositiveNumberInput(text));
                       clearInvalid('endYear');
                     }}
                     placeholder={t('endYear')}

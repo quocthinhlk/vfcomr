@@ -77,6 +77,14 @@ const getWeekDateRange = (year: number, weekNumber: number): string => {
   return `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
 };
 
+const getWeekDisplayYear = (year: number, weekNumber: number): number => {
+  const jan1 = new Date(year, 0, 1);
+  const daysOffset = (weekNumber - 1) * 7;
+  const weekStart = new Date(jan1.getTime() + daysOffset * 24 * 60 * 60 * 1000);
+  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
+  return Math.max(weekStart.getFullYear(), weekEnd.getFullYear());
+};
+
 // Helper function to format number with thousand separators
 const formatNumber = (num: number | null | undefined): string => {
   if (num === null || num === undefined) {return '';}
@@ -1306,12 +1314,19 @@ export default function MonthlyDataEntryScreen() {
             {/* Church Name and Week Info */}
             <View style={styles.infoContainer}>
               <Text style={[styles.infoLabel, {color: C.textPrimary}]}>
-                {t('enterDataFor') || 'Enter data for'}: {displayChurchName}
+                {t('enterDataFor') || 'Enter data for'}:
+              </Text>
+              <Text
+                style={[styles.churchNameStrong, {color: C.textPrimary}]}
+                numberOfLines={2}>
+                {displayChurchName}
               </Text>
               <Text style={[styles.weekInfo, {color: C.textPrimary}]}>
-                {t('week') || 'Week'} {currentWeekNumber}
                 {currentWeekNumber
-                  ? ` (${getWeekDateRange(year, currentWeekNumber)})`
+                  ? ` (${getWeekDateRange(year, currentWeekNumber)} ${getWeekDisplayYear(
+                      year,
+                      currentWeekNumber,
+                    )})`
                   : ''}
               </Text>
             </View>
@@ -1417,23 +1432,6 @@ export default function MonthlyDataEntryScreen() {
                       disabled={!canAccess}
                       activeOpacity={0.7}>
                       <>
-                        <View style={styles.weekNavTitleRow}>
-                          <Text
-                            style={[
-                              styles.weekNavText,
-                              {
-                                color:
-                                  isCurrent || isCompleted
-                                    ? '#fff'
-                                    : C.textPrimary,
-                              },
-                            ]}>
-                            {t('week') || 'Week'} {weekNum}
-                          </Text>
-                          {isCompleted && !isCurrent && (
-                            <Text style={styles.weekNavCheckmarkInline}>✓</Text>
-                          )}
-                        </View>
                         <Text
                           style={[
                             styles.weekNavDateText,
@@ -1444,8 +1442,23 @@ export default function MonthlyDataEntryScreen() {
                                   : C.textPrimary,
                             },
                           ]}>
-                          ({getWeekDateRange(year, weekNum)})
+                          {getWeekDateRange(year, weekNum)}
                         </Text>
+                        <View style={styles.weekNavYearRow}>
+                          <Text
+                            style={[
+                              styles.weekNavYearText,
+                              {
+                                color:
+                                  isCurrent || isCompleted ? '#fff' : C.textPrimary,
+                              },
+                            ]}>
+                            {getWeekDisplayYear(year, weekNum)}
+                          </Text>
+                          {isCompleted && !isCurrent && (
+                            <Text style={styles.weekNavCheckmarkInline}>✓</Text>
+                          )}
+                        </View>
                       </>
                     </TouchableOpacity>
                   );
@@ -2222,6 +2235,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: ms(16),
+    paddingTop: ms(10),
     paddingBottom: ms(28),
   },
   loadingContainer: {
@@ -2239,22 +2253,28 @@ const styles = StyleSheet.create({
   infoContainer: {
     padding: ms(12),
     borderRadius: rs(8),
-    marginBottom: ms(16),
+    marginBottom: ms(10),
   },
   infoLabel: {
     fontSize: fs(12),
     textAlign: 'center',
     fontWeight: '500',
-    marginBottom: ms(10),
+    marginBottom: ms(2),
+  },
+  churchNameStrong: {
+    fontSize: fs(12),
+    fontWeight: '700',
+    textAlign: 'center',
+    marginBottom: ms(6),
   },
   weekInfo: {
     fontSize: fs(12),
     textAlign: 'center',
     fontWeight: '500',
-    // marginBottom: ms(10),
+    marginBottom: ms(6),
   },
   weekNavScrollView: {
-    marginBottom: ms(8),
+    marginBottom: ms(6),
   },
   weekNavContainer: {
     flexDirection: 'row',
@@ -2270,25 +2290,27 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: ms(12),
-  },
-  weekNavText: {
-    fontSize: fs(12),
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  weekNavTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(6),
-    marginBottom: ms(4),
+    position: 'relative',
   },
   weekNavDateText: {
-    fontSize: fs(10),
+    fontSize: fs(11),
     fontWeight: '400',
     textAlign: 'center',
   },
+  weekNavYearText: {
+    fontSize: fs(11),
+    fontWeight: '400',
+    textAlign: 'center',
+  },
+  weekNavYearRow: {
+    marginTop: ms(2),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: ms(6),
+  },
   weekNavCheckmarkInline: {
-    fontSize: fs(12),
+    fontSize: fs(13),
     fontWeight: 'bold',
     color: '#fff',
   },

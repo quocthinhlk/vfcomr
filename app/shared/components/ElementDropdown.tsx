@@ -95,7 +95,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
 
   return (
     <Dropdown
-      style={[ themed.dropdown, error ? { borderColor: '#db2d2d' } : null, containerStyle ]}
+      style={[themed.dropdown, error ? {borderColor: C.error || '#ff4444'} : null, containerStyle]}
       containerStyle={[themed.dropdownContainer, dropdownContainerStyle]}
       data={data}
       labelField="label"

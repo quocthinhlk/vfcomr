@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Image,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
@@ -25,14 +26,11 @@ import ActionSheetModal, {
 } from '../../../shared/components/ActionSheetModal';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
-import {EditSvgIcon} from '../../../shared/components/icons';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import api from '../../../config/api';
-import {COLORS} from '../../../shared/constants/colors';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import SearchInput from '../../../shared/components/SearchInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import AppInput from '../../../shared/components/AppInput';
+
+const editIcon = require('../../../assets/icons/edit.png');
 
 export const VisitsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -46,9 +44,6 @@ export const VisitsScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedVisit, setSelectedVisit] = useState<VisitItem | null>(null);
-  const [churchId, setChurchId] = useState<number | null>(null);
-  const [churchName, setChurchName] = useState<string>('');
-  const [userId, setUserId] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
@@ -56,79 +51,44 @@ export const VisitsScreen: React.FC = () => {
   const [weekNumber, setWeekNumber] = useState<number | null>(null);
   const [query, setQuery] = useState('');
 
-  const fetchChurchInfo = useCallback(async (id: number) => {
-    try {
-      const res = await api.get(`churches/${id}`);
-      const churchData = res?.data?.data;
-      if (churchData?.name) {
-        setChurchName(churchData.name);
-      }
-    } catch (e) {
-      console.error('Error fetching church info:', e);
-    }
-  }, []);
-
-  const fetchUserInfo = useCallback(async () => {
-    try {
-      const res = await api.get('users/me');
-      const userData = res?.data?.data;
-      if (userData?.id) {
-        setUserId(userData.id);
-      }
-    } catch (e) {
-      console.error('Error fetching user info:', e);
-    }
-  }, []);
-
   const fetchData = useCallback(
     async (targetPage: number = 1, reset = false) => {
       try {
         if (loading) {
           return;
         }
-        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        if (!savedChurchId) {
-          Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
-          return;
-        }
-        const id = parseInt(savedChurchId, 10);
-        if (isNaN(id)) {
-          Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
-          return;
-        }
-        setChurchId(id);
         setLoading(true);
-        
+
         const params: any = {
-          church_id: id,
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
           year: year,
         };
-        
-        if (userId) {
-          params.user_id = userId;
-        }
-        
+
         if (weekNumber) {
           params.week_number = weekNumber;
         }
 
         const res = await listVisits(params);
         const visits = res?.data?.items ?? [];
-        
-        // Filter by search query (week_number)
+
         const filtered = query.trim()
           ? visits.filter((v: VisitItem) =>
-              String(v.week_number).includes(query.trim())
+              [
+                String(v.id),
+                String(v.user_id),
+                String(v.church_id),
+                String(v.year),
+                String(v.week_number),
+                String(v.number_of_days),
+              ].some(value => value.includes(query.trim()))
             )
           : visits;
-        
+
         setTotal(res?.data?.total ?? 0);
         setTotalPages(res?.data?.total_pages ?? 1);
         setPage(res?.data?.page ?? targetPage);
         setItems(filtered);
-        await fetchChurchInfo(id);
       } catch (e) {
         console.error('Error fetching visits:', e);
         Alert.alert(t('error') || 'Error', t('failedToLoadVisits') || 'Failed to load visits');
@@ -136,12 +96,8 @@ export const VisitsScreen: React.FC = () => {
         setLoading(false);
       }
     },
-    [loading, t, fetchChurchInfo, year, weekNumber, userId, query],
+    [loading, t, year, weekNumber, query],
   );
-
-  useEffect(() => {
-    fetchUserInfo();
-  }, [fetchUserInfo]);
 
   useEffect(() => {
     fetchData(1, true);
@@ -178,8 +134,8 @@ export const VisitsScreen: React.FC = () => {
     navigation.navigate('VisitDetail', {visitId: item.id});
   };
 
-  const handleDelete = (item: VisitItem) => {
-    navigation.navigate('DeleteVisit', {visitId: item.id});
+  const handleEdit = (item: VisitItem) => {
+    navigation.navigate('EditVisit', {visitId: item.id});
   };
 
   const renderItem = ({item}: {item: VisitItem}) => (
@@ -198,19 +154,30 @@ export const VisitsScreen: React.FC = () => {
               {t('year') || 'Year'}: {item.year} • {t('week') || 'Week'}: {item.week_number}
             </Text>
             <View style={styles.metaRow}>
+                  <Text style={[styles.metaText, {color: C.textSecondary}]}>
+                    {t('userId') || 'User ID'}: {item.user_id}
+                  </Text>
+                  <Text style={[styles.metaText, {color: C.textSecondary}]}>
+                    {t('churchId') || 'Church ID'}: {item.church_id}
+                  </Text>
+            </View>
+            <View style={styles.metaRow}>
               <Text style={[styles.metaText, {color: C.textSecondary}]}>
                 {t('numberOfDays') || 'Number of Days'}: {item.number_of_days}
               </Text>
             </View>
           </View>
           <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.deleteBtn]}
-                onPress={() => handleDelete(item)}>
-                <EditSvgIcon width={fs(15)} height={fs(15)} />
-              </TouchableOpacity>
-            </View>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => handleEdit(item)}>
+              <Image
+                source={editIcon}
+                style={styles.editIcon}
+                resizeMode="contain"
+              />
+            </TouchableOpacity>
+            <Text style={[styles.idText, {color: C.textSecondary}]}>#{item.id}</Text>
           </View>
         </View>
       </View>
@@ -219,13 +186,16 @@ export const VisitsScreen: React.FC = () => {
 
   const keyExtractor = (item: VisitItem) => String(item.id);
 
-  const yearOptions = Array.from({length: 10}, (_, i) => {
-    const y = new Date().getFullYear() - 5 + i;
-    return {label: String(y), value: y};
-  });
+  const yearOptions = Array.from(
+    {length: new Date().getFullYear() + 1 - 1900 + 1},
+    (_, i) => {
+      const y = new Date().getFullYear() + 1 - i;
+      return {label: String(y), value: y};
+    },
+  );
 
   const weekOptions = [
-    {label: t('all') || 'All', value: null},
+    {label: t('all') || 'All', value: 0},
     ...Array.from({length: 52}, (_, i) => ({
       label: String(i + 1),
       value: i + 1,
@@ -285,17 +255,6 @@ export const VisitsScreen: React.FC = () => {
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={t('visits') || 'Visits'} />
 
-          {churchName ? (
-            <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
-              <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
-                {t('church') || 'Church'}:{' '}
-              </Text>
-              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {churchName}
-              </Text>
-            </View>
-          ) : null}
-
           <View style={styles.headerRow}>
             <AddNewHeaderButton
               name="AddVisits"
@@ -325,7 +284,7 @@ export const VisitsScreen: React.FC = () => {
                 data={weekOptions}
                 value={weekNumber as any}
                 onChange={v => {
-                  setWeekNumber(v === null ? null : (v as number));
+                  setWeekNumber((v as number) === 0 ? null : (v as number));
                 }}
                 placeholder={t('week') || 'Week'}
                 containerStyle={
@@ -341,7 +300,9 @@ export const VisitsScreen: React.FC = () => {
           <SearchInput
             value={query}
             onChangeText={setQuery}
-            placeholder={t('search') || 'Search by week number...'}
+            placeholder={
+              t('searchByIdUserChurchYearWeek') || 'Search by id, user, church, year, week...'
+            }
           />
 
           <FlatList
@@ -392,11 +353,10 @@ export const VisitsScreen: React.FC = () => {
                 },
               });
               list.push({
-                label: t('delete') || 'Delete',
-                type: 'danger',
+                label: t('edit') || 'Edit',
                 onPress: () => {
                   if (selectedVisit) {
-                    navigation.navigate('DeleteVisit', {
+                    navigation.navigate('EditVisit', {
                       visitId: selectedVisit.id,
                     });
                   }
@@ -419,22 +379,6 @@ const styles = StyleSheet.create({
     paddingLeft: ms(16),
     paddingRight: ms(16),
   },
-  churchNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: ms(8),
-    marginBottom: ms(4),
-    paddingVertical: ms(4),
-  },
-  churchNameLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
-  },
-  churchNameText: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    flex: 1,
-  },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
@@ -456,9 +400,9 @@ const styles = StyleSheet.create({
   },
   itemColRight: {
     alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: ms(8),
-    width: ws(72),
+    justifyContent: 'flex-start',
+    paddingLeft: ms(4),
+    width: ws(56),
   },
   name: {
     fontSize: fs(14),
@@ -487,19 +431,22 @@ const styles = StyleSheet.create({
     paddingVertical: ms(12),
     alignItems: 'flex-end',
   },
-  actionRow: {
-    flexDirection: 'row',
-    gap: ms(6),
-  },
   actionBtn: {
-    width: ws(25),
-    height: ws(25),
+    width: ws(28),
+    height: ws(28),
     borderRadius: rs(4),
     justifyContent: 'center',
     alignItems: 'center',
+    marginTop: -ms(6),
   },
-  deleteBtn: {
-    backgroundColor: COLORS.dangerColor,
+  editIcon: {
+    width: fs(18),
+    height: fs(18),
+  },
+  idText: {
+    fontSize: fs(11),
+    marginTop: ms(4),
+    fontWeight: '500',
   },
 });
 

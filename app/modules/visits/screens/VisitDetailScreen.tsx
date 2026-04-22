@@ -1,8 +1,8 @@
-import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, ScrollView} from 'react-native';
+import React, {useEffect, useMemo, useState} from 'react';
+import {ActivityIndicator, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
-import {useNavigation, useRoute} from '@react-navigation/native';
+import {useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {getVisitById} from '../services/visit.service';
@@ -10,11 +10,9 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import {VisitItem} from '../services/visit.service';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
 
 export const VisitDetailScreen: React.FC = () => {
-  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const visitId: number | undefined = route.params?.visitId;
   const [visit, setVisit] = useState<VisitItem | null>(null);
@@ -33,7 +31,7 @@ export const VisitDetailScreen: React.FC = () => {
           }
           const visitData = res?.data || null;
           setVisit(visitData);
-          
+
           // Fetch church name
           if (visitData?.church_id) {
             try {
@@ -65,11 +63,18 @@ export const VisitDetailScreen: React.FC = () => {
     if (!dateString) return '-';
     try {
       const date = new Date(dateString);
-      return date.toLocaleDateString();
+      return date.toLocaleString();
     } catch {
       return dateString;
     }
   };
+
+  const heroTitle = useMemo(() => {
+    if (!visit) return '';
+    const yearLabel = t('year') || 'Year';
+    const weekLabel = t('week') || 'Week';
+    return `${yearLabel} ${visit.year} • ${weekLabel} ${visit.week_number}`;
+  }, [t, visit]);
 
   return (
     <SafeAreaView
@@ -77,91 +82,88 @@ export const VisitDetailScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={{flex: 1, backgroundColor: C.background}}>
         <View style={styles.container}>
-          <Header
-            title={t('visitDetail') || 'Visit Detail'}
-            showMenu={false}
-          />
-          
-          {churchName ? (
-            <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
-              <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
-                {t('church') || 'Church'}:{' '}
-              </Text>
-              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {churchName}
+          <Header title={t('visitDetail') || 'Visit Detail'} showMenu={false} />
+
+          {loading ? (
+            <View style={styles.loadingWrap}>
+              <ActivityIndicator size="small" color={C.textPrimary} />
+              <Text style={[styles.loadingText, {color: C.textSecondary}]}>
+                {t('loading') || 'Loading'}...
               </Text>
             </View>
-          ) : null}
-          
-          {loading ? (
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('loading') || 'Loading'}...
-            </Text>
           ) : !visit ? (
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
+            <Text style={[styles.emptyText, {color: C.textPrimary}]}>
               {t('noDataFound') || 'No data found'}
             </Text>
           ) : (
-            <ScrollView
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={styles.scrollContent}>
-              <View style={styles.content}>
-                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('year') || 'Year'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {visit.year}
-                    </Text>
-                  </View>
-                </View>
+            <View style={{gap: ms(12), marginTop: ms(10)}}>
+              <View style={[styles.heroCard, {backgroundColor: C.surface, borderColor: C.border}]}>
+                {churchName ? (
+                  <Text
+                    style={[styles.churchNameText, {color: C.textPrimary}]}
+                    numberOfLines={2}>
+                    {churchName}
+                  </Text>
+                ) : null}
 
-                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('week') || 'Week'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {visit.week_number}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={[styles.heroTitle, {color: C.textPrimary}]}>{heroTitle}</Text>
 
-                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('numberOfDays') || 'Number of Days'}:
+                <View style={styles.heroRow}>
+                  <View style={[styles.badge, {backgroundColor: C.inputBg, borderColor: C.border}]}>
+                    <Text style={[styles.badgeLabel, {color: C.textSecondary}]}>
+                      {t('numberOfDays') || 'Number of Days'}
                     </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
+                    <Text style={[styles.badgeValue, {color: C.textPrimary}]}>
                       {visit.number_of_days}
                     </Text>
                   </View>
                 </View>
+              </View>
 
-                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('created') || 'Created'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {formatDate(visit.Created)}
-                    </Text>
-                  </View>
+              <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
+                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                  {t('details') || 'Details'}
+                </Text>
+
+                <View style={styles.kvRow}>
+                  <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
+                    {t('visitId') || 'Visit ID'}
+                  </Text>
+                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>#{visit.id}</Text>
+                </View>
+                <View style={styles.kvRow}>
+                  <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
+                    {t('userId') || 'User ID'}
+                  </Text>
+                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>{visit.user_id}</Text>
+                </View>
+                <View style={styles.kvRow}>
+                  <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
+                    {t('churchId') || 'Church ID'}
+                  </Text>
+                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>{visit.church_id}</Text>
                 </View>
 
-                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('modified') || 'Modified'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {formatDate(visit.Modified)}
-                    </Text>
-                  </View>
+                <View style={[styles.divider, {backgroundColor: C.border}]} />
+
+                <View style={styles.kvRow}>
+                  <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
+                    {t('created') || 'Created'}
+                  </Text>
+                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>
+                    {formatDate(visit.Created)}
+                  </Text>
+                </View>
+                <View style={styles.kvRow}>
+                  <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
+                    {t('modified') || 'Modified'}
+                  </Text>
+                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>
+                    {formatDate(visit.Modified)}
+                  </Text>
                 </View>
               </View>
-            </ScrollView>
+            </View>
           )}
         </View>
       </View>
@@ -175,61 +177,87 @@ const styles = StyleSheet.create({
     paddingLeft: ms(16),
     paddingRight: ms(16),
   },
-  churchNameContainer: {
-    flexDirection: 'row',
+  loadingWrap: {
+    marginTop: ms(32),
     alignItems: 'center',
-    marginTop: ms(8),
-    marginBottom: ms(12),
-    paddingVertical: ms(10),
-    paddingHorizontal: ms(12),
-    borderRadius: rs(8),
-    borderWidth: 1,
+    gap: ms(8),
   },
-  churchNameLabel: {
+  loadingText: {
     fontSize: fs(14),
     fontWeight: '500',
   },
-  churchNameText: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: ms(24),
-  },
-  content: {
-    marginTop: ms(8),
-    gap: ms(12),
-  },
-  detailCard: {
-    padding: ms(16),
-    borderRadius: rs(12),
-    borderWidth: 1,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: rs(8),
-    elevation: 3,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  label: {
-    fontSize: fs(14),
-    fontWeight: '500',
-    flex: 1,
-  },
-  value: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    textAlign: 'right',
-    flex: 1,
-  },
-  loading: {
+  emptyText: {
     textAlign: 'center',
     marginTop: ms(40),
     fontSize: fs(14),
+    fontWeight: '600',
+  },
+  heroCard: {
+    padding: ms(16),
+    borderRadius: rs(14),
+    borderWidth: 1,
+  },
+  churchNameText: {
+    fontSize: fs(14),
+    fontWeight: '700',
+    marginBottom: ms(6),
+  },
+  heroTitle: {
+    fontSize: fs(16),
+    fontWeight: '800',
+    marginBottom: ms(12),
+  },
+  heroRow: {
+    flexDirection: 'row',
+    gap: ms(10),
+  },
+  badge: {
+    flex: 1,
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(12),
+    borderRadius: rs(12),
+    borderWidth: 1,
+  },
+  badgeLabel: {
+    fontSize: fs(12),
+    fontWeight: '600',
+    marginBottom: ms(4),
+  },
+  badgeValue: {
+    fontSize: fs(18),
+    fontWeight: '900',
+  },
+  detailCard: {
+    padding: ms(16),
+    borderRadius: rs(14),
+    borderWidth: 1,
+  },
+  sectionTitle: {
+    fontSize: fs(14),
+    fontWeight: '800',
+    marginBottom: ms(10),
+  },
+  kvRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: ms(6),
+  },
+  kvLabel: {
+    fontSize: fs(13),
+    fontWeight: '600',
+    flex: 1,
+    paddingRight: ms(12),
+  },
+  kvValue: {
+    fontSize: fs(13),
+    fontWeight: '700',
+    textAlign: 'right',
+    flex: 1,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: ms(10),
   },
 });
 

@@ -134,7 +134,7 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
     children: [
       {label: t('addNew'), routeName: 'AddOverseerGoals'},
       {label: t('list'), routeName: 'OverseerGoals'},
-      {label: t('editDefaults'), routeName: 'EditOverseerGoalDefaults'},
+      // {label: t('editDefaults'), routeName: 'EditOverseerGoalDefaults'},
     ],
   },
   {label: t('generateReports'), routeName: 'GenerateReports'},
@@ -244,6 +244,13 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
   {
     label: t('generateReports'),
     routeName: 'GenerateReports',
+  },
+  {
+    label: t('visits'),
+    children: [
+      {label: t('list'), routeName: 'Visits'},
+      {label: 'Add New Visitor', routeName: 'AddVisits'},
+    ],
   },
   {
     label: t('resources'),

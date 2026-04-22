@@ -31,6 +31,7 @@ export type RootStackParamList = {
   OverseerGoals: undefined;
   AddOverseerGoals: undefined;
   OverseerGoalDetail: { goalPeriodId: number } | undefined;
+  DeleteOverseerGoalPeriod: { goalPeriodId: number } | undefined;
   EditOverseerGoalDefaults: { goalPeriodId: number } | undefined;
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: undefined;
@@ -108,7 +109,31 @@ export type RootStackParamList = {
   EditStepsChart: { projectionId: number } | undefined;
   Visits: undefined;
   VisitDetail: { visitId: number } | undefined;
+  EditVisit: { visitId: number } | undefined;
+  EditVisitDetails:
+    | {
+        visitId?: number;
+        userId: number;
+        visitorName: string;
+        visitorRole: string;
+        selectedMonth: number;
+        selectedYear: number;
+        churchVisitCount: number;
+        eventCount: number;
+      }
+    | undefined;
   AddVisits: undefined;
+  AddVisitsDetails:
+    | {
+        userId: number;
+        visitorName: string;
+      visitorRole: string;
+        selectedMonth: number;
+        selectedYear: number;
+        churchVisitCount: number;
+        eventCount: number;
+      }
+    | undefined;
   DeleteVisit: { visitId: number } | undefined;
   MonthlyDataSelect: undefined;
   MonthlyDataEntry: {
@@ -150,6 +175,7 @@ import ChurchGivingChartScreen from '../modules/dashboard/screens/ChurchGivingCh
 import { WatchListScreen } from '../modules/dashboard/screens/WatchListScreen';
 import { OverseerGoalsScreen } from '../modules/overseer/screens/OverseerGoalsScreen';
 import AddOverseerGoalsScreen from '../modules/overseer/screens/AddOverseerGoalsScreen';
+import DeleteOverseerGoalPeriodScreen from '../modules/overseer/screens/DeleteOverseerGoalPeriodScreen';
 import EditOverseerGoalDefaultsScreen from '../modules/overseer/screens/EditOverseerGoalDefaultsScreen';
 import { GenerateReportsScreen } from '../modules/report/screens/GenerateReportsScreen';
  
@@ -224,7 +250,9 @@ import EditStepsChartScreen from '../modules/churchplantingprojections/screens/E
 import VisitsScreen from '../modules/visits/screens/VisitsScreen';
 import VisitDetailScreen from '../modules/visits/screens/VisitDetailScreen';
 import AddVisitsScreen from '../modules/visits/screens/AddVisitsScreen';
+import AddVisitsDetailsScreen from '../modules/visits/screens/AddVisitsDetailsScreen';
 import DeleteVisitScreen from '../modules/visits/screens/DeleteVisitScreen';
+import EditVisitDetailsScreen from '../modules/visits/screens/EditVisitDetailsScreen';
 import MonthlyDataSelectScreen from '../modules/monthlydata/screens/MonthlyDataSelectScreen';
 import MonthlyDataEntryScreen from '../modules/monthlydata/screens/MonthlyDataEntryScreen';
 
@@ -232,6 +260,8 @@ const OverseerGoalDetailScreen =
   require('../modules/overseer/screens/OverseerGoalDetailScreen').default;
 const EditOverseerGoalsScreen =
   require('../modules/overseer/screens/EditOverseerGoalsScreen').default;
+const EditVisitScreen =
+  require('../modules/visits/screens/EditVisitScreen').default;
 
 const Stack = createNativeStackNavigator();
 
@@ -299,7 +329,10 @@ export default function Navigation() {
               <Stack.Screen name="EnterVisits" component={AddVisitsScreen} />
               <Stack.Screen name="Visits" component={VisitsScreen} />
               <Stack.Screen name="VisitDetail" component={VisitDetailScreen} />
+              <Stack.Screen name="EditVisit" component={EditVisitScreen} />
+              <Stack.Screen name="EditVisitDetails" component={EditVisitDetailsScreen} />
               <Stack.Screen name="AddVisits" component={AddVisitsScreen} />
+              <Stack.Screen name="AddVisitsDetails" component={AddVisitsDetailsScreen} />
               <Stack.Screen name="DeleteVisit" component={DeleteVisitScreen} />
               <Stack.Screen name="NewPastorAndChurch" component={NewPastorAndChurchScreen} />
               {/* New screens */}
@@ -311,6 +344,10 @@ export default function Navigation() {
               <Stack.Screen name="OverseerGoals" component={OverseerGoalsScreen} />
               <Stack.Screen name="AddOverseerGoals" component={AddOverseerGoalsScreen} />
               <Stack.Screen name="OverseerGoalDetail" component={OverseerGoalDetailScreen} />
+              <Stack.Screen
+                name="DeleteOverseerGoalPeriod"
+                component={DeleteOverseerGoalPeriodScreen}
+              />
               <Stack.Screen
                 name="EditOverseerGoalDefaults"
                 component={EditOverseerGoalDefaultsScreen}

@@ -42,6 +42,23 @@ const EditOverseerGoalsScreen = () => {
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState<GoalPeriodDetailData | null>(null);
 
+  const getMetricTitleParts = (label: string) => {
+    const normalizedLabel = label.trim();
+    const match = normalizedLabel.match(/^(\d+(?:\.\d+)?)\s*(.*)$/);
+
+    if (!match) {
+      return {
+        order: '',
+        text: normalizedLabel,
+      };
+    }
+
+    return {
+      order: match[1],
+      text: match[2].trim(),
+    };
+  };
+
   useEffect(() => {
     let mounted = true;
 
@@ -185,9 +202,27 @@ const EditOverseerGoalsScreen = () => {
                           borderColor: C.inputBorder,
                         },
                       ]}>
-                      <Text style={[styles.metricTitle, {color: C.textPrimary}]}>
-                        {t(metric.labelKey as any)}
-                      </Text>
+                      {(() => {
+                        const metricTitle = t(metric.labelKey as any);
+                        const {order, text} = getMetricTitleParts(metricTitle);
+
+                        return (
+                          <View style={styles.metricTitleRow}>
+                            {order ? (
+                              <Text
+                                style={[
+                                  styles.metricOrder,
+                                  {color: C.textSecondary},
+                                ]}>
+                                {`${order}:`}
+                              </Text>
+                            ) : null}
+                            <Text style={[styles.metricTitle, {color: C.textPrimary}]}>
+                              {text || metricTitle}
+                            </Text>
+                          </View>
+                        );
+                      })()}
 
                       <View style={styles.periodsList}>
                         {detail[section.key].map((row, rowIndex) => {
@@ -349,10 +384,20 @@ const styles = StyleSheet.create({
     padding: ms(10),
     marginBottom: ms(10),
   },
+  metricTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ms(6),
+    marginBottom: ms(8),
+  },
+  metricOrder: {
+    fontSize: fs(13),
+    fontWeight: '700',
+  },
   metricTitle: {
     fontSize: fs(13),
     fontWeight: '700',
-    marginBottom: ms(8),
+    flex: 1,
   },
   periodsList: {
     gap: 0,

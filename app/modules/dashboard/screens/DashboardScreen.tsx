@@ -354,7 +354,7 @@ export default function DashboardScreen() {
         <Animated.View
           style={[
             dashboardStyles.statCardContainer,
-            {paddingHorizontal: ms(15), opacity: fade, transform: [{translateY}]},
+            {opacity: fade, transform: [{translateY}]},
           ]}>
           {(
             [
@@ -476,7 +476,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         )}
 
-        <View style={{marginTop: ms(8), paddingHorizontal: ms(16)}}>
+        <View style={{marginTop: ms(8)}}>
           {menuItems.map((item, index) => (
             <TouchableOpacity
               key={index}
@@ -503,8 +503,8 @@ export default function DashboardScreen() {
               <Image
                 source={item.icon}
                 style={{
-                  width: ws(17),
-                  height: hs(17),
+                  width: ws(23),
+                  height: hs(23),
                   marginRight: ms(12),
                   resizeMode: 'contain',
                 }}

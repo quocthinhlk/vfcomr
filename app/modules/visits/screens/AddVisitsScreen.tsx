@@ -1,219 +1,305 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   View,
   StyleSheet,
-  Alert,
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  TouchableOpacity,
+  ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
-import {createVisitsBulk, CreateVisitPayload} from '../services/visit.service';
-import {
-  SaveButton,
-  CancelButton,
-} from '../../../shared/components/ActionButtons';
+import {SaveButton, CancelButton} from '../../../shared/components/ActionButtons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
-import {COLORS} from '../../../shared/constants/colors';
+import {useLanguage} from '../../../shared/context/LanguageContext';
 
-interface VisitFormItem {
-  year: number;
-  week_number: number | null;
-  number_of_days: number | null;
-}
+const MONTHS = [
+  {value: 1},
+  {value: 2},
+  {value: 3},
+  {value: 4},
+  {value: 5},
+  {value: 6},
+  {value: 7},
+  {value: 8},
+  {value: 9},
+  {value: 10},
+  {value: 11},
+  {value: 12},
+];
+
+const localeMap: Record<string, string> = {
+  en: 'en-US',
+  pt: 'pt-PT',
+  es: 'es-ES',
+  fr: 'fr-FR',
+  zh: 'zh-CN',
+  ms: 'ms-MY',
+  ja: 'ja-JP',
+};
+
+type YearOption = {label: string; value: number};
+type CountOption = {label: string; value: number};
+type VisitorOption = {
+  label: string;
+  value: number;
+  name: string;
+  role: string;
+  title: string;
+};
+
+const buildVisitorLabel = (user: {
+  name?: string;
+  title?: string;
+  city_name?: string;
+}) => {
+  const titlePart = user.title?.trim() ? ` [${user.title.trim()}]` : '';
+  const cityPart = user.city_name?.trim() ? ` - ${user.city_name.trim()}` : '';
+  return `${user.name || '-'}${titlePart}${cityPart}`;
+};
+
+const resolveRoleName = (user: any) =>
+  user?.role_name || user?.role?.name || user?.role?.role_name || '';
 
 export const AddVisitsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  // Screen chưa hoàn thiện → tạm thời khóa các CTA chính để tránh user thao tác.
-  const screenDisabled = true;
-  const [visits, setVisits] = useState<VisitFormItem[]>([
-    {
-      year: new Date().getFullYear(),
-      week_number: null,
-      number_of_days: null,
-    },
-  ]);
-  const [submitting, setSubmitting] = useState(false);
-  const [invalid, setInvalid] = useState<Record<number, Record<string, boolean>>>({});
-  const [churchId, setChurchId] = useState<number | null>(null);
-  const [churchName, setChurchName] = useState<string>('');
-  const [userId, setUserId] = useState<number | null>(null);
   const {t} = useTranslation();
+  const {selectedLanguage} = useLanguage();
   const C = useThemedColors();
 
-  const clearInvalid = (index: number, key: string) =>
-    setInvalid(prev => ({
-      ...prev,
-      [index]: {...(prev[index] || {}), [key]: false},
-    }));
+  const scrollRef = useRef<ScrollView | null>(null);
+  const fieldPosRef = useRef<Record<string, number>>({});
 
-  const yearOptions = Array.from({length: 10}, (_, i) => {
-    const y = new Date().getFullYear() - 5 + i;
-    return {label: String(y), value: y};
-  });
+  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
-  const weekOptions = Array.from({length: 52}, (_, i) => ({
-    label: String(i + 1),
-    value: i + 1,
-  }));
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<number | null>(null);
+  const [visitorOptions, setVisitorOptions] = useState<VisitorOption[]>([]);
+  const [visitorName, setVisitorName] = useState('');
+  const [visitorRole, setVisitorRole] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
+  const [churchVisitCount, setChurchVisitCount] = useState<number | null>(0);
+  const [eventCount, setEventCount] = useState<number | null>(0);
 
-  const daysOptions = Array.from({length: 7}, (_, i) => ({
-    label: String(i + 1),
-    value: i + 1,
-  }));
+  const monthOptions = useMemo(() => {
+    const locale = localeMap[selectedLanguage as string] || 'en-US';
+    return MONTHS.map(month => {
+      const date = new Date(2000, month.value - 1, 1);
+      const label = date.toLocaleDateString(locale, {month: 'long'});
+      return {
+        label: label.charAt(0).toUpperCase() + label.slice(1),
+        value: month.value,
+      };
+    });
+  }, [selectedLanguage]);
+
+  const yearOptions = useMemo<YearOption[]>(() => {
+    const maxYear = new Date().getFullYear() + 1;
+    return Array.from({length: maxYear - 1900 + 1}, (_, i) => {
+      const year = maxYear - i;
+      return {label: String(year), value: year};
+    });
+  }, []);
+
+  const countOptions = useMemo<CountOption[]>(
+    () =>
+      Array.from({length: 10000}, (_, index) => ({
+        label: String(index),
+        value: index,
+      })),
+    [],
+  );
 
   useEffect(() => {
     let mounted = true;
+
     (async () => {
       try {
-        // Get user ID
-        const userRes = await api.get('users/me');
-        const userData = userRes?.data?.data;
-        if (userData?.id && mounted) {
-          setUserId(userData.id);
+        const [meRes, visitorsRes] = await Promise.all([
+          api.get('users/me'),
+          api.get('users', {
+            params: {
+              page: 1,
+              limit: 10,
+              sort_desc: true,
+              search: 'vietnam',
+              sort_by: 'city',
+            },
+          }),
+        ]);
+
+        if (!mounted) {
+          return;
         }
 
-        // Get church ID
-        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        if (!savedChurchId) {
-          Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
-          navigation.goBack();
-          return;
+        const me = meRes?.data?.data;
+        const meId = typeof me?.id === 'number' ? me.id : null;
+        const visitorItems = (visitorsRes?.data?.data?.items ?? []) as any[];
+
+        const mappedVisitors: VisitorOption[] = visitorItems.map(item => ({
+          label: buildVisitorLabel(item),
+          value: item.id,
+          name: item.name || '',
+          role: resolveRoleName(item),
+          title: item.title || '',
+        }));
+
+        if (meId && !mappedVisitors.some(option => option.value === meId)) {
+          mappedVisitors.unshift({
+            label: buildVisitorLabel(me),
+            value: meId,
+            name: me?.name || '',
+            role: resolveRoleName(me),
+            title: me?.title || '',
+          });
         }
-        const id = parseInt(savedChurchId, 10);
-        if (isNaN(id)) {
-          Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
-          navigation.goBack();
-          return;
+
+        const selectedVisitor =
+          mappedVisitors.find(option => option.value === meId) || mappedVisitors[0] || null;
+
+        setVisitorOptions(mappedVisitors);
+        setUserId(selectedVisitor?.value ?? meId);
+        setVisitorName(selectedVisitor?.name || '');
+        setVisitorRole(selectedVisitor?.role || '');
+      } catch (error) {
+        console.error('Failed to load visit/event setup:', error);
+      } finally {
+        if (mounted) {
+          setLoading(false);
         }
-        setChurchId(id);
-        
-        // Fetch church name
-        const res = await api.get(`churches/${id}`);
-        const churchData = res?.data?.data;
-        if (churchData?.name && mounted) {
-          setChurchName(churchData.name);
-        }
-      } catch (e) {
-        console.error('Error fetching info:', e);
       }
     })();
+
     return () => {
       mounted = false;
     };
-  }, [navigation, t]);
+  }, []);
 
-  const addVisit = () => {
-    if (screenDisabled) {
-      return;
-    }
-    setVisits([
-      ...visits,
-      {
-        year: new Date().getFullYear(),
-        week_number: null,
-        number_of_days: null,
-      },
-    ]);
+  const clearInvalid = (key: string) => {
+    setInvalid(prev => ({...prev, [key]: false}));
   };
 
-  const removeVisit = (index: number) => {
-    if (screenDisabled) {
-      return;
-    }
-    if (visits.length > 1) {
-      setVisits(visits.filter((_, i) => i !== index));
-      setInvalid(prev => {
-        const newInvalid = {...prev};
-        delete newInvalid[index];
-        // Reindex
-        const reindexed: Record<number, Record<string, boolean>> = {};
-        Object.keys(newInvalid).forEach(key => {
-          const oldIndex = parseInt(key, 10);
-          if (oldIndex > index) {
-            reindexed[oldIndex - 1] = newInvalid[oldIndex];
-          } else if (oldIndex < index) {
-            reindexed[oldIndex] = newInvalid[oldIndex];
-          }
-        });
-        return reindexed;
-      });
-    }
+  const setFieldError = (key: string, message: string) => {
+    setFieldErrors(prev => ({...prev, [key]: message}));
+    setInvalid(prev => ({...prev, [key]: true}));
   };
 
-  const updateVisit = (index: number, field: keyof VisitFormItem, value: any) => {
-    setVisits(prev => {
-      const updated = [...prev];
-      updated[index] = {...updated[index], [field]: value};
-      return updated;
+  const clearFieldError = (key: string) => {
+    setFieldErrors(prev => {
+      if (!(key in prev)) return prev;
+      const next = {...prev};
+      delete next[key];
+      return next;
     });
-    clearInvalid(index, field);
   };
 
-  const onSave = async () => {
-    if (screenDisabled) {
+  const renderFieldError = (key: string) => {
+    const msg = fieldErrors[key];
+    if (!msg) return null;
+    return <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{msg}</Text>;
+  };
+
+  const setFieldPos = (key: string, y: number) => {
+    fieldPosRef.current[key] = y;
+  };
+
+  const scrollToField = (key: string) => {
+    const y = fieldPosRef.current[key];
+    if (typeof y !== 'number') {
       return;
     }
-    if (!churchId || !userId) {
-      Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
-      return;
-    }
+    scrollRef.current?.scrollTo({y: Math.max(0, y - ms(12)), animated: true});
+  };
 
-    const newInvalid: Record<number, Record<string, boolean>> = {};
-    let hasError = false;
+  const goToDetailStep = () => {
+    setInvalid({});
+    setFieldErrors({});
 
-    visits.forEach((visit, index) => {
-      const visitInvalid: Record<string, boolean> = {};
-      visitInvalid.week_number = visit.week_number === null;
-      visitInvalid.number_of_days = visit.number_of_days === null;
-      
-      if (visitInvalid.week_number || visitInvalid.number_of_days) {
-        hasError = true;
-        newInvalid[index] = visitInvalid;
+    const nextInvalid: Record<string, boolean> = {};
+    const nextErrors: Record<string, string> = {};
+
+    if (!selectedMonth || !selectedYear) {
+      if (!selectedMonth) {
+        nextInvalid.selectedMonth = true;
+        nextErrors.selectedMonth = t('pleaseSelectYearAndMonth') || 'Please select year and month';
       }
-    });
+      if (!selectedYear) {
+        nextInvalid.selectedYear = true;
+        nextErrors.selectedYear = t('pleaseSelectYearAndMonth') || 'Please select year and month';
+      }
+    }
 
-    setInvalid(newInvalid);
+    const churchCountValue = Number(churchVisitCount ?? 0);
+    const eventCountValue = Number(eventCount ?? 0);
 
-    if (hasError) {
+    if (
+      !Number.isFinite(churchCountValue) ||
+      !Number.isFinite(eventCountValue) ||
+      churchCountValue < 0 ||
+      eventCountValue < 0
+    ) {
+      nextInvalid.churchVisitCount = true;
+      nextInvalid.eventCount = true;
+      nextErrors.churchVisitCount = t('pleaseEnterValidCounts') || 'Please enter valid counts.';
+      nextErrors.eventCount = t('pleaseEnterValidCounts') || 'Please enter valid counts.';
+    }
+
+    if (churchCountValue === 0 && eventCountValue === 0) {
+      nextInvalid.churchVisitCount = true;
+      nextInvalid.eventCount = true;
+      nextErrors.churchVisitCount =
+        t('pleaseAddAtLeastOneChurchVisitOrEvent') ||
+        'Please add at least one church visit or event.';
+      nextErrors.eventCount =
+        t('pleaseAddAtLeastOneChurchVisitOrEvent') ||
+        'Please add at least one church visit or event.';
+    }
+
+    if (!userId) {
+      nextInvalid.user_id = true;
+      nextErrors.user_id = t('userInformationIsMissing') || 'User information is missing.';
+    }
+
+    if (Object.keys(nextErrors).length > 0) {
+      setInvalid(nextInvalid);
+      setFieldErrors(nextErrors);
+      const firstKey = Object.keys(nextErrors)[0];
+      requestAnimationFrame(() => scrollToField(firstKey));
       return;
     }
 
-    try {
-      setSubmitting(true);
-      const payloads: CreateVisitPayload[] = visits.map(visit => ({
-        user_id: userId,
-        church_id: churchId,
-        year: visit.year,
-        week_number: visit.week_number!,
-        number_of_days: visit.number_of_days!,
-      }));
-
-      await createVisitsBulk(payloads);
-      Alert.alert(
-        t('success') || 'Success',
-        t('visitsCreatedSuccess') || 'Visits created successfully!',
-      );
-      navigation.navigate('Visits', {reload: true});
-    } catch (e: any) {
-      Alert.alert(
-        t('error') || 'Error',
-        e?.message || t('failedToCreateVisits') || 'Failed to create visits',
-      );
-    } finally {
-      setSubmitting(false);
-    }
+    navigation.navigate('AddVisitsDetails', {
+      userId,
+      visitorName,
+      visitorRole,
+      selectedMonth,
+      selectedYear,
+      churchVisitCount: churchCountValue,
+      eventCount: eventCountValue,
+    });
   };
+
+  if (loading) {
+    return (
+      <SafeAreaView
+        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <View style={[styles.loadingWrap, {backgroundColor: C.background}]}>
+          <ActivityIndicator size="small" color={C.textPrimary} />
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -225,131 +311,144 @@ export const AddVisitsScreen: React.FC = () => {
         style={{flex: 1}}>
         <View style={{flex: 1, backgroundColor: C.background}}>
           <View style={styles.container}>
-            <Header
-              title={t('addVisits') || 'Add Visits'}
-              showMenu={false}
-            />
-            
-            {churchName ? (
-              <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
-                <Text style={[styles.churchNameLabel, {color: C.textSecondary}]}>
-                  {t('church') || 'Church'}:{' '}
-                </Text>
-                <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                  {churchName}
-                </Text>
-              </View>
-            ) : null}
-
-            {screenDisabled ? (
-              <View
-                style={[
-                  styles.devNotice,
-                  {backgroundColor: 'rgba(219,45,45,0.08)', borderColor: COLORS.dangerColor},
-                ]}>
-                <Text style={[styles.devNoticeText, {color: COLORS.dangerColor}]}>
-                  {t('featureUnderDevelopment') ||
-                    'Tính năng này đang được hoàn thiện. Vui lòng quay lại sau.'}
-                </Text>
-              </View>
-            ) : null}
+            <Header title={t('addVisits') || 'Add Visits'} showMenu={false} />
 
             <ScrollView
+              ref={ref => {
+                scrollRef.current = ref;
+              }}
               showsVerticalScrollIndicator={false}
               contentContainerStyle={styles.scrollContent}>
-              <View style={styles.form}>
-                {visits.map((visit, index) => (
-                  <View
-                    key={index}
-                    style={[styles.visitCard, {backgroundColor: C.surface, borderColor: C.border}]}>
-                    <View style={styles.visitHeader}>
-                      <Text style={[styles.visitTitle, {color: C.textPrimary}]}>
-                        {t('visit') || 'Visit'} {index + 1}
-                      </Text>
-                      {visits.length > 1 && (
-                        <TouchableOpacity
-                          onPress={() => removeVisit(index)}
-                          disabled={screenDisabled}
-                          style={[
-                            styles.removeBtn,
-                            {backgroundColor: COLORS.dangerColor},
-                            screenDisabled ? styles.disabledTouchable : null,
-                          ]}>
-                          <Text style={styles.removeBtnText}>×</Text>
-                        </TouchableOpacity>
-                      )}
-                    </View>
+              <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.border}]}>
+                <Text style={[styles.headingTitle, {color: C.textPrimary}]}>
+                  {`${t('visitsAndEventsInformationFor') || 'Visits and Events Information For'} : ${
+                    visitorName || '-'
+                  }${visitorRole ? `, ${visitorRole}` : ''}`}
+                </Text>
+                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                  {t('pleaseSelectTheInformation') || 'Please Select the Information'}
+                </Text>
 
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('year') || 'Year'} *
-                      </Text>
-                      <ElementDropdown
-                        data={yearOptions}
-                        value={visit.year as any}
-                        onChange={v => updateVisit(index, 'year', v as number)}
-                        placeholder={t('year') || 'Year'}
-                        containerStyle={
-                          {
-                            backgroundColor: C.inputBg,
-                            borderColor: C.inputBorder,
-                          } as any
-                        }
-                      />
-                    </View>
-
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('week') || 'Week'} *
-                      </Text>
-                      <ElementDropdown
-                        data={weekOptions}
-                        value={visit.week_number as any}
-                        onChange={v => updateVisit(index, 'week_number', v as number)}
-                        placeholder={t('week') || 'Week'}
-                        error={!!invalid[index]?.week_number}
-                        containerStyle={
-                          {
-                            backgroundColor: C.inputBg,
-                            borderColor: invalid[index]?.week_number ? '#db2d2d' : C.inputBorder,
-                          } as any
-                        }
-                      />
-                    </View>
-
-                    <View style={styles.field}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('numberOfDays') || 'Number of Days'} *
-                      </Text>
-                      <ElementDropdown
-                        data={daysOptions}
-                        value={visit.number_of_days as any}
-                        onChange={v => updateVisit(index, 'number_of_days', v as number)}
-                        placeholder={t('numberOfDays') || 'Number of Days'}
-                        error={!!invalid[index]?.number_of_days}
-                        containerStyle={
-                          {
-                            backgroundColor: C.inputBg,
-                            borderColor: invalid[index]?.number_of_days ? '#db2d2d' : C.inputBorder,
-                          } as any
-                        }
-                      />
-                    </View>
-                  </View>
-                ))}
-
-                <TouchableOpacity
-                  onPress={addVisit}
-                  disabled={screenDisabled}
-                  style={[
-                    styles.addBtn,
-                    {backgroundColor: C.surface, borderColor: C.border},
-                    screenDisabled ? styles.disabledTouchable : null,
-                  ]}>
-                  <Text style={[styles.addBtnText, {color: C.textPrimary}]}>
-                    + {t('addVisit') || 'Add Visit'}
+                <View
+                  style={styles.field}
+                  onLayout={e => setFieldPos('user_id', e.nativeEvent.layout.y)}>
+                  <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                    {t('visitor') || 'Visitor'}
                   </Text>
-                </TouchableOpacity>
+                  <ElementDropdown
+                    data={visitorOptions}
+                    value={userId}
+                    onChange={value => {
+                      const selectedVisitor = visitorOptions.find(
+                        option => option.value === (value as number),
+                      );
+                      setUserId((value as number) || null);
+                      setVisitorName(selectedVisitor?.name || '');
+                      setVisitorRole(selectedVisitor?.role || '');
+                      clearInvalid('user_id');
+                      clearFieldError('user_id');
+                    }}
+                    placeholder={t('visitor') || 'Visitor'}
+                    containerStyle={{
+                      backgroundColor: C.inputBg,
+                      borderColor: invalid.user_id ? C.error || '#ff4444' : C.inputBorder,
+                    }}
+                  />
+                  {renderFieldError('user_id')}
+                </View>
+
+                <View style={styles.row}>
+                  <View
+                    style={[styles.field, styles.halfField]}
+                    onLayout={e => setFieldPos('selectedMonth', e.nativeEvent.layout.y)}>
+                    <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                      {t('month') || 'Month'}
+                    </Text>
+                    <ElementDropdown
+                      data={monthOptions}
+                      value={selectedMonth}
+                      onChange={value => {
+                        setSelectedMonth(value as number);
+                        clearInvalid('selectedMonth');
+                        clearFieldError('selectedMonth');
+                      }}
+                      placeholder={t('month') || 'Month'}
+                      containerStyle={{
+                        backgroundColor: C.inputBg,
+                        borderColor: invalid.selectedMonth ? C.error || '#ff4444' : C.inputBorder,
+                      }}
+                    />
+                    {renderFieldError('selectedMonth')}
+                  </View>
+                  <View
+                    style={[styles.field, styles.halfField]}
+                    onLayout={e => setFieldPos('selectedYear', e.nativeEvent.layout.y)}>
+                    <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                      {t('year') || 'Year'}
+                    </Text>
+                    <ElementDropdown
+                      data={yearOptions}
+                      value={selectedYear}
+                      onChange={value => {
+                        setSelectedYear(value as number);
+                        clearInvalid('selectedYear');
+                        clearFieldError('selectedYear');
+                      }}
+                      placeholder={t('year') || 'Year'}
+                      containerStyle={{
+                        backgroundColor: C.inputBg,
+                        borderColor: invalid.selectedYear ? C.error || '#ff4444' : C.inputBorder,
+                      }}
+                    />
+                    {renderFieldError('selectedYear')}
+                  </View>
+                </View>
+
+                <View
+                  style={styles.field}
+                  onLayout={e => setFieldPos('churchVisitCount', e.nativeEvent.layout.y)}>
+                  <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                    {t('numberOfChurchesVisited') || 'Number of Churches Visited'}
+                  </Text>
+                  <ElementDropdown
+                    data={countOptions}
+                    value={churchVisitCount}
+                    onChange={value => {
+                      setChurchVisitCount(value as number);
+                      clearInvalid('churchVisitCount');
+                      clearFieldError('churchVisitCount');
+                    }}
+                    placeholder="0"
+                    containerStyle={{
+                      backgroundColor: C.inputBg,
+                      borderColor: invalid.churchVisitCount ? C.error || '#ff4444' : C.inputBorder,
+                    }}
+                  />
+                  {renderFieldError('churchVisitCount')}
+                </View>
+
+                <View
+                  style={styles.field}
+                  onLayout={e => setFieldPos('eventCount', e.nativeEvent.layout.y)}>
+                  <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                    {t('numberOfEventsYouOrganised') || 'Number of Events You Organised'}
+                  </Text>
+                  <ElementDropdown
+                    data={countOptions}
+                    value={eventCount}
+                    onChange={value => {
+                      setEventCount(value as number);
+                      clearInvalid('eventCount');
+                      clearFieldError('eventCount');
+                    }}
+                    placeholder="0"
+                    containerStyle={{
+                      backgroundColor: C.inputBg,
+                      borderColor: invalid.eventCount ? C.error || '#ff4444' : C.inputBorder,
+                    }}
+                  />
+                  {renderFieldError('eventCount')}
+                </View>
               </View>
             </ScrollView>
 
@@ -357,12 +456,10 @@ export const AddVisitsScreen: React.FC = () => {
               <CancelButton
                 label={t('cancel') || 'Cancel'}
                 onPress={() => navigation.goBack()}
-                disabled={submitting}
               />
               <SaveButton
-                label={t('save') || 'Save'}
-                onPress={onSave}
-                disabled={screenDisabled || submitting}
+                label={t('next') || 'Next'}
+                onPress={goToDetailStep}
               />
             </View>
           </View>
@@ -378,76 +475,35 @@ const styles = StyleSheet.create({
     paddingLeft: ms(16),
     paddingRight: ms(16),
   },
-  churchNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: ms(8),
-    marginBottom: ms(12),
-    paddingVertical: ms(10),
-    paddingHorizontal: ms(12),
-    borderRadius: rs(8),
-    borderWidth: 1,
-  },
-  churchNameLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
-  },
-  churchNameText: {
-    fontSize: fs(14),
-    fontWeight: '600',
+  loadingWrap: {
     flex: 1,
-  },
-  devNotice: {
-    marginBottom: ms(12),
-    paddingVertical: ms(10),
-    paddingHorizontal: ms(12),
-    borderRadius: rs(8),
-    borderWidth: 1,
-  },
-  devNoticeText: {
-    fontSize: fs(13),
-    fontWeight: '600',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   scrollContent: {
     paddingBottom: ms(24),
   },
-  form: {
+  card: {
     marginTop: ms(8),
-    gap: ms(16),
-  },
-  visitCard: {
-    padding: ms(16),
     borderRadius: rs(12),
-    borderWidth: 1,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: rs(8),
-    elevation: 3,
   },
-  visitHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+  headingTitle: {
+    fontSize: fs(16),
+    fontWeight: '700',
+    lineHeight: fs(22),
+    marginBottom: ms(10),
+  },
+  sectionTitle: {
+    fontSize: fs(14),
+    fontWeight: '600',
     marginBottom: ms(12),
   },
-  visitTitle: {
-    fontSize: fs(16),
-    fontWeight: '600',
+  row: {
+    flexDirection: 'row',
+    gap: ms(12),
   },
-  removeBtn: {
-    width: ms(28),
-    height: ms(28),
-    borderRadius: rs(14),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  removeBtnText: {
-    color: '#fff',
-    fontSize: fs(20),
-    fontWeight: 'bold',
-  },
-  disabledTouchable: {
-    opacity: 0.45,
+  halfField: {
+    flex: 1,
   },
   field: {
     marginBottom: ms(12),
@@ -457,16 +513,9 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     marginBottom: ms(6),
   },
-  addBtn: {
-    padding: ms(16),
-    borderRadius: rs(12),
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addBtnText: {
-    fontSize: fs(14),
+  errorText: {
+    marginTop: ms(6),
+    fontSize: fs(12),
     fontWeight: '500',
   },
   actions: {
