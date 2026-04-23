@@ -11,6 +11,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import {VisitItem} from '../services/visit.service';
 import api from '../../../config/api';
+import {getIsoWeekDateRangeLabelFull} from '../../../shared/utils/isoWeek';
 
 export const VisitDetailScreen: React.FC = () => {
   const route = useRoute<any>();
@@ -71,9 +72,7 @@ export const VisitDetailScreen: React.FC = () => {
 
   const heroTitle = useMemo(() => {
     if (!visit) return '';
-    const yearLabel = t('year') || 'Year';
-    const weekLabel = t('week') || 'Week';
-    return `${yearLabel} ${visit.year} • ${weekLabel} ${visit.week_number}`;
+    return getIsoWeekDateRangeLabelFull(visit.year, visit.week_number);
   }, [t, visit]);
 
   return (
@@ -97,51 +96,42 @@ export const VisitDetailScreen: React.FC = () => {
             </Text>
           ) : (
             <View style={{gap: ms(12), marginTop: ms(10)}}>
-              <View style={[styles.heroCard, {backgroundColor: C.surface, borderColor: C.border}]}>
-                {churchName ? (
+              <View style={[styles.heroCard, {backgroundColor: C.background}]}>
+                {(visit.church_name || churchName || visit.church_id) ? (
                   <Text
                     style={[styles.churchNameText, {color: C.textPrimary}]}
                     numberOfLines={2}>
-                    {churchName}
+                    {visit.church_name ?? churchName ?? String(visit.church_id)}
                   </Text>
                 ) : null}
 
                 <Text style={[styles.heroTitle, {color: C.textPrimary}]}>{heroTitle}</Text>
 
-                <View style={styles.heroRow}>
-                  <View style={[styles.badge, {backgroundColor: C.inputBg, borderColor: C.border}]}>
-                    <Text style={[styles.badgeLabel, {color: C.textSecondary}]}>
-                      {t('numberOfDays') || 'Number of Days'}
-                    </Text>
-                    <Text style={[styles.badgeValue, {color: C.textPrimary}]}>
-                      {visit.number_of_days}
-                    </Text>
-                  </View>
-                </View>
+                <Text style={[styles.inlineMeta, {color: C.textSecondary}]}>
+                  {t('numberOfDays') || 'Number of Days'}: {visit.number_of_days}
+                </Text>
               </View>
 
-              <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border}]}>
+              <View style={[styles.detailCard, {backgroundColor: C.background}]}>
                 <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
                   {t('details') || 'Details'}
                 </Text>
 
                 <View style={styles.kvRow}>
                   <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
-                    {t('visitId') || 'Visit ID'}
+                    {t('userName') || 'Name'}
                   </Text>
-                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>#{visit.id}</Text>
+                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>
+                    {visit.user_name ?? String(visit.user_id)}
+                  </Text>
                 </View>
                 <View style={styles.kvRow}>
                   <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
-                    {t('userId') || 'User ID'}
+                    {t('churchName') || 'Church'}
                   </Text>
-                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>{visit.user_id}</Text>
-                </View>
-                <View style={styles.kvRow}>
-                  <Text style={[styles.kvLabel, {color: C.textSecondary}]}>
-                    {t('churchId') || 'Church ID'}
+                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>
+                    {visit.church_name ?? churchName ?? String(visit.church_id)}
                   </Text>
-                  <Text style={[styles.kvValue, {color: C.textPrimary}]}>{visit.church_id}</Text>
                 </View>
 
                 <View style={[styles.divider, {backgroundColor: C.border}]} />
@@ -193,9 +183,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   heroCard: {
-    padding: ms(16),
-    borderRadius: rs(14),
-    borderWidth: 1,
+    paddingVertical: ms(10),
+    paddingHorizontal: 0,
+    borderRadius: 0,
+    borderWidth: 0,
   },
   churchNameText: {
     fontSize: fs(14),
@@ -205,32 +196,17 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontSize: fs(16),
     fontWeight: '800',
-    marginBottom: ms(12),
+    marginBottom: ms(6),
   },
-  heroRow: {
-    flexDirection: 'row',
-    gap: ms(10),
-  },
-  badge: {
-    flex: 1,
-    paddingVertical: ms(10),
-    paddingHorizontal: ms(12),
-    borderRadius: rs(12),
-    borderWidth: 1,
-  },
-  badgeLabel: {
-    fontSize: fs(12),
+  inlineMeta: {
+    fontSize: fs(13),
     fontWeight: '600',
-    marginBottom: ms(4),
-  },
-  badgeValue: {
-    fontSize: fs(18),
-    fontWeight: '900',
   },
   detailCard: {
-    padding: ms(16),
-    borderRadius: rs(14),
-    borderWidth: 1,
+    paddingVertical: ms(10),
+    paddingHorizontal: 0,
+    borderRadius: 0,
+    borderWidth: 0,
   },
   sectionTitle: {
     fontSize: fs(14),

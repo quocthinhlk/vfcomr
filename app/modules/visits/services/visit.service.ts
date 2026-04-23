@@ -3,7 +3,9 @@ import api from '../../../config/api';
 export interface VisitItem {
   id: number;
   user_id: number;
+  user_name?: string;
   church_id: number;
+  church_name?: string;
   year: number;
   week_number: number;
   number_of_days: number;

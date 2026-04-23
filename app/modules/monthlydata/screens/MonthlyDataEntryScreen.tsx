@@ -2314,6 +2314,8 @@ const styles = StyleSheet.create({
   rowLabelWrapper: {
     minHeight: fs(12) * 2,
     justifyContent: 'flex-end',
+    flex: 1,
+    minWidth: 0,
   },
 
   rowLabel: {
@@ -2322,6 +2324,8 @@ const styles = StyleSheet.create({
     includeFontPadding: false,
     textAlignVertical: 'bottom',
     paddingBlock: ms(5),
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   fieldContainer: {
     marginBottom: ms(12),
@@ -2338,10 +2342,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'flex-start',
     marginBottom: ms(4),
+    columnGap: ms(6),
+    width: '100%',
+    overflow: 'hidden',
+    flexWrap: 'wrap',
   },
   helpIconInline: {
-    marginLeft: ms(6),
     marginTop: ms(2),
+    flexShrink: 0,
+    alignSelf: 'flex-start',
   },
   helpIcon: {
     fontSize: fs(16),

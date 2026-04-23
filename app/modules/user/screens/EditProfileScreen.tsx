@@ -467,7 +467,7 @@ export default function EditProfileScreen() {
                   <View onLayout={e => setFieldPos('title', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('ministryTitle')} <Text style={{color: '#c00000'}}>*</Text>
+                        {t('titleOfChurchRole')} <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon title={t('ministryTitle')} message={t('helpMinistryTitle')} size={16} offsetY={-2} />
                     </View>
@@ -601,7 +601,7 @@ export default function EditProfileScreen() {
                   <View onLayout={e => setFieldPos('sensitive_nation', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('sensitiveNation')}
+                        {t('inSensitiveNation')}
                       </Text>
                       <HelpIcon title={t('sensitiveNation')} message={t('helpSensitiveNation')} size={16} offsetY={-2} />
                     </View>
@@ -626,7 +626,7 @@ export default function EditProfileScreen() {
                   <View onLayout={e => setFieldPos('language_id', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('language')} <Text style={{color: '#c00000'}}>*</Text>
+                        {t('theLanguageOmrWillUseForYou')} <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon title={t('language')} message={t('helpUserLanguage')} size={16} offsetY={-2} />
                     </View>
@@ -655,7 +655,7 @@ export default function EditProfileScreen() {
                   <View onLayout={e => setFieldPos('church_id', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('church')} <Text style={{color: '#c00000'}}>*</Text>
+                        {t('churchBelongsTo')} <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon title={t('church')} message={t('helpUserChurch')} size={16} offsetY={-2} />
                     </View>

@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
-import {Formik} from 'formik';
+import {Formik, type FormikProps} from 'formik';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles, FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import {addUser} from '../services/user.service';
@@ -32,6 +32,7 @@ import HelpIcon from '../../../shared/components/HelpIcon';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {ROLES} from '../../../shared/utils/permissions';
 
 const countryCodeToFlag = (code: string) => {
   if (!code) {
@@ -80,6 +81,7 @@ export default function AddUserScreen() {
   const [showPassword, setShowPassword] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
+  const formikRef = useRef<FormikProps<any> | null>(null);
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
@@ -183,6 +185,19 @@ export default function AddUserScreen() {
     };
   }, []);
 
+  useEffect(() => {
+    const pastorLeader = roleOptions.find(r => r?.id === ROLES.PASTOR_LEADER);
+    if (!pastorLeader) {
+      return;
+    }
+    const currentRoleId = formikRef.current?.values?.role_id;
+    if (currentRoleId == null) {
+      formikRef.current?.setFieldValue('role_id', pastorLeader.id);
+      clearInvalid('role_id');
+      clearFieldError('role_id');
+    }
+  }, [roleOptions]);
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -203,6 +218,9 @@ export default function AddUserScreen() {
             contentInsetAdjustmentBehavior="always"
             contentContainerStyle={{paddingBottom: ms(24)}}>
             <Formik
+              innerRef={ref => {
+                formikRef.current = (ref as any) || null;
+              }}
               initialValues={{
                 username: '',
                 password: '',
@@ -430,6 +448,10 @@ export default function AddUserScreen() {
                         secureTextEntry={!showPassword}
                         value={values.password}
                         autoCapitalize="none"
+                        autoComplete="off"
+                        textContentType="none"
+                        importantForAutofill="no"
+                        autoCorrect={false}
                         onChangeText={(v: string) => {
                           setFieldValue('password', v);
                           clearInvalid('password');
@@ -463,7 +485,7 @@ export default function AddUserScreen() {
                   <View onLayout={e => setFieldPos('title', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('ministryTitle')} <Text style={{color: '#c00000'}}>*</Text>
+                        {t('titleOfChurchRole')} <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon title={t('ministryTitle')} message={t('helpMinistryTitle')} />
                     </View>
@@ -543,7 +565,7 @@ export default function AddUserScreen() {
                   <View onLayout={e => setFieldPos('sensitive_nation', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('sensitiveNation')}
+                        {t('inSensitiveNation')}
                       </Text>
                       <HelpIcon title={t('sensitiveNation')} message={t('helpSensitiveNation')} />
                     </View>
@@ -568,7 +590,7 @@ export default function AddUserScreen() {
                   <View onLayout={e => setFieldPos('language_id', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('language')} <Text style={{color: '#c00000'}}>*</Text>
+                        {t('theLanguageOmrWillUseForYou')} <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon title={t('language')} message={t('helpUserLanguage')} />
                     </View>
@@ -597,7 +619,7 @@ export default function AddUserScreen() {
                   <View onLayout={e => setFieldPos('church_id', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('church')} <Text style={{color: '#c00000'}}>*</Text>
+                        {t('churchBelongsTo')} <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon title={t('church')} message={t('helpUserChurch')} />
                     </View>

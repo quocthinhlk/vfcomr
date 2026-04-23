@@ -34,6 +34,7 @@ import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
 import {fs, hs, ms, rs} from '../../../shared/utils/scale';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
+import {ROLES} from '../../../shared/utils/permissions';
 
 const countryCodeToFlag = (code: string) => {
   if (!code) {
@@ -119,7 +120,7 @@ export default function NewPastorAndChurchScreen() {
       date_of_birth: t('dob') || 'Date of Birth',
       username: t('username') || 'Username',
       password: t('password') || 'Password',
-      title: t('ministryTitle') || 'Ministry Title',
+      title: t('titleOfChurchRole') || 'Title of Church Role',
       first_name: t('firstName') || 'First Name',
       user_role_id: t('omrStatus') || 'OMR Status',
       user_language_id: t('language') || 'Language',
@@ -340,6 +341,19 @@ export default function NewPastorAndChurchScreen() {
       mounted = false;
     };
   }, []);
+
+  useEffect(() => {
+    const pastorLeader = roleOptions.find(r => r?.id === ROLES.PASTOR_LEADER);
+    if (!pastorLeader) {
+      return;
+    }
+    setInitialValues(prev => {
+      if (prev.user_role_id) {
+        return prev;
+      }
+      return {...prev, user_role_id: String(pastorLeader.id)};
+    });
+  }, [roleOptions]);
 
   const handleSaveChurchAndContinue = async (values: CombinedFormValues) => {
     setFieldErrorText({});
@@ -956,7 +970,7 @@ export default function NewPastorAndChurchScreen() {
                                 <View>
                                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      {t('sensitiveNation')}?
+                                      {t('inSensitiveNation')}?
                                     </Text>
                                     <HelpIcon title={t('sensitiveNation')} message={t('helpSensitiveNation')} />
                                   </View>
@@ -1323,6 +1337,10 @@ export default function NewPastorAndChurchScreen() {
                                     value={values.password}
                                     autoCapitalize="none"
                                     secureTextEntry
+                                    autoComplete="off"
+                                    textContentType="none"
+                                    importantForAutofill="no"
+                                    autoCorrect={false}
                                     onChangeText={text => {
                                       setFieldValue('password', text);
                                       setInvalid(prev => ({...prev, password: false}));
@@ -1340,7 +1358,7 @@ export default function NewPastorAndChurchScreen() {
                                 <View>
                                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      {t('ministryTitle')} <Text status="danger">*</Text>
+                                      {t('titleOfChurchRole')} <Text status="danger">*</Text>
                                     </Text>
                                     <HelpIcon title={t('ministryTitle')} message={t('helpMinistryTitle')} />
                                   </View>
@@ -1416,7 +1434,7 @@ export default function NewPastorAndChurchScreen() {
                                 <View>
                                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      {t('sensitiveNation')}?
+                                      {t('inSensitiveNation')}?
                                     </Text>
                                     <HelpIcon title={t('sensitiveNation')} message={t('helpSensitiveNation')} />
                                   </View>
@@ -1435,7 +1453,7 @@ export default function NewPastorAndChurchScreen() {
                                 <View>
                                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      {t('language')} <Text status="danger">*</Text>
+                                      {t('theLanguageOmrWillUseForYou')} <Text status="danger">*</Text>
                                     </Text>
                                     <HelpIcon title={t('language')} message={t('helpUserLanguage')} />
                                   </View>
@@ -1460,7 +1478,7 @@ export default function NewPastorAndChurchScreen() {
                                 <View>
                                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      {t('church')} <Text status="danger">*</Text>
+                                      {t('churchBelongsTo')} <Text status="danger">*</Text>
                                     </Text>
                                     <HelpIcon title={t('church')} message={t('helpUserChurch')} />
                                   </View>

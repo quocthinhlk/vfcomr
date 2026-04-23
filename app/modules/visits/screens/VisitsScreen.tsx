@@ -29,6 +29,7 @@ import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import SearchInput from '../../../shared/components/SearchInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
+import {getIsoWeekDateRangeLabelFull} from '../../../shared/utils/isoWeek';
 
 const editIcon = require('../../../assets/icons/edit.png');
 
@@ -77,7 +78,9 @@ export const VisitsScreen: React.FC = () => {
               [
                 String(v.id),
                 String(v.user_id),
+                String(v.user_name),
                 String(v.church_id),
+                String(v.church_name),
                 String(v.year),
                 String(v.week_number),
                 String(v.number_of_days),
@@ -151,15 +154,15 @@ export const VisitsScreen: React.FC = () => {
         <View style={L.itemRow as any}>
           <View style={styles.itemCol}>
             <Text style={[styles.name, {color: C.textPrimary}]}>
-              {t('year') || 'Year'}: {item.year} • {t('week') || 'Week'}: {item.week_number}
+              {getIsoWeekDateRangeLabelFull(item.year, item.week_number)}
             </Text>
             <View style={styles.metaRow}>
-                  <Text style={[styles.metaText, {color: C.textSecondary}]}>
-                    {t('userId') || 'User ID'}: {item.user_id}
-                  </Text>
-                  <Text style={[styles.metaText, {color: C.textSecondary}]}>
-                    {t('churchId') || 'Church ID'}: {item.church_id}
-                  </Text>
+              <Text style={[styles.metaText, {color: C.textSecondary}]}>
+                {t('userName') || 'Name'}: {item.user_name ?? item.user_id}
+              </Text>
+              <Text style={[styles.metaText, {color: C.textSecondary}]}>
+                {t('churchName') || 'Church'}: {item.church_name ?? item.church_id}
+              </Text>
             </View>
             <View style={styles.metaRow}>
               <Text style={[styles.metaText, {color: C.textSecondary}]}>
@@ -400,7 +403,7 @@ const styles = StyleSheet.create({
   },
   itemColRight: {
     alignItems: 'flex-end',
-    justifyContent: 'flex-start',
+    justifyContent: 'space-between',
     paddingLeft: ms(4),
     width: ws(56),
   },
@@ -414,9 +417,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: ms(8),
     marginTop: ms(2),
+    flexWrap: 'wrap',
   },
   metaText: {
     fontSize: fs(12),
+    flexShrink: 1,
   },
   empty: {
     textAlign: 'center',
@@ -437,7 +442,6 @@ const styles = StyleSheet.create({
     borderRadius: rs(4),
     justifyContent: 'center',
     alignItems: 'center',
-    marginTop: -ms(6),
   },
   editIcon: {
     width: fs(18),

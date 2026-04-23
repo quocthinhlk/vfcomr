@@ -1,11 +1,14 @@
-import React, {useMemo, useRef} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
   TouchableOpacity,
   Text as RNText,
   TextInput,
+  View,
   ViewStyle,
+  Keyboard,
   Platform,
   StyleSheet,
+  useWindowDimensions,
 } from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useThemedColors } from '../styles/theme';
@@ -51,6 +54,24 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
 }) => {
   const C = useThemedColors();
   const searchRef = useRef<TextInput>(null);
+  const anchorRef = useRef<View>(null);
+  const {height: windowH} = useWindowDimensions();
+  const [keyboardH, setKeyboardH] = useState(0);
+  const [dropdownPosition, setDropdownPosition] = useState<'auto' | 'top' | 'bottom'>('auto');
+  const [dropdownMaxHeight, setDropdownMaxHeight] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    const showSub = Keyboard.addListener('keyboardDidShow', e => {
+      setKeyboardH(e?.endCoordinates?.height ?? 0);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardH(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   const themed = useMemo(() =>
     StyleSheet.create({
@@ -102,58 +123,82 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
     );
   };
 
+  const computeBestPosition = () => {
+    const margin = ms(12);
+    try {
+      anchorRef.current?.measureInWindow((_x, y, _w, h) => {
+        const usableBottom = Math.max(0, windowH - keyboardH);
+        const below = usableBottom - (y + h) - margin;
+        const above = y - margin;
+        const pos: 'top' | 'bottom' = below >= above ? 'bottom' : 'top';
+        setDropdownPosition(pos);
+
+        const available = pos === 'bottom' ? below : above;
+        const maxH = Math.max(hs(180), Math.floor(available));
+        setDropdownMaxHeight(maxH);
+      });
+    } catch {
+      setDropdownPosition('auto');
+      setDropdownMaxHeight(undefined);
+    }
+  };
+
   return (
-    <Dropdown
-      style={[themed.dropdown, error ? {borderColor: C.error || '#ff4444'} : null, containerStyle]}
-      containerStyle={[themed.dropdownContainer, dropdownContainerStyle]}
-      data={data}
-      labelField="label"
-      valueField="value"
-      placeholder={placeholder}
-      value={value as any}
-      search={search}
-      searchPlaceholder={placeholder}
-      onChange={item => {
-        // Preserve selected label in internal display by setting value to match items
-        onChange((item?.value as any) ?? null);
-      }}
-      onChangeText={text => onSearchText && onSearchText(text)}
-      renderItem={renderItem as any}
-      renderInputSearch={(onSearch) => (
-        <TextInput
-          ref={searchRef}
-          placeholder={placeholder}
-          autoFocus
-          style={themed.searchInput}
-          onChangeText={(t) => {
-            onSearch(t);
-            onSearchText && onSearchText(t);
-          }}
-        />
-      )}
-      flatListProps={
-        onEndReached
-          ? { onEndReached: onEndReached, onEndReachedThreshold: 0.2 }
-          : undefined
-      }
-      renderRightIcon={renderRightIcon}
-      selectedTextStyle={themed.selectedText}
-      placeholderStyle={themed.placeholderText}
-      itemTextStyle={themed.itemText}
-      itemContainerStyle={[themed.itemContainer, optionItemStyle]}
-      // activeColor={activeItemColor as any}
-      activeColor={C.bgSelectedOption}
-      dropdownPosition="auto"
-      onFocus={() => {
-        // Ensure keyboard shows for search input on both iOS and Android
-        onOpen && onOpen();
-        onFocus && onFocus();
-        try {
-          // Delay to allow dropdown to mount input
-          setTimeout(() => searchRef.current?.focus(), Platform.OS === 'android' ? 80 : 0);
-        } catch {}
-      }}
-    />
+    <View ref={anchorRef}>
+      <Dropdown
+        style={[themed.dropdown, error ? {borderColor: C.error || '#ff4444'} : null, containerStyle]}
+        containerStyle={[themed.dropdownContainer, dropdownContainerStyle]}
+        data={data}
+        labelField="label"
+        valueField="value"
+        placeholder={placeholder}
+        value={value as any}
+        search={search}
+        searchPlaceholder={placeholder}
+        onChange={item => {
+          // Preserve selected label in internal display by setting value to match items
+          onChange((item?.value as any) ?? null);
+        }}
+        onChangeText={text => onSearchText && onSearchText(text)}
+        renderItem={renderItem as any}
+        renderInputSearch={(onSearch) => (
+          <TextInput
+            ref={searchRef}
+            placeholder={placeholder}
+            autoFocus
+            style={themed.searchInput}
+            onChangeText={(t) => {
+              onSearch(t);
+              onSearchText && onSearchText(t);
+            }}
+          />
+        )}
+        flatListProps={
+          onEndReached
+            ? { onEndReached: onEndReached, onEndReachedThreshold: 0.2 }
+            : undefined
+        }
+        renderRightIcon={renderRightIcon}
+        selectedTextStyle={themed.selectedText}
+        placeholderStyle={themed.placeholderText}
+        itemTextStyle={themed.itemText}
+        itemContainerStyle={[themed.itemContainer, optionItemStyle]}
+        // activeColor={activeItemColor as any}
+        activeColor={C.bgSelectedOption}
+        dropdownPosition={dropdownPosition as any}
+        maxHeight={dropdownMaxHeight as any}
+        onFocus={() => {
+          // Ensure dropdown is fully visible near keyboard/screen edges
+          onOpen && onOpen();
+          onFocus && onFocus();
+          computeBestPosition();
+          try {
+            // Delay to allow dropdown to mount input
+            setTimeout(() => searchRef.current?.focus(), Platform.OS === 'android' ? 80 : 0);
+          } catch {}
+        }}
+      />
+    </View>
   );
 };
 
