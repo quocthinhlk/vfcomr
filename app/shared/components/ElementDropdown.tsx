@@ -1,5 +1,12 @@
-import React, { useMemo, useRef } from 'react';
-import { TouchableOpacity, Text as RNText, TextInput, ViewStyle, Keyboard, Platform, StyleSheet } from 'react-native';
+import React, {useMemo, useRef} from 'react';
+import {
+  TouchableOpacity,
+  Text as RNText,
+  TextInput,
+  ViewStyle,
+  Platform,
+  StyleSheet,
+} from 'react-native';
 import { Dropdown } from 'react-native-element-dropdown';
 import { useThemedColors } from '../styles/theme';
 import { fs, ws, hs, ms, rs } from '../utils/scale';
@@ -22,6 +29,7 @@ interface ElementDropdownProps {
   onEndReached?: () => void;
   onFocus?: () => void;
   onOpen?: () => void; // allow parent to scroll before opening
+  renderItem?: (item: ElementDropdownItem) => React.ReactElement | null;
 }
 
 const ElementDropdown: React.FC<ElementDropdownProps> = ({
@@ -39,6 +47,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   onEndReached,
   onFocus,
   onOpen,
+  renderItem,
 }) => {
   const C = useThemedColors();
   const searchRef = useRef<TextInput>(null);
@@ -109,6 +118,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         onChange((item?.value as any) ?? null);
       }}
       onChangeText={text => onSearchText && onSearchText(text)}
+      renderItem={renderItem as any}
       renderInputSearch={(onSearch) => (
         <TextInput
           ref={searchRef}

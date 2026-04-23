@@ -184,12 +184,27 @@ export const WorshipServicesScreen: React.FC = () => {
             </View>
           ) : null}
 
-          <View style={styles.headerRow}>
+          <View
+            style={[
+              styles.infoNote,
+              {
+                backgroundColor: C.inputBg,
+                borderColor: C.inputBorder,
+              },
+            ]}>
+            <Text
+              style={[styles.infoNoteText, {color: C.textSecondary}]}
+              allowFontScaling={false}>
+              {t('worshipServicesMscFaqNote')}
+            </Text>
+          </View>
+
+          {/* <View style={styles.headerRow}>
             <AddNewHeaderButton
               name="AddWorshipService"
               text={t('addNew') || 'Add New'}
             />
-          </View>
+          </View> */}
 
           <FlatList
             data={items}
@@ -274,6 +289,18 @@ const styles = StyleSheet.create({
     marginTop: ms(8),
     marginBottom: ms(4),
     paddingVertical: ms(4),
+  },
+  infoNote: {
+    marginTop: ms(2),
+    marginBottom: ms(8),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(10),
+    borderRadius: rs(8),
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  infoNoteText: {
+    fontSize: fs(13),
+    lineHeight: fs(20),
   },
   churchNameLabel: {
     fontSize: fs(14),

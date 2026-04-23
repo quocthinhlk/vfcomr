@@ -37,6 +37,7 @@ import {
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useMonthlyData} from '../context/MonthlyDataContext';
 import api from '../../../config/api';
+import {getIsoWeekDateRangeLabel, getIsoWeekDisplayYear} from '../../../shared/utils/isoWeek';
 import {listWorshipServicesByChurch} from '../../worshipservices/services/worshipService.service';
 
 interface RouteParams {
@@ -46,44 +47,6 @@ interface RouteParams {
   month: number;
   weekNumbers: number[];
 }
-
-// Helper function to get week date range
-const getWeekDateRange = (year: number, weekNumber: number): string => {
-  const jan1 = new Date(year, 0, 1);
-  const daysOffset = (weekNumber - 1) * 7;
-  const weekStart = new Date(jan1.getTime() + daysOffset * 24 * 60 * 60 * 1000);
-  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
-
-  const formatDate = (date: Date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const monthNames = [
-      'Jan',
-      'Feb',
-      'Mar',
-      'Apr',
-      'May',
-      'Jun',
-      'Jul',
-      'Aug',
-      'Sep',
-      'Oct',
-      'Nov',
-      'Dec',
-    ];
-    const month = monthNames[date.getMonth()];
-    return `${day} ${month}`;
-  };
-
-  return `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
-};
-
-const getWeekDisplayYear = (year: number, weekNumber: number): number => {
-  const jan1 = new Date(year, 0, 1);
-  const daysOffset = (weekNumber - 1) * 7;
-  const weekStart = new Date(jan1.getTime() + daysOffset * 24 * 60 * 60 * 1000);
-  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
-  return Math.max(weekStart.getFullYear(), weekEnd.getFullYear());
-};
 
 // Helper function to format number with thousand separators
 const formatNumber = (num: number | null | undefined): string => {
@@ -1286,7 +1249,7 @@ export default function MonthlyDataEntryScreen() {
       <KeyboardAvoidingView
         style={[styles.container, {backgroundColor: C.background}]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
       >
         <View style={styles.headerWrapper}>
           <Header title={t('addMonthlyData') || 'Add Monthly Data'} showMenu={false} />
@@ -1297,7 +1260,9 @@ export default function MonthlyDataEntryScreen() {
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
-            keyboardShouldPersistTaps="handled">
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={false}
+            contentInsetAdjustmentBehavior="never">
             {renderSkeletonLoader()}
           </ScrollView>
         ) : (
@@ -1307,6 +1272,8 @@ export default function MonthlyDataEntryScreen() {
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
             keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets={false}
+            contentInsetAdjustmentBehavior="never"
             onScroll={event => {
               scrollYRef.current = event.nativeEvent.contentOffset.y;
             }}
@@ -1323,7 +1290,7 @@ export default function MonthlyDataEntryScreen() {
               </Text>
               <Text style={[styles.weekInfo, {color: C.textPrimary}]}>
                 {currentWeekNumber
-                  ? ` (${getWeekDateRange(year, currentWeekNumber)} ${getWeekDisplayYear(
+                  ? ` (${getIsoWeekDateRangeLabel(year, currentWeekNumber)} ${getIsoWeekDisplayYear(
                       year,
                       currentWeekNumber,
                     )})`
@@ -1442,7 +1409,7 @@ export default function MonthlyDataEntryScreen() {
                                   : C.textPrimary,
                             },
                           ]}>
-                          {getWeekDateRange(year, weekNum)}
+                          {getIsoWeekDateRangeLabel(year, weekNum)}
                         </Text>
                         <View style={styles.weekNavYearRow}>
                           <Text
@@ -1453,7 +1420,7 @@ export default function MonthlyDataEntryScreen() {
                                   isCurrent || isCompleted ? '#fff' : C.textPrimary,
                               },
                             ]}>
-                            {getWeekDisplayYear(year, weekNum)}
+                            {getIsoWeekDisplayYear(year, weekNum)}
                           </Text>
                           {isCompleted && !isCurrent && (
                             <Text style={styles.weekNavCheckmarkInline}>✓</Text>

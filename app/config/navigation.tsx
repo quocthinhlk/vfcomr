@@ -18,7 +18,7 @@ export type RootStackParamList = {
   DisableChurch: { id: number } | undefined;
   DisableChurches: undefined;
   EnableChurch: { id: number } | undefined;
-  EditChurch: { id: number } | undefined;
+  EditChurch: { id: number; returnTo?: 'DashboardPastorLeader' } | undefined;
   ChurchDetail: { id: number } | undefined;
   Overseer: undefined;
   EditProfile: undefined;

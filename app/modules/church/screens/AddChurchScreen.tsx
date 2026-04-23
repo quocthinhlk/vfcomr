@@ -30,6 +30,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {Col, Row, Grid} from 'react-native-easy-grid';
 import {ms, hs} from '../../../shared/utils/scale';
+import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 
 export default function AddChurchScreen() {
   const navigation = useNavigation<any>();
@@ -109,15 +110,12 @@ export default function AddChurchScreen() {
   const requiredFieldMessageForKey = (key: string) => {
     const labelByKey: Record<string, string> = {
       name: t('churchName') || 'Church Name',
-      is_msc: t('msc') || 'MSC',
-      language_id: t('languageUsedInTheService') || 'Language',
+      is_first_msc: 'Is this the first MSC?',
+      msc_parent_id: 'MSC Designated Parent',
       church_type_id: t('churchType') || 'Church Type',
       pastor_id: t('pastorLeader') || 'Pastor Leader',
-      church_network_id: t('churchNetwork') || 'Church Network',
-      church_region_id: t('apostolicRegion') || 'Apostolic Region',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
-      language_region_id: t('languageRegion') || 'Language Region',
-      country_id: t('country') || 'Country',
+      country_id: t('nation') || 'Nation',
       currency_id: t('currency') || 'Currency',
       email_address: t('emailAddress') || 'Email Address',
       date_of_birth: t('dob') || 'Date of Birth',
@@ -247,8 +245,10 @@ export default function AddChurchScreen() {
             name: d.name || '',
             short_name: d.short_name || '',
             is_msc: d.is_msc ? 'Yes' : 'No',
+            is_first_msc: d.is_first_msc ? 'Yes' : 'No',
             enable_cpm: d.enable_cpm ? 'Yes' : 'No',
             parent_id: d.parent_id ? String(d.parent_id) : '',
+            msc_parent_id: d.msc_parent_id ? String(d.msc_parent_id) : '',
             language_id: d.language_id ? String(d.language_id) : '',
             church_type_id: d.church_type_id ? String(d.church_type_id) : '',
             pastor_id: d.pastor_id ? String(d.pastor_id) : '',
@@ -309,8 +309,10 @@ export default function AddChurchScreen() {
     name: '',
     short_name: '',
     is_msc: '',
+    is_first_msc: '',
     enable_cpm: '',
     parent_id: '',
+    msc_parent_id: '',
     language_id: '',
     church_type_id: '',
     pastor_id: '',
@@ -371,18 +373,19 @@ export default function AddChurchScreen() {
                 setFieldErrorText({});
                 const newInvalid: Record<string, boolean> = {};
                 newInvalid.name = !values.name;
-                newInvalid.is_msc = !values.is_msc;
-                newInvalid.language_id = !values.language_id;
                 newInvalid.church_type_id = !values.church_type_id;
                 newInvalid.pastor_id = !values.pastor_id;
-                newInvalid.church_network_id = !values.church_network_id;
-                newInvalid.church_region_id = !values.church_region_id;
                 newInvalid.geographical_region_id = !values.geographical_region_id;
-                newInvalid.language_region_id = !values.language_region_id;
                 newInvalid.country_id = !values.country_id;
                 newInvalid.currency_id = !values.currency_id;
                 newInvalid.email_address = !values.email_address;
                 newInvalid.date_of_birth = !values.date_of_birth;
+                newInvalid.is_first_msc =
+                  values.is_msc === 'Yes' && !values.is_first_msc;
+                newInvalid.msc_parent_id =
+                  values.is_msc === 'Yes' &&
+                  values.is_first_msc === 'No' &&
+                  !values.msc_parent_id;
                 setInvalid(newInvalid);
                 const newFieldErrors: Record<string, string> = {};
                 Object.keys(newInvalid).forEach(k => {
@@ -393,14 +396,11 @@ export default function AddChurchScreen() {
                 setFieldErrorText(newFieldErrors);
                 const firstInvalidKey = [
                   'name',
-                  'is_msc',
-                  'language_id',
+                  'is_first_msc',
+                  'msc_parent_id',
                   'church_type_id',
                   'pastor_id',
-                  'church_network_id',
-                  'church_region_id',
                   'geographical_region_id',
-                  'language_region_id',
                   'country_id',
                   'currency_id',
                   'email_address',
@@ -430,7 +430,7 @@ export default function AddChurchScreen() {
                   name: values.name,
                   short_name: values.short_name,
                   is_msc: values.is_msc === 'Yes',
-                  is_first_msc: false,
+                  is_first_msc: values.is_msc === 'Yes' && values.is_first_msc === 'Yes',
                   enable_cpm: values.enable_cpm ? values.enable_cpm === 'Yes' : false,
                   parent_id: values.parent_id ? Number(values.parent_id) : null,
                   language_id: values.language_id ? Number(values.language_id) : null,
@@ -464,7 +464,10 @@ export default function AddChurchScreen() {
                     : null,
                   service_venue: '',
                   church_planting_projection_id: 0,
-                  msc_parent_id: 0,
+                  msc_parent_id:
+                    values.is_msc === 'Yes' && values.is_first_msc === 'No' && values.msc_parent_id
+                      ? Number(values.msc_parent_id)
+                      : 0,
                   geographical_region_id: values.geographical_region_id ? Number(values.geographical_region_id) : 0,
                   language_region_id: values.language_region_id ? Number(values.language_region_id) : 0,
                   photo_dir: values.photo_dir,
@@ -571,7 +574,6 @@ export default function AddChurchScreen() {
                         style={[formStyles.label, {color: C.textSecondary}]}
                         category="label">
                         {t('msc')}?{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                     </View>
                     <ElementDropdown
@@ -584,6 +586,18 @@ export default function AddChurchScreen() {
                         setFieldValue('is_msc', (v as string) || '');
                         setInvalid(prev => ({...prev, is_msc: false}));
                         clearFieldError('is_msc');
+                        const next = (v as string) || '';
+                        if (next !== 'Yes') {
+                          setFieldValue('is_first_msc', '');
+                          setFieldValue('msc_parent_id', '');
+                          setInvalid(prev => ({
+                            ...prev,
+                            is_first_msc: false,
+                            msc_parent_id: false,
+                          }));
+                          clearFieldError('is_first_msc');
+                          clearFieldError('msc_parent_id');
+                        }
                       }}
                       placeholder={t('selectOption')}
                       containerStyle={
@@ -599,6 +613,52 @@ export default function AddChurchScreen() {
                     {renderFieldError('is_msc')}
                   </View>
                 </View>
+
+                {values.is_msc === 'Yes' && (
+                  <View
+                    onLayout={e =>
+                      setFieldPos('is_first_msc', e.nativeEvent.layout.y)
+                    }>
+                    <View>
+                      <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Text
+                          style={[formStyles.label, {color: C.textSecondary}]}
+                          category="label">
+                          Is this the first MSC? <Text style={{color: '#c00000'}}>*</Text>
+                        </Text>
+                      </View>
+                      <ElementDropdown
+                        data={[
+                          {label: t('yes'), value: 'Yes'},
+                          {label: t('no'), value: 'No'},
+                        ]}
+                        value={values.is_first_msc as any}
+                        onChange={v => {
+                          setFieldValue('is_first_msc', (v as string) || '');
+                          setInvalid(prev => ({...prev, is_first_msc: false}));
+                          clearFieldError('is_first_msc');
+                          const next = (v as string) || '';
+                          if (next !== 'No') {
+                            setFieldValue('msc_parent_id', '');
+                            setInvalid(prev => ({...prev, msc_parent_id: false}));
+                            clearFieldError('msc_parent_id');
+                          }
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={
+                          {
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.is_first_msc
+                              ? '#db2d2d'
+                              : C.inputBorder,
+                          } as any
+                        }
+                        error={!!invalid?.is_first_msc}
+                      />
+                      {renderFieldError('is_first_msc')}
+                    </View>
+                  </View>
+                )}
 
                 {/* House C.P. field removed as requested */}
 
@@ -635,6 +695,52 @@ export default function AddChurchScreen() {
                   </View>
                 </View>
 
+                {values.is_msc === 'Yes' && values.is_first_msc === 'No' && (
+                  <View
+                    onLayout={e =>
+                      setFieldPos('msc_parent_id', e.nativeEvent.layout.y)
+                    }>
+                    <View>
+                      <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                        <Text
+                          style={[formStyles.label, {color: C.textSecondary}]}
+                          category="label">
+                          MSC Designated Parent <Text style={{color: '#c00000'}}>*</Text>
+                        </Text>
+                      </View>
+                      <ElementDropdown
+                        data={motherOptions}
+                        value={values.msc_parent_id as any}
+                        onChange={v => {
+                          setFieldValue('msc_parent_id', v as any);
+                          setInvalid(prev => ({...prev, msc_parent_id: false}));
+                          clearFieldError('msc_parent_id');
+                        }}
+                        placeholder={t('selectOption')}
+                        containerStyle={
+                          {
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid?.msc_parent_id
+                              ? '#db2d2d'
+                              : C.inputBorder,
+                          } as any
+                        }
+                        onSearchText={async text => {
+                          setMotherQuery(text);
+                          await loadMothers(1, text);
+                        }}
+                        onEndReached={async () => {
+                          if (motherHasNext) {
+                            await loadMothers(motherPage + 1, motherQuery);
+                          }
+                        }}
+                        error={!!invalid?.msc_parent_id}
+                      />
+                      {renderFieldError('msc_parent_id')}
+                    </View>
+                  </View>
+                )}
+
                 <View
                   onLayout={e =>
                     setFieldPos('language_id', e.nativeEvent.layout.y)
@@ -645,7 +751,6 @@ export default function AddChurchScreen() {
                         style={[formStyles.label, {color: C.textSecondary}]}
                         category="label">
                         {t('languageUsedInTheService')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                     </View>
                     <ElementDropdown
@@ -798,7 +903,6 @@ export default function AddChurchScreen() {
                         style={[formStyles.label, {color: C.textSecondary}]}
                         category="label">
                         {t('churchNetwork')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon
                         title={t('churchNetwork')}
@@ -855,7 +959,6 @@ export default function AddChurchScreen() {
                         style={[formStyles.label, {color: C.textSecondary}]}
                         category="label">
                         {t('apostolicRegion')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon
                         title={t('apostolicRegion')}
@@ -922,6 +1025,7 @@ export default function AddChurchScreen() {
                     <ElementDropdown
                       data={geographicalRegionOptions}
                       value={values.geographical_region_id as any}
+                      renderItem={createHierarchyDropdownRenderItem(C) as any}
                       onChange={v => {
                         setFieldValue('geographical_region_id', v as any);
                         setInvalid(prev => ({
@@ -955,7 +1059,6 @@ export default function AddChurchScreen() {
                         style={[formStyles.label, {color: C.textSecondary}]}
                         category="label">
                         {t('languageRegion')}{' '}
-                        <Text style={{color: '#c00000'}}>*</Text>
                       </Text>
                       <HelpIcon
                         title={t('languageRegion')}
@@ -1029,7 +1132,7 @@ export default function AddChurchScreen() {
                     <Text
                       style={[formStyles.label, {color: C.textSecondary}]}
                       category="label">
-                      {t('country')}{' '}
+                      {t('nation')}{' '}
                       <Text style={{color: '#c00000'}}>*</Text>
                     </Text>
                     <ElementDropdown
@@ -1087,10 +1190,10 @@ export default function AddChurchScreen() {
                             {color: C.textSecondary},
                           ]}
                           category="label">
-                          {t('city')}
+                          {t('cityTownVillage')}
                         </Text>
                         <HelpIcon
-                          title={t('city')}
+                          title={t('cityTownVillage')}
                           message={t('helpCity')}
                         />
                       </View>

@@ -309,7 +309,7 @@ const en = {
     tag: 'Tag',
     contacts: 'Contacts',
     addresses: 'Addresses',
-    servicePostalCode: 'Service Postal Code',
+    servicePostalCode: 'Service Address Postal code',
     only10Chars: 'Only 10 characters',
     max5mb: 'Max 5 MB',
     error: 'Error',
@@ -363,6 +363,7 @@ const en = {
     active: 'Active',
 
     city: 'City',
+    cityTownVillage: 'City / Town / Village',
 
     churchType: 'Church Type',
     network: 'Network',
@@ -423,8 +424,8 @@ const en = {
     helpMotherChurch: 'The Church responsible for Pioneering this Church',
     helpChurchType: 'The stage of development or unique status the church has',
     helpPastorLeader: 'Select the Pastor / Leader of this church from the drop-down list. If it is not found, create one using the ‘Add a New Pastor” function',
-    helpChurchNetwork: 'The Network this church belongs to. Usually VFC Network [Worldwide]. If it is not this and that option cannot be found, please contact OMR Support',
-    helpApostolicRegion: 'The movement of churches under an Apostolic leadership structure',
+    helpChurchNetwork: 'This is the Network this church is part of. The default in VFC Global Network.',
+    helpApostolicRegion: 'This is the Movement of churches under an Apostolic Leadership structure, that the church belongs too.',
     helpGeographicalRegion: 'The world is divided up into Geographic Regions, Nations, Geo-political Regions, Divisions, Provinces, Counties, sub-counties etc. Initially select your Nation, or a geographic sub category within that Nation if one is available',
     helpLanguageRegion: 'The Language shared by a Geographic Region. It may or may not be the Language spoken in the Church Service',
     helpSensitiveNation: 'Is this nation generally opposed to Christian activities',
@@ -489,6 +490,8 @@ const en = {
     failedToCreateWorshipService: 'Failed to create Worship Service',
     failedToUpdateWorshipService: 'Failed to update Worship Service',
     failedToDeleteWorshipService: 'Failed to delete Worship Service',
+    worshipServicesMscFaqNote:
+      "If you need to add another church service, at another location, or in another language, or at another time, use OMR's Multi Service Church feature. To find out how, go to FAQ [Frequently Asked Questions] found in the drop-down menu, top right.",
     // Dashboard Stats
     enterVisits: 'Enter Visits',
     editMyProfile: 'Edit My Profile',

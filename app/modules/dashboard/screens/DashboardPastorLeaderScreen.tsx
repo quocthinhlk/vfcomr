@@ -423,7 +423,10 @@ export default function DashboardPastorLeaderScreen() {
           if (savedChurchId) {
             const churchId = parseInt(savedChurchId, 10);
             if (!isNaN(churchId)) {
-              navigation.navigate('EditChurch', { id: churchId });
+              navigation.navigate('EditChurch', {
+                id: churchId,
+                returnTo: 'DashboardPastorLeader',
+              });
             } else {
               Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
             }

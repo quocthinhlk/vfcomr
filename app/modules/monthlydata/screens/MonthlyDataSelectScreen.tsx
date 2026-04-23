@@ -19,12 +19,13 @@ import {formStyles} from '../../../shared/styles/form';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useLanguage} from '../../../shared/context/LanguageContext';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ws, ms, rs} from '../../../shared/utils/scale';
+import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {getWeekInfo, WeekInfo} from '../services/monthlydata.service';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import api from '../../../config/api';
+import {getIsoWeekDateRangeLabel} from '../../../shared/utils/isoWeek';
 
 const MONTHS = [
   {label: 'January', value: 1},
@@ -40,23 +41,6 @@ const MONTHS = [
   {label: 'November', value: 11},
   {label: 'December', value: 12},
 ];
-
-// Helper function to get week date range
-const getWeekDateRange = (year: number, weekNumber: number): string => {
-  const jan1 = new Date(year, 0, 1);
-  const daysOffset = (weekNumber - 1) * 7;
-  const weekStart = new Date(jan1.getTime() + daysOffset * 24 * 60 * 60 * 1000);
-  const weekEnd = new Date(weekStart.getTime() + 6 * 24 * 60 * 60 * 1000);
-  
-  const formatDate = (date: Date) => {
-    const day = String(date.getDate()).padStart(2, '0');
-    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const month = monthNames[date.getMonth()];
-    return `${day} ${month}`;
-  };
-  
-  return `${formatDate(weekStart)} - ${formatDate(weekEnd)}`;
-};
 
 export default function MonthlyDataSelectScreen() {
   const navigation = useNavigation<any>();
@@ -248,7 +232,7 @@ export default function MonthlyDataSelectScreen() {
       <KeyboardAvoidingView
         style={[styles.container, {backgroundColor: C.background, flex: 1}]}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 80 : 0}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
       >
         <View style={styles.headerWrapper}>
           <Header
@@ -261,7 +245,9 @@ export default function MonthlyDataSelectScreen() {
           style={[styles.scrollView, {backgroundColor: C.background}]}
           contentContainerStyle={[styles.scrollContent, {backgroundColor: C.background}]}
           showsVerticalScrollIndicator={false}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets={false}
+          contentInsetAdjustmentBehavior="never">
           
           {churchName ? (
             <View style={[styles.enterDataForContainer, {backgroundColor: C.surface}]}>
@@ -330,7 +316,7 @@ export default function MonthlyDataSelectScreen() {
                   const weekNumber = weekInfo.week_number;
                   const isReported = weekInfo.is_reported;
                   const isSelected = selectedWeeks.has(weekNumber);
-                  const weekRange = getWeekDateRange(selectedYear, weekNumber);
+                  const weekRange = getIsoWeekDateRangeLabel(selectedYear, weekNumber);
                   
                   return (
                     <TouchableOpacity

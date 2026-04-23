@@ -296,7 +296,7 @@ const zh = {
     tag: '标签',
     contacts: '联系方式',
     addresses: '地址',
-    servicePostalCode: '服务邮编',
+    servicePostalCode: '聚会地址邮政编码',
     only10Chars: '只有10个字符',
     max5mb: '最大 5 MB',
     error: '错误',
@@ -352,6 +352,7 @@ const zh = {
     active: '活跃',
 
     city: '城市',
+    cityTownVillage: '市 / 镇 / 村',
 
     churchType: '教会类型',
     network: '网络',
@@ -411,8 +412,8 @@ const zh = {
     helpMotherChurch: '负责开拓这间教会的母会',
     helpChurchType: '教会目前的发展阶段或独特的身份状态',
     helpPastorLeader: '从下拉列表中选择这间教会的牧师／领袖。如果找不到，请使用“添加新牧师”功能创建。',
-    helpChurchNetwork: '这间教会所属的网络，通常是 VFC Network [Worldwide]。如果不是，并且找不到合适的选项，请联系 OMR 支持。',
-    helpApostolicRegion: '在使徒性领导架构之下的教会群体运动。',
+    helpChurchNetwork: '这是该教会所属的网络。默认是 VFC Global Network。',
+    helpApostolicRegion: '这是教会所归属的、在使徒性领导架构之下的教会群体运动。',
     helpGeographicalRegion: '世界被划分为地理区域、国家、地缘政治区域、分区、省份、郡、县等。请先选择你的国家，或在有需要时选择该国中的地理子类别。',
     helpLanguageRegion: '某个地理区域共同使用的语言，它可能与教会礼拜中使用的语言相同，也可能不同。',
     helpSensitiveNation: '这个国家是否普遍反对基督教活动？',
@@ -477,6 +478,8 @@ const zh = {
     failedToCreateWorshipService: '创建敬拜聚会失败',
     failedToUpdateWorshipService: '更新敬拜聚会失败',
     failedToDeleteWorshipService: '删除敬拜聚会失败',
+    worshipServicesMscFaqNote:
+      '若需在另一地点、以另一语言或在另一时段增加教会聚会，请使用 OMR 的多重聚会教会功能。了解做法请查看右上角下拉菜单中的「常见问题（FAQ）」。',
     // Dashboard Stats
     enterVisits: '输入访问',
     editMyProfile: '编辑我的个人资料',

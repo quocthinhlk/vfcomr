@@ -304,7 +304,7 @@ const ja = {
     answer: '回答',
     contacts: '連絡先',
     addresses: '住所',
-    servicePostalCode: 'サービス郵便番号',
+    servicePostalCode: '礼拝住所の郵便番号',
     only10Chars: '10文字のみ',
     max5mb: '最大 5 MB',
     error: 'エラー',
@@ -363,6 +363,7 @@ const ja = {
     year: '年',
 
     city: '都市',
+    cityTownVillage: '市 / 町 / 村',
 
     churchType: '教会タイプ',
     network: 'ネットワーク',
@@ -419,8 +420,8 @@ const ja = {
     helpMotherChurch: 'この教会を開拓した責任を持つ母教会',
     helpChurchType: '教会の発展段階または特別なステータス',
     helpPastorLeader: 'プルダウンリストからこの教会の牧師／リーダーを選択してください。見つからない場合は「新しい牧師を追加」機能を使って作成してください。',
-    helpChurchNetwork: 'この教会が属しているネットワーク。通常は VFC Network［Worldwide］です。そうでなく、適切な選択肢が見つからない場合は OMR サポートにお問い合わせください。',
-    helpApostolicRegion: '使徒的なリーダーシップ構造の下にある諸教会のムーブメントです。',
+    helpChurchNetwork: 'これはこの教会が属するネットワークです。デフォルトは VFC Global Network です。',
+    helpApostolicRegion: 'これは、教会が属する「使徒的リーダーシップ構造」の下にある諸教会のムーブメントです。',
     helpGeographicalRegion: '世界は地理的地域、国家、地政学的地域、地区、州、郡、サブカウンティ等に分かれています。まずは自分の国、または該当する場合はその国の地理的サブカテゴリーを選択してください。',
     helpLanguageRegion: 'ある地理的地域で共有されている言語。教会の礼拝で用いられている言語と同じとは限りません。',
     helpSensitiveNation: 'この国は一般的にキリスト教活動に反対していますか？',
@@ -485,6 +486,8 @@ const ja = {
     failedToCreateWorshipService: '礼拝の作成に失敗しました',
     failedToUpdateWorshipService: '礼拝の更新に失敗しました',
     failedToDeleteWorshipService: '礼拝の削除に失敗しました',
+    worshipServicesMscFaqNote:
+      '別の場所・別の言語・別の時間帯に教会の礼拝を追加する場合は、OMRのマルチサービス教会機能をご利用ください。手順は、右上のドロップダウンメニューにある「よくある質問（FAQ）」をご覧ください。',
     // Dashboard Stats
     enterVisits: '訪問を入力',
     editMyProfile: 'マイプロフィールを編集',

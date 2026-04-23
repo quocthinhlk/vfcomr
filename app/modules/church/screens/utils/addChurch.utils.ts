@@ -8,8 +8,10 @@ export interface AddChurchFormValues {
   name: string;
   short_name: string;
   is_msc: string;
+  is_first_msc: string;
   enable_cpm: string;
   parent_id: string;
+  msc_parent_id: string;
   language_id: string;
   church_type_id: string;
   pastor_id: string;
@@ -40,15 +42,22 @@ export interface AddChurchFormValues {
 export const AddChurchSchema = Yup.object().shape({
   name: Yup.string().required('Required'),
   short_name: Yup.string(),
-  is_msc: Yup.string().required('Required'),
+  is_msc: Yup.string(),
+  is_first_msc: Yup.string().when('is_msc', {
+    is: (v: any) => v === 'Yes',
+    then: schema => schema.required('Required'),
+    otherwise: schema => schema.notRequired(),
+  }),
   enable_cpm: Yup.string().required('Required'),
-  language_id: Yup.string().required('Required'),
+  msc_parent_id: Yup.string().when(['is_msc', 'is_first_msc'], {
+    is: (isMsc: any, isFirst: any) => isMsc === 'Yes' && isFirst === 'No',
+    then: schema => schema.required('Required'),
+    otherwise: schema => schema.notRequired(),
+  }),
+  language_id: Yup.string(),
   church_type_id: Yup.string().required('Required'),
   pastor_id: Yup.string().required('Required'),
-  church_network_id: Yup.string().required('Required'),
-  church_region_id: Yup.string().required('Required'),
   geographical_region_id: Yup.string().required('Required'),
-  language_region_id: Yup.string().required('Required'),
   country_id: Yup.string().required('Required'),
   currency_id: Yup.string().required('Required'),
   email_address: Yup.string().email('Invalid email').required('Required'),

@@ -17,8 +17,24 @@ type Props = TextInputProps & {
 };
 
 export default function AppInput(props: Props) {
-  const { style, error, containerStyle, ...rest } = props;
+  const {
+    style,
+    error,
+    containerStyle,
+    value,
+    defaultValue,
+    editable,
+    selectTextOnFocus,
+    ...rest
+  } = props;
   const C = useThemedColors();
+
+  const hasExistingValue =
+    (typeof value === 'string' && value.length > 0) ||
+    (typeof defaultValue === 'string' && defaultValue.length > 0);
+
+  const computedSelectTextOnFocus =
+    selectTextOnFocus ?? (editable !== false && hasExistingValue);
 
   return (
     <View style={[
@@ -31,6 +47,10 @@ export default function AppInput(props: Props) {
     ]}>
       <TextInput
         {...rest}
+        value={value}
+        defaultValue={defaultValue}
+        editable={editable}
+        selectTextOnFocus={computedSelectTextOnFocus}
         allowFontScaling={false}
         placeholderTextColor={C.textSecondary}
         textAlignVertical={rest.multiline ? 'top' : 'center'}

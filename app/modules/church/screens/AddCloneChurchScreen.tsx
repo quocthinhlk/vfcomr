@@ -30,6 +30,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {Col, Row, Grid} from 'react-native-easy-grid';
 import {ms, hs} from '../../../shared/utils/scale';
+import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 
 export const AddCloneChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -61,16 +62,13 @@ export const AddCloneChurchScreen: React.FC = () => {
   const requiredFieldMessageForKey = (key: string) => {
     const labelByKey: Record<string, string> = {
       name: t('churchName') || 'Church Name',
-      is_msc: t('msc') || 'MSC',
+      is_first_msc: 'Is this the first MSC?',
       enable_cpm: t('houseCp') || 'House C.P.',
-      language_id: t('language') || 'Language',
+      msc_parent_id: 'MSC Designated Parent',
       church_type_id: t('churchType') || 'Church Type',
       pastor_id: t('pastorLeader') || 'Pastor Leader',
-      church_network_id: t('churchNetwork') || 'Church Network',
-      church_region_id: t('apostolicRegion') || 'Apostolic Region',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
-      language_region_id: t('languageRegion') || 'Language Region',
-      country_id: t('country') || 'Country',
+      country_id: t('nation') || 'Nation',
       currency_id: t('currency') || 'Currency',
       email_address: t('emailAddress') || 'Email Address',
       date_of_birth: t('dob') || 'Date of Birth',
@@ -118,7 +116,7 @@ export const AddCloneChurchScreen: React.FC = () => {
   };
 
   const [initialFormValues, setInitialFormValues] = useState<AddChurchFormValues>({
-    name: '', short_name: '', is_msc: '', enable_cpm: '', parent_id: '',
+    name: '', short_name: '', is_msc: '', is_first_msc: '', enable_cpm: '', parent_id: '', msc_parent_id: '',
     language_id: '', church_type_id: '', pastor_id: '', church_network_id: '',
     church_region_id: '', geographical_region_id: '', language_region_id: '',
     sensitive_nation: '', country_id: '', currency_id: '', city_id: '',
@@ -154,8 +152,10 @@ export const AddCloneChurchScreen: React.FC = () => {
           name: name ? `${name} copy` : '',
           short_name: shortName ? makeCopyShort(shortName) : '',
           is_msc: d.is_msc ? 'Yes' : 'No',
+          is_first_msc: d.is_first_msc ? 'Yes' : 'No',
           enable_cpm: d.enable_cpm ? 'Yes' : 'No',
           parent_id: d.parent_id ? String(d.parent_id) : '',
+          msc_parent_id: d.msc_parent_id ? String(d.msc_parent_id) : '',
           language_id: d.language_id ? String(d.language_id) : '',
           church_type_id: d.church_type_id ? String(d.church_type_id) : '',
           pastor_id: d.pastor_id ? String(d.pastor_id) : '',
@@ -222,19 +222,20 @@ export const AddCloneChurchScreen: React.FC = () => {
                   setFieldErrorText({});
                   const newInvalid: Record<string, boolean> = {};
                   newInvalid.name = !values.name;
-                  newInvalid.is_msc = !values.is_msc;
                   newInvalid.enable_cpm = !values.enable_cpm;
-                  newInvalid.language_id = !values.language_id;
                   newInvalid.church_type_id = !values.church_type_id;
                   newInvalid.pastor_id = !values.pastor_id;
-                  newInvalid.church_network_id = !values.church_network_id;
-                  newInvalid.church_region_id = !values.church_region_id;
                   newInvalid.geographical_region_id = !values.geographical_region_id;
-                  newInvalid.language_region_id = !values.language_region_id;
                   newInvalid.country_id = !values.country_id;
                   newInvalid.currency_id = !values.currency_id;
                   newInvalid.email_address = !values.email_address;
                   newInvalid.date_of_birth = !values.date_of_birth;
+                  newInvalid.is_first_msc =
+                    values.is_msc === 'Yes' && !values.is_first_msc;
+                  newInvalid.msc_parent_id =
+                    values.is_msc === 'Yes' &&
+                    values.is_first_msc === 'No' &&
+                    !values.msc_parent_id;
                   setInvalid(newInvalid);
 
                   const newFieldErrors: Record<string, string> = {};
@@ -246,10 +247,11 @@ export const AddCloneChurchScreen: React.FC = () => {
                   setFieldErrorText(newFieldErrors);
 
                   const firstInvalidKey = [
-                    'name', 'is_msc', 'enable_cpm', 'language_id', 'church_type_id',
-                    'pastor_id', 'church_network_id', 'church_region_id',
-                    'geographical_region_id', 'language_region_id', 'country_id',
+                    'name', 'enable_cpm', 'church_type_id',
+                    'pastor_id',
+                    'geographical_region_id', 'country_id',
                     'currency_id', 'email_address', 'date_of_birth',
+                    'is_first_msc', 'msc_parent_id',
                   ].find(k => newInvalid[k]);
                   if (firstInvalidKey) {
                     scrollToField(firstInvalidKey);
@@ -293,9 +295,14 @@ export const AddCloneChurchScreen: React.FC = () => {
                     name: toStr(values.name),
                     short_name: toStr(shortName),
                     is_msc: values.is_msc === 'Yes',
-                    is_first_msc: false,
+                    is_first_msc:
+                      values.is_msc === 'Yes' && values.is_first_msc === 'Yes',
                     enable_cpm: values.enable_cpm ? values.enable_cpm === 'Yes' : false,
                     parent_id: toNum(values.parent_id),
+                    msc_parent_id:
+                      values.is_msc === 'Yes' && values.is_first_msc === 'No'
+                        ? toNum(values.msc_parent_id) ?? 0
+                        : 0,
                     language_id: toNum(values.language_id),
                     church_type_id: toNum(values.church_type_id),
                     pastor_id: toNum(values.pastor_id),
@@ -324,7 +331,6 @@ export const AddCloneChurchScreen: React.FC = () => {
                       : undefined,
                     service_venue: '',
                     church_planting_projection_id: 0,
-                    msc_parent_id: 0,
                     photo_dir: toStr(values.photo_dir),
                     mailing_address_street: '',
                     property: '',
@@ -420,7 +426,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                       <View style={churchStyles.input}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('msc')}? <Text style={{color: '#c00000'}}>*</Text>
+                            {t('msc')}?
                           </Text>
                           <HelpIcon title={t('msc')} message={t('helpIsMsc')} />
                         </View>
@@ -431,6 +437,18 @@ export const AddCloneChurchScreen: React.FC = () => {
                             setFieldValue('is_msc', (v as string) || '');
                             setInvalid(prev => ({...prev, is_msc: false}));
                             clearFieldError('is_msc');
+                            const next = (v as string) || '';
+                            if (next !== 'Yes') {
+                              setFieldValue('is_first_msc', '');
+                              setFieldValue('msc_parent_id', '');
+                              setInvalid(prev => ({
+                                ...prev,
+                                is_first_msc: false,
+                                msc_parent_id: false,
+                              }));
+                              clearFieldError('is_first_msc');
+                              clearFieldError('msc_parent_id');
+                            }
                           }}
                           placeholder={t('selectOption')}
                           containerStyle={{backgroundColor: C.inputBg, borderColor: invalid?.is_msc ? '#db2d2d' : C.inputBorder} as any}
@@ -439,6 +457,56 @@ export const AddCloneChurchScreen: React.FC = () => {
                         {renderFieldError('is_msc')}
                       </View>
                     </View>
+
+                    {values.is_msc === 'Yes' && (
+                      <View
+                        style={churchStyles.row}
+                        onLayout={e =>
+                          setFieldPos('is_first_msc', e.nativeEvent.layout.y)
+                        }>
+                        <View style={churchStyles.input}>
+                          <Text
+                            style={[formStyles.label, {color: C.textSecondary}]}
+                            category="label">
+                            Is this the first MSC?{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <ElementDropdown
+                            data={[
+                              {label: t('yes'), value: 'Yes'},
+                              {label: t('no'), value: 'No'},
+                            ]}
+                            value={values.is_first_msc as any}
+                            onChange={v => {
+                              setFieldValue('is_first_msc', (v as string) || '');
+                              setInvalid(prev => ({
+                                ...prev,
+                                is_first_msc: false,
+                              }));
+                              clearFieldError('is_first_msc');
+                              const next = (v as string) || '';
+                              if (next !== 'No') {
+                                setFieldValue('msc_parent_id', '');
+                                setInvalid(prev => ({
+                                  ...prev,
+                                  msc_parent_id: false,
+                                }));
+                                clearFieldError('msc_parent_id');
+                              }
+                            }}
+                            placeholder={t('selectOption')}
+                            containerStyle={{
+                              backgroundColor: C.inputBg,
+                              borderColor: invalid?.is_first_msc
+                                ? '#db2d2d'
+                                : C.inputBorder,
+                            } as any}
+                            error={!!invalid?.is_first_msc}
+                          />
+                          {renderFieldError('is_first_msc')}
+                        </View>
+                      </View>
+                    )}
 
                     {/* House C.P. */}
                     <View
@@ -474,7 +542,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                       <View style={churchStyles.input}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('language')} <Text style={{color: '#c00000'}}>*</Text>
+                            {t('language')}
                           </Text>
                           <HelpIcon title={t('language')} message={t('helpLanguage')} />
                         </View>
@@ -512,6 +580,44 @@ export const AddCloneChurchScreen: React.FC = () => {
                         />
                       </View>
                     </View>
+
+                    {values.is_msc === 'Yes' && values.is_first_msc === 'No' && (
+                      <View
+                        style={churchStyles.row}
+                        onLayout={e =>
+                          setFieldPos('msc_parent_id', e.nativeEvent.layout.y)
+                        }>
+                        <View style={churchStyles.input}>
+                          <Text
+                            style={[formStyles.label, {color: C.textSecondary}]}
+                            category="label">
+                            MSC Designated Parent{' '}
+                            <Text style={{color: '#c00000'}}>*</Text>
+                          </Text>
+                          <ElementDropdown
+                            data={motherChurchOptions}
+                            value={values.msc_parent_id as any}
+                            onChange={v => {
+                              setFieldValue('msc_parent_id', v as any);
+                              setInvalid(prev => ({
+                                ...prev,
+                                msc_parent_id: false,
+                              }));
+                              clearFieldError('msc_parent_id');
+                            }}
+                            placeholder={t('selectOption')}
+                            containerStyle={{
+                              backgroundColor: C.inputBg,
+                              borderColor: invalid?.msc_parent_id
+                                ? '#db2d2d'
+                                : C.inputBorder,
+                            } as any}
+                            error={!!invalid?.msc_parent_id}
+                          />
+                          {renderFieldError('msc_parent_id')}
+                        </View>
+                      </View>
+                    )}
 
                     {/* Church Type */}
                     <View
@@ -574,7 +680,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                       <View style={churchStyles.input}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('churchNetwork')} <Text style={{color: '#c00000'}}>*</Text>
+                            {t('churchNetwork')}
                           </Text>
                           <HelpIcon title={t('churchNetwork')} message={t('helpChurchNetwork')} />
                         </View>
@@ -601,7 +707,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                       <View style={churchStyles.input}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('apostolicRegion')} <Text style={{color: '#c00000'}}>*</Text>
+                            {t('apostolicRegion')}
                           </Text>
                           <HelpIcon title={t('apostolicRegion')} message={t('helpApostolicRegion')} />
                         </View>
@@ -635,6 +741,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                         <ElementDropdown
                           data={geographicalRegionOptions}
                           value={values.geographical_region_id as any}
+                          renderItem={createHierarchyDropdownRenderItem(C) as any}
                           onChange={v => {
                             setFieldValue('geographical_region_id', v as any);
                             setInvalid(prev => ({...prev, geographical_region_id: false}));
@@ -655,7 +762,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                       <View style={churchStyles.input}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('languageRegion')} <Text style={{color: '#c00000'}}>*</Text>
+                            {t('languageRegion')}
                           </Text>
                           <HelpIcon title={t('languageRegion')} message={t('helpLanguageRegion')} />
                         </View>
@@ -700,7 +807,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                       onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
                       <View style={churchStyles.input}>
                         <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                          {t('country')} <Text style={{color: '#c00000'}}>*</Text>
+                          {t('nation')} <Text style={{color: '#c00000'}}>*</Text>
                         </Text>
                         <ElementDropdown
                           data={countryOptions}
@@ -728,9 +835,9 @@ export const AddCloneChurchScreen: React.FC = () => {
                         <View style={churchStyles.input}>
                           <View style={{flexDirection: 'row', alignItems: 'center'}}>
                             <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                              {t('city')}
+                              {t('cityTownVillage')}
                             </Text>
-                            <HelpIcon title={t('city')} message={t('helpCity')} />
+                            <HelpIcon title={t('cityTownVillage')} message={t('helpCity')} />
                           </View>
                           <ElementDropdown
                             data={cityOptions}

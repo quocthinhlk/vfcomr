@@ -303,7 +303,7 @@ const ms = {
     answer: 'Jawaban',
     contacts: 'Kenalan',
     addresses: 'Alamat',
-    servicePostalCode: 'Poskod Perkhidmatan',
+    servicePostalCode: 'Poskod alamat perkhidmatan',
     only10Chars: 'Hanya 10 aksara',
     max5mb: 'Maks 5 MB',
     error: 'Ralat',
@@ -362,6 +362,7 @@ const ms = {
     year: 'Tahun',
 
     city: 'Bandar',
+    cityTownVillage: 'Bandar / Pekan / Kampung',
 
     churchType: 'Jenis Gereja',
     network: 'Rangkaian',
@@ -418,8 +419,8 @@ const ms = {
     helpMotherChurch: 'Gereja yang bertanggungjawab memulakan (merintis) gereja ini',
     helpChurchType: 'Peringkat pembangunan atau status khas yang dimiliki oleh gereja',
     helpPastorLeader: 'Pilih Pastor / Pemimpin gereja ini daripada senarai jatuh bawah. Jika tiada dalam senarai, cipta seorang menggunakan fungsi “Tambah Pastor Baharu”.',
-    helpChurchNetwork: 'Rangkaian yang gereja ini tergolong di dalamnya. Biasanya VFC Network [Worldwide]. Jika bukan dan pilihan yang sesuai tidak ditemui, sila hubungi sokongan OMR.',
-    helpApostolicRegion: 'Pergerakan gereja di bawah struktur kepimpinan apostolik.',
+    helpChurchNetwork: 'Ini ialah rangkaian yang menjadi sebahagian daripada gereja ini. Lalai ialah VFC Global Network.',
+    helpApostolicRegion: 'Ini ialah pergerakan gereja di bawah struktur Kepimpinan Apostolik yang gereja ini tergolong di dalamnya.',
     helpGeographicalRegion: 'Dunia dibahagikan kepada Wilayah Geografi, Negara, Wilayah geo‑politik, Bahagian, Negeri, Daerah, sub-daerah dan sebagainya. Mula‑mula pilih Negara anda atau subkategori geografi dalam negara tersebut jika ada.',
     helpLanguageRegion: 'Bahasa yang dikongsi oleh sesuatu Wilayah Geografi. Ia mungkin sama atau tidak sama dengan bahasa yang digunakan dalam ibadah gereja.',
     helpSensitiveNation: 'Adakah negara ini secara umumnya menentang aktiviti Kristian?',
@@ -484,6 +485,8 @@ const ms = {
     failedToCreateWorshipService: 'Gagal mencipta Ibadah',
     failedToUpdateWorshipService: 'Gagal mengemas kini Ibadah',
     failedToDeleteWorshipService: 'Gagal memadam Ibadah',
+    worshipServicesMscFaqNote:
+      'Jika perlu menambah sesi ibadah gereja lain, di lokasi lain, dalam bahasa lain, atau pada waktu lain, gunakan ciri Gereja Berbilang Perkhidmatan OMR. Untuk cara melakukannya, rujuk Soalan Lazim [FAQ] pada menu lungsur, kanan atas.',
     // Dashboard Stats
     enterVisits: 'Masukkan Lawatan',
     editMyProfile: 'Edit Profil Saya',
