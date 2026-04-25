@@ -211,7 +211,8 @@ export default function DashboardPastorLeaderScreen() {
   const [churchPicturesError, setChurchPicturesError] = useState<string | null>(null);
   const [organizationRowWidth, setOrganizationRowWidth] = useState(0);
   const [organizationFirstLineWidth, setOrganizationFirstLineWidth] = useState(0);
-  const [organizationChevronLeft, setOrganizationChevronLeft] = useState(0);
+  /** null = chưa đo layout; tránh left: 0 đè lên chữ khi vừa load */
+  const [organizationChevronLeft, setOrganizationChevronLeft] = useState<number | null>(null);
 
   useEffect(() => {
     Animated.timing(rotation, {
@@ -593,19 +594,29 @@ export default function DashboardPastorLeaderScreen() {
   };
 
   useEffect(() => {
+    if (organizationRowWidth <= 0 || organizationFirstLineWidth <= 0) {
+      setOrganizationChevronLeft(null);
+      return;
+    }
     const iconWidth = ws(10);
     const desiredLeft = organizationFirstLineWidth + ms(4);
     const maxLeft = Math.max(0, organizationRowWidth - iconWidth);
     const nextLeft = Math.min(desiredLeft, maxLeft);
-    if (!Number.isNaN(nextLeft) && Math.abs(nextLeft - organizationChevronLeft) > 1) {
-      setOrganizationChevronLeft(nextLeft);
+    if (Number.isNaN(nextLeft)) {
+      return;
     }
+    setOrganizationChevronLeft(prev => {
+      if (prev == null || Math.abs(nextLeft - prev) > 1) {
+        return nextLeft;
+      }
+      return prev;
+    });
   }, [organizationFirstLineWidth, organizationRowWidth]);
 
   useEffect(() => {
     // reset and let layout recalculate for new organization text
     setOrganizationFirstLineWidth(0);
-    setOrganizationChevronLeft(0);
+    setOrganizationChevronLeft(null);
   }, [userProfile?.organization]);
 
   const handleDownloadImage = async () => {
@@ -748,7 +759,8 @@ export default function DashboardPastorLeaderScreen() {
                 styles.dropdownIcon,
                 {
                   tintColor: C.textPrimary,
-                  left: organizationChevronLeft,
+                  left: organizationChevronLeft ?? 0,
+                  opacity: organizationChevronLeft == null ? 0 : 1,
                 },
               ]}
             />
@@ -924,10 +936,18 @@ export default function DashboardPastorLeaderScreen() {
 
         {allStats.length > 4 && (
           <TouchableOpacity onPress={handleToggleStats} style={styles.viewMoreButton}>
-            <Text style={[styles.viewMoreText, { color: C.textSecondary }]}>
-              {showAllStats ? `${t('viewLess')} ` : `${t('viewMore')} `}
-              <Animated.Image source={icons.iconDown} style={[styles.viewMoreIcon, { transform: [{ rotate: arrowRotate }] }]} />
-            </Text>
+            <View style={styles.viewMoreRow}>
+              <Text style={[styles.viewMoreText, { color: C.textSecondary }]}>
+                {showAllStats ? t('viewLess') : t('viewMore')}
+              </Text>
+              <Animated.Image
+                source={icons.iconDown}
+                style={[
+                  styles.viewMoreIcon,
+                  { transform: [{ rotate: arrowRotate }, { translateY: ms(1) }] },
+                ]}
+              />
+            </View>
           </TouchableOpacity>
         )}
 
@@ -1252,16 +1272,20 @@ const styles = StyleSheet.create({
     fontSize: fs(12),
     paddingHorizontal: ms(16),
   },
-  viewMoreText: {
-    fontSize: fs(13),
-    color: '#666',
+  viewMoreRow: {
     flexDirection: 'row',
     alignItems: 'center',
   },
+  viewMoreText: {
+    fontSize: fs(13),
+    color: '#666',
+    fontWeight: '500',
+  },
   viewMoreIcon: {
-    width: ws(12),
-    height: hs(12),
-    marginLeft: ms(4),
+    width: ws(10),
+    height: hs(10),
+    marginLeft: ms(6),
+    opacity: 0.9,
   },
   menuContainer: {
     paddingHorizontal: ms(16),

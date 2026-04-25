@@ -39,20 +39,22 @@ const es = {
   peopleInCgs: 'Personas en CG’s []',
   peopleInGtLiw: 'Personas en GT/LIW',
   newDecisions: 'Nuevas decisiones',
-  statInfoPeople: 'La asistencia promedio del servicio durante los últimos 3 meses',
-  statInfoGrowth: 'El % de crecimiento, comparado con los mismos 3 meses del año pasado',
-  statInfoGiving: 'El promedio de diezmos y ofrendas durante los últimos 3 meses',
+  statInfoPeople: 'La asistencia promedio al servicio durante los últimos 3 meses reportados.',
+  statInfoGrowth:
+    'El % de crecimiento: la asistencia a los servicios de los últimos 3 meses reportados en comparación con los mismos 3 meses del año anterior.',
+  statInfoGiving:
+    'El promedio de diezmos y ofrendas dados durante los últimos 3 meses reportados.',
   statInfoChurchPlantsTitle: 'Plantación de iglesias',
   statInfoChurchPlants: 'Número de nuevas iglesias pioneras por esta iglesia madre en los últimos 3 años',
   statInfoGivingMfpTitle: 'Ofrenda de misiones',
   statInfoGivingMfp:
-    'Promedio de Ofrenda de Compromiso de Fe (MFP) y ofrendas de misiones durante los últimos 3 meses. Esto debe incluir cualquier ofrenda del fondo general de la iglesia.',
+    'El promedio de Missions Faith Pledge (MFP) y ofrendas de misiones dadas durante los últimos 3 meses reportados. Este monto debe incluir cualquier ofrenda para misiones proveniente del fondo general de la iglesia, ya que muchas iglesias destinan un % de sus ingresos generales a las misiones.',
   statInfoPeopleInCgs:
-    'Asistencia promedio a Grupos de Conexión (Grupos Celulares) durante los últimos 3 meses, como % de la asistencia semanal promedio de adultos y jóvenes.',
+    'La asistencia promedio a grupos celulares durante los últimos 3 meses reportados, como % de la asistencia semanal promedio a los servicios de adultos y jóvenes, durante el mismo período.',
   statInfoPeopleInGtLiw:
-    'Asistencia promedio a Growth Track y Life In the Word durante los últimos 3 meses, como % de la asistencia semanal promedio de adultos y jóvenes.',
+    'La asistencia promedio a las clases de Growth Track y Life In the Word durante los últimos 3 meses reportados, como % de la asistencia semanal promedio a los servicios de adultos y jóvenes, durante el mismo período.',
   statInfoNewDecisions:
-    'Número de nuevas decisiones por Cristo durante los últimos 3 meses',
+    'El número de nuevas decisiones por Cristo realizadas durante los últimos 3 meses reportados.',
   lastMonthlyRecord: 'Último informe',
   viewMore: 'Ver más',
   viewLess: 'Ver menos',

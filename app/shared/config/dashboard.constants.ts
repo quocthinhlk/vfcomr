@@ -245,13 +245,13 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
     label: t('generateReports'),
     routeName: 'GenerateReports',
   },
-  {
-    label: t('visits'),
-    children: [
-      {label: t('list'), routeName: 'Visits'},
-      {label: 'Add New Visitor', routeName: 'AddVisits'},
-    ],
-  },
+  // {
+  //   label: t('visits'),
+  //   children: [
+  //     {label: t('list'), routeName: 'Visits'},
+  //     {label: 'Add New Visitor', routeName: 'AddVisits'},
+  //   ],
+  // },
   {
     label: t('resources'),
     children: [
