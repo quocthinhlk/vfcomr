@@ -121,6 +121,9 @@ export default function ActionSheetModal({
       transparent
       visible={visible}
       animationType="none"
+      presentationStyle="overFullScreen"
+      statusBarTranslucent
+      hardwareAccelerated
       onRequestClose={onRequestClose}>
       <View style={styles.modalContainer}>
         <TouchableWithoutFeedback onPress={onRequestClose}>

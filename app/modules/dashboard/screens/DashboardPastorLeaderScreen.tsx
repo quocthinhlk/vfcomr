@@ -1,5 +1,5 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator } from 'react-native';
+import React, { useCallback, useState, useContext, useEffect, useRef } from 'react';
+import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
 import { useNavigation } from '@react-navigation/native';
@@ -22,6 +22,12 @@ import { Col, Row, Grid } from 'react-native-easy-grid';
 import RNFS from 'react-native-fs';
 import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
+import IosActionSheet from '../../../shared/components/IosActionSheet';
+import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
+import ImagePicker from 'react-native-image-crop-picker';
+import {updateUser} from '../../user/services/user.service';
+import {updateChurch} from '../../church/services/church.service';
 // CameraRoll is provided by '@react-native-camera-roll/camera-roll' at runtime.
 // The library exports `CameraRoll` as a named export in recent versions,
 // so we resolve it from `.CameraRoll` first, then fall back to default/CommonJS.
@@ -79,6 +85,8 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS) =>
       });
   });
 };
+
+const normalizeFileUri = (p: string) => (p.startsWith('file://') ? p : `file://${p}`);
 
 // Stats data will be populated from API
 const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
@@ -140,7 +148,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
     },
     {
       icon: require('../../../../app/assets/images/cellgroup.png'),
-      value: `${(indicators.avg_cell_group_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
+      value: `${(indicators.percent_cell_group_attendance || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
       label: tr('peopleInCgs', 'People in CG’s'),
       helpMessage: tr(
         'statInfoPeopleInCgs',
@@ -149,7 +157,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
     },
     {
       icon: require('../../../../app/assets/images/icon/angel.png'),
-      value: `${(indicators.avg_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
+      value: `${(indicators.total_new_decisions || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}`,
       label: tr('newDecisions', 'New Decisions'),
       helpMessage: tr(
         'statInfoNewDecisions',
@@ -158,7 +166,7 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
     },
     {
       icon: require('../../../../app/assets/images/icon/education.png'),
-      value: `${(indicators.avg_liw_students || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
+      value: `${(indicators.percent_liw_students || 0).toLocaleString('en-US', { maximumFractionDigits: 0 })}%`,
       label: tr('peopleInGtLiw', 'People in GT/LIW'),
       helpMessage: tr(
         'statInfoPeopleInGtLiw',
@@ -204,6 +212,14 @@ export default function DashboardPastorLeaderScreen() {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
   const toastOpacity = useRef(new Animated.Value(0)).current;
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const [selectedImageMenuVisible, setSelectedImageMenuVisible] = useState(false); // Android fallback menu
+
+  // Profile avatar popup (keep separate from selectedImage modal)
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [avatarMenuVisible, setAvatarMenuVisible] = useState(false); // Android fallback
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [localAvatarPath, setLocalAvatarPath] = useState<string | null>(null);
   const [churchPictureExpanded, setChurchPictureExpanded] = useState(false);
   const [churchPicturesLoading, setChurchPicturesLoading] = useState(false);
   const [churchPicturesLoaded, setChurchPicturesLoaded] = useState(false);
@@ -234,6 +250,157 @@ export default function DashboardPastorLeaderScreen() {
     const year = date.getFullYear();
     return `${month} ${year}`;
   };
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    toastOpacity.stopAnimation();
+    toastOpacity.setValue(0);
+    Animated.timing(toastOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    setTimeout(() => {
+      Animated.timing(toastOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => {
+        setToastVisible(false);
+      });
+    }, 3000);
+  }, [toastOpacity]);
+
+  const closeAvatarPopup = useCallback(() => {
+    setAvatarMenuVisible(false);
+    setAvatarModalVisible(false);
+  }, []);
+
+  const refreshMeAvatar = useCallback(async () => {
+    try {
+      const res = await api.get('users/me');
+      const userData = res?.data?.data;
+      const nextUrl = userData?.photo_url || '';
+      setUserProfile((prev: any) => ({
+        ...(prev || {}),
+        profileImage: nextUrl,
+      }));
+      setProfileError(false);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const uploadAndApplyAvatar = useCallback(async (imagePath: string) => {
+    if (!currentUserId || avatarUploading) return;
+    setAvatarUploading(true);
+    let uploadedUserPhotoPath: string | null = null;
+    try {
+      const form = new FormData();
+      const fileName = imagePath.split('/').pop() || 'photo.jpg';
+      form.append('file', {
+        uri: imagePath,
+        name: fileName,
+        type: 'image/jpeg',
+      } as any);
+      form.append('entity_type', 'users');
+      form.append('alt_text', String(userProfile?.name || '').trim());
+
+      const uploadRes = await api.post('images/upload', form, {
+        headers: {'Content-Type': 'multipart/form-data'},
+      });
+      uploadedUserPhotoPath = uploadRes?.data?.data?.path || null;
+    } catch {
+      uploadedUserPhotoPath = null;
+    }
+
+    if (!uploadedUserPhotoPath) {
+      setAvatarUploading(false);
+      Alert.alert(t('error'), t('imageDownloadError'));
+      return;
+    }
+
+    try {
+      await updateUser(currentUserId, {user_photo: uploadedUserPhotoPath} as any);
+      setLocalAvatarPath(null);
+      await refreshMeAvatar();
+      closeAvatarPopup();
+      showToast(t('profileUpdatedSuccess'));
+    } catch (e: any) {
+      Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('couldNotUpdateUser'));
+    } finally {
+      setAvatarUploading(false);
+    }
+  }, [avatarUploading, closeAvatarPopup, currentUserId, refreshMeAvatar, showToast, t, userProfile?.name]);
+
+  const openAvatarPhotoSourcePicker = useCallback(() => {
+    const pickFromLibrary = async () => {
+      try {
+        const image: any = await ImagePicker.openPicker({
+          width: 300,
+          height: 300,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 1024,
+          compressImageMaxHeight: 1024,
+          compressImageQuality: 0.8,
+          includeBase64: false,
+        });
+        if (image?.size && image.size > 1572864) {
+          Alert.alert('File too large', 'Please select an image under 1.5MB');
+          return;
+        }
+        if (image?.path) {
+          // Close immediately after cropping completes to avoid flashing old image.
+          closeAvatarPopup();
+          setLocalAvatarPath(image.path);
+          void uploadAndApplyAvatar(image.path);
+        }
+      } catch {}
+    };
+
+    const takePhoto = async () => {
+      try {
+        const image: any = await ImagePicker.openCamera({
+          width: 300,
+          height: 300,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 1024,
+          compressImageMaxHeight: 1024,
+          compressImageQuality: 0.8,
+          includeBase64: false,
+        });
+        if (image?.size && image.size > 1572864) {
+          Alert.alert('File too large', 'Please select an image under 1.5MB');
+          return;
+        }
+        if (image?.path) {
+          closeAvatarPopup();
+          setLocalAvatarPath(image.path);
+          void uploadAndApplyAvatar(image.path);
+        }
+      } catch {}
+    };
+
+    if (Platform.OS === 'ios') {
+      const takeLabel = 'Take Photo';
+      const chooseLabel = 'Choose Photo';
+      const cancelLabel = t('cancel') || 'Cancel';
+      ActionSheetIOS.showActionSheetWithOptions(
+        {options: [takeLabel, chooseLabel, cancelLabel], cancelButtonIndex: 2, userInterfaceStyle: 'light'},
+        (idx: number) => {
+          if (idx === 0) void takePhoto();
+          if (idx === 1) void pickFromLibrary();
+        },
+      );
+      return;
+    }
+
+    setAvatarMenuVisible(true);
+  }, [closeAvatarPopup, t, uploadAndApplyAvatar]);
   const formatVerifiedDate = (dateString: string) => {
     if (!dateString) return '';
     const date = new Date(dateString);
@@ -533,6 +700,118 @@ export default function DashboardPastorLeaderScreen() {
     return typeof dashboardChurchId === 'number' ? dashboardChurchId : null;
   };
 
+  const refreshChurchPictures = useCallback(async () => {
+    try {
+      const churchId = await getCurrentChurchId();
+      if (!churchId) return;
+      const response = await api.get(`churches/${churchId}`);
+      const pictureUrls = extractChurchPictures(response);
+      setChurchPictures(pictureUrls);
+      setChurchPicturesLoaded(true);
+      setChurchPicturesError(null);
+    } catch {
+      // ignore
+    }
+  }, [dashboardData]);
+
+  const uploadAndApplyChurchPictureFromPicker = useCallback(
+    async (imagePath: string) => {
+      const churchId = await getCurrentChurchId();
+      if (!churchId) return;
+
+      let uploadedPhotoPath: string | null = null;
+      try {
+        // Same upload flow as EditChurchScreen.tsx
+        const form = new FormData();
+        const fileName = imagePath.split('/').pop() || 'photo.jpg';
+        form.append('file', {
+          uri: imagePath,
+          name: fileName,
+          type: 'image/jpeg',
+        } as any);
+        form.append('entity_type', 'churches');
+        form.append('alt_text', userProfile?.organization || 'church photo');
+        const uploadRes = await api.post('images/upload', form, {
+          headers: {'Content-Type': 'multipart/form-data'},
+        });
+        uploadedPhotoPath = uploadRes?.data?.data?.path || null;
+      } catch {
+        uploadedPhotoPath = null;
+      }
+
+      if (!uploadedPhotoPath) {
+        Alert.alert(t('error'), t('imageDownloadError'));
+        return;
+      }
+
+      try {
+        await updateChurch(churchId, {photo: uploadedPhotoPath} as any);
+        await refreshChurchPictures();
+        showToast(t('profileUpdatedSuccess'));
+      } catch (e: any) {
+        Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('failedToLoadData'));
+      }
+    },
+    [refreshChurchPictures, showToast, t, userProfile?.organization],
+  );
+
+  const openSelectedImageChurchPhotoPicker = useCallback(() => {
+    const pickFromLibrary = async () => {
+      try {
+        const image: any = await ImagePicker.openPicker({
+          width: 1600,
+          height: 900,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 2048,
+          compressImageMaxHeight: 2048,
+          compressImageQuality: 0.85,
+          includeBase64: false,
+        });
+        if (image?.path) {
+          // Close popup immediately after crop to avoid showing old image.
+          setImageModalVisible(false);
+          void uploadAndApplyChurchPictureFromPicker(image.path);
+        }
+      } catch {}
+    };
+
+    const takePhoto = async () => {
+      try {
+        const image: any = await ImagePicker.openCamera({
+          width: 1600,
+          height: 900,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 2048,
+          compressImageMaxHeight: 2048,
+          compressImageQuality: 0.85,
+          includeBase64: false,
+        });
+        if (image?.path) {
+          setImageModalVisible(false);
+          void uploadAndApplyChurchPictureFromPicker(image.path);
+        }
+      } catch {}
+    };
+
+    if (Platform.OS === 'ios') {
+      const takeLabel = 'Take Photo';
+      const chooseLabel = 'Choose Photo';
+      const cancelLabel = t('cancel') || 'Cancel';
+      ActionSheetIOS.showActionSheetWithOptions(
+        {options: [takeLabel, chooseLabel, cancelLabel], cancelButtonIndex: 2, userInterfaceStyle: 'light'},
+        (idx: number) => {
+          if (idx === 0) void takePhoto();
+          if (idx === 1) void pickFromLibrary();
+        },
+      );
+      return;
+    }
+
+    setSelectedImageMenuVisible(true);
+  }, [t, uploadAndApplyChurchPictureFromPicker]);
+
   const handleToggleChurchPictures = async () => {
     const nextExpanded = !churchPictureExpanded;
     setChurchPictureExpanded(nextExpanded);
@@ -646,25 +925,9 @@ export default function DashboardPastorLeaderScreen() {
         
         // Close image modal
         setImageModalVisible(false);
-        
-        // Show toast message instead of alert
-        setToastVisible(true);
-        Animated.timing(toastOpacity, {
-          toValue: 1,
-          duration: 200,
-          useNativeDriver: true,
-        }).start();
-        
-        // Auto hide after 3 seconds
-        setTimeout(() => {
-          Animated.timing(toastOpacity, {
-            toValue: 0,
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            setToastVisible(false);
-          });
-        }, 3000);
+
+        // Temporary: show alert for reliable feedback
+        Alert.alert(t('success'), t('imageDownloadSuccess'));
         } else {
           console.log('Download failed with status', downloadRes.statusCode);
           throw new Error('Failed to download image');
@@ -802,8 +1065,7 @@ export default function DashboardPastorLeaderScreen() {
               disabled={!userProfile.profileImage || profileError}
               onPress={() => {
                 if (userProfile.profileImage && !profileError) {
-                  setSelectedImage(userProfile.profileImage);
-                  setImageModalVisible(true);
+                  setAvatarModalVisible(true);
                 }
               }}
             >
@@ -870,39 +1132,181 @@ export default function DashboardPastorLeaderScreen() {
         </Modal>
 
 
-        {/* Fullscreen Image Modal */}
-        <Modal
+        {/* Fullscreen image popup (profileImage-like behavior) */}
+        <ZoomableImageModal
           visible={imageModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setImageModalVisible(false)}
-        >
-          <View style={styles.fullImageBackdrop}>
-            <View style={styles.fullImageHeader}>
-              <TouchableOpacity onPress={() => setImageModalVisible(false)}>
-                <Text style={styles.fullImageCloseText}>✕</Text>
+          uri={selectedImage}
+          onClose={() => setImageModalVisible(false)}
+          headerRight={
+            selectedImage ? (
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS === 'ios') {
+                    const downloadLabel = t('download') || 'Download';
+                    const changePhotoLabel = t('changePhoto') || 'Change Photo';
+                    const cancelLabel = t('cancel') || 'Cancel';
+                    ActionSheetIOS.showActionSheetWithOptions(
+                      {
+                        options: [downloadLabel, changePhotoLabel, cancelLabel],
+                        cancelButtonIndex: 2,
+                        userInterfaceStyle: 'light',
+                      },
+                      async (buttonIndex: number) => {
+                        if (buttonIndex === 0) {
+                          if (!selectedImage) return;
+                          try {
+                            await downloadImageToCameraRoll(selectedImage, {filePrefix: 'church-photo'});
+                            Alert.alert(t('success'), t('imageDownloadSuccess'));
+                          } catch {
+                            Alert.alert(t('error'), t('imageDownloadError'));
+                          }
+                          return;
+                        }
+                        if (buttonIndex === 1) {
+                          requestAnimationFrame(() => openSelectedImageChurchPhotoPicker());
+                        }
+                      },
+                    );
+                    return;
+                  }
+
+                  setSelectedImageMenuVisible(true);
+                }}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                style={{paddingHorizontal: ms(6), paddingVertical: ms(4)}}
+              >
+                <RNText style={{color: '#fff', fontSize: fs(22), fontWeight: '700'}}>
+                  ⋯
+                </RNText>
               </TouchableOpacity>
-              {selectedImage ? (
-                <TouchableOpacity style={styles.downloadButton} onPress={handleDownloadImage}>
-                  <Text style={styles.downloadButtonText}>{t('download')}</Text>
-                </TouchableOpacity>
-              ) : null}
-            </View>
-            <TouchableOpacity
-              style={styles.fullImageContent}
-              activeOpacity={1}
-              onPress={() => setImageModalVisible(false)}
-            >
-              {selectedImage ? (
-                <Image
-                  source={{ uri: selectedImage }}
-                  style={styles.fullImage}
-                  resizeMode="contain"
-                />
-              ) : null}
-            </TouchableOpacity>
-          </View>
-        </Modal>
+            ) : null
+          }
+        />
+
+        {Platform.OS === 'android' ? (
+          <IosActionSheet
+            visible={selectedImageMenuVisible}
+            onClose={() => setSelectedImageMenuVisible(false)}
+            cancelLabel={t('cancel') || 'Cancel'}
+            items={[
+              {
+                label: t('download') || 'Download',
+                disabled: !selectedImage,
+                onPress: async () => {
+                  if (!selectedImage) return;
+                  try {
+                    await downloadImageToCameraRoll(selectedImage, {filePrefix: 'church-photo'});
+                    Alert.alert(t('success'), t('imageDownloadSuccess'));
+                  } catch {
+                    Alert.alert(t('error'), t('imageDownloadError'));
+                  }
+                },
+              },
+              {
+                label: t('changePhoto') || 'Change Photo',
+                onPress: () => {
+                  requestAnimationFrame(() => openSelectedImageChurchPhotoPicker());
+                },
+              },
+            ]}
+          />
+        ) : null}
+
+        {/* Profile avatar (UserScreen-like) popup */}
+        <ZoomableImageModal
+          visible={avatarModalVisible}
+          uri={
+            localAvatarPath
+              ? normalizeFileUri(localAvatarPath)
+              : userProfile?.profileImage && !profileError
+                ? String(userProfile.profileImage)
+                : null
+          }
+          onClose={closeAvatarPopup}
+          headerRight={
+            userProfile?.profileImage && !profileError ? (
+              <TouchableOpacity
+                onPress={() => {
+                  const avatarUrl = localAvatarPath
+                    ? normalizeFileUri(localAvatarPath)
+                    : String(userProfile.profileImage || '');
+
+                  if (Platform.OS === 'ios') {
+                    const downloadLabel = t('download') || 'Download';
+                    const changePhotoLabel = t('changePhoto') || 'Change Photo';
+                    const cancelLabel = t('cancel') || 'Cancel';
+
+                    ActionSheetIOS.showActionSheetWithOptions(
+                      {
+                        options: [downloadLabel, changePhotoLabel, cancelLabel],
+                        cancelButtonIndex: 2,
+                        userInterfaceStyle: 'light',
+                      },
+                      async (buttonIndex: number) => {
+                        if (buttonIndex === 0) {
+                          if (!avatarUrl || avatarUploading) return;
+                          try {
+                            await downloadImageToCameraRoll(avatarUrl, {filePrefix: 'user-avatar'});
+                            Alert.alert(t('success'), t('imageDownloadSuccess'));
+                          } catch {
+                            Alert.alert(t('error'), t('imageDownloadError'));
+                          }
+                          return;
+                        }
+                        if (buttonIndex === 1) {
+                          if (!currentUserId) return;
+                          requestAnimationFrame(() => openAvatarPhotoSourcePicker());
+                        }
+                      },
+                    );
+                    return;
+                  }
+
+                  setAvatarMenuVisible(true);
+                }}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                style={{paddingHorizontal: ms(6), paddingVertical: ms(4)}}
+              >
+                <RNText style={{color: '#fff', fontSize: fs(22), fontWeight: '700', opacity: avatarUploading ? 0.6 : 1}}>
+                  ⋯
+                </RNText>
+              </TouchableOpacity>
+            ) : null
+          }
+        />
+
+        {Platform.OS === 'android' ? (
+          <IosActionSheet
+            visible={avatarMenuVisible}
+            onClose={() => setAvatarMenuVisible(false)}
+            cancelLabel={t('cancel') || 'Cancel'}
+            items={[
+              {
+                label: t('download') || 'Download',
+                disabled: !userProfile?.profileImage || avatarUploading,
+                onPress: async () => {
+                  const avatarUrl = localAvatarPath
+                    ? normalizeFileUri(localAvatarPath)
+                    : String(userProfile?.profileImage || '');
+                  if (!avatarUrl || avatarUploading) return;
+                  try {
+                    await downloadImageToCameraRoll(avatarUrl, {filePrefix: 'user-avatar'});
+                    Alert.alert(t('success'), t('imageDownloadSuccess'));
+                  } catch {
+                    Alert.alert(t('error'), t('imageDownloadError'));
+                  }
+                },
+              },
+              {
+                label: t('changePhoto') || 'Change Photo',
+                disabled: !currentUserId,
+                onPress: () => {
+                  requestAnimationFrame(() => openAvatarPhotoSourcePicker());
+                },
+              },
+            ]}
+          />
+        ) : null}
 
         {/* Toast Message Modal - Separate modal with highest zIndex */}
         <Modal
@@ -911,6 +1315,8 @@ export default function DashboardPastorLeaderScreen() {
           animationType="none"
           onRequestClose={() => {}}
           statusBarTranslucent
+          presentationStyle="overFullScreen"
+          hardwareAccelerated
         >
           <Animated.View
             pointerEvents="none"
@@ -922,7 +1328,7 @@ export default function DashboardPastorLeaderScreen() {
             ]}>
             <View style={styles.toastBackground}>
               <Text style={styles.toastText}>
-                {t('imageDownloadSuccess')}
+                {toastMessage || t('imageDownloadSuccess')}
               </Text>
             </View>
           </Animated.View>
@@ -935,7 +1341,12 @@ export default function DashboardPastorLeaderScreen() {
         </Animated.View>
 
         {allStats.length > 4 && (
-          <TouchableOpacity onPress={handleToggleStats} style={styles.viewMoreButton}>
+          <TouchableOpacity
+            onPress={handleToggleStats}
+            style={styles.viewMoreButton}
+            activeOpacity={0.75}
+            hitSlop={{top: 10, bottom: 14, left: 16, right: 16}}
+          >
             <View style={styles.viewMoreRow}>
               <Text style={[styles.viewMoreText, { color: C.textSecondary }]}>
                 {showAllStats ? t('viewLess') : t('viewMore')}
@@ -1271,6 +1682,8 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     fontSize: fs(12),
     paddingHorizontal: ms(16),
+    paddingVertical: ms(10),
+    marginBottom: ms(8),
   },
   viewMoreRow: {
     flexDirection: 'row',
@@ -1446,9 +1859,7 @@ const styles = StyleSheet.create({
   toastContainer: {
     flex: 1,
     alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingBottom: hs(80),
-    pointerEvents: 'none',
+    justifyContent: 'center',
   },
   toastBackground: {
     backgroundColor: 'rgba(0, 0, 0, 0.75)',

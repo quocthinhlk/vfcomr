@@ -3,7 +3,6 @@ import {
   ActivityIndicator,
   Image,
   Linking,
-  Modal,
   ScrollView,
   StyleSheet,
   Text as RNText,
@@ -22,6 +21,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import AppButton from '../../../shared/components/AppButton';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 
 const blankChurch = require('../../../assets/images/church.png');
 const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
@@ -31,6 +31,7 @@ export default function ChurchDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const churchId: number | null = route?.params?.id ?? null;
+  const refetchKey: number | undefined = route?.params?.refetchKey;
   const {t} = useTranslation();
   const C = useThemedColors();
   const [data, setData] = useState<any | null>(null);
@@ -74,6 +75,16 @@ export default function ChurchDetailScreen() {
       return () => {};
     }, [churchId]),
   );
+
+  useEffect(() => {
+    if (!refetchKey) {
+      return;
+    }
+    // One-time refetch signal (e.g. after edit).
+    fetchChurch();
+    navigation.setParams({refetchKey: undefined});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refetchKey]);
 
   useEffect(() => {
     let mounted = true;
@@ -383,27 +394,11 @@ export default function ChurchDetailScreen() {
                 </View>
               ) : null}
 
-              <Modal
+              <ZoomableImageModal
                 visible={imageModalVisible}
-                transparent
-                animationType="fade"
-                onRequestClose={() => setImageModalVisible(false)}>
-                <View style={styles.fullImageBackdrop}>
-                  <TouchableOpacity
-                    style={styles.fullImageHeader}
-                    onPress={() => setImageModalVisible(false)}>
-                    <RNText style={styles.fullImageCloseText}>✕</RNText>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.fullImageContent}
-                    activeOpacity={1}
-                    onPress={() => setImageModalVisible(false)}>
-                    {imageUri ? (
-                      <Image source={{uri: imageUri}} style={styles.fullImage} resizeMode="contain" />
-                    ) : null}
-                  </TouchableOpacity>
-                </View>
-              </Modal>
+                uri={imageUri}
+                onClose={() => setImageModalVisible(false)}
+              />
             </>
           )}
         </ScrollView>
@@ -461,7 +456,7 @@ const styles = StyleSheet.create({
     paddingRight: ws(44),
   },
   summaryName: {
-    fontSize: fs(20),
+    fontSize: fs(18),
     fontWeight: '700',
   },
   summarySub: {

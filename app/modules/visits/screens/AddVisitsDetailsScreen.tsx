@@ -179,7 +179,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
         }
 
         const [countriesRes, eventTypesRes] = await Promise.all([
-          api.get('countries', {params: {page: 1, limit: 1000}}),
+          api.get('countries', {params: {page: 1, limit: 1000, sort_by: 'name', sort_desc: false}}),
           listEventTypes(),
         ]);
 
@@ -292,7 +292,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
 
   const loadVisitCities = async (index: number, countryId: number) => {
     try {
-      const res = await api.get(`cities/country/${countryId}`);
+      const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
       const list = Array.isArray(res?.data?.data) ? res.data.data : [];
       const cityOptions = list.map((item: any) => ({
         label: item.name,
@@ -318,6 +318,8 @@ export const AddVisitsDetailsScreen: React.FC = () => {
           page: 1,
           limit: 1000,
           country_id: countryId,
+          sort_by: 'name',
+          sort_desc: false,
         },
       });
       const items = ((res?.data?.data?.items ?? []) as any[]).map(item => ({

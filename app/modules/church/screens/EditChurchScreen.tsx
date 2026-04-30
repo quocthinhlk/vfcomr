@@ -31,6 +31,7 @@ import {Col, Row, Grid} from 'react-native-easy-grid';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {ms, hs} from '../../../shared/utils/scale';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
+import {getLanguageById} from '../../language/services/language.service';
 
 export default function EditChurchScreen() {
   const navigation = useNavigation<any>();
@@ -67,6 +68,8 @@ export default function EditChurchScreen() {
   const [langPage, setLangPage] = useState(1);
   const [langHasNext, setLangHasNext] = useState(false);
   const [langQuery, setLangQuery] = useState('');
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string | null>(null);
+  const lastLanguageFetchRef = useRef<string | null>(null);
 
   const [motherOptions, setMotherOptions] = useState<{label: string; value: string}[]>(motherChurchOptions);
   const [motherPage, setMotherPage] = useState(1);
@@ -156,7 +159,7 @@ export default function EditChurchScreen() {
 
   const loadCities = async (countryId: string | number) => {
     try {
-      const res = await api.get(`cities/country/${countryId}`);
+      const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
     } catch {}
@@ -184,7 +187,7 @@ export default function EditChurchScreen() {
   const loadLanguages = async (page: number, name?: string) => {
     try {
       const res = await api.get('languages', {
-        params: {page, limit: PAGE_LIMIT, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -202,8 +205,8 @@ export default function EditChurchScreen() {
         params: {
           page,
           limit: PAGE_LIMIT,
-          sort_by: 'id',
-          sort_desc: true,
+          sort_by: 'name',
+          sort_desc: false,
           ...(name?.trim() ? {name: name.trim()} : {}),
         },
       });
@@ -220,7 +223,7 @@ export default function EditChurchScreen() {
   const loadPastors = async (page: number, name?: string) => {
     try {
       const res = await api.get('users/pastors', {
-        params: {page, limit: PAGE_LIMIT, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -235,7 +238,7 @@ export default function EditChurchScreen() {
   const loadCountries = async (page: number, name?: string) => {
     try {
       const res = await api.get('countries', {
-        params: {page, limit: 1000, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {page, limit: 1000, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -415,6 +418,54 @@ export default function EditChurchScreen() {
       date_of_birth: null,
     });
 
+  // Keep the selected language option visible in the dropdown list.
+  // When searching/paging, `langOptions` can be reset back to page 1,
+  // and the selected `language_id` option may disappear from `langOptions`.
+  useEffect(() => {
+    const v = initialFormValues.language_id?.toString?.() ?? '';
+    setSelectedLanguageId(v.trim() ? v : null);
+  }, [initialFormValues.language_id]);
+
+  useEffect(() => {
+    const selectedId = selectedLanguageId;
+    if (!selectedId) {
+      lastLanguageFetchRef.current = null;
+      return;
+    }
+
+    const exists = langOptions.some(opt => String(opt.value) === String(selectedId));
+    if (exists) {
+      lastLanguageFetchRef.current = null;
+      return;
+    }
+
+    if (lastLanguageFetchRef.current === selectedId) {
+      return;
+    }
+    lastLanguageFetchRef.current = selectedId;
+
+    (async () => {
+      try {
+        const res = await getLanguageById(Number(selectedId));
+        const lang = (res as any)?.data;
+        if (!lang?.id || !lang?.name) {
+          return;
+        }
+
+        const option = {label: String(lang.name), value: String(lang.id)};
+        setLangOptions(prev => {
+          const already = prev.some(x => String(x.value) === option.value);
+          if (already) return prev;
+          return [option, ...prev];
+        });
+      } catch {
+        // If request fails, keep previous options as-is.
+      } finally {
+        lastLanguageFetchRef.current = null;
+      }
+    })();
+  }, [selectedLanguageId, langOptions]);
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -450,7 +501,6 @@ export default function EditChurchScreen() {
                   setFieldErrorText({});
                   const newInvalid: Record<string, boolean> = {};
                   newInvalid.name = !values.name;
-                  newInvalid.enable_cpm = !values.enable_cpm;
                   newInvalid.church_type_id = !values.church_type_id;
                   newInvalid.pastor_id = !values.pastor_id;
                   newInvalid.geographical_region_id = !values.geographical_region_id;
@@ -476,7 +526,6 @@ export default function EditChurchScreen() {
 
                   const firstInvalidKey = [
                     'name',
-                    'enable_cpm',
                     'church_type_id',
                     'pastor_id',
                     'geographical_region_id',
@@ -569,7 +618,10 @@ export default function EditChurchScreen() {
                   if (returnToAfterSave === 'DashboardPastorLeader') {
                     navigation.navigate('DashboardPastorLeader');
                   } else {
-                    navigation.navigate('Churches');
+                    navigation.navigate('ChurchDetail', {
+                      id: editId,
+                      refetchKey: Date.now(),
+                    });
                   }
                 } catch (e: any) {
                   const apiErrors = e?.response?.data?.errors;
@@ -637,7 +689,6 @@ export default function EditChurchScreen() {
                             {t('shortName')}
                             <Text style={formStyles.subLabel}> [{t('only10Chars')}]</Text>
                           </Text>
-                          <HelpIcon title={t('shortName')} message={t('helpShortName')} />
                         </View>
                         <AppInput
                           autoCapitalize="none"
@@ -655,7 +706,6 @@ export default function EditChurchScreen() {
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                             {t('msc')}?
                           </Text>
-                          <HelpIcon title={t('msc')} message={t('helpIsMsc')} />
                         </View>
                         <ElementDropdown
                           data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
@@ -720,34 +770,6 @@ export default function EditChurchScreen() {
                       </View>
                     )}
 
-                    {/* House C.P. */}
-                    <View onLayout={e => setFieldPos('enable_cpm', e.nativeEvent.layout.y)}>
-                      <View>
-                        <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                          <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('houseCp')}? <Text style={{color: '#c00000'}}>*</Text>
-                          </Text>
-                          <HelpIcon title={t('houseCp')} message={t('helpEnableCp')} />
-                        </View>
-                        <ElementDropdown
-                          data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
-                          value={values.enable_cpm as any}
-                          onChange={v => {
-                            setFieldValue('enable_cpm', (v as string) || '');
-                            setInvalid(prev => ({...prev, enable_cpm: false}));
-                            clearFieldError('enable_cpm');
-                          }}
-                          placeholder={t('selectOption')}
-                          containerStyle={{
-                            backgroundColor: C.inputBg,
-                            borderColor: invalid?.enable_cpm ? '#db2d2d' : C.inputBorder,
-                          } as any}
-                          error={!!invalid?.enable_cpm}
-                        />
-                        {renderFieldError('enable_cpm')}
-                      </View>
-                    </View>
-
                     {/* Mother Church */}
                     <View>
                       <View>
@@ -755,7 +777,6 @@ export default function EditChurchScreen() {
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                             {t('motherChurch')}
                           </Text>
-                          <HelpIcon title={t('motherChurch')} message={t('helpMotherChurch')} />
                         </View>
                         <ElementDropdown
                           data={motherOptions}
@@ -816,14 +837,15 @@ export default function EditChurchScreen() {
                       <View>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('language')}{' '}
+                            {t('languageUsedInTheService')}{' '}
                           </Text>
-                          <HelpIcon title={t('language')} message={t('helpLanguage')} />
                         </View>
                         <ElementDropdown
                           data={langOptions}
                           value={values.language_id as any}
                           onChange={v => {
+                            const next = v == null ? null : String(v);
+                            setSelectedLanguageId(next);
                             setFieldValue('language_id', v as any);
                             setInvalid(prev => ({...prev, language_id: false}));
                             clearFieldError('language_id');
@@ -879,7 +901,7 @@ export default function EditChurchScreen() {
                           error={!!invalid?.church_type_id}
                           onSearchText={async text => {
                             try {
-                              const res = await api.get('church-types');
+                              const res = await api.get('church-types', {params: {sort_by: 'name', sort_desc: false}});
                               const items = ((res.data?.data ?? []) as any[]).map(i => ({
                                 label: i.name,
                                 value: String(i.id),
@@ -956,7 +978,7 @@ export default function EditChurchScreen() {
                           error={!!invalid?.church_network_id}
                           onSearchText={async _text => {
                             try {
-                              const res = await api.get('church-networks');
+                              const res = await api.get('church-networks', {params: {sort_by: 'name', sort_desc: false}});
                               const items = ((res.data?.data ?? []) as any[]).map(i => ({
                                 label: i.name,
                                 value: String(i.id),
@@ -995,7 +1017,7 @@ export default function EditChurchScreen() {
                           error={!!invalid?.church_region_id}
                           onSearchText={async _text => {
                             try {
-                              const res = await api.get('church-regions');
+                              const res = await api.get('church-regions', {params: {sort_by: 'name', sort_desc: false}});
                               const items = ((res.data?.data ?? []) as any[]).map(i => ({
                                 label: i.name,
                                 value: String(i.id),
@@ -1177,7 +1199,7 @@ export default function EditChurchScreen() {
                           error={!!invalid?.currency_id}
                           onSearchText={async _text => {
                             try {
-                              const res = await api.get('currencies');
+                              const res = await api.get('currencies', {params: {sort_by: 'name', sort_desc: false}});
                               const items = ((res.data?.data?.items ?? []) as any[]).map((i: any) => ({
                                 label: `${i.name} (${i.three_letter_code})`,
                                 value: String(i.id),

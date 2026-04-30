@@ -31,6 +31,7 @@ import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {Col, Row, Grid} from 'react-native-easy-grid';
 import {ms, hs} from '../../../shared/utils/scale';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
+import {getLanguageById} from '../../language/services/language.service';
 
 export default function AddChurchScreen() {
   const navigation = useNavigation<any>();
@@ -68,6 +69,8 @@ export default function AddChurchScreen() {
   const [langPage, setLangPage] = useState(1);
   const [langHasNext, setLangHasNext] = useState(false);
   const [langQuery, setLangQuery] = useState('');
+  const [selectedLanguageId, setSelectedLanguageId] = useState<string | null>(null);
+  const lastLanguageFetchRef = useRef<string | null>(null);
 
   const [motherOptions, setMotherOptions] = useState<{label: string; value: string}[]>(motherChurchOptions);
   const [motherPage, setMotherPage] = useState(1);
@@ -137,7 +140,7 @@ export default function AddChurchScreen() {
 
   const loadCities = async (countryId: string | number) => {
     try {
-      const res = await api.get(`cities/country/${countryId}`);
+      const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
     } catch {}
@@ -146,7 +149,7 @@ export default function AddChurchScreen() {
   const loadLanguages = async (page: number, name?: string) => {
     try {
       const res = await api.get('languages', {
-        params: {page, limit: PAGE_LIMIT, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -164,8 +167,8 @@ export default function AddChurchScreen() {
         params: {
           page,
           limit: PAGE_LIMIT,
-          sort_by: 'id',
-          sort_desc: true,
+          sort_by: 'name',
+          sort_desc: false,
           ...(name?.trim() ? {name: name.trim()} : {}),
         },
       });
@@ -182,7 +185,7 @@ export default function AddChurchScreen() {
   const loadPastors = async (page: number, name?: string) => {
     try {
       const res = await api.get('users/pastors', {
-        params: {page, limit: PAGE_LIMIT, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -197,7 +200,7 @@ export default function AddChurchScreen() {
   const loadCountries = async (page: number, name?: string) => {
     try {
       const res = await api.get('countries', {
-        params: {page, limit: 1000, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {page, limit: 1000, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -339,6 +342,55 @@ export default function AddChurchScreen() {
     twitter: '',
     date_of_birth: null,
   });
+
+  // Keep the selected language option visible in the dropdown list.
+  // Without this, switching search/scroll can reset `langOptions` back to page 1,
+  // causing the selected value to disappear from the data set.
+  useEffect(() => {
+    const v = initialFormValues.language_id?.toString?.() ?? '';
+    setSelectedLanguageId(v.trim() ? v : null);
+  }, [initialFormValues.language_id]);
+
+  useEffect(() => {
+    const selectedId = selectedLanguageId;
+    if (!selectedId) {
+      lastLanguageFetchRef.current = null;
+      return;
+    }
+
+    const exists = langOptions.some(opt => String(opt.value) === String(selectedId));
+    if (exists) {
+      lastLanguageFetchRef.current = null;
+      return;
+    }
+
+    if (lastLanguageFetchRef.current === selectedId) {
+      return;
+    }
+    lastLanguageFetchRef.current = selectedId;
+
+    (async () => {
+      try {
+        const res = await getLanguageById(Number(selectedId));
+        const lang = (res as any)?.data;
+        if (!lang?.id || !lang?.name) {
+          return;
+        }
+
+        const option = {label: String(lang.name), value: String(lang.id)};
+        setLangOptions(prev => {
+          const already = prev.some(x => String(x.value) === option.value);
+          if (already) return prev;
+          return [option, ...prev];
+        });
+      } catch {
+        // Keep previous options; dropdown will remain placeholder if request fails.
+      } finally {
+        // Allow retry if still missing after a future re-render.
+        lastLanguageFetchRef.current = null;
+      }
+    })();
+  }, [selectedLanguageId, langOptions]);
 
   return (
     <SafeAreaView
@@ -757,6 +809,8 @@ export default function AddChurchScreen() {
                       data={langOptions}
                       value={values.language_id as any}
                       onChange={v => {
+                        const next = v == null ? null : String(v);
+                        setSelectedLanguageId(next);
                         setFieldValue('language_id', v as any);
                         setInvalid(prev => ({...prev, language_id: false}));
                         clearFieldError('language_id');
@@ -827,7 +881,7 @@ export default function AddChurchScreen() {
                       error={!!invalid?.church_type_id}
                       onSearchText={async text => {
                         try {
-                          const res = await api.get('church-types');
+                          const res = await api.get('church-types', {params: {sort_by: 'name', sort_desc: false}});
                           const items = ((res.data?.data ?? []) as any[]).map(
                             i => ({label: i.name, value: String(i.id)}),
                           );
@@ -932,7 +986,7 @@ export default function AddChurchScreen() {
                       error={!!invalid?.church_network_id}
                       onSearchText={async _text => {
                         try {
-                          const res = await api.get('church-networks');
+                          const res = await api.get('church-networks', {params: {sort_by: 'name', sort_desc: false}});
                           const items = ((res.data?.data ?? []) as any[]).map(
                             i => ({label: i.name, value: String(i.id)}),
                           );
@@ -988,7 +1042,7 @@ export default function AddChurchScreen() {
                       error={!!invalid?.church_region_id}
                       onSearchText={async _text => {
                         try {
-                          const res = await api.get('church-regions');
+                          const res = await api.get('church-regions', {params: {sort_by: 'name', sort_desc: false}});
                           const items = ((res.data?.data ?? []) as any[]).map(
                             i => ({label: i.name, value: String(i.id)}),
                           );
@@ -1250,7 +1304,7 @@ export default function AddChurchScreen() {
                       error={!!invalid?.currency_id}
                       onSearchText={async _text => {
                         try {
-                          const res = await api.get('currencies');
+                          const res = await api.get('currencies', {params: {sort_by: 'name', sort_desc: false}});
                           const items = (
                             (res.data?.data?.items ?? []) as any[]
                           ).map((i: any) => ({

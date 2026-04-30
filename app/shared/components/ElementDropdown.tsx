@@ -60,6 +60,24 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   const [dropdownPosition, setDropdownPosition] = useState<'auto' | 'top' | 'bottom'>('auto');
   const [dropdownMaxHeight, setDropdownMaxHeight] = useState<number | undefined>(undefined);
 
+  const blurAnyFocusedInput = () => {
+    try {
+      // RN 0.62+ (Fabric-friendly)
+      const focused = (TextInput as any)?.State?.currentlyFocusedInput?.();
+      if (focused?.blur) {
+        focused.blur();
+        return;
+      }
+    } catch {}
+    try {
+      // Legacy fallback
+      const focusedField = (TextInput as any)?.State?.currentlyFocusedField?.();
+      if (focusedField != null) {
+        (TextInput as any)?.State?.blurTextInput?.(focusedField);
+      }
+    } catch {}
+  };
+
   useEffect(() => {
     const showSub = Keyboard.addListener('keyboardDidShow', e => {
       setKeyboardH(e?.endCoordinates?.height ?? 0);
@@ -158,8 +176,12 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         onChange={item => {
           // Preserve selected label in internal display by setting value to match items
           onChange((item?.value as any) ?? null);
+          // Prevent previously-focused TextInput from regaining focus and auto-scrolling
+          blurAnyFocusedInput();
+          Keyboard.dismiss();
         }}
-        onChangeText={text => onSearchText && onSearchText(text)}
+        // NOTE: do not forward Dropdown's internal search text events here.
+        // We handle search via `renderInputSearch` below to avoid duplicate calls.
         renderItem={renderItem as any}
         renderInputSearch={(onSearch) => (
           <TextInput
@@ -191,6 +213,9 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
           // Ensure dropdown is fully visible near keyboard/screen edges
           onOpen && onOpen();
           onFocus && onFocus();
+          // Avoid auto-scroll back to previously focused input
+          blurAnyFocusedInput();
+          Keyboard.dismiss();
           computeBestPosition();
           try {
             // Delay to allow dropdown to mount input

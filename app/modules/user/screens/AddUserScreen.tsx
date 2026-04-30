@@ -78,6 +78,10 @@ export default function AddUserScreen() {
   const [churchTotal, setChurchTotal] = useState<number>(0);
   const [churchPage, setChurchPage] = useState<number>(1);
   const [churchQuery, setChurchQuery] = useState<string>('');
+  const [countryItems, setCountryItems] = useState<{id: number; name: string}[]>([]);
+  const [countryTotal, setCountryTotal] = useState<number>(0);
+  const [countryPage, setCountryPage] = useState<number>(1);
+  const [countryQuery, setCountryQuery] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
 
   const scrollRef = useRef<ScrollView>(null);
@@ -110,9 +114,12 @@ export default function AddUserScreen() {
       password: t('password') || 'Password',
       title: t('ministryTitle') || 'Ministry Title',
       first_name: t('firstName') || 'First Name',
+      last_name: t('lastName') || 'Last Name',
       role_id: t('omrStatus') || 'OMR Status',
+      sensitive_nation: t('inSensitiveNation') || 'Sensitive Nation',
       language_id: t('language') || 'Language',
       church_id: t('church') || 'Church',
+      country_id: t('nation') || 'Nation',
       email_address: t('emailAddress') || 'Email Address',
       mobile_phone: t('mobilePhone') || 'Mobile Phone',
     };
@@ -146,11 +153,33 @@ export default function AddUserScreen() {
         page,
         limit: DEFAULT_PAGE_LIMIT,
         search: query && query.trim() ? query.trim() : undefined,
+        sort_by: 'name',
+        sort_desc: false,
       });
       const items = (data?.items ?? []).map((c: any) => ({id: c.id, name: c.name}));
       setChurchItems(prev => (page === 1 ? items : [...prev, ...items]));
       setChurchTotal(data?.total ?? items.length);
       setChurchPage(data?.page ?? page);
+    } catch {}
+  }, []);
+
+  const loadCountries = useCallback(async (page: number, query?: string) => {
+    try {
+      const res = await api.get('/countries', {
+        params: {
+          page,
+          limit: DEFAULT_PAGE_LIMIT,
+          name: query && query.trim() ? query.trim() : undefined,
+          sort_by: 'name',
+          sort_desc: false,
+        },
+      });
+      const data = res?.data?.data;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const mapped = items.map((c: any) => ({id: c.id, name: c.name}));
+      setCountryItems(prev => (page === 1 ? mapped : [...prev, ...mapped]));
+      setCountryTotal(data?.total ?? mapped.length);
+      setCountryPage(data?.page ?? page);
     } catch {}
   }, []);
 
@@ -169,7 +198,7 @@ export default function AddUserScreen() {
       })
       .catch(() => {});
     api
-      .get('/language-regions')
+      .get('/language-regions', {params: {sort_by: 'name', sort_desc: false}})
       .then(res => {
         if (!mounted) {
           return;
@@ -180,6 +209,7 @@ export default function AddUserScreen() {
       })
       .catch(() => {});
     loadChurches(1);
+    loadCountries(1);
     return () => {
       mounted = false;
     };
@@ -239,6 +269,7 @@ export default function AddUserScreen() {
                 credentials_form: '',
                 credentials_expiry_date: null as Date | null,
                 church_id: null as number | null,
+                country_id: null as number | null,
               }}
               onSubmit={async values => {
                 setFieldErrorText({});
@@ -248,9 +279,11 @@ export default function AddUserScreen() {
                 newInvalid.password = !values.password;
                 newInvalid.title = !values.title;
                 newInvalid.first_name = !values.first_name;
+                newInvalid.last_name = !values.last_name;
                 newInvalid.role_id = values.role_id == null;
                 newInvalid.language_id = values.language_id == null;
                 newInvalid.church_id = values.church_id == null;
+                newInvalid.country_id = values.country_id == null;
                 if (!sens) {
                   newInvalid.email_address = !values.email_address;
                   newInvalid.mobile_phone = !values.mobile_phone;
@@ -266,8 +299,8 @@ export default function AddUserScreen() {
                 setFieldErrorText(newFieldErrors);
 
                 const firstInvalidKey = [
-                  'username', 'password', 'title', 'first_name',
-                  'role_id', 'language_id', 'church_id',
+                  'username', 'password', 'title', 'first_name', 'last_name',
+                  'role_id', 'language_id', 'church_id', 'country_id',
                   'email_address', 'mobile_phone',
                 ].find(k => newInvalid[k]);
                 if (firstInvalidKey) {
@@ -316,6 +349,7 @@ export default function AddUserScreen() {
                   sensitive_nation: sens,
                   language_id: values.language_id,
                   church_id: values.church_id,
+                  country_id: values.country_id,
                   email_address: values.email_address,
                   mobile_phone: formattedPhone,
                   credentials: values.credentials,
@@ -331,10 +365,17 @@ export default function AddUserScreen() {
                 } as any;
 
                 try {
-                  await addUser(payload);
+                  const saveResponse = await addUser(payload);
+                  console.log('[AddUserScreen] save response:', saveResponse);
                   Alert.alert(t('success'), 'User created successfully!');
                   navigation.navigate('UserList');
                 } catch (error: any) {
+                  console.error('[AddUserScreen] save error:', {
+                    message: error?.message,
+                    status: error?.response?.status,
+                    data: error?.response?.data,
+                  });
+                  const apiMessage = error?.response?.data?.message;
                   const apiErrors = error?.response?.data?.errors;
                   if (apiErrors && typeof apiErrors === 'object') {
                     const nextInvalid: Record<string, boolean> = {};
@@ -357,7 +398,7 @@ export default function AddUserScreen() {
                   }
                   Alert.alert(
                     t('error'),
-                    error?.response?.data?.message || error.message || 'Could not create user.',
+                    apiMessage || error?.message || 'Could not create user.',
                   );
                 }
               }}>
@@ -403,14 +444,20 @@ export default function AddUserScreen() {
                   {/* Last Name */}
                   <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                      {t('lastName')}
+                      {t('lastName')} <Text style={{color: '#c00000'}}>*</Text>
                     </Text>
                     <AppInput
                       value={values.last_name}
                       autoCapitalize="words"
-                      onChangeText={handleChange('last_name')}
+                      onChangeText={(v: string) => {
+                        setFieldValue('last_name', v);
+                        clearInvalid('last_name');
+                        clearFieldError('last_name');
+                      }}
                       onBlur={handleBlur('last_name')}
+                      error={!!invalid.last_name}
                     />
+                    {renderFieldError('last_name')}
                   </View>
 
                   {/* Username */}
@@ -574,6 +621,8 @@ export default function AddUserScreen() {
                       value={values.sensitive_nation ? 'Yes' : 'No'}
                       onChange={v => {
                         setFieldValue('sensitive_nation', v === 'Yes');
+                      clearInvalid('sensitive_nation');
+                      clearFieldError('sensitive_nation');
                         if (v === 'Yes') {
                           clearInvalid('email_address');
                           clearInvalid('mobile_phone');
@@ -582,8 +631,13 @@ export default function AddUserScreen() {
                         }
                       }}
                       placeholder={t('selectOption')}
-                      containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
+                    containerStyle={{
+                      backgroundColor: C.inputBg,
+                      borderColor: invalid.sensitive_nation ? '#db2d2d' : C.inputBorder,
+                    } as any}
+                    error={!!invalid.sensitive_nation}
                     />
+                  {renderFieldError('sensitive_nation')}
                   </View>
 
                   {/* Language */}
@@ -656,6 +710,46 @@ export default function AddUserScreen() {
                       }}
                     />
                     {renderFieldError('church_id')}
+                  </View>
+
+                  {/* Nation */}
+                  <View onLayout={e => setFieldPos('country_id', e.nativeEvent.layout.y)}>
+                    <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                      {t('nation') || 'Nation'} <Text style={{color: '#c00000'}}>*</Text>
+                    </Text>
+                    <ElementDropdown
+                      data={useMemo(
+                        () => countryItems.map(c => ({label: c.name, value: c.id})),
+                        [countryItems],
+                      )}
+                      value={(values as any).country_id as any}
+                      onChange={v => {
+                        setFieldValue('country_id', (typeof v === 'number' ? v : Number(v)) || null);
+                        clearInvalid('country_id');
+                        clearFieldError('country_id');
+                      }}
+                      placeholder={t('selectCountry') || t('selectOption')}
+                      containerStyle={{
+                        borderColor: invalid.country_id ? '#db2d2d' : C.inputBorder,
+                        backgroundColor: C.inputBg,
+                      } as any}
+                      error={!!invalid.country_id}
+                      onSearchText={async text => {
+                        setCountryQuery(text);
+                        setCountryItems([]);
+                        setCountryTotal(0);
+                        setCountryPage(1);
+                        await loadCountries(1, text);
+                      }}
+                      onEndReached={async () => {
+                        const next = countryPage + 1;
+                        const maxPages = Math.max(1, Math.ceil(countryTotal / DEFAULT_PAGE_LIMIT));
+                        if (next <= maxPages) {
+                          await loadCountries(next, countryQuery);
+                        }
+                      }}
+                    />
+                    {renderFieldError('country_id')}
                   </View>
 
                   {/* Email Address */}

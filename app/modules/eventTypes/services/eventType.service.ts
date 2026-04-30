@@ -35,7 +35,7 @@ export interface UpdateEventTypePayload {
 }
 
 export async function listEventTypes() {
-  const response = await api.get<ListEventTypesResponse>(`/event-types`);
+  const response = await api.get<ListEventTypesResponse>(`/event-types`, {params: {sort_by: 'name', sort_desc: false}});
   return response.data;
 }
 

@@ -58,7 +58,7 @@ const EditOverseerGoalDefaultsScreen = () => {
 
   const loadChurches = async (search = '') => {
     const res = await api.get('churches', {
-      params: {page: 1, limit: 50, ...(search ? {search} : {})},
+      params: {page: 1, limit: 50, sort_by: 'name', sort_desc: false, ...(search ? {search} : {})},
     });
     const items = res?.data?.data?.items ?? [];
     setChurchOptions(
@@ -71,7 +71,7 @@ const EditOverseerGoalDefaultsScreen = () => {
 
   const loadNations = async (search = '') => {
     const res = await api.get('countries', {
-      params: {page: 1, limit: 50, ...(search ? {name: search} : {})},
+      params: {page: 1, limit: 50, sort_by: 'name', sort_desc: false, ...(search ? {name: search} : {})},
     });
     const items = res?.data?.data?.items ?? [];
     setNationOptions(

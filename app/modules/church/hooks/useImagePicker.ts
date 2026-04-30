@@ -1,6 +1,7 @@
-import { useState } from 'react';
+import {useState} from 'react';
 import ImagePicker from 'react-native-image-crop-picker';
-import { Alert } from 'react-native';
+import {ActionSheetIOS, Alert, Platform} from 'react-native';
+import {useTranslation} from '../../../shared/hooks/useTranslation';
 
 interface ImagePickerResult {
   path: string;
@@ -19,38 +20,69 @@ interface ImagePickerConfig {
 }
 
 export function useImagePicker(config?: ImagePickerConfig) {
+  const {t} = useTranslation();
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
 
+  const pick = async (source: 'camera' | 'library') => {
+    const targetWidth = config?.width ?? 300;
+    const targetHeight = config?.height ?? 300;
+
+    const open =
+      source === 'camera'
+        ? ImagePicker.openCamera
+        : ImagePicker.openPicker;
+
+    const image: ImagePickerResult = await open({
+      width: targetWidth,
+      height: targetHeight,
+      cropping: true,
+      cropperCircleOverlay: false,
+      compressImageMaxWidth: 1024,
+      compressImageMaxHeight: 1024,
+      compressImageQuality: 0.8,
+      includeBase64: false,
+    });
+
+    if (image.size > 1572864) {
+      // 1.5 MB
+      Alert.alert(t('fileTooLargeTitle'), t('fileTooLargeMessage'));
+      setImageError(t('fileTooLargeTitle'));
+      return;
+    }
+
+    if (image?.path) {
+      setImagePath(image.path);
+      setImageError(null);
+    }
+  };
+
   const handleImagePick = async () => {
     try {
-      const targetWidth = config?.width ?? 300;
-      const targetHeight = config?.height ?? 300;
-
-      const image: ImagePickerResult = await ImagePicker.openPicker({
-        width: targetWidth,
-        height: targetHeight,
-        cropping: true,
-        cropperCircleOverlay: false,
-        compressImageMaxWidth: 1024,
-        compressImageMaxHeight: 1024,
-        compressImageQuality: 0.8,
-        includeBase64: false,
-      });
-
-      if (image.size > 1572864) { // 1.5 MB
-        Alert.alert('File too large', 'Please select an image under 1.5MB');
-        setImageError('File too large');
+      // Match UserScreen.tsx pattern: iOS ActionSheet, Android Alert buttons.
+      if (Platform.OS === 'ios') {
+        ActionSheetIOS.showActionSheetWithOptions(
+          {
+            options: [t('takePhoto'), t('uploadImage'), t('cancel')],
+            cancelButtonIndex: 2,
+            userInterfaceStyle: 'light',
+          },
+          (idx: number) => {
+            if (idx === 0) void pick('camera');
+            if (idx === 1) void pick('library');
+          },
+        );
         return;
       }
 
-      if (image?.path) {
-        setImagePath(image.path);
-        setImageError(null);
-      }
+      Alert.alert(t('selectImage'), '', [
+        {text: t('takePhoto'), onPress: () => void pick('camera')},
+        {text: t('uploadImage'), onPress: () => void pick('library')},
+        {text: t('cancel'), style: 'cancel'},
+      ]);
     } catch (error) {
       console.warn('Image pick error:', error);
-      setImageError('Image selection failed');
+      setImageError(t('imageSelectionFailed'));
     }
   };
 
@@ -59,5 +91,5 @@ export function useImagePicker(config?: ImagePickerConfig) {
     setImageError(null);
   };
 
-  return { imagePath, imageError, handleImagePick, clearImage };
-} 
+  return {imagePath, imageError, handleImagePick, clearImage};
+}

@@ -1,4 +1,4 @@
-import React, {useRef, useState, useEffect} from 'react';
+import React, {useRef, useState, useEffect, useMemo} from 'react';
 import {
   View,
   ScrollView,
@@ -62,6 +62,7 @@ type CombinedFormValues = AddChurchFormValues & {
   user_sensitive_nation: string;
   user_language_id: string;
   user_church_id: string;
+  user_country_id: string;
   credentials: string;
   credentials_from: string;
   credentials_expiry_date: Date | null;
@@ -79,7 +80,7 @@ const CHURCH_REQUIRED_KEYS = [
 
 const USER_REQUIRED_KEYS = [
   'username', 'password', 'title', 'first_name', 'user_role_id',
-  'user_language_id', 'user_church_id', 'user_email_address', 'user_mobile_phone',
+  'user_language_id', 'user_church_id', 'user_country_id', 'user_email_address', 'user_mobile_phone',
 ];
 
 export default function NewPastorAndChurchScreen() {
@@ -115,6 +116,7 @@ export default function NewPastorAndChurchScreen() {
       church_type_id: t('churchType') || 'Church Type',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
       country_id: t('nation') || 'Nation',
+      city_id: t('cityTownVillage') || 'City / Town / Village',
       currency_id: t('currency') || 'Currency',
       email_address: t('emailAddress') || 'Email Address',
       date_of_birth: t('dob') || 'Date of Birth',
@@ -125,6 +127,7 @@ export default function NewPastorAndChurchScreen() {
       user_role_id: t('omrStatus') || 'OMR Status',
       user_language_id: t('language') || 'Language',
       user_church_id: t('church') || 'Church',
+      user_country_id: t('nation') || 'Nation',
       user_email_address: t('emailAddress') || 'Email Address',
       user_mobile_phone: t('mobilePhone') || 'Mobile Phone',
     };
@@ -172,7 +175,7 @@ export default function NewPastorAndChurchScreen() {
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
   const loadCities = async (countryId: string | number) => {
     try {
-      const res = await api.get(`cities/country/${countryId}`);
+      const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
     } catch {}
@@ -183,6 +186,10 @@ export default function NewPastorAndChurchScreen() {
   const [langPage, setLangPage] = useState(1);
   const [langHasNext, setLangHasNext] = useState(false);
   const [langQuery, setLangQuery] = useState('');
+  const [userCountryItems, setUserCountryItems] = useState<{id: number; name: string}[]>([]);
+  const [userCountryTotal, setUserCountryTotal] = useState<number>(0);
+  const [userCountryPage, setUserCountryPage] = useState<number>(1);
+  const [userCountryQuery, setUserCountryQuery] = useState<string>('');
   const [prefixOptions, setPrefixOptions] = useState<string[]>([]);
   const [roleOptions, setRoleOptions] = useState<Array<{id: number; name: string}>>([]);
   const [credentialOptions, setCredentialOptions] = useState<string[]>([]);
@@ -198,7 +205,7 @@ export default function NewPastorAndChurchScreen() {
     office_address_postal_code: '', office_phone: '', office_fax: '', email_address: '',
     website: '', facebook: '', instagram: '', twitter: '', date_of_birth: null,
     username: '', password: '', prefix: '', title: '', first_name: '', last_name: '',
-    user_role_id: '', user_sensitive_nation: '', user_language_id: '', user_church_id: '',
+    user_role_id: '', user_sensitive_nation: '', user_language_id: '', user_church_id: '', user_country_id: '',
     credentials: '', credentials_from: '', credentials_expiry_date: null,
     user_email_address: '', user_mobile_phone: '',
   });
@@ -215,7 +222,7 @@ export default function NewPastorAndChurchScreen() {
   const loadLanguages = async (page: number, name?: string) => {
     try {
       const res = await api.get('languages', {
-        params: {page, limit: PAGE_LIMIT, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
@@ -226,6 +233,31 @@ export default function NewPastorAndChurchScreen() {
       setLangHasNext(!!res.data?.data?.has_next);
     } catch {}
   };
+
+  const loadUserCountries = async (page: number, name?: string) => {
+    try {
+      const res = await api.get('/countries', {
+        params: {
+          page,
+          limit: PAGE_LIMIT,
+          sort_by: 'name',
+          sort_desc: false,
+          ...(name?.trim() ? {name: name.trim()} : {}),
+        },
+      });
+      const data = res?.data?.data;
+      const items = Array.isArray(data?.items) ? data.items : [];
+      const mapped = items.map((c: any) => ({id: c.id, name: c.name}));
+      setUserCountryItems(prev => (page === 1 ? mapped : [...prev, ...mapped]));
+      setUserCountryPage(data?.page ?? page);
+      setUserCountryTotal(data?.total ?? mapped.length);
+    } catch {}
+  };
+
+  const userCountryDropdownData = useMemo(
+    () => userCountryItems.map(c => ({label: c.name, value: String(c.id)})),
+    [userCountryItems],
+  );
 
   useEffect(() => {
     if (!langQuery && langPage === 1) {
@@ -390,6 +422,90 @@ export default function NewPastorAndChurchScreen() {
       return;
     }
 
+    // Server-side validation for church fields (ignore user.* errors).
+    try {
+      const churchPayloadForValidate: any = {
+        name: values.name,
+        short_name: values.short_name,
+        is_msc: values.is_msc === 'Yes',
+        is_first_msc: values.is_msc === 'Yes' && values.is_first_msc === 'Yes',
+        enable_cpm: values.enable_cpm ? values.enable_cpm === 'Yes' : false,
+        parent_id: values.parent_id ? Number(values.parent_id) : null,
+        msc_parent_id:
+          values.is_msc === 'Yes' &&
+          values.is_first_msc === 'No' &&
+          values.msc_parent_id
+            ? Number(values.msc_parent_id)
+            : 0,
+        language_id: values.language_id ? Number(values.language_id) : null,
+        church_type_id: values.church_type_id ? Number(values.church_type_id) : null,
+        church_network_id: values.church_network_id ? Number(values.church_network_id) : null,
+        church_region_id: values.church_region_id ? Number(values.church_region_id) : null,
+        geographical_region_id: values.geographical_region_id ? Number(values.geographical_region_id) : 0,
+        language_region_id: values.language_region_id ? Number(values.language_region_id) : 0,
+        country_id: values.country_id ? Number(values.country_id) : null,
+        city_id: values.city_id ? Number(values.city_id) : 0,
+        currency_id: values.currency_id ? Number(values.currency_id) : null,
+        sensitive_nation: values.sensitive_nation === 'Yes',
+        service_address_street: values.service_address_street,
+        service_address_postal_code: values.service_address_postal_code,
+        mailing_address_postal_code: values.mailing_address_postal_code,
+        office_address_street: values.office_address_street,
+        office_address_postal_code: values.office_address_postal_code,
+        office_phone: values.office_phone,
+        office_fax: values.office_fax,
+        email_address: values.email_address,
+        website: values.website,
+        facebook: values.facebook,
+        twitter: values.twitter,
+        date_of_birth: values.date_of_birth
+          ? `${values.date_of_birth.getFullYear()}-${String(values.date_of_birth.getMonth() + 1).padStart(2, '0')}-${String(values.date_of_birth.getDate()).padStart(2, '0')}`
+          : null,
+        service_venue: '',
+        church_planting_projection_id: 0,
+        photo_dir: values.photo_dir,
+        mailing_address_street: '',
+        property: '',
+      };
+
+      await api.post('churches/with-user', {church: churchPayloadForValidate, user: {}});
+    } catch (e: any) {
+      const apiErrors = e?.response?.data?.errors;
+      if (apiErrors && typeof apiErrors === 'object') {
+        const nextInvalidFromApi: Record<string, boolean> = {};
+        const nextFieldErrorsFromApi: Record<string, string> = {};
+
+        Object.entries(apiErrors).forEach(([key, value]) => {
+          if (typeof value !== 'string' || !value.trim()) {
+            return;
+          }
+          if (!key.startsWith('church.')) {
+            return;
+          }
+          const churchKey = key.slice('church.'.length);
+          // City is not required in this flow.
+          if (churchKey === 'city_id') {
+            return;
+          }
+          nextInvalidFromApi[churchKey] = true;
+          nextFieldErrorsFromApi[churchKey] = value;
+        });
+
+        if (Object.keys(nextFieldErrorsFromApi).length > 0) {
+          setInvalid(prev => ({...prev, ...nextInvalidFromApi}));
+          setFieldErrorText(prev => ({...prev, ...nextFieldErrorsFromApi}));
+          const firstKey = Object.keys(nextFieldErrorsFromApi)[0];
+          if (firstKey) {
+            scrollToField(firstKey);
+          }
+          return;
+        }
+        // Only user.* errors returned => church data passed validation.
+      } else {
+        // If server doesn't return structured validation errors, don't block the flow here.
+      }
+    }
+
     try {
       const draftToStore = {
         name: values.name,
@@ -464,6 +580,7 @@ export default function NewPastorAndChurchScreen() {
                 initialValues={initialValues}
                 onSubmit={async values => {
                   try {
+                    console.log('[NewPastorAndChurchScreen] submit start');
                     setFieldErrorText({});
                     const newInvalid: Record<string, boolean> = {};
                     [...CHURCH_REQUIRED_KEYS, ...USER_REQUIRED_KEYS].forEach(k => {
@@ -542,7 +659,8 @@ export default function NewPastorAndChurchScreen() {
                       geographical_region_id: values.geographical_region_id ? Number(values.geographical_region_id) : 0,
                       language_region_id: values.language_region_id ? Number(values.language_region_id) : 0,
                       country_id: values.country_id ? Number(values.country_id) : null,
-                      city_id: values.city_id ? Number(values.city_id) : null,
+                      // Backend currently validates city_id as required; send 0 when not selected.
+                      city_id: values.city_id ? Number(values.city_id) : 0,
                       currency_id: values.currency_id ? Number(values.currency_id) : null,
                       sensitive_nation: values.sensitive_nation === 'Yes',
                       photo: churchPhotoPath,
@@ -583,6 +701,7 @@ export default function NewPastorAndChurchScreen() {
                       user_photo: userPhotoPath,
                       sensitive_nation: values.user_sensitive_nation === 'Yes',
                       language_id: values.user_language_id ? Number(values.user_language_id) : null,
+                      country_id: values.user_country_id ? Number(values.user_country_id) : null,
                       mobile_phone: formattedUserPhone,
                       email_address: values.user_email_address,
                       credentials: values.credentials || undefined,
@@ -593,22 +712,66 @@ export default function NewPastorAndChurchScreen() {
                     };
 
                     const payload = {church: churchPayload, user: userPayload};
-                    await api.post('churches/with-user', payload);
+                    console.log('[NewPastorAndChurchScreen] submit payload:', payload);
+                    const res = await api.post('churches/with-user', payload);
+                    console.log('[NewPastorAndChurchScreen] submit response:', res?.data);
                     try {
                       await AsyncStorage.removeItem(CHURCH_DRAFT_KEY);
                     } catch {}
-                    Alert.alert(t('success'), t('churchCreatedSuccess'));
+                    Alert.alert(t('success'), 'Church and User created successfully!');
                     navigation.navigate('Churches');
                   } catch (e: any) {
+                    console.error('[NewPastorAndChurchScreen] submit error:', {
+                      message: e?.message,
+                      status: e?.response?.status,
+                      data: e?.response?.data,
+                    });
                     const apiErrors = e?.response?.data?.errors;
                     if (apiErrors && typeof apiErrors === 'object') {
                       const nextInvalid: Record<string, boolean> = {};
                       const nextFieldErrors: Record<string, string> = {};
-                      Object.entries(apiErrors).forEach(([key, value]) => {
-                        if (typeof value === 'string' && value.trim()) {
-                          nextInvalid[key] = true;
-                          nextFieldErrors[key] = value;
+
+                      const mapUserKeyToFormKey = (userKey: string) => {
+                        // Keys from API: user.<field>
+                        // Form keys: some are prefixed with user_
+                        switch (userKey) {
+                          case 'role_id':
+                            return 'user_role_id';
+                          case 'language_id':
+                            return 'user_language_id';
+                          case 'church_id':
+                            return 'user_church_id';
+                          case 'email_address':
+                            return 'user_email_address';
+                          case 'mobile_phone':
+                            return 'user_mobile_phone';
+                          case 'sensitive_nation':
+                            return 'user_sensitive_nation';
+                          default:
+                            return userKey; // username, password, first_name, last_name, title, prefix, etc.
                         }
+                      };
+
+                      Object.entries(apiErrors).forEach(([key, value]) => {
+                        if (typeof value !== 'string' || !value.trim()) {
+                          return;
+                        }
+                        if (key.startsWith('church.')) {
+                          const churchKey = key.slice('church.'.length);
+                          nextInvalid[churchKey] = true;
+                          nextFieldErrors[churchKey] = value;
+                          return;
+                        }
+                        if (key.startsWith('user.')) {
+                          const userKey = key.slice('user.'.length);
+                          const formKey = mapUserKeyToFormKey(userKey);
+                          nextInvalid[formKey] = true;
+                          nextFieldErrors[formKey] = value;
+                          return;
+                        }
+                        // Fallback: already a form key
+                        nextInvalid[key] = true;
+                        nextFieldErrors[key] = value;
                       });
                       if (Object.keys(nextFieldErrors).length > 0) {
                         setInvalid(prev => ({...prev, ...nextInvalid}));
@@ -672,7 +835,6 @@ export default function NewPastorAndChurchScreen() {
                                       {t('shortName')}
                                       <Text style={formStyles.subLabel}> [{t('only10Chars')}]</Text>
                                     </Text>
-                                    <HelpIcon title={t('shortName')} message={t('helpShortName')} />
                                   </View>
                                   <AppInput
                                     autoCapitalize="none"
@@ -807,7 +969,6 @@ export default function NewPastorAndChurchScreen() {
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                                       {t('languageUsedInTheService')}
                                     </Text>
-                                    <HelpIcon title={t('languageUsedInTheService')} message={t('helpLanguage')} />
                                   </View>
                                   <ElementDropdown
                                     data={langOptions}
@@ -1016,17 +1177,27 @@ export default function NewPastorAndChurchScreen() {
                                   <View>
                                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
                                       <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                        {t('cityTownVillage')}
+                                        {t('cityTownVillage')} 
+                                        {/* <Text status="danger">*</Text> */}
                                       </Text>
                                       <HelpIcon title={t('cityTownVillage')} message={t('helpCity')} />
                                     </View>
                                     <ElementDropdown
                                       data={cityOptions}
                                       value={values.city_id as any}
-                                      onChange={v => setFieldValue('city_id', v as any)}
+                                      onChange={v => {
+                                        setFieldValue('city_id', v as any);
+                                        setInvalid(prev => ({...prev, city_id: false}));
+                                        clearFieldError('city_id');
+                                      }}
                                       placeholder={t('selectOption')}
-                                      containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
+                                      containerStyle={{
+                                        backgroundColor: C.inputBg,
+                                        borderColor: invalid?.city_id ? '#db2d2d' : C.inputBorder,
+                                      } as any}
+                                      error={!!invalid?.city_id}
                                     />
+                                    {renderFieldError('city_id')}
                                   </View>
                                 </View>
                               ) : null}
@@ -1495,6 +1666,47 @@ export default function NewPastorAndChurchScreen() {
                                     error={!!invalid?.user_church_id}
                                   />
                                   {renderFieldError('user_church_id')}
+                                </View>
+                              </View>
+
+                              {/* User Nation */}
+                              <View onLayout={e => setFieldPos('user_country_id', e.nativeEvent.layout.y)}>
+                                <View>
+                                  <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                                    {t('nation') || 'Nation'} <Text status="danger">*</Text>
+                                  </Text>
+                                  <ElementDropdown
+                                    data={userCountryDropdownData}
+                                    value={values.user_country_id as any}
+                                    onChange={v => {
+                                      setFieldValue('user_country_id', (v as string) || '');
+                                      setInvalid(prev => ({...prev, user_country_id: false}));
+                                      clearFieldError('user_country_id');
+                                    }}
+                                    placeholder={t('selectCountry') || t('selectOption')}
+                                    containerStyle={{backgroundColor: C.inputBg, borderColor: invalid?.user_country_id ? '#db2d2d' : C.inputBorder} as any}
+                                    error={!!invalid?.user_country_id}
+                                    onFocus={async () => {
+                                      if (userCountryItems.length === 0) {
+                                        await loadUserCountries(1);
+                                      }
+                                    }}
+                                    onSearchText={async text => {
+                                      setUserCountryQuery(text);
+                                      setUserCountryItems([]);
+                                      setUserCountryTotal(0);
+                                      setUserCountryPage(1);
+                                      await loadUserCountries(1, text);
+                                    }}
+                                    onEndReached={async () => {
+                                      const next = userCountryPage + 1;
+                                      const maxPages = Math.max(1, Math.ceil(userCountryTotal / PAGE_LIMIT));
+                                      if (next <= maxPages) {
+                                        await loadUserCountries(next, userCountryQuery);
+                                      }
+                                    }}
+                                  />
+                                  {renderFieldError('user_country_id')}
                                 </View>
                               </View>
 

@@ -43,15 +43,16 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
   {
     label: t('myChurchProfile'),
     children: [
+      {label: t('myDashboard'), routeName: 'Dashboard'},
       {label: t('churchAttendanceChart'), routeName: 'ChurchAttendanceChart'},
       {label: t('churchGivingChart'), routeName: 'ChurchGivingChart'},
-      {label: t('last4WeeksDetails'), routeName: 'Dashboard'},
-      {label: t('multiServiceChurchDetails'), routeName: 'Dashboard'},
-      {label: t('daughterChurchesList'), routeName: 'Dashboard'},
-      {label: t('otherPastorLeadersInChurch'), routeName: 'Dashboard'},
-      {label: t('churchPlantingProjections'), routeName: 'ChurchPlantingProjections'},
-      {label: t('geographicLocationOnMap'), routeName: 'Dashboard'},
-      {label: t('attachments'), routeName: 'Dashboard'},
+      // {label: t('last4WeeksDetails'), routeName: 'Dashboard'},
+      // {label: t('multiServiceChurchDetails'), routeName: 'Dashboard'},
+      // {label: t('daughterChurchesList'), routeName: 'Dashboard'},
+      // {label: t('otherPastorLeadersInChurch'), routeName: 'Dashboard'},
+      // {label: t('churchPlantingProjections'), routeName: 'ChurchPlantingProjections'},
+      // {label: t('geographicLocationOnMap'), routeName: 'Dashboard'},
+      // {label: t('attachments'), routeName: 'Dashboard'},
     ],
   },
   {

@@ -35,6 +35,7 @@ import {isOverseer, isPastorLeader} from '../../../shared/utils/permissions';
 import DashboardPastorLeaderScreen from './DashboardPastorLeaderScreen';
 import OverseerDashboardScreen from './OverseerDashboardScreen';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {COLORS} from '../../../shared/constants/colors';
 
 const resolveRoleId = (userData: any): number | null => {
   const rawRoleId =
@@ -279,7 +280,7 @@ export default function DashboardScreen() {
                   category="h6"
                   style={{
                     fontWeight: 'bold',
-                    color: C.textPrimary,
+                    color: COLORS.mainColor,
                     fontSize: fs(14),
                   }}>
                   {profile.name}

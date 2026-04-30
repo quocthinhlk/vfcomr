@@ -109,7 +109,7 @@ export const AddCloneChurchScreen: React.FC = () => {
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
   const loadCities = async (countryId: string | number) => {
     try {
-      const res = await api.get(`cities/country/${countryId}`);
+      const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
     } catch {}

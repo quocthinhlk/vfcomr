@@ -70,7 +70,7 @@ export const EditChurchPlantingProjectionScreen: React.FC = () => {
   const loadCountries = async (page: number = 1, name: string = '') => {
     try {
       const res = await api.get('countries', {
-        params: {page, limit: 20, name},
+        params: {page, limit: 20, name, sort_by: 'name', sort_desc: false},
       });
       const data = res?.data?.data;
       if (page === 1) {

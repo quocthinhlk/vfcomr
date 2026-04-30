@@ -1,8 +1,12 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
+  ActionSheetIOS,
+  Alert,
+  Animated,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StyleSheet,
   Text as RNText,
@@ -14,7 +18,7 @@ import {Layout, Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
-import {getUserById, UserDetailData} from '../services/user.service';
+import {getUserById, updateUser, UserDetailData} from '../services/user.service';
 import {getChurchDetail} from '../../church/services/church.service';
 import api from '../../../config/api';
 import {COLORS} from '../../../shared/constants/colors';
@@ -22,7 +26,11 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms, rs, ws} from '../../../shared/utils/scale';
+import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
+import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
+import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
+import IosActionSheet from '../../../shared/components/IosActionSheet';
+import ImagePicker from 'react-native-image-crop-picker';
 
 const blankAvatar = require('../../../assets/images/blank-avatar.png');
 const editIcon = require('../../../assets/icons/edit.png');
@@ -52,8 +60,14 @@ export const UserScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const userId: number | undefined = route?.params?.userId;
+  const refetchKey: number | undefined = route?.params?.refetchKey;
   const {t} = useTranslation();
   const C = useThemedColors();
+
+  const tRef = useRef(t);
+  useEffect(() => {
+    tRef.current = t;
+  }, [t]);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -64,6 +78,26 @@ export const UserScreen = () => {
   const [pastorChurches, setPastorChurches] = useState<any[]>([]);
   const [loadingChurches, setLoadingChurches] = useState<boolean>(false);
   const [imageModalVisible, setImageModalVisible] = useState<boolean>(false);
+  const [downloadingImage, setDownloadingImage] = useState(false);
+  const [imageMenuVisible, setImageMenuVisible] = useState(false);
+  const [localAvatarPath, setLocalAvatarPath] = useState<string | null>(null);
+  const [toastVisible, setToastVisible] = useState(false);
+  const toastOpacity = useRef(new Animated.Value(0)).current;
+  const [toastMessage, setToastMessage] = useState<string>('');
+  const lastHandledRefetchKeyRef = useRef<number | null>(null);
+
+  const closeImagePopup = useCallback(() => {
+    // Important: if the sheet is visible (even behind the image modal),
+    // it can still block touches after the image modal closes.
+    setImageMenuVisible(false);
+    setImageModalVisible(false);
+  }, []);
+
+  useEffect(() => {
+    if (!imageModalVisible) {
+      setImageMenuVisible(false);
+    }
+  }, [imageModalVisible]);
 
   const formatPhoneDisplay = (value?: string | null) => {
     if (!value) return '';
@@ -96,27 +130,25 @@ export const UserScreen = () => {
     }
   }, []);
 
-  useEffect(() => {
-    let active = true;
-
-    const run = async () => {
-      setLoading(true);
+  const fetchUserDetails = useCallback(
+    async (opts?: {showLoading?: boolean}) => {
+      const shouldShowLoading = opts?.showLoading !== false;
+      if (shouldShowLoading) {
+        setLoading(true);
+      }
       setError(null);
 
       if (!userId) {
-        if (!active) return;
         setUser(null);
         setPastorChurches([]);
         setLoadingChurches(false);
-        setError(t('userIDMissing'));
-        setLoading(false);
+        setError(tRef.current('userIDMissing'));
+        if (shouldShowLoading) setLoading(false);
         return;
       }
 
       try {
         const res = await withTimeout(getUserById(Number(userId)), USER_DETAIL_TIMEOUT_MS);
-        if (!active) return;
-
         const userData = res?.data ?? null;
         setUser(userData);
 
@@ -128,25 +160,35 @@ export const UserScreen = () => {
           setLoadingChurches(false);
         }
       } catch (e: any) {
-        if (!active) return;
         setUser(null);
         setPastorChurches([]);
         setLoadingChurches(false);
         if (e?.message === REQUEST_TIMEOUT_ERROR) {
-          setError(t('requestTimedOut'));
+          setError(tRef.current('requestTimedOut'));
         } else {
-          setError(e?.message || t('failedToLoadUserData'));
+          setError(e?.message || tRef.current('failedToLoadUserData'));
         }
       } finally {
-        if (active) setLoading(false);
+        if (shouldShowLoading) {
+          setLoading(false);
+        }
       }
-    };
+    },
+    [loadPastorChurches, userId],
+  );
 
-    void run();
-    return () => {
-      active = false;
-    };
-  }, [loadPastorChurches, userId]);
+  useEffect(() => {
+    void fetchUserDetails({showLoading: true});
+  }, [fetchUserDetails, userId]);
+
+  useEffect(() => {
+    if (!refetchKey) return;
+    if (lastHandledRefetchKeyRef.current === refetchKey) return;
+    lastHandledRefetchKeyRef.current = refetchKey;
+    void fetchUserDetails({showLoading: false});
+    // Clear the flag so it only refetches once.
+    navigation.setParams({refetchKey: undefined});
+  }, [fetchUserDetails, navigation, refetchKey]);
 
   useEffect(() => {
     (async () => {
@@ -192,8 +234,174 @@ export const UserScreen = () => {
     const lines = [credentialsForm, number, expiry ? `${t('expires')}: ${expiry}` : ''].filter(Boolean);
     return lines.join('\n');
   })();
-  const avatarUri = user?.photo_url && !avatarError ? user.photo_url : null;
+  const normalizeFileUri = (p: string) => (p.startsWith('file://') ? p : `file://${p}`);
+  const avatarUri = localAvatarPath
+    ? normalizeFileUri(localAvatarPath)
+    : user?.photo_url && !avatarError
+      ? user.photo_url
+      : null;
   const canOpenFullImage = Boolean(avatarUri);
+
+  const refreshUser = useCallback(
+    async (id: number) => {
+      try {
+        const res = await withTimeout(getUserById(Number(id)), USER_DETAIL_TIMEOUT_MS);
+        const userData = res?.data ?? null;
+        setUser(userData);
+      } catch {
+        // ignore refresh errors
+      }
+    },
+    [],
+  );
+
+  const showToast = useCallback((message: string) => {
+    setToastMessage(message);
+    setToastVisible(true);
+    toastOpacity.stopAnimation();
+    toastOpacity.setValue(0);
+    Animated.timing(toastOpacity, {
+      toValue: 1,
+      duration: 200,
+      useNativeDriver: true,
+    }).start();
+
+    setTimeout(() => {
+      Animated.timing(toastOpacity, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }).start(() => setToastVisible(false));
+    }, 3000);
+  }, [toastOpacity]);
+
+  const uploadAndApplyAvatar = useCallback(
+    async (imagePath: string) => {
+      const targetId = Number(userId || user?.id);
+      if (!targetId) return;
+
+      let uploadedUserPhotoPath: string | null = null;
+      try {
+        const form = new FormData();
+        const fileName = imagePath.split('/').pop() || 'photo.jpg';
+        form.append('file', {
+          uri: imagePath,
+          name: fileName,
+          type: 'image/jpeg',
+        } as any);
+        form.append('entity_type', 'users');
+        form.append('alt_text', String(displayName || '').trim());
+
+        const uploadRes = await api.post('images/upload', form, {
+          headers: {'Content-Type': 'multipart/form-data'},
+        });
+        uploadedUserPhotoPath = uploadRes?.data?.data?.path || null;
+      } catch {
+        uploadedUserPhotoPath = null;
+      }
+
+      if (!uploadedUserPhotoPath) {
+        Alert.alert(t('error'), t('imageDownloadError') || 'Could not upload image');
+        return;
+      }
+
+      try {
+        await updateUser(targetId, {user_photo: uploadedUserPhotoPath});
+        setLocalAvatarPath(null);
+        await refreshUser(targetId);
+        closeImagePopup();
+        showToast(t('profileUpdatedSuccess'));
+      } catch (error: any) {
+        Alert.alert(
+          t('error'),
+          error?.response?.data?.message || error?.message || t('couldNotUpdateUser'),
+        );
+      }
+    },
+    [api, closeImagePopup, displayName, refreshUser, showToast, t, user?.id, userId],
+  );
+
+  const openPhotoSourcePicker = useCallback(() => {
+    const pickFromLibrary = async () => {
+      try {
+        const image: any = await ImagePicker.openPicker({
+          width: 300,
+          height: 300,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 1024,
+          compressImageMaxHeight: 1024,
+          compressImageQuality: 0.8,
+          includeBase64: false,
+        });
+        if (image?.size && image.size > 1572864) {
+          Alert.alert('File too large', 'Please select an image under 1.5MB');
+          return;
+        }
+        if (image?.path) {
+          // Close the fullscreen preview immediately after cropping completes
+          // to avoid flashing the old image while the new one loads.
+          closeImagePopup();
+          setLocalAvatarPath(image.path);
+          void uploadAndApplyAvatar(image.path);
+        }
+      } catch {
+        // user cancelled or picker error
+      }
+    };
+
+    const takePhoto = async () => {
+      try {
+        const image: any = await ImagePicker.openCamera({
+          width: 300,
+          height: 300,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 1024,
+          compressImageMaxHeight: 1024,
+          compressImageQuality: 0.8,
+          includeBase64: false,
+        });
+        if (image?.size && image.size > 1572864) {
+          Alert.alert('File too large', 'Please select an image under 1.5MB');
+          return;
+        }
+        if (image?.path) {
+          // Close the fullscreen preview immediately after cropping completes
+          // to avoid flashing the old image while the new one loads.
+          closeImagePopup();
+          setLocalAvatarPath(image.path);
+          void uploadAndApplyAvatar(image.path);
+        }
+      } catch {
+        // user cancelled or camera error
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      const takeLabel = 'Take Photo';
+      const chooseLabel = 'Choose Photo';
+      const cancelLabel = t('cancel') || 'Cancel';
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [takeLabel, chooseLabel, cancelLabel],
+          cancelButtonIndex: 2,
+          userInterfaceStyle: 'light',
+        },
+        (idx: number) => {
+          if (idx === 0) void takePhoto();
+          if (idx === 1) void pickFromLibrary();
+        },
+      );
+      return;
+    }
+
+    Alert.alert(t('changePhoto') || 'Change Photo', '', [
+      {text: 'Take Photo', onPress: () => void takePhoto()},
+      {text: 'Choose Photo', onPress: () => void pickFromLibrary()},
+      {text: t('cancel') || 'Cancel', style: 'cancel'},
+    ]);
+  }, [t, uploadAndApplyAvatar]);
 
   const openEditScreen = () => {
     const targetId = Number(userId || user?.id);
@@ -258,12 +466,22 @@ export const UserScreen = () => {
         <ScrollView showsVerticalScrollIndicator={false}>
           <View style={[styles.profileCard, {backgroundColor: C.surface, borderColor: C.border}]}>
             <View style={[styles.summaryRow, {borderBottomColor: C.border}]}>
-              <Image
-                source={avatarUri ? {uri: avatarUri} : blankAvatar}
-                style={[styles.detailsPhoto, {borderColor: C.border}]}
-                resizeMode="cover"
-                onError={() => setAvatarError(true)}
-              />
+              <TouchableOpacity
+                activeOpacity={0.85}
+                disabled={!canOpenFullImage}
+                onPress={() => setImageModalVisible(true)}
+              >
+                <Image
+                  source={avatarUri ? {uri: avatarUri} : blankAvatar}
+                  style={[
+                    styles.detailsPhoto,
+                    {borderColor: C.border},
+                    !canOpenFullImage && styles.disabledAction,
+                  ]}
+                  resizeMode="cover"
+                  onError={() => setAvatarError(true)}
+                />
+              </TouchableOpacity>
               <View style={styles.summaryText}>
                 <Text style={[styles.nameText, {color: COLORS.mainColor}]}>
                   {displayName}
@@ -312,6 +530,7 @@ export const UserScreen = () => {
               </View>
               {renderDetailRow(t('from'), churchName)}
               {renderDetailRow(t('nation'), user?.country_name || '-', styles.detailValueStrong)}
+              {renderDetailRow(t('role'), user?.title || '-')}
               {renderDetailRow(
                 t('sensitiveNation'),
                 user?.sensitive_nation ? t('yes') : t('no'),
@@ -369,25 +588,113 @@ export const UserScreen = () => {
             </View>
           ) : null}
         </ScrollView>
-        <Modal
+        <ZoomableImageModal
           visible={imageModalVisible}
+          uri={avatarUri}
+          onClose={closeImagePopup}
+          headerRight={
+            avatarUri ? (
+              <TouchableOpacity
+                onPress={() => {
+                  if (Platform.OS === 'ios') {
+                    const downloadLabel = t('download') || 'Download';
+                    const changePhotoLabel = t('changePhoto') || 'Change Photo';
+                    const cancelLabel = t('cancel') || 'Cancel';
+
+                    ActionSheetIOS.showActionSheetWithOptions(
+                      {
+                        options: [downloadLabel, changePhotoLabel, cancelLabel],
+                        cancelButtonIndex: 2,
+                        userInterfaceStyle: 'light',
+                      },
+                      async (buttonIndex: number) => {
+                        if (buttonIndex === 0) {
+                          if (!avatarUri || downloadingImage) return;
+                          try {
+                            setDownloadingImage(true);
+                            await downloadImageToCameraRoll(avatarUri, {filePrefix: 'user-avatar'});
+                            Alert.alert(t('success'), t('imageDownloadSuccess'));
+                          } catch {
+                            Alert.alert(t('error'), t('imageDownloadError'));
+                          } finally {
+                            setDownloadingImage(false);
+                          }
+                          return;
+                        }
+                        if (buttonIndex === 1) {
+                          if (!isOwnProfile) return;
+                          requestAnimationFrame(() => openPhotoSourcePicker());
+                        }
+                      },
+                    );
+                    return;
+                  }
+
+                  setImageMenuVisible(true);
+                }}
+                hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                style={{paddingHorizontal: ms(6), paddingVertical: ms(4)}}
+              >
+                <RNText style={{color: '#fff', fontSize: fs(22), fontWeight: '700', opacity: downloadingImage ? 0.6 : 1}}>
+                  ⋯
+                </RNText>
+              </TouchableOpacity>
+            ) : null
+          }
+        />
+
+        {Platform.OS === 'android' ? (
+          <IosActionSheet
+            visible={imageMenuVisible}
+            onClose={() => setImageMenuVisible(false)}
+            cancelLabel={t('cancel') || 'Cancel'}
+            items={[
+              {
+                label: t('download') || 'Download',
+                disabled: !avatarUri || downloadingImage,
+                onPress: async () => {
+                  if (!avatarUri || downloadingImage) return;
+                  try {
+                    setDownloadingImage(true);
+                    await downloadImageToCameraRoll(avatarUri, {filePrefix: 'user-avatar'});
+                    Alert.alert(t('success'), t('imageDownloadSuccess'));
+                  } catch {
+                    Alert.alert(t('error'), t('imageDownloadError'));
+                  } finally {
+                    setDownloadingImage(false);
+                  }
+                },
+              },
+              {
+                label: t('changePhoto') || 'Change Photo',
+                disabled: !isOwnProfile,
+                onPress: () => {
+                  requestAnimationFrame(() => openPhotoSourcePicker());
+                },
+              },
+            ]}
+          />
+        ) : null}
+
+        <Modal
           transparent
-          animationType="fade"
-          onRequestClose={() => setImageModalVisible(false)}>
-          <View style={styles.fullImageBackdrop}>
-            <TouchableOpacity
-              style={styles.fullImageHeader}
-              onPress={() => setImageModalVisible(false)}>
-              <RNText style={styles.fullImageCloseText}>✕</RNText>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.fullImageContent}
-              activeOpacity={1}
-              onPress={() => setImageModalVisible(false)}>
-              {avatarUri ? (
-                <Image source={{uri: avatarUri}} style={styles.fullImage} resizeMode="contain" />
-              ) : null}
-            </TouchableOpacity>
+          visible={toastVisible}
+          animationType="none"
+          presentationStyle="overFullScreen"
+          statusBarTranslucent
+          hardwareAccelerated
+        >
+          <View pointerEvents="none" style={styles.toastModalRoot}>
+            <Animated.View
+              style={[
+                styles.toast,
+                {backgroundColor: C.surface, borderColor: C.border, opacity: toastOpacity},
+              ]}
+            >
+              <Text style={{color: C.textPrimary, fontWeight: '700'}}>
+                {toastMessage || t('profileUpdatedSuccess')}
+              </Text>
+            </Animated.View>
           </View>
         </Modal>
       </Layout>
@@ -426,12 +733,12 @@ const styles = StyleSheet.create({
     marginLeft: ms(14),
   },
   nameText: {
-    fontSize: fs(20),
+    fontSize: fs(18),
     fontWeight: '700',
   },
   titleText: {
     marginTop: ms(4),
-    fontSize: fs(16),
+    fontSize: fs(14),
     fontWeight: '500',
   },
   detailsPhoto: {
@@ -454,6 +761,20 @@ const styles = StyleSheet.create({
   },
   editBtn: {
     right: 0,
+  },
+  toast: {
+    maxWidth: ms(320),
+    width: '90%',
+    paddingVertical: ms(12),
+    paddingHorizontal: ms(14),
+    borderRadius: rs(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  toastModalRoot: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   editIcon: {
     width: ws(20),
@@ -532,3 +853,5 @@ const styles = StyleSheet.create({
   },
   errorText: {},
 });
+
+export default UserScreen;

@@ -23,6 +23,7 @@ import api from '../../../config/api';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
+import {COLORS} from '../../../shared/constants/colors';
 
 type OverseerDashboardData = {
   overseer_profile?: {
@@ -382,7 +383,7 @@ export default function OverseerDashboardScreen() {
               }}
               activeOpacity={0.7}
               disabled={!currentUserId}>
-              <Text category="h6" style={{fontWeight: 'bold', color: C.textPrimary, fontSize: fs(14)}}>
+              <Text category="h6" style={{fontWeight: 'bold', color: COLORS.mainColor, fontSize: fs(16)}}>
                 {profile.name}
               </Text>
               <Text category="s2" appearance="hint" style={{color: C.textSecondary, fontSize: fs(12)}}>

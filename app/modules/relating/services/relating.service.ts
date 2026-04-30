@@ -32,6 +32,8 @@ export async function searchRelatingCountries(params?: {
       page: params?.page ?? 1,
       limit: params?.limit ?? 10,
       name: (params?.name ?? '').trim(),
+      sort_by: 'name',
+      sort_desc: false,
     },
   });
 
@@ -41,7 +43,7 @@ export async function searchRelatingCountries(params?: {
 export async function listCitiesByCountry(
   countryId: number,
 ): Promise<RelatingCityItem[]> {
-  const response = await api.get(`cities/country/${countryId}`);
+  const response = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
   const payload = response?.data?.data;
   if (Array.isArray(payload)) {
     return payload as RelatingCityItem[];

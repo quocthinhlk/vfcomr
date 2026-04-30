@@ -165,7 +165,7 @@ import NewPastorAndChurchScreen from '../modules/church/screens/NewPastorAndChur
 import ListOverseerScreen from '../modules/user/screens/ListOverseerScreen';
 
 // New Screens Imports
-import { UserScreen } from '../modules/user/screens/UserScreen';
+import UserScreen from '../modules/user/screens/UserScreen';
 import { UserRolesScreen } from '../modules/user/screens/UserRolesScreen';
 import { ChurchesListScreen } from '../modules/church/screens/ListChurchScreen';
 import ChangePasswordForOtherUserScreen from '../modules/user/screens/ChangePasswordForOtherUserScreen';

@@ -87,31 +87,31 @@ export function useFormOptions() {
       try {
         setLoading(true);
         // languages (lazy: first page only)
-        const languages = await api.get('languages', { params: { page: 1, limit: 10 } });
+        const languages = await api.get('languages', { params: { page: 1, limit: 10, sort_by: 'name', sort_desc: false } });
         const languageOptions = ((languages.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // mother churches (lazy: first page only)
-        const mothers = await api.get('churches', { params: { page: 1, limit: 10, sort_by: 'id', sort_desc: true } });
+        const mothers = await api.get('churches', { params: { page: 1, limit: 10, sort_by: 'name', sort_desc: false } });
         const motherChurchOptions = ((mothers.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // church types
-        const types = await api.get('church-types');
+        const types = await api.get('church-types', { params: { sort_by: 'name', sort_desc: false } });
         const churchTypeOptions = ((types.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // pastors
-        const pastors = await api.get('users/pastors', { params: { page: 1, limit: 10 } });
+        const pastors = await api.get('users/pastors', { params: { page: 1, limit: 10, sort_by: 'name', sort_desc: false } });
         const pastorOptions = ((pastors.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // church networks
-        const networks = await api.get('church-networks');
+        const networks = await api.get('church-networks', { params: { sort_by: 'name', sort_desc: false } });
         const churchNetworkOptions = ((networks.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // church regions
-        const cRegions = await api.get('church-regions');
+        const cRegions = await api.get('church-regions', { params: { sort_by: 'name', sort_desc: false } });
         const churchRegionOptions = ((cRegions.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // geographical regions (tree -> flattened with hyphens)
-        const geo = await api.get('geographical-regions');
+        const geo = await api.get('geographical-regions', { params: { sort_by: 'name', sort_desc: false } });
         function flattenGeo(nodes: any[], depth = 0): { label: string; value: string }[] {
           const result: { label: string; value: string }[] = [];
           for (const n of nodes) {
@@ -127,15 +127,15 @@ export function useFormOptions() {
         const geographicalRegionOptions = geoRootItems.length ? flattenGeo(geoRootItems) : [];
 
         // language regions
-        const langRegions = await api.get('language-regions');
+        const langRegions = await api.get('language-regions', { params: { sort_by: 'name', sort_desc: false } });
         const languageRegionOptions = ((langRegions.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // countries: fetch all once (limit=1000); search handled on demand in screen
-        const countries = await api.get('countries', { params: { page: 1, limit: 1000 } });
+        const countries = await api.get('countries', { params: { page: 1, limit: 1000, sort_by: 'name', sort_desc: false } });
         const countryOptions = ((countries.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
 
         // currencies
-        const currencies = await api.get('currencies');
+        const currencies = await api.get('currencies', { params: { sort_by: 'name', sort_desc: false } });
         const localCurrencyOptions = ((currencies.data?.data?.items ?? []) as any[]).map((i: any) => ({ label: `${i.name} (${i.three_letter_code})`, value: String(i.id) }));
 
         setOptions({

@@ -103,6 +103,7 @@ export default function EditProfileScreen() {
       username: t('username') || 'Username',
       title: t('ministryTitle') || 'Ministry Title',
       first_name: t('firstName') || 'First Name',
+      last_name: t('lastName') || 'Last Name',
       role_id: t('omrStatus') || 'OMR Status',
       language_id: t('language') || 'Language',
       church_id: t('church') || 'Church',
@@ -139,6 +140,8 @@ export default function EditProfileScreen() {
         page,
         limit: DEFAULT_PAGE_LIMIT,
         search: query && query.trim() ? query.trim() : undefined,
+        sort_by: 'name',
+        sort_desc: false,
       });
       const items = (data?.items ?? []).map((c: any) => ({id: c.id, name: c.name}));
       setChurchItems(prev => (page === 1 ? items : [...prev, ...items]));
@@ -164,7 +167,7 @@ export default function EditProfileScreen() {
         setCredentialOptions(d?.credentials || []);
 
         try {
-          const lg = await api.get('/language-regions');
+          const lg = await api.get('/language-regions', {params: {sort_by: 'name', sort_desc: false}});
           const arr = Array.isArray(lg.data?.data) ? lg.data.data : [];
           const roots = arr.filter((x: any) => x.parent_id == null && !x.disabled);
           setLanguageOptions(roots.map((x: any) => ({id: x.id, name: x.name})));
@@ -292,6 +295,7 @@ export default function EditProfileScreen() {
                 newInvalid.username = !values.username;
                 newInvalid.title = !values.title;
                 newInvalid.first_name = !values.first_name;
+                newInvalid.last_name = !values.last_name;
                 newInvalid.role_id = values.role_id == null;
                 newInvalid.language_id = values.language_id == null;
                 newInvalid.church_id = values.church_id == null;
@@ -310,7 +314,7 @@ export default function EditProfileScreen() {
                 setFieldErrorText(newFieldErrors);
 
                 const firstInvalidKey = [
-                  'username', 'title', 'first_name', 'role_id',
+                  'username', 'title', 'first_name', 'last_name', 'role_id',
                   'language_id', 'church_id', 'email_address', 'mobile_phone',
                 ].find(k => newInvalid[k]);
                 if (firstInvalidKey) {
@@ -386,7 +390,10 @@ export default function EditProfileScreen() {
                 try {
                   await updateUser(userId, payload);
                   Alert.alert(t('success'), t('profileUpdatedSuccess'));
-                  navigation.goBack();
+                  navigation.navigate('User', {
+                    userId,
+                    refetchKey: Date.now(),
+                  });
                 } catch (error: any) {
                   const apiErrors = error?.response?.data?.errors;
                   if (apiErrors && typeof apiErrors === 'object') {
@@ -488,14 +495,20 @@ export default function EditProfileScreen() {
                   {/* Last Name */}
                   <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                      {t('lastName')}
+                      {t('lastName')} <Text style={{color: '#c00000'}}>*</Text>
                     </Text>
                     <AppInput
                       value={values.last_name}
                       autoCapitalize="words"
-                      onChangeText={handleChange('last_name')}
+                      onChangeText={v => {
+                        setFieldValue('last_name', v);
+                        clearInvalid('last_name');
+                        clearFieldError('last_name');
+                      }}
                       onBlur={handleBlur('last_name')}
+                      error={!!invalid.last_name}
                     />
+                    {renderFieldError('last_name')}
                   </View>
 
                   {/* Username (read-only) */}
