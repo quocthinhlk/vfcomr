@@ -39,6 +39,21 @@ export const getListStyles = (C: ThemeColors, theme: ThemeMode) => {
       fontWeight: '700',
       color: C.textPrimary,
     } as const,
+    /** Rectangular list thumbnail (e.g. church photo) */
+    avatarPhotoWrap: {
+      width: ws(48),
+      height: hs(36),
+      overflow: 'hidden',
+      borderWidth: borderW,
+      borderColor: C.inputBorder,
+      backgroundColor: C.inputBg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    } as const,
+    avatarPhoto: {
+      width: '100%',
+      height: '100%',
+    } as const,
     chevron: {
       fontSize: fs(22),
       lineHeight: fs(22),

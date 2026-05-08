@@ -25,7 +25,14 @@ const DateTripleDropdown: React.FC<Props> = ({
   const currentYear = new Date().getFullYear();
   const centerYear = startYear || currentYear;
 
-  const years = useMemo(() => Array.from({ length: (yearRange * 2) + 1 }, (_, i) => centerYear - yearRange + i), [centerYear, yearRange]);
+  const years = useMemo(
+    () =>
+      Array.from(
+        {length: yearRange * 2 + 1},
+        (_, i) => centerYear + yearRange - i,
+      ),
+    [centerYear, yearRange],
+  );
   const months = useMemo(() => Array.from({ length: 12 }, (_, i) => i + 1), []);
   const days = useMemo(() => Array.from({ length: 31 }, (_, i) => i + 1), []);
 

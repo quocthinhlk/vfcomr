@@ -523,7 +523,7 @@ const pt = {
     indicatorTitleChurchesWithMfp: 'Igrejas com ofertas MFP',
     indicatorInfoChurchesWithMfp: 'O número de igrejas com Missions Faith Pledges e ofertas para missões do fundo geral, calculado a partir da última vez que cada igreja reportou, comparado ao número de igrejas na Região ou Nação do líder, expresso como %',
     indicatorTitleMoreChurches: '% de Mais Igrejas',
-    indicatorInfoMoreChurches: 'A % de crescimento no número de igrejas na Região ou Nação do líder, comparando com o número de igrejas no mesmo período do ano anterior',
+    indicatorInfoMoreChurches: 'A % de crescimento no número de igrejas na Região ou Nação do líder, comparado com o número de igrejas no mesmo período do ano anterior',
     indicatorTitleChurchesWithTithesOfferings: '% de Igrejas recolhendo Dízimos e Ofertas',
     indicatorInfoChurchesWithTithesOfferings: 'O número de igrejas que recolhem Dízimos e Ofertas, calculado a partir da última vez que cada igreja reportou, comparado ao número de igrejas na Região ou Nação do líder, expresso como %.',
     indicatorInfoChurches: 'O número total de igrejas na Região ou Nação do líder',

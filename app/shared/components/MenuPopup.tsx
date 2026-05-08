@@ -353,7 +353,7 @@ const styles = StyleSheet.create({
   expandIndicator: {
     color: '#fff',
     marginLeft: ms(6),
-    fontSize: fs(16),
+    fontSize: fs(20),
   },
   subMenuList: {
     marginLeft: ms(14),

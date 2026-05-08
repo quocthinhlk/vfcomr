@@ -526,7 +526,7 @@ const ms = {
     indicatorTitleChurchesWithMfp: 'Gereja dengan pemberian MFP',
     indicatorInfoChurchesWithMfp: 'Bilangan gereja dengan Missions Faith Pledges dan pemberian misi daripada dana am gereja, dikira daripada kali terakhir setiap gereja melaporkan, dibandingkan dengan bilangan gereja dalam Wilayah atau Negara pemimpin, dinyatakan sebagai %',
     indicatorTitleMoreChurches: '% Lebih Banyak Gereja',
-    indicatorInfoMoreChurches: 'Peratus pertumbuhan bilangan gereja dalam Wilayah atau Negara pemimpin, dengan membandingkannya kepada bilangan gereja pada tempoh yang sama tahun sebelumnya',
+    indicatorInfoMoreChurches: 'Peratus pertumbuhan bilangan gereja dalam Wilayah atau Negara pemimpin, dibandingkan dengan bilangan gereja pada tempoh yang sama tahun sebelumnya',
     indicatorTitleChurchesWithTithesOfferings: '% Gereja mengambil Persepuluhan & Persembahan',
     indicatorInfoChurchesWithTithesOfferings: 'Bilangan gereja yang memberi Persepuluhan & Persembahan, dikira daripada kali terakhir setiap gereja melaporkan, dibandingkan dengan bilangan gereja dalam Wilayah atau Negara pemimpin, dinyatakan sebagai %.',
     indicatorInfoChurches: 'Jumlah keseluruhan gereja dalam Wilayah atau Negara pemimpin',

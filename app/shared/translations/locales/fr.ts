@@ -492,7 +492,7 @@ const fr = {
     indicatorTitleChurchesWithMfp: 'Églises avec dons MFP',
     indicatorInfoChurchesWithMfp: 'Le nombre d’églises avec Missions Faith Pledges et dons missionnaires provenant du fonds général, calculé à partir de la dernière fois où chaque église a rapporté, comparé au nombre d’églises dans la Région ou Nation du leader, exprimé en %',
     indicatorTitleMoreChurches: '% de Plus d’Églises',
-    indicatorInfoMoreChurches: 'Le % de croissance du nombre d’églises dans la Région ou Nation du leader, en le comparant au nombre d’églises sur la même période l’année précédente',
+    indicatorInfoMoreChurches: 'Le % de croissance du nombre d’églises dans la Région ou Nation du leader, comparé au nombre d’églises dans la même période l’année précédente',
     indicatorTitleChurchesWithTithesOfferings: '% d’Églises recueillant Dîmes et Offrandes',
     indicatorInfoChurchesWithTithesOfferings: 'Le nombre d’églises qui recueillent les dîmes et offrandes, calculé à partir de la dernière fois où chaque église a rapporté, comparé au nombre d’églises dans la Région ou Nation du leader, exprimé en %.',
     indicatorInfoChurches: 'Le nombre total d’églises dans la Région ou Nation du leader',

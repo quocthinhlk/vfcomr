@@ -575,7 +575,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
                   <Text style={[styles.summaryTitle, {color: C.textPrimary}]}>
                     {`${t('visitsAndEventsInformationFor') || 'Visits and Events Information For'} : ${
                       visitorName || '-'
-                    }${visitorRole ? `, ${visitorRole}` : ''}`}
+                    }`}
                   </Text>
                   <Text style={[styles.summaryText, {color: C.textPrimary}]}>
                     {`${t('month') || 'Month'}: ${monthLabel}    ${t('year') || 'Year'}: ${

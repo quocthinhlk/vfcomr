@@ -17,6 +17,7 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useLanguage} from '../../../shared/context/LanguageContext';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
@@ -68,6 +69,7 @@ export default function MonthlyDataEntryScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
+  const {selectedLanguage} = useLanguage();
   const C = useThemedColors();
   const {getWeekData, setWeekData: saveWeekDataToContext} = useMonthlyData();
 
@@ -85,6 +87,8 @@ export default function MonthlyDataEntryScreen() {
   const [displayChurchName, setDisplayChurchName] = useState<string>(
     churchName || '',
   );
+  const [lastReportDate, setLastReportDate] = useState<string>('');
+  const dashboardInfoLoadKeyRef = useRef<string | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weekData, setWeekData] = useState<Map<number, WeeklyReportData>>(
     new Map(),
@@ -162,7 +166,6 @@ export default function MonthlyDataEntryScreen() {
   useEffect(() => {
     if (churchName) {
       setDisplayChurchName(churchName);
-      return;
     }
     let mounted = true;
     (async () => {
@@ -179,8 +182,11 @@ export default function MonthlyDataEntryScreen() {
           const response = await api.get('dashboard', {
             params: {church_id: churchId},
           });
-          const dashboardChurchName =
-            response.data?.data?.dashboard_info?.church_name;
+          const dashboardInfo = response.data?.data?.dashboard_info;
+          const dashboardChurchName = dashboardInfo?.church_name;
+          if (dashboardInfo?.last_report_date) {
+            setLastReportDate(String(dashboardInfo.last_report_date));
+          }
           if (dashboardChurchName) {
             setDisplayChurchName(dashboardChurchName);
             await AsyncStorage.setItem(
@@ -197,6 +203,47 @@ export default function MonthlyDataEntryScreen() {
       mounted = false;
     };
   }, [churchName, churchId]);
+
+  // Always attempt to load last report date when we have churchId
+  useEffect(() => {
+    if (!churchId) {return;}
+    const key = String(churchId);
+    if (dashboardInfoLoadKeyRef.current === key) {return;}
+    dashboardInfoLoadKeyRef.current = key;
+    (async () => {
+      try {
+        const response = await api.get('dashboard', {params: {church_id: churchId}});
+        const dashboardInfo = response.data?.data?.dashboard_info;
+        if (dashboardInfo?.last_report_date) {
+          setLastReportDate(String(dashboardInfo.last_report_date));
+        }
+      } catch {
+        // ignore
+      }
+    })();
+  }, [churchId]);
+
+  const localeMap: Record<string, string> = {
+    en: 'en',
+    pt: 'pt',
+    es: 'es',
+    fr: 'fr',
+    zh: 'zh',
+    ms: 'ms',
+    ja: 'ja',
+  };
+  const formatLastRecord = useCallback(
+    (dateString: string) => {
+      if (!dateString) {return '-';}
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {return '-';}
+      const locale = localeMap[selectedLanguage as string] || 'en';
+      const month = new Intl.DateTimeFormat(locale, {month: 'short'}).format(date);
+      const year = date.getFullYear();
+      return `${month} ${year}`;
+    },
+    [selectedLanguage],
+  );
 
   // Load worship sessions structure and first week data
   useEffect(() => {
@@ -1288,6 +1335,12 @@ export default function MonthlyDataEntryScreen() {
                 numberOfLines={2}>
                 {displayChurchName}
               </Text>
+              <Text style={styles.lastRecordDate} numberOfLines={1}>
+                {`${t('lastMonthlyRecord') || 'Last monthly record'}: `}
+                <Text style={styles.lastRecordDateValue}>
+                  {formatLastRecord(lastReportDate || '')}
+                </Text>
+              </Text>
               <Text style={[styles.weekInfo, {color: C.textPrimary}]}>
                 {currentWeekNumber
                   ? ` (${getIsoWeekDateRangeLabel(year, currentWeekNumber)} ${getIsoWeekDisplayYear(
@@ -2218,7 +2271,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(16),
   },
   infoContainer: {
-    padding: ms(12),
     borderRadius: rs(8),
     marginBottom: ms(10),
   },
@@ -2233,6 +2285,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: ms(6),
+  },
+  lastRecordDate: {
+    fontSize: fs(12),
+    color: COLORS.mainColor,
+    textAlign: 'center',
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  lastRecordDateValue: {
+    fontSize: fs(12),
+    color: COLORS.mainColor,
+    fontWeight: '700',
   },
   weekInfo: {
     fontSize: fs(12),

@@ -9,8 +9,8 @@ const DEFAULT_LANGUAGE = 'en';
 // Admin token
 // export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODkzNzQ1MzQsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NDUwfQ.oH5eRvElBNThPtwq8_2nhgtAOWAhgudiK0qzRtsLhzY";
 // Overseer token
-// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3OTEyODEyMDEsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.uQ9qXyfn5NUGHSPY61nTqPjRs2APbRqPkMHF7pn0lDo";
-export const TOKEN_FOR_TEST = '';
+export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3OTEyODEyMDEsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.uQ9qXyfn5NUGHSPY61nTqPjRs2APbRqPkMHF7pn0lDo";
+// export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
   baseURL: 'http://34.126.158.119/api/v1/',

@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
+  Image,
   RefreshControl,
   FlatList,
   TouchableOpacity,
@@ -33,23 +34,35 @@ import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import SearchInput from '../../../shared/components/SearchInput';
 
-// Soft palette for deterministic avatar colours
-const AVATAR_PALETTE = [
-  {bg: '#DEEAD4', text: '#4A7A27'},
-  {bg: '#DDE5F4', text: '#2B4C8C'},
-  {bg: '#F1E0D1', text: '#8C4A1E'},
-  {bg: '#F0E4F5', text: '#7B3A8C'},
-  {bg: '#E4F0F5', text: '#1E6A7C'},
-  {bg: '#F5E4E4', text: '#8C2B2B'},
-  {bg: '#F5F3E4', text: '#7A6A1A'},
-];
+const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
 
-const getAvatarColor = (id: number, name: string) => {
-  let hash = id * 31;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  return AVATAR_PALETTE[Math.abs(hash) % AVATAR_PALETTE.length];
+type ListStyles = ReturnType<typeof getListStyles>;
+
+const ChurchListRowThumb: React.FC<{item: ChurchListItem; listStyles: ListStyles}> = ({
+  item,
+  listStyles,
+}) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const uri = String(item.photo_url ?? '').trim();
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [uri]);
+
+  const useRemote = uri.length > 0 && !imageFailed;
+
+  return (
+    <View style={listStyles.avatarWrap as any}>
+      <View style={listStyles.avatarPhotoWrap as any}>
+        <Image
+          source={useRemote ? {uri} : DEFAULT_CHURCH_LIST_PHOTO}
+          style={listStyles.avatarPhoto as any}
+          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+        />
+      </View>
+    </View>
+  );
 };
 
 // ─── Skeleton card ───────────────────────────────────────────────────────────
@@ -208,9 +221,6 @@ export const ChurchesListScreen: React.FC = () => {
   // ─── Item renderer ────────────────────────────────────────────────────────
   const renderItem = ({item}: {item: ChurchListItem}) => {
     const name = item.name || '';
-    const initials =
-      name.split(' ').filter(Boolean).slice(0, 2).map(s => s[0]?.toUpperCase()).join('') || 'C';
-    const avatarColor = getAvatarColor(item.id, name);
     const isMother = !!(item as any)?.is_mother_church;
     const isMsc = !!(item as any)?.is_msc;
     const isOnMap = !!((item as any)?.omr_map_location || (item as any)?.omr_map_url);
@@ -228,14 +238,7 @@ export const ChurchesListScreen: React.FC = () => {
         delayLongPress={280}
         android_ripple={{color: C.inputBorder, borderless: false}}>
         <View style={listStyles.itemRow as any}>
-          {/* Avatar */}
-          <View style={listStyles.avatarWrap as any}>
-            <View style={[listStyles.avatar as any, {backgroundColor: avatarColor.bg, borderColor: avatarColor.bg}]}>
-              <Text style={[listStyles.avatarText as any, {color: avatarColor.text, fontSize: fs(13)}]}>
-                {initials}
-              </Text>
-            </View>
-          </View>
+          <ChurchListRowThumb item={item} listStyles={listStyles} />
 
           {/* Content */}
           <View style={styles.itemCol}>

@@ -246,6 +246,7 @@ export default function DashboardScreen() {
             flexDirection: 'row',
             justifyContent: 'space-between',
             alignItems: 'center',
+            marginBottom: ms(10),
           }}>
           <View
             style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
@@ -549,8 +550,8 @@ const localStyles = StyleSheet.create({
     borderBottomColor: '#eee',
   },
   menuArrow: {
-    width: ws(12),
-    height: ws(12),
+    width: ws(15),
+    height: ws(15),
     transform: [{ rotate: '-90deg' }],
   },
   modalItemText: {

@@ -9,6 +9,7 @@ export const dashboardStyles = StyleSheet.create({
     // alignItems: 'center',
     paddingHorizontal: ms(16),
     backgroundColor: '#fff',
+    paddingTop: ms(15),
   },
   button: {
     marginVertical: ms(8),

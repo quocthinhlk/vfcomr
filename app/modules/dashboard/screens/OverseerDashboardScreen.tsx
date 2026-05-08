@@ -122,12 +122,12 @@ export default function OverseerDashboardScreen() {
   const [profile, setProfile] = useState<{
     name: string;
     role: string;
-    location: string;
+    title: string;
     image: any;
   }>({
     name: '',
     role: '',
-    location: '',
+    title: '',
     image: BLANK_AVATAR,
   });
   const [indicatorData, setIndicatorData] = useState<OverseerIndicatorData>({});
@@ -178,7 +178,7 @@ export default function OverseerDashboardScreen() {
         setProfile({
           name: p?.name || '',
           role: p?.role_name || '',
-          location: p?.title || '',
+          title: p?.title || '',
           image: p?.photo_url || BLANK_AVATAR,
         });
         setIndicatorData(indicator);
@@ -369,7 +369,7 @@ export default function OverseerDashboardScreen() {
       style={{flex: 1, backgroundColor: C.background}}
       edges={['top', 'bottom', 'left', 'right']}>
       <ScrollView style={[dashboardStyles.container, {backgroundColor: C.background}]}>
-        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center'}}>
+        <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: ms(10)}}>
           <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
             <Image
               source={typeof profile.image === 'string' ? {uri: profile.image} : profile.image}
@@ -387,10 +387,10 @@ export default function OverseerDashboardScreen() {
                 {profile.name}
               </Text>
               <Text category="s2" appearance="hint" style={{color: C.textSecondary, fontSize: fs(12)}}>
-                {profile.role}
+                {profile.title}
               </Text>
               <Text category="s2" appearance="hint" style={{color: C.textSecondary, fontSize: fs(12)}}>
-                {profile.location}
+                {profile.role}
               </Text>
             </TouchableOpacity>
           </View>
@@ -474,8 +474,8 @@ const styles = StyleSheet.create({
     resizeMode: 'contain',
   },
   menuArrow: {
-    width: ws(12),
-    height: ws(12),
+    width: ws(15),
+    height: ws(15),
     transform: [{rotate: '-90deg'}],
   },
 });

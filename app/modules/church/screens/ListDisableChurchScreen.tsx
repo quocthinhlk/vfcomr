@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
+  Image,
   RefreshControl,
   FlatList,
   TouchableOpacity,
@@ -33,6 +34,37 @@ import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionShe
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import SearchInput from '../../../shared/components/SearchInput';
+
+const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
+
+type ListStyles = ReturnType<typeof getListStyles>;
+
+const ChurchListRowThumb: React.FC<{item: ChurchListItem; listStyles: ListStyles}> = ({
+  item,
+  listStyles,
+}) => {
+  const [imageFailed, setImageFailed] = useState(false);
+  const uri = String(item.photo_url ?? '').trim();
+
+  useEffect(() => {
+    setImageFailed(false);
+  }, [uri]);
+
+  const useRemote = uri.length > 0 && !imageFailed;
+
+  return (
+    <View style={listStyles.avatarWrap as any}>
+      <View style={listStyles.avatarPhotoWrap as any}>
+        <Image
+          source={useRemote ? {uri} : DEFAULT_CHURCH_LIST_PHOTO}
+          style={listStyles.avatarPhoto as any}
+          resizeMode="cover"
+          onError={() => setImageFailed(true)}
+        />
+      </View>
+    </View>
+  );
+};
 
 export const ChurchesListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -123,13 +155,6 @@ export const ChurchesListScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: ChurchListItem}) => {
     const name = item.name || '';
-    const initials =
-      name
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map(s => s[0]?.toUpperCase())
-        .join('') || 'C';
     const isMother = (item as any)?.is_mother_church;
     const isMsc = (item as any)?.is_msc;
     return (
@@ -140,11 +165,7 @@ export const ChurchesListScreen: React.FC = () => {
         delayLongPress={300}
       >
         <View style={listStyles.itemRow as any}>
-          <View style={listStyles.avatarWrap as any}>
-            <View style={listStyles.avatar as any}>
-              <Text style={listStyles.avatarText as any}>{initials}</Text>
-            </View>
-          </View>
+          <ChurchListRowThumb item={item} listStyles={listStyles} />
           <View style={styles.itemCol}>
             <Text
               style={[styles.name, {color: C.textPrimary}]}

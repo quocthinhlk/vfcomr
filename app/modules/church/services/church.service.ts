@@ -154,8 +154,10 @@ export interface ChurchListItem {
   name: string;
   short_name: string;
   is_mother_church: boolean;
+  is_msc?: boolean;
   city: string | null;
   photo: string | null;
+  photo_url?: string | null;
   date_of_birth: string | null;
   pastor_name: string | null;
   country_name: string | null;

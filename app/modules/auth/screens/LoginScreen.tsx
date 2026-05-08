@@ -1,6 +1,6 @@
 // modules/auth/screens/LoginScreen.tsx
-import React, { useState } from 'react';
-import { View, Image, TouchableOpacity, Alert, KeyboardAvoidingView, Platform, ScrollView, Modal, TouchableWithoutFeedback, StyleSheet } from 'react-native';
+import React, { useState, useRef } from 'react';
+import { View, Image, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { Text } from '@ui-kitten/components';
 import { globalStyles } from '../../../shared/styles/global';
 import { authStyles } from '../styles';
@@ -37,13 +37,17 @@ export default function LoginScreen() {
     errorMessage,
     handleLogin,
   } = useLoginForm();
+  const passwordInputRef = useRef<TextInput>(null);
 
   return (
     <KeyboardAvoidingView
       style={{ flex: 1, backgroundColor: C.background }}
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
     >
-      <ScrollView contentContainerStyle={[authStyles.container, { backgroundColor: C.background }]}>
+      <ScrollView
+        keyboardShouldPersistTaps="handled"
+        contentContainerStyle={[authStyles.container, { backgroundColor: C.background }]}
+      >
         <View style={authStyles.logoContainer}>
           <Image source={authImages.logo} style={authStyles.logo} />
           <Text category="h1" style={[authStyles.title, { color: C.textPrimary }]}>{t('login')}</Text>
@@ -61,6 +65,7 @@ export default function LoginScreen() {
 
         <View style={[authStyles.passwordInputContainer, { marginBottom: ms(15) }]}>
           <AppInput
+            ref={passwordInputRef}
             placeholder={t('password')}
             value={password}
             onChangeText={setPassword}
@@ -69,7 +74,10 @@ export default function LoginScreen() {
             containerStyle={{ width: '100%' }}
           />
           <TouchableOpacity
-            onPress={() => setShowPassword(!showPassword)}
+            onPress={() => {
+              setShowPassword((v) => !v);
+              setTimeout(() => passwordInputRef.current?.focus(), 0);
+            }}
             style={authStyles.passwordToggle}
           >
             <Image

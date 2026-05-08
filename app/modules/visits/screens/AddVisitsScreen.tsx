@@ -61,9 +61,8 @@ const buildVisitorLabel = (user: {
   title?: string;
   city_name?: string;
 }) => {
-  const titlePart = user.title?.trim() ? ` [${user.title.trim()}]` : '';
-  const cityPart = user.city_name?.trim() ? ` - ${user.city_name.trim()}` : '';
-  return `${user.name || '-'}${titlePart}${cityPart}`;
+  // Dropdown should show only visitor name (no role/title/city).
+  return user.name || '-';
 };
 
 const resolveRoleName = (user: any) =>
@@ -144,6 +143,12 @@ export const AddVisitsScreen: React.FC = () => {
 
         const me = meRes?.data?.data;
         const meId = typeof me?.id === 'number' ? me.id : null;
+        const meName =
+          (me?.name && String(me.name).trim()) ||
+          `${me?.first_name || ''} ${me?.last_name || ''}`.trim() ||
+          '';
+        const meTitle = (me?.title && String(me.title).trim()) || '';
+        const meCityName = (me?.city_name && String(me.city_name).trim()) || '';
         const visitorItems = (visitorsRes?.data?.data?.items ?? []) as any[];
 
         const mappedVisitors: VisitorOption[] = visitorItems.map(item => ({
@@ -156,11 +161,11 @@ export const AddVisitsScreen: React.FC = () => {
 
         if (meId && !mappedVisitors.some(option => option.value === meId)) {
           mappedVisitors.unshift({
-            label: buildVisitorLabel(me),
+            label: buildVisitorLabel({name: meName, title: meTitle, city_name: meCityName}),
             value: meId,
-            name: me?.name || '',
+            name: meName,
             role: resolveRoleName(me),
-            title: me?.title || '',
+            title: meTitle,
           });
         }
 
@@ -323,7 +328,7 @@ export const AddVisitsScreen: React.FC = () => {
                 <Text style={[styles.headingTitle, {color: C.textPrimary}]}>
                   {`${t('visitsAndEventsInformationFor') || 'Visits and Events Information For'} : ${
                     visitorName || '-'
-                  }${visitorRole ? `, ${visitorRole}` : ''}`}
+                  }`}
                 </Text>
                 <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
                   {t('pleaseSelectTheInformation') || 'Please Select the Information'}
@@ -450,18 +455,19 @@ export const AddVisitsScreen: React.FC = () => {
                   {renderFieldError('eventCount')}
                 </View>
               </View>
+
+              <View style={[styles.actions, {borderTopColor: C.border}]}>
+                <CancelButton
+                  label={t('cancel') || 'Cancel'}
+                  onPress={() => navigation.goBack()}
+                />
+                <SaveButton
+                  label={t('next') || 'Next'}
+                  onPress={goToDetailStep}
+                />
+              </View>
             </ScrollView>
 
-            <View style={[styles.actions, {borderTopColor: C.border}]}>
-              <CancelButton
-                label={t('cancel') || 'Cancel'}
-                onPress={() => navigation.goBack()}
-              />
-              <SaveButton
-                label={t('next') || 'Next'}
-                onPress={goToDetailStep}
-              />
-            </View>
           </View>
         </View>
       </KeyboardAvoidingView>
@@ -481,7 +487,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   scrollContent: {
-    paddingBottom: ms(24),
+    paddingBottom: ms(8),
   },
   card: {
     marginTop: ms(8),
@@ -521,7 +527,8 @@ const styles = StyleSheet.create({
   actions: {
     flexDirection: 'row',
     gap: ms(12),
-    paddingVertical: ms(16),
+    paddingTop: ms(8),
+    paddingBottom: ms(8),
     borderTopWidth: StyleSheet.hairlineWidth,
     justifyContent: 'flex-end',
   },

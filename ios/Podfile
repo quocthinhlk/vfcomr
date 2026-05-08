@@ -31,5 +31,55 @@ target 'vfcomr' do
       :mac_catalyst_enabled => false,
       # :ccache_enabled => true
     )
+
+    # Xcode 26 / newer libc++ builds React Native pods that use C++20 APIs
+    # (e.g. std::unordered_set::contains). Some pods still default to gnu++17,
+    # which breaks compilation. Force C++20 across pods for consistency.
+    installer.pods_project.targets.each do |t|
+      t.build_configurations.each do |bc|
+        bc.build_settings['CLANG_CXX_LANGUAGE_STANDARD'] = 'c++20'
+        bc.build_settings['CLANG_CXX_LIBRARY'] = 'libc++'
+
+        # Work around Apple Clang / libc++ consteval issues in fmt (used by RN).
+        # Disable fmt's consteval-based format string checking to avoid build
+        # failures in Xcode 26 toolchain.
+        defs = bc.build_settings['GCC_PREPROCESSOR_DEFINITIONS']
+        defs = ['$(inherited)'] if defs.nil?
+        defs = defs.split(' ') if defs.is_a?(String)
+        defs << 'FMT_USE_NONTYPE_TEMPLATE_ARGS=0'
+        bc.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] = defs.uniq
+
+        if t.name == 'fmt' && bc.name == 'Debug'
+          # libc++ hardening debug mode breaks fmt's consteval checks on Xcode 26.
+          # Override the hardening mode for this pod only.
+          cxxflags = bc.build_settings['OTHER_CPLUSPLUSFLAGS']
+          cxxflags = ['$(inherited)'] if cxxflags.nil?
+          cxxflags = cxxflags.split(' ') if cxxflags.is_a?(String)
+          cxxflags << '-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_NONE'
+          bc.build_settings['OTHER_CPLUSPLUSFLAGS'] = cxxflags.uniq
+
+          cflags = bc.build_settings['OTHER_CFLAGS']
+          cflags = ['$(inherited)'] if cflags.nil?
+          cflags = cflags.split(' ') if cflags.is_a?(String)
+          cflags << '-D_LIBCPP_HARDENING_MODE=_LIBCPP_HARDENING_MODE_NONE'
+          bc.build_settings['OTHER_CFLAGS'] = cflags.uniq
+        end
+      end
+    end
+
+    # fmt 11 + Xcode 26 toolchain can fail with consteval format string checks:
+    # "call to consteval function ... is not a constant expression".
+    # fmt doesn't provide a clean compile-flag override for FMT_USE_CONSTEVAL,
+    # so patch the header after pods generation.
+    fmt_base_h = File.join(installer.sandbox.root.to_s, 'fmt', 'include', 'fmt', 'base.h')
+    if File.exist?(fmt_base_h)
+      contents = File.read(fmt_base_h)
+      patched = contents.gsub("\n#  define FMT_USE_CONSTEVAL 1\n", "\n#  define FMT_USE_CONSTEVAL 0\n")
+      if patched != contents
+        require 'fileutils'
+        FileUtils.chmod('u+w', fmt_base_h)
+        File.write(fmt_base_h, patched)
+      end
+    end
   end
 end

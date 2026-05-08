@@ -1721,8 +1721,8 @@ const styles = StyleSheet.create({
     color: '#000',
   },
   menuArrow: {
-    width: ws(12),
-    height: hs(12),
+    width: ws(15),
+    height: hs(15),
     transform: [{ rotate: '-90deg' }],
   },
   menuArrowExpanded: {

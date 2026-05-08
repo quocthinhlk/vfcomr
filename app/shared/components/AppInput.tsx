@@ -16,7 +16,10 @@ type Props = TextInputProps & {
   containerStyle?: ViewStyle;
 };
 
-export default function AppInput(props: Props) {
+const AppInput = React.forwardRef<TextInput, Props>(function AppInput(
+  props,
+  ref,
+) {
   const {
     style,
     error,
@@ -46,6 +49,7 @@ export default function AppInput(props: Props) {
       containerStyle,
     ]}>
       <TextInput
+        ref={ref}
         {...rest}
         value={value}
         defaultValue={defaultValue}
@@ -64,7 +68,9 @@ export default function AppInput(props: Props) {
       />
     </View>
   );
-}
+});
+
+export default AppInput;
 
 const styles = StyleSheet.create({
   container: {

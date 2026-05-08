@@ -533,7 +533,7 @@ const en = {
     indicatorTitleChurchesWithMfp: 'Churches with MFP giving',
     indicatorInfoChurchesWithMfp: 'The number Churches with Missions Faith Pledges and missions giving from the churches general fund, calculated from the last time each church reported, compared against the number of churches in that Leaders Region or Nation, expressed as a %',
     indicatorTitleMoreChurches: '% of More Churches',
-    indicatorInfoMoreChurches: 'This is the % growth in the Number of churches in the Leaders Region or Nation, by compared it to the number of churches in the same period the previous year',
+    indicatorInfoMoreChurches: 'This is the % growth in the Number of churches in the Leaders Region or Nation, compared to the number of churches in the same period the previous year',
     indicatorTitleChurchesWithTithesOfferings: '% of Churches taking up Tithes & Offerings',
     indicatorInfoChurchesWithTithesOfferings: 'The number of Churches giving Tithes & Offerings, calculated from the last time each church reported, compared against the number of churches in that Leaders Region or Nation, expressed as a %.',
     indicatorInfoChurches: 'The total number of churches in that Leaders Region or Nation',

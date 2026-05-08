@@ -51,6 +51,7 @@ export default function MonthlyDataSelectScreen() {
   
   const [churchId, setChurchId] = useState<number | null>(null);
   const [churchName, setChurchName] = useState<string>('');
+  const [lastReportDate, setLastReportDate] = useState<string>('');
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const [weekInfos, setWeekInfos] = useState<WeekInfo[]>([]);
@@ -58,6 +59,27 @@ export default function MonthlyDataSelectScreen() {
   const [loadingWeeks, setLoadingWeeks] = useState(false);
   const lastWeekLoadKeyRef = useRef<string | null>(null);
   const didInitialFocusRef = useRef(false);
+  const localeMap: Record<string, string> = {
+    en: 'en',
+    pt: 'pt',
+    es: 'es',
+    fr: 'fr',
+    zh: 'zh',
+    ms: 'ms',
+    ja: 'ja',
+  };
+  const formatLastRecord = useCallback(
+    (dateString: string) => {
+      if (!dateString) {return '-';}
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {return '-';}
+      const locale = localeMap[langCode as string] || 'en';
+      const month = new Intl.DateTimeFormat(locale, {month: 'short'}).format(date);
+      const year = date.getFullYear();
+      return `${month} ${year}`;
+    },
+    [langCode],
+  );
 
   // Generate years from current year to 1900
   const years = useMemo(() => {
@@ -96,11 +118,13 @@ export default function MonthlyDataSelectScreen() {
         const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
         const savedChurchName = await AsyncStorage.getItem('selectedChurchName');
         let hasSavedChurchId = false;
+        let effectiveChurchId: number | null = null;
         if (savedChurchId) {
           const id = parseInt(savedChurchId, 10);
           if (!isNaN(id)) {
             console.log('Church ID from AsyncStorage:', id);
             setChurchId(id);
+            effectiveChurchId = id;
             hasSavedChurchId = true;
             if (savedChurchName) {
               setChurchName(savedChurchName);
@@ -115,10 +139,12 @@ export default function MonthlyDataSelectScreen() {
           const dashboardInfo = response.data?.data?.dashboard_info;
           const dashboardChurchId = dashboardInfo?.church_id;
           const dashboardChurchName = dashboardInfo?.church_name;
+          const dashboardLastReportDate = dashboardInfo?.last_report_date;
         
           if (dashboardChurchId) {
             console.log('Church ID from Dashboard API:', dashboardChurchId);
             setChurchId(dashboardChurchId);
+            effectiveChurchId = dashboardChurchId;
             await AsyncStorage.setItem('selectedChurchId', String(dashboardChurchId));
             if (dashboardChurchName) {
               setChurchName(dashboardChurchName);
@@ -126,6 +152,23 @@ export default function MonthlyDataSelectScreen() {
             }
           } else if (!hasSavedChurchId) {
             console.error('No church_id found in dashboard response');
+          }
+
+          if (dashboardLastReportDate) {
+            setLastReportDate(String(dashboardLastReportDate));
+          }
+        } else if (effectiveChurchId) {
+          // We have church from AsyncStorage; still fetch dashboard to get last report date.
+          try {
+            const response = await api.get('dashboard', {
+              params: {church_id: effectiveChurchId},
+            });
+            const dashboardInfo = response.data?.data?.dashboard_info;
+            if (dashboardInfo?.last_report_date) {
+              setLastReportDate(String(dashboardInfo.last_report_date));
+            }
+          } catch {
+            // ignore
           }
         }
       } catch (error) {
@@ -256,6 +299,12 @@ export default function MonthlyDataSelectScreen() {
               </Text>
               <Text style={[styles.churchNameStrong, {color: C.textPrimary}]} numberOfLines={2}>
                 {churchName}
+              </Text>
+              <Text style={styles.lastRecordDate} numberOfLines={1}>
+                {`${t('lastMonthlyRecord') || 'Last monthly record'}: `}
+                <Text style={styles.lastRecordDateValue}>
+                  {formatLastRecord(lastReportDate || '')}
+                </Text>
               </Text>
             </View>
           ) : null}
@@ -394,7 +443,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(16),
   },
   enterDataForContainer: {
-    padding: ms(12),
     borderRadius: rs(8),
     marginBottom: ms(10),
   },
@@ -408,6 +456,18 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     textAlign: 'center',
     marginTop: ms(2),
+  },
+  lastRecordDate: {
+    fontSize: fs(12),
+    color: COLORS.mainColor,
+    textAlign: 'center',
+    fontWeight: '600',
+    flexShrink: 1,
+  },
+  lastRecordDateValue: {
+    fontSize: fs(12),
+    color: COLORS.mainColor,
+    fontWeight: '700',
   },
   section: {
     paddingTop: ms(10),

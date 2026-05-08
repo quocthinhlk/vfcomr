@@ -567,7 +567,7 @@ const es = {
     'Iglesias con MFP y ofrendas de misiones como % del total.',
   indicatorTitleMoreChurches: '% de más iglesias',
   indicatorInfoMoreChurches:
-    'Crecimiento en el número de iglesias comparado con el año anterior.',
+    'Crecimiento en el número de iglesias comparado al número de iglesias en el mismo período del año anterior.',
   indicatorTitleChurchesWithTithesOfferings:
     '% de iglesias con diezmos y ofrendas',
   indicatorInfoChurchesWithTithesOfferings:

@@ -22,6 +22,7 @@ import {
   type TapGestureHandlerStateChangeEvent,
 } from 'react-native-gesture-handler';
 import {fs, hs, ms} from '../utils/scale';
+import {HamburgerMenuIcon} from './HamburgerMenuIcon';
 
 type Props = {
   visible: boolean;
@@ -388,7 +389,14 @@ export default function ZoomableImageModal({
               <RNText style={styles.closeText}>✕</RNText>
             </TouchableOpacity>
             <View style={styles.headerRight}>
-              {headerRight}
+              {React.isValidElement(headerRight) &&
+              typeof (headerRight as any)?.props?.onPress === 'function' ? (
+                <View style={{transform: [{scale: 0.75}]}}>
+                  <HamburgerMenuIcon onPress={(headerRight as any).props.onPress} />
+                </View>
+              ) : (
+                headerRight
+              )}
             </View>
           </View>
         </View>
