@@ -327,7 +327,7 @@ export default function ChurchAttendanceChartScreen() {
           <ScrollView
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+
             showsHorizontalScrollIndicator>
             <View
               style={[
@@ -395,9 +395,10 @@ export default function ChurchAttendanceChartScreen() {
                           y1={PADDING_Y}
                           x2={PADDING_X + item.index * POINT_GAP}
                           y2={CHART_HEIGHT - PADDING_Y}
-                          stroke={C.inputBorder}
-                          strokeWidth={0.8}
-                          opacity={0.3}
+                          stroke={COLORS.mainColor}
+                          strokeWidth={1}
+                          opacity={0.25}
+                          strokeDasharray="3,3"
                         />
                       ))}
                       <Line
@@ -406,7 +407,7 @@ export default function ChurchAttendanceChartScreen() {
                         x2={chartWidth - PADDING_X}
                         y2={CHART_HEIGHT - PADDING_Y}
                         stroke={C.inputBorder}
-                        strokeWidth={1}
+                        strokeWidth={1.5}
                       />
                       <Line
                         x1={PADDING_X}
@@ -414,7 +415,7 @@ export default function ChurchAttendanceChartScreen() {
                         x2={PADDING_X}
                         y2={CHART_HEIGHT - PADDING_Y}
                         stroke={C.inputBorder}
-                        strokeWidth={1}
+                        strokeWidth={1.5}
                       />
                       {renderedSeries.map(item =>
                         item.segments.map((points, index) => (
@@ -451,11 +452,11 @@ export default function ChurchAttendanceChartScreen() {
                           <View
                             style={[
                               styles.xAxisTick,
-                              {backgroundColor: C.inputBorder},
+                              {backgroundColor: COLORS.mainColor},
                             ]}
                           />
                           <Text
-                            style={[styles.xAxisLabel, {color: C.textSecondary}]}>
+                            style={[styles.xAxisLabel, {color: C.textPrimary}]}>
                             {item.label}
                           </Text>
                         </View>
@@ -555,24 +556,25 @@ const styles = StyleSheet.create({
   },
   xAxisContainer: {
     position: 'relative',
-    height: ms(54),
+    height: ms(76),
     marginTop: ms(2),
   },
   xAxisLabelWrap: {
     position: 'absolute',
     top: 0,
-    width: ms(96),
-    marginLeft: -ms(48),
+    width: ms(90),
+    marginLeft: -ms(45),
     alignItems: 'center',
   },
   xAxisTick: {
-    width: 1,
-    height: ms(7),
-    marginBottom: ms(3),
+    width: 1.5,
+    height: ms(8),
+    marginBottom: ms(2),
   },
   xAxisLabel: {
-    fontSize: fs(9),
-    transform: [{rotate: '-22deg'}],
+    fontSize: fs(9.5),
+    fontWeight: '500',
+    transform: [{rotate: '-45deg'}, {translateY: ms(16)}],
     textAlign: 'center',
     width: '100%',
   },

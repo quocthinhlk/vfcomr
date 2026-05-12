@@ -25,7 +25,12 @@ import {
   ChurchListItem,
 } from '../services/church.service';
 import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
-import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {
+  isOverseer,
+  isPastorLeader,
+  isSuperAdmin,
+  resolveRoleIdFromUser,
+} from '../../../shared/utils/permissions';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -33,6 +38,7 @@ import {getListStyles} from '../../../shared/styles/list';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import SearchInput from '../../../shared/components/SearchInput';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
 
@@ -187,8 +193,11 @@ export const ChurchesListScreen: React.FC = () => {
     (async () => {
       try {
         const res = await api.get('users/me');
-        const r = res?.data?.data?.role?.id;
-        if (typeof r === 'number') {setRoleId(r);}
+        const userData = res?.data?.data;
+        const r = resolveRoleIdFromUser(userData);
+        if (r != null) {
+          setRoleId(r);
+        }
       } catch {}
     })();
   }, []);
@@ -233,7 +242,37 @@ export const ChurchesListScreen: React.FC = () => {
           listStyles.itemCard as any,
           pressed && {opacity: 0.75},
         ]}
-        onPress={() => navigation.navigate('ChurchDetail', {id: item.id})}
+        onPress={() => {
+          const usePastorLeaderDashboard =
+            route?.params?.openChurchInPastorDashboard === true ||
+            isOverseer(roleId) ||
+            isPastorLeader(roleId);
+          if (usePastorLeaderDashboard) {
+            (async () => {
+              try {
+                await AsyncStorage.setItem('selectedChurchId', String(item.id));
+                await AsyncStorage.setItem('selectedChurchName', name);
+                if (item.country_name) {
+                  await AsyncStorage.setItem(
+                    'selectedChurchCountryName',
+                    String(item.country_name),
+                  );
+                } else {
+                  await AsyncStorage.removeItem('selectedChurchCountryName');
+                }
+              } catch {
+                // still open dashboard; bootstrap may use route params only
+              }
+              navigation.navigate('DashboardPastorLeader', {
+                church_id: item.id,
+                church_name: item.name,
+                church_country_name: item.country_name ?? undefined,
+              });
+            })();
+            return;
+          }
+          navigation.navigate('ChurchDetail', {id: item.id});
+        }}
         onLongPress={() => {setSelectedChurch(item); setActionsVisible(true);}}
         delayLongPress={280}
         android_ripple={{color: C.inputBorder, borderless: false}}>
@@ -400,7 +439,7 @@ export const ChurchesListScreen: React.FC = () => {
             data={isInitialLoad ? [] : items}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"

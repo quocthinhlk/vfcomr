@@ -566,7 +566,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
               ref={ref => {
                 scrollRef.current = ref;
               }}
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}>
               <View style={styles.form}>
                 <View

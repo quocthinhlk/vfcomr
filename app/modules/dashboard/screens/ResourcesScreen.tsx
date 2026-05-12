@@ -10,7 +10,7 @@ export const ResourcesScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
       <BackButton title="Resources" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
         <View style={{ flex: 1 }}>
           <PlaceholderScreen screenName="Resources" />
         </View>

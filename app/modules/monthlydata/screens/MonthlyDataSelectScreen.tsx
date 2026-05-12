@@ -287,7 +287,7 @@ export default function MonthlyDataSelectScreen() {
         <ScrollView
           style={[styles.scrollView, {backgroundColor: C.background}]}
           contentContainerStyle={[styles.scrollContent, {backgroundColor: C.background}]}
-          showsVerticalScrollIndicator={false}
+
           keyboardShouldPersistTaps="handled"
           automaticallyAdjustKeyboardInsets={false}
           contentInsetAdjustmentBehavior="never">

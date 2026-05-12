@@ -109,7 +109,7 @@ export const OmrSupportScreen = () => {
         <ScrollView
           style={styles.scroll}
           contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
+
           keyboardShouldPersistTaps="handled">
           <View style={[styles.card, {borderColor: C.inputBorder, backgroundColor: C.surface}]}>
             {loadingIntro ? (

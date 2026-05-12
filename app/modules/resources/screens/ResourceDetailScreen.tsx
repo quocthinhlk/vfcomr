@@ -226,7 +226,7 @@ export default function ResourceDetailScreen() {
           </View>
         ) : (
           <ScrollView
-            showsVerticalScrollIndicator={false}
+
             contentContainerStyle={styles.scrollContent}>
             <View
               style={[

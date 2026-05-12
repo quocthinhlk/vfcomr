@@ -32,6 +32,7 @@ import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {ms, hs} from '../../../shared/utils/scale';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {getLanguageById} from '../../language/services/language.service';
+import {isPastorLeader} from '../../../shared/utils/permissions';
 
 export default function EditChurchScreen() {
   const navigation = useNavigation<any>();
@@ -108,6 +109,31 @@ export default function EditChurchScreen() {
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
+
+  const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
+  useEffect(() => {
+    let mounted = true;
+    api
+      .get('users/me')
+      .then((res: any) => {
+        if (!mounted) {
+          return;
+        }
+        const me = res?.data?.data;
+        const raw =
+          me?.role?.id ??
+          me?.role_id ??
+          me?.roleID ??
+          me?.roleId;
+        const parsed = Number(raw);
+        setCurrentUserRoleId(Number.isFinite(parsed) ? parsed : null);
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+  const motherChurchDisabled = isPastorLeader(currentUserRoleId);
 
   const setFieldPos = (key: string, y: number) =>
     setFieldY(prev => (prev[key] === y ? prev : {...prev, [key]: y}));
@@ -482,7 +508,7 @@ export default function EditChurchScreen() {
           style={{flex: 1}}>
           <ScrollView
             ref={scrollRef}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"
@@ -783,6 +809,7 @@ export default function EditChurchScreen() {
                           value={values.parent_id as any}
                           onChange={v => setFieldValue('parent_id', v as any)}
                           placeholder={t('selectOption')}
+                          disabled={motherChurchDisabled}
                           containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
                           onSearchText={async text => {
                             setMotherQuery(text);

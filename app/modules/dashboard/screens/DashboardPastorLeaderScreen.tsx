@@ -1,8 +1,8 @@
-import React, { useCallback, useState, useContext, useEffect, useRef } from 'react';
+import React, { useCallback, useMemo, useState, useContext, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { logout } from '../../auth/services/auth.service';
 import { AuthContext } from '../../../config/navigation';
 import { MenuPopup } from '../../../shared/components/MenuPopup';
@@ -19,22 +19,22 @@ import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
 import { useThemeMode } from '../../../shared/context/ThemeContext';
 import { Col, Row, Grid } from 'react-native-easy-grid';
-import RNFS from 'react-native-fs';
 import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
-import {updateUser} from '../../user/services/user.service';
-import {updateChurch} from '../../church/services/church.service';
-// CameraRoll is provided by '@react-native-camera-roll/camera-roll' at runtime.
-// The library exports `CameraRoll` as a named export in recent versions,
-// so we resolve it from `.CameraRoll` first, then fall back to default/CommonJS.
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const CameraRollModule = require('@react-native-camera-roll/camera-roll');
-const CameraRoll: any =
-  CameraRollModule.CameraRoll || CameraRollModule.default || CameraRollModule;
+import {getUserById, updateUser} from '../../user/services/user.service';
+import {getChurchDetail, updateChurch} from '../../church/services/church.service';
+import {
+  ensureAndroidPermission,
+  isOverseer,
+  isPastorLeader,
+  isPermissionError,
+  promptPermissionSettings,
+  resolveRoleIdFromUser,
+} from '../../../shared/utils/permissions';
 
 // Helper function to decode HTML entities (e.g., &#x20ab; -> ₫)
 const decodeHtmlEntity = (str: string): string => {
@@ -86,14 +86,337 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS) =>
   });
 };
 
+/** Route / list navigation may pass church_id as number or string — normalize once. */
+const parseRouteChurchId = (raw: unknown): number | null => {
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) {
+    return Math.trunc(raw);
+  }
+  if (raw != null && String(raw).trim() !== '') {
+    const n = parseInt(String(raw), 10);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }
+  return null;
+};
+
+/** Axios: `{ data: T }` envelope or body already `T`. */
+const getAxiosDataPayload = (res: any): any => {
+  const body = res?.data;
+  if (body == null) {
+    return null;
+  }
+  if (
+    body.data !== undefined &&
+    body.data !== null &&
+    typeof body.data === 'object' &&
+    !Array.isArray(body.data)
+  ) {
+    return body.data;
+  }
+  return body;
+};
+
+const USERS_ME_INCLUDE_PASTOR = {params: {include_pastor_churches: 'true'}};
+
+/**
+ * Churches for the org picker modal: Pastor Leader reads `from_churches` on `users/me`;
+ * otherwise falls back to `pastor_of_churches` / `pastor_churches`.
+ */
+const getOrgModalChurchesFromUserMe = (
+  userData: any,
+  roleId: number | null,
+): any[] | null => {
+  if (!userData || typeof userData !== 'object') {
+    return null;
+  }
+  if (isPastorLeader(roleId)) {
+    const from =
+      userData.from_churches ??
+      userData.fromChurches ??
+      null;
+    if (Array.isArray(from) && from.length > 0) {
+      const rows = from
+        .filter((c: any) => c && typeof c === 'object' && c.disabled !== true)
+        .map((c: any) => {
+          const id = Number(c.id);
+          const name = String(c.name ?? '').trim();
+          return Number.isFinite(id) && id > 0
+            ? {id, name: name || String(id)}
+            : null;
+        })
+        .filter(Boolean) as any[];
+      return rows.length > 0 ? rows : null;
+    }
+  }
+  const alt =
+    userData.pastor_of_churches ??
+    userData.pastor_churches ??
+    null;
+  return Array.isArray(alt) && alt.length > 0 ? alt : null;
+};
+
+/** Merge dashboard payload shapes (overseer + church_id query vs pastor) into one `dashboard_info` + stable `church_id`. */
+const DASHBOARD_INFO_MERGE_KEYS = [
+  'church_id',
+  'church_name',
+  'country_name',
+  'photo_url',
+  'church_region_logo_url',
+  'last_report_date',
+  'is_verified',
+  'verified_date',
+  'verified_by_user_name',
+] as const;
+
+const DASHBOARD_INFO_FROM_INDICATORS_KEYS = [
+  'last_report_date',
+  'is_verified',
+  'verified_date',
+  'verified_by_user_name',
+] as const;
+
+const LAST_REPORT_DATE_KEYS = [
+  'last_report_date',
+  'lastReportDate',
+  'last_monthly_report_date',
+  'lastMonthlyReportDate',
+  'last_reported_at',
+  'report_date',
+  'latest_report_date',
+] as const;
+
+const INDICATOR_OBJECT_KEYS = [
+  'dashboard_indicators',
+  'church_dashboard_indicators',
+  'church_indicators',
+  'indicators',
+  'statistics',
+  'stats',
+] as const;
+
+const INDICATOR_SCALAR_KEYS = [
+  'church_id',
+  'avg_attendance',
+  'growth',
+  'currency_symbol_code',
+  'avg_monthly_giving',
+  'avg_monthly_giving_in_usd',
+  'avg_monthly_mfp_giving',
+  'avg_monthly_mfp_giving_in_usd',
+  'total_church_plants',
+  'percent_cell_group_attendance',
+  'total_new_decisions',
+  'percent_liw_students',
+] as const;
+
+const firstNonEmptyDateFromSources = (...sources: any[]): string | undefined => {
+  for (const src of sources) {
+    if (!src || typeof src !== 'object' || Array.isArray(src)) {
+      continue;
+    }
+    for (const k of LAST_REPORT_DATE_KEYS) {
+      const v = src[k];
+      if (v != null && String(v).trim() !== '') {
+        return String(v);
+      }
+    }
+  }
+  return undefined;
+};
+
+const pickIndicatorObject = (raw: any): Record<string, any> => {
+  if (!raw || typeof raw !== 'object') {
+    return {};
+  }
+  for (const name of INDICATOR_OBJECT_KEYS) {
+    const v = raw[name];
+    if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0) {
+      return {...v};
+    }
+  }
+  return {};
+};
+
+const mergeScalarIndicatorsFrom = (target: Record<string, any>, src: any) => {
+  if (!src || typeof src !== 'object' || Array.isArray(src)) {
+    return;
+  }
+  for (const k of INDICATOR_SCALAR_KEYS) {
+    if ((target[k] === undefined || target[k] === null) && src[k] !== undefined && src[k] !== null) {
+      target[k] = src[k];
+    }
+  }
+};
+
+const normalizePastorLeaderDashboard = (
+  rawInput: any,
+  opts?: { fallbackChurchId?: number | null },
+): any => {
+  if (rawInput == null || typeof rawInput !== 'object') {
+    return rawInput;
+  }
+  let raw: any = rawInput;
+  if (
+    raw.success === true &&
+    raw.data != null &&
+    typeof raw.data === 'object' &&
+    !Array.isArray(raw.data)
+  ) {
+    raw = raw.data;
+  }
+  const out = {...raw};
+  let info: Record<string, any> =
+    raw.dashboard_info != null &&
+    typeof raw.dashboard_info === 'object' &&
+    !Array.isArray(raw.dashboard_info)
+      ? {...raw.dashboard_info}
+      : {};
+
+  const mergeFrom = (src: Record<string, any> | null | undefined) => {
+    if (!src || typeof src !== 'object' || Array.isArray(src)) {
+      return;
+    }
+    for (const key of DASHBOARD_INFO_MERGE_KEYS) {
+      const v = src[key];
+      if (v != null && v !== '' && (info[key] == null || info[key] === '')) {
+        info[key] = v;
+      }
+    }
+  };
+
+  if (raw.church && typeof raw.church === 'object' && !Array.isArray(raw.church)) {
+    mergeFrom(raw.church);
+  }
+
+  let indicators =
+    raw.dashboard_indicators && typeof raw.dashboard_indicators === 'object' && !Array.isArray(raw.dashboard_indicators)
+      ? {...raw.dashboard_indicators}
+      : pickIndicatorObject(raw);
+
+  const indicatorsSparse =
+    !indicators ||
+    (typeof indicators === 'object' &&
+      !Array.isArray(indicators) &&
+      Object.keys(indicators).length === 0);
+  if (indicatorsSparse) {
+    mergeScalarIndicatorsFrom(indicators, raw);
+    mergeScalarIndicatorsFrom(indicators, raw.church);
+  }
+
+  if (indicators && typeof indicators === 'object' && !Array.isArray(indicators)) {
+    for (const key of DASHBOARD_INFO_FROM_INDICATORS_KEYS) {
+      const v = indicators[key];
+      if (v != null && v !== '' && (info[key] == null || info[key] === '')) {
+        info[key] = v;
+      }
+    }
+  }
+
+  if (info.last_report_date == null || String(info.last_report_date).trim() === '') {
+    const lr = firstNonEmptyDateFromSources(
+      info,
+      raw,
+      indicators,
+      raw.church,
+      raw.monthly_summary,
+      raw.monthly_data,
+      raw.latest_monthly_report,
+      raw.last_monthly_report,
+    );
+    if (lr) {
+      info.last_report_date = lr;
+    }
+  }
+
+  if (info.is_verified == null && raw.verification_status != null) {
+    const vs = String(raw.verification_status).toLowerCase();
+    info.is_verified = vs.includes('verified') || vs === '1' || vs === 'true';
+  }
+  if (info.is_verified == null && raw.church && typeof raw.church === 'object' && raw.church.is_verified != null) {
+    info.is_verified = raw.church.is_verified;
+  }
+
+  const fid = opts?.fallbackChurchId ?? null;
+  let cid = parseRouteChurchId(info.church_id);
+  if (cid == null && fid != null) {
+    cid = fid;
+  }
+  if (cid == null && indicators && typeof indicators === 'object') {
+    cid = parseRouteChurchId(indicators.church_id);
+  }
+  if (cid != null) {
+    info.church_id = cid;
+  }
+
+  if (typeof info.is_verified === 'string') {
+    const s = info.is_verified.toLowerCase();
+    info.is_verified = s === 'true' || s === '1' || s === 'yes';
+  } else if (info.is_verified === 1 || info.is_verified === 0) {
+    info.is_verified = Boolean(info.is_verified);
+  }
+
+  out.dashboard_info = info;
+  out.dashboard_indicators = indicators && typeof indicators === 'object' && !Array.isArray(indicators) ? indicators : {};
+
+  // Normalize assigned_churches: also check pastor_of_churches for PastorLeader role
+  if (!Array.isArray(out.assigned_churches) || out.assigned_churches.length === 0) {
+    const alt =
+      raw.from_churches ??
+      raw.fromChurches ??
+      raw.pastor_of_churches ??
+      raw.pastor_churches ??
+      raw.churches ??
+      null;
+    if (Array.isArray(alt) && alt.length > 0) {
+      out.assigned_churches = alt;
+    }
+  }
+
+  return out;
+};
+
 const normalizeFileUri = (p: string) => (p.startsWith('file://') ? p : `file://${p}`);
+
+/** Stats: always resolve indicators (envelope / alternate keys / root scalars). */
+const resolveDashboardIndicatorsForStats = (dashboardData: any): Record<string, any> => {
+  if (!dashboardData || typeof dashboardData !== 'object') {
+    return {};
+  }
+  const asCopy = (v: any): Record<string, any> | null =>
+    v != null && typeof v === 'object' && !Array.isArray(v) ? {...v} : null;
+
+  const main = asCopy(dashboardData.dashboard_indicators);
+  if (main && Object.keys(main).length > 0) {
+    return main;
+  }
+  for (const key of ['church_dashboard_indicators', 'church_indicators', 'indicators', 'statistics', 'stats']) {
+    const o = asCopy((dashboardData as any)[key]);
+    if (o && Object.keys(o).length > 0) {
+      return o;
+    }
+  }
+  const fromRoot: Record<string, any> = {};
+  for (const k of INDICATOR_SCALAR_KEYS) {
+    const v = (dashboardData as any)[k];
+    if (v !== undefined && v !== null) {
+      fromRoot[k] = v;
+    }
+  }
+  const cc = (dashboardData as any).currency_code;
+  if (cc != null && cc !== '' && (fromRoot.currency_symbol_code == null || fromRoot.currency_symbol_code === '')) {
+    fromRoot.currency_code = cc;
+  }
+  return fromRoot;
+};
 
 // Stats data will be populated from API
 const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
-  if (!dashboardData?.dashboard_indicators) return [];
-  
-  const indicators = dashboardData.dashboard_indicators;
-  const currencySymbol = decodeHtmlEntity(indicators.currency_symbol_code || '');
+  if (!dashboardData || typeof dashboardData !== 'object') {
+    return [];
+  }
+  const indicators = resolveDashboardIndicatorsForStats(dashboardData);
+  const currencyRaw = indicators.currency_symbol_code ?? indicators.currency_code ?? '';
+  const currencySymbol =
+    decodeHtmlEntity(String(currencyRaw || '')) || (String(currencyRaw || '').trim() ? String(currencyRaw).trim() : '');
   const avgMonthlyGivingLocal = indicators.avg_monthly_giving || 0;
   const avgMonthlyGivingUsd = indicators.avg_monthly_giving_in_usd || 0;
   const avgMonthlyMfpGivingLocal = indicators.avg_monthly_mfp_giving || 0;
@@ -185,8 +508,67 @@ const menuItems = [
   { icon: require('../../../../app/assets/images/icon/home.png'), label: 'New Church', routeName: 'AddChurch' },
 ];
 
+function getApiOrigin(): string {
+  const base = String(api.defaults.baseURL || '').trim();
+  if (!base) return '';
+  try {
+    const u = new URL(base);
+    return `${u.protocol}//${u.host}`;
+  } catch {
+    return '';
+  }
+}
+
+function resolveChurchPictureUri(raw: string): string {
+  const s = String(raw || '').trim();
+  if (!s) return '';
+  if (/^https?:\/\//i.test(s) || s.startsWith('file://')) {
+    return s;
+  }
+  const origin = getApiOrigin();
+  if (!origin) return s;
+  if (s.startsWith('/')) {
+    return `${origin}${s}`;
+  }
+  return `${origin}/${s.replace(/^\/+/, '')}`;
+}
+
+function churchPictureDedupeKey(resolved: string): string {
+  try {
+    const u = new URL(resolved);
+    return `${u.hostname}${u.pathname}`.toLowerCase().replace(/\/+$/, '');
+  } catch {
+    return resolved.split('?')[0].toLowerCase().replace(/\/+$/, '');
+  }
+}
+
+/** Merge photo_url + photos[] etc.; same file often appears twice (absolute + relative). */
+function dedupeResolvedChurchPictureUrls(urls: string[]): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  for (const raw of urls) {
+    const resolved = resolveChurchPictureUri(String(raw || '').trim());
+    if (!resolved) continue;
+    const key = churchPictureDedupeKey(resolved);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(resolved);
+  }
+  return out;
+}
+
+function isRenderableChurchImageUri(u: string): boolean {
+  const s = String(u || '').trim();
+  return /^https?:\/\//i.test(s) || s.startsWith('file://');
+}
+
+const DEFAULT_CHURCH_PHOTO_ASSET = require('../../../assets/images/group-user.jpg');
+const DEFAULT_CHURCH_PICTURE_URI =
+  Image.resolveAssetSource(DEFAULT_CHURCH_PHOTO_ASSET)?.uri ?? '';
+
 export default function DashboardPastorLeaderScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const { setIsAuthenticated } = useContext(AuthContext);
   const { selectedLanguage, setLanguage } = useLanguage();
   const { t } = useTranslation();
@@ -197,6 +579,8 @@ export default function DashboardPastorLeaderScreen() {
   const [menuVisible, setMenuVisible] = useState(false);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  /** For overseers: the ID of the pastor/leader whose profile is displayed. Used for "tap name" navigation. */
+  const [pastorProfileUserId, setPastorProfileUserId] = useState<number | null>(null);
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -225,10 +609,14 @@ export default function DashboardPastorLeaderScreen() {
   const [churchPicturesLoaded, setChurchPicturesLoaded] = useState(false);
   const [churchPictures, setChurchPictures] = useState<string[]>([]);
   const [churchPicturesError, setChurchPicturesError] = useState<string | null>(null);
-  const [organizationRowWidth, setOrganizationRowWidth] = useState(0);
-  const [organizationFirstLineWidth, setOrganizationFirstLineWidth] = useState(0);
-  /** null = chưa đo layout; tránh left: 0 đè lên chữ khi vừa load */
-  const [organizationChevronLeft, setOrganizationChevronLeft] = useState<number | null>(null);
+  const organizationRowWidthRef = useRef(0);
+  /** Last line of the org text: width + y-offset, used to place the chevron right after the text end. */
+  const [orgLastLineInfo, setOrgLastLineInfo] = useState<{width: number; y: number} | null>(null);
+
+  /** After initial bootstrap, `church_id` in route params is handled by the param effect (same screen, new selection). */
+  const bootstrapDoneRef = useRef(false);
+
+  const isOverseerUser = isOverseer(currentUserRoleId ?? undefined);
 
   useEffect(() => {
     Animated.timing(rotation, {
@@ -281,7 +669,7 @@ export default function DashboardPastorLeaderScreen() {
   const refreshMeAvatar = useCallback(async () => {
     try {
       const res = await api.get('users/me');
-      const userData = res?.data?.data;
+      const userData = getAxiosDataPayload(res);
       const nextUrl = userData?.photo_url || '';
       setUserProfile((prev: any) => ({
         ...(prev || {}),
@@ -311,14 +699,20 @@ export default function DashboardPastorLeaderScreen() {
       const uploadRes = await api.post('images/upload', form, {
         headers: {'Content-Type': 'multipart/form-data'},
       });
-      uploadedUserPhotoPath = uploadRes?.data?.data?.path || null;
-    } catch {
+      uploadedUserPhotoPath =
+        uploadRes?.data?.data?.path ||
+        uploadRes?.data?.data?.url ||
+        uploadRes?.data?.path ||
+        uploadRes?.data?.url ||
+        null;
+    } catch (e: any) {
+      console.error('[avatar upload] error:', e?.response?.status, e?.response?.data, e?.message);
       uploadedUserPhotoPath = null;
     }
 
     if (!uploadedUserPhotoPath) {
       setAvatarUploading(false);
-      Alert.alert(t('error'), t('imageDownloadError'));
+      Alert.alert(t('error'), t('failedToLoadData'));
       return;
     }
 
@@ -337,6 +731,9 @@ export default function DashboardPastorLeaderScreen() {
 
   const openAvatarPhotoSourcePicker = useCallback(() => {
     const pickFromLibrary = async () => {
+      const cancelText = t('cancel') || 'Cancel';
+      const ok = await ensureAndroidPermission('library', cancelText);
+      if (!ok) return;
       try {
         const image: any = await ImagePicker.openPicker({
           width: 300,
@@ -358,10 +755,17 @@ export default function DashboardPastorLeaderScreen() {
           setLocalAvatarPath(image.path);
           void uploadAndApplyAvatar(image.path);
         }
-      } catch {}
+      } catch (err) {
+        if (isPermissionError(err)) {
+          promptPermissionSettings('library', t('cancel') || 'Cancel');
+        }
+      }
     };
 
     const takePhoto = async () => {
+      const cancelText = t('cancel') || 'Cancel';
+      const ok = await ensureAndroidPermission('camera', cancelText);
+      if (!ok) return;
       try {
         const image: any = await ImagePicker.openCamera({
           width: 300,
@@ -382,7 +786,11 @@ export default function DashboardPastorLeaderScreen() {
           setLocalAvatarPath(image.path);
           void uploadAndApplyAvatar(image.path);
         }
-      } catch {}
+      } catch (err) {
+        if (isPermissionError(err)) {
+          promptPermissionSettings('camera', t('cancel') || 'Cancel');
+        }
+      }
     };
 
     if (Platform.OS === 'ios') {
@@ -435,45 +843,159 @@ export default function DashboardPastorLeaderScreen() {
   };
 
   const handleSelectAssignedChurch = async (church: any) => {
+    const churchIdNum = parseRouteChurchId(church?.id) ?? null;
+    const churchNameFromParam = typeof church?.name === 'string' ? church.name.trim() : '';
+    const churchCountryFromParam = typeof church?.country_name === 'string' ? church.country_name.trim() : '';
+
+    setOrgModalVisible(false);
+    setLoading(true);
+    setBannerError(false);
+    setProfileError(false);
+    setLogoError(false);
+    setChurchPictureExpanded(false);
+    setChurchPictures([]);
+    setChurchPicturesLoaded(false);
+    setChurchPicturesError(null);
+
     try {
-      setOrgModalVisible(false);
-      setLoading(true);
-      setBannerError(false);
-      setProfileError(false);
-      setLogoError(false);
-      setChurchPictureExpanded(false);
-      setChurchPictures([]);
-      setChurchPicturesLoaded(false);
-      setChurchPicturesError(null);
-      
-      // Save selected church_id to AsyncStorage
+      // Save selected church to AsyncStorage
       if (church?.id) {
         await AsyncStorage.setItem('selectedChurchId', String(church.id));
       }
-      if (church?.name) {
-        await AsyncStorage.setItem('selectedChurchName', String(church.name));
+      if (churchNameFromParam) {
+        await AsyncStorage.setItem('selectedChurchName', churchNameFromParam);
       }
-      
-      const res = await withTimeout(
-        api.get('dashboard', { params: { church_id: church?.id } }),
+      if (churchCountryFromParam) {
+        await AsyncStorage.setItem('selectedChurchCountryName', churchCountryFromParam);
+      }
+
+      const dashboardEndpoint =
+        churchIdNum != null ? `dashboard/churches/${churchIdNum}` : 'dashboard';
+
+      let data: any = null;
+      try {
+        const res = await withTimeout(api.get(dashboardEndpoint));
+        data = normalizePastorLeaderDashboard(getAxiosDataPayload(res), {fallbackChurchId: churchIdNum});
+      } catch (apiErr: any) {
+        console.warn('[handleSelectAssignedChurch] dashboard API failed:', apiErr?.message);
+        // Build a minimal data structure so the screen is still usable
+        data = normalizePastorLeaderDashboard(
+          { dashboard_info: { church_id: churchIdNum, church_name: churchNameFromParam, country_name: churchCountryFromParam }, dashboard_indicators: {} },
+          {fallbackChurchId: churchIdNum},
+        );
+      }
+
+      // Ensure data is always a valid object (never null)
+      if (data == null || typeof data !== 'object') {
+        data = normalizePastorLeaderDashboard(
+          { dashboard_info: { church_id: churchIdNum, church_name: churchNameFromParam, country_name: churchCountryFromParam }, dashboard_indicators: {} },
+          {fallbackChurchId: churchIdNum},
+        );
+      }
+
+      let organization =
+        (data?.dashboard_info?.church_name && String(data.dashboard_info.church_name).trim()) ||
+        churchNameFromParam ||
+        '';
+      let location =
+        (data?.dashboard_info?.country_name && String(data.dashboard_info.country_name).trim()) ||
+        churchCountryFromParam ||
+        '';
+
+      const di = data?.dashboard_info && typeof data.dashboard_info === 'object' ? data.dashboard_info : {};
+      const lastReportEmpty = !di.last_report_date || String(di.last_report_date).trim() === '';
+      const needChurchDetail =
+        churchIdNum != null &&
+        (!organization ||
+          !location ||
+          !di.photo_url ||
+          !di.church_region_logo_url ||
+          !String(di.church_region_logo_url || '').trim() ||
+          lastReportEmpty);
+
+      if (needChurchDetail) {
+        try {
+          const d = await getChurchDetail(churchIdNum!);
+          if (d) {
+            if (!organization && d.name) {
+              organization = String(d.name).trim();
+            }
+            if (!location && d.country_name) {
+              location = String(d.country_name).trim();
+            }
+            const nextInfo = {...(data?.dashboard_info && typeof data.dashboard_info === 'object' ? data.dashboard_info : {})};
+            if (!nextInfo.photo_url && d.photo_url) {
+              nextInfo.photo_url = d.photo_url;
+            }
+            const regionLogo =
+              (d as any).church_region_logo_url ||
+              (d as any).region_logo_url ||
+              (d as any).church_region?.logo_url ||
+              (d as any).church_region?.photo_url;
+            if (!nextInfo.church_region_logo_url && regionLogo) {
+              nextInfo.church_region_logo_url = String(regionLogo).trim();
+            }
+            if (!nextInfo.church_name && d.name) {
+              nextInfo.church_name = String(d.name).trim();
+            }
+            if (!nextInfo.country_name && d.country_name) {
+              nextInfo.country_name = String(d.country_name).trim();
+            }
+            if (churchIdNum != null && nextInfo.church_id == null) {
+              nextInfo.church_id = churchIdNum;
+            }
+            if (lastReportEmpty) {
+              const lrFromDetail = firstNonEmptyDateFromSources(d);
+              if (lrFromDetail) {
+                nextInfo.last_report_date = lrFromDetail;
+              }
+            }
+            data = {...data, dashboard_info: nextInfo};
+          }
+        } catch {
+          // ignore detail errors; we still have the dashboard data
+        }
+      }
+
+      // Preserve assigned_churches when switching churches (new dashboard won't include the list)
+      if (!Array.isArray(data.assigned_churches) || data.assigned_churches.length === 0) {
+        const prevAssigned = dashboardData?.assigned_churches;
+        if (Array.isArray(prevAssigned) && prevAssigned.length > 0) {
+          data.assigned_churches = prevAssigned;
+        }
+      }
+
+      setDashboardData(data);
+      setUserProfile((prev: any) => ({
+        ...(prev || {}),
+        name: prev?.name || '',
+        organization,
+        location,
+        lastRecord: formatLastRecord(data.dashboard_info?.last_report_date || ''),
+        profileImage: (prev && prev.profileImage) || '',
+        bannerImage: data.dashboard_info?.photo_url || '',
+      }));
+    } catch (e) {
+      console.warn('[handleSelectAssignedChurch] unexpected error:', e);
+      // Even on unexpected error, show church info from params so screen is not blank
+      const fallbackData = normalizePastorLeaderDashboard(
+        { dashboard_info: { church_id: churchIdNum, church_name: churchNameFromParam, country_name: churchCountryFromParam }, dashboard_indicators: {} },
+        {fallbackChurchId: churchIdNum},
       );
-      const data = res?.data?.data;
-      if (data) {
-        // use top-level formatLastRecord
-        console.log('church_region_logo_url (selected church):', data.dashboard_info?.church_region_logo_url);
-        setDashboardData(data);
+      if (dashboardData == null) {
+        setDashboardData(fallbackData);
+      }
+      if (churchNameFromParam || churchCountryFromParam) {
         setUserProfile((prev: any) => ({
           ...(prev || {}),
           name: prev?.name || '',
-          organization: data.dashboard_info?.church_name || church?.name || '',
-          location: data.dashboard_info?.country_name || '',
-          lastRecord: formatLastRecord(data.dashboard_info?.last_report_date || ''),
+          organization: churchNameFromParam || prev?.organization || '',
+          location: churchCountryFromParam || prev?.location || '',
+          lastRecord: prev?.lastRecord || '-',
           profileImage: (prev && prev.profileImage) || '',
-          bannerImage: data.dashboard_info?.photo_url || '',
+          bannerImage: prev?.bannerImage || '',
         }));
       }
-    } catch (e) {
-      // keep current data on error
     } finally {
       setLoading(false);
     }
@@ -483,55 +1005,142 @@ export default function DashboardPastorLeaderScreen() {
     let mounted = true;
     (async () => {
       try {
-        // Load selected church_id from AsyncStorage
+        const incoming = parseRouteChurchId(route?.params?.church_id);
+        const incomingName = route?.params?.church_name;
+        const incomingCountry = route?.params?.church_country_name;
+
         const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
         const savedChurchName = await AsyncStorage.getItem('selectedChurchName');
-        
-        // Prepare dashboard API call with church_id if available
-        const dashboardParams = savedChurchId ? { church_id: parseInt(savedChurchId, 10) } : undefined;
-        
+        const savedChurchCountryName = await AsyncStorage.getItem(
+          'selectedChurchCountryName',
+        );
+
+        const effectiveChurchId =
+          incoming ?? parseRouteChurchId(savedChurchId);
+
+        if (effectiveChurchId != null) {
+          const userRes = await withTimeout(
+            api.get('users/me', USERS_ME_INCLUDE_PASTOR),
+          );
+          if (!mounted) {
+            return;
+          }
+          const userData = getAxiosDataPayload(userRes);
+          if (!userData) {
+            return;
+          }
+          if (typeof userData.id === 'number') {
+            setCurrentUserId(userData.id);
+          }
+          const resolvedRole = resolveRoleIdFromUser(userData);
+          if (resolvedRole != null) {
+            setCurrentUserRoleId(resolvedRole);
+          }
+          setUserProfile({
+            prefix: userData.prefix || '',
+            name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
+            title: userData.title || '',
+            organization: '',
+            location: '',
+            profileImage: userData.photo_url || '',
+            bannerImage: '',
+          });
+
+          const resolvedName =
+            typeof incomingName === 'string' && incomingName.trim() !== ''
+              ? incomingName
+              : savedChurchName && String(savedChurchName).trim() !== ''
+                ? String(savedChurchName).trim()
+                : undefined;
+
+          const resolvedCountry =
+            incomingCountry != null && String(incomingCountry).trim() !== ''
+              ? incomingCountry
+              : savedChurchCountryName &&
+                  String(savedChurchCountryName).trim() !== ''
+                ? String(savedChurchCountryName).trim()
+                : undefined;
+
+          await handleSelectAssignedChurch({
+            id: effectiveChurchId,
+            name: resolvedName,
+            country_name: resolvedCountry,
+          });
+
+          // Pastor Leader: `from_churches` on users/me powers the org picker; others use pastor assignments.
+          const orgList = getOrgModalChurchesFromUserMe(userData, resolvedRole);
+          if (Array.isArray(orgList) && orgList.length > 0) {
+            setDashboardData((prev: any) => {
+              if (!prev) return prev;
+              if (Array.isArray(prev.assigned_churches) && prev.assigned_churches.length > 0) {
+                return prev;
+              }
+              return {...prev, assigned_churches: orgList};
+            });
+          }
+
+          if (mounted && incoming != null) {
+            try {
+              navigation.setParams({
+                church_id: undefined,
+                church_name: undefined,
+                church_country_name: undefined,
+              });
+            } catch {
+              // ignore
+            }
+          }
+          return;
+        }
+
         const [userRes, dashboardRes] = await withTimeout(
           Promise.all([
-            api.get('users/me'),
-            api.get(
-              'dashboard',
-              dashboardParams ? { params: dashboardParams } : undefined,
-            ),
+            api.get('users/me', USERS_ME_INCLUDE_PASTOR),
+            api.get('dashboard'),
           ]),
         );
         if (!mounted) return;
         
-        const userData = userRes?.data?.data;
-        const dashboardData = dashboardRes?.data?.data;
-        
-        if (userData && dashboardData) {
-          // Format last report date to localized "Month, yyyy" format (moved to top-level function)
-          
+        const userData = getAxiosDataPayload(userRes);
+        const dashboardRaw = getAxiosDataPayload(dashboardRes);
+
+        if (userData && dashboardRaw) {
+          const dashboardData = normalizePastorLeaderDashboard(dashboardRaw, {
+            fallbackChurchId: null,
+          });
+
+          const roleIdForOrgList = resolveRoleIdFromUser(userData);
+          // Pastor Leader: `from_churches` on users/me; otherwise pastor assignment lists.
+          if (!Array.isArray(dashboardData.assigned_churches) || dashboardData.assigned_churches.length === 0) {
+            const orgList = getOrgModalChurchesFromUserMe(userData, roleIdForOrgList);
+            if (Array.isArray(orgList) && orgList.length > 0) {
+              dashboardData.assigned_churches = orgList;
+            }
+          }
+
           // Store user ID for navigation
           if (typeof userData.id === 'number') {
             setCurrentUserId(userData.id);
           }
-          
+
           // Store user role ID for menu filtering
-          const roleId = userData?.role?.id;
-          if (typeof roleId === 'number') {
-            setCurrentUserRoleId(roleId);
+          const resolvedRole = roleIdForOrgList;
+          if (resolvedRole != null) {
+            setCurrentUserRoleId(resolvedRole);
           }
 
           // Auto-save church_id to AsyncStorage if not already saved
           if (!savedChurchId) {
-            // Prefer dashboard_info for initial default selection
-            const dashboardChurchId = dashboardData?.dashboard_info?.church_id;
-            if (dashboardChurchId && typeof dashboardChurchId === 'number') {
+            const dashboardChurchId = parseRouteChurchId(dashboardData?.dashboard_info?.church_id);
+            if (dashboardChurchId != null) {
               await AsyncStorage.setItem('selectedChurchId', String(dashboardChurchId));
               console.log('Auto-saved church_id from dashboard:', dashboardChurchId);
               if (!savedChurchName && dashboardData?.dashboard_info?.church_name) {
                 await AsyncStorage.setItem('selectedChurchName', String(dashboardData.dashboard_info.church_name));
               }
             } else {
-              // Fallback to userData if dashboard_info is missing
-              const userChurchId = userData?.church_id;
-              if (userChurchId && typeof userChurchId === 'number') {
+              const userChurchId = parseRouteChurchId(userData?.church_id);
+              if (userChurchId != null) {
                 await AsyncStorage.setItem('selectedChurchId', String(userChurchId));
                 console.log('Auto-saved church_id from userData:', userChurchId);
                 if (!savedChurchName && userData?.church_name) {
@@ -546,27 +1155,134 @@ export default function DashboardPastorLeaderScreen() {
             }
           }
 
+          let organization =
+            (dashboardData.dashboard_info?.church_name &&
+              String(dashboardData.dashboard_info.church_name).trim()) ||
+            (savedChurchName && String(savedChurchName).trim()) ||
+            '';
+          let location =
+            (dashboardData.dashboard_info?.country_name &&
+              String(dashboardData.dashboard_info.country_name).trim()) ||
+            '';
+
+          const churchIdForDetail = parseRouteChurchId(
+            dashboardData?.dashboard_info?.church_id,
+          );
+          if ((!organization || !location) && churchIdForDetail != null) {
+            try {
+              const d = await getChurchDetail(churchIdForDetail);
+              if (d) {
+                if (!organization && d.name) {
+                  organization = String(d.name).trim();
+                }
+                if (!location && d.country_name) {
+                  location = String(d.country_name).trim();
+                }
+              }
+            } catch {
+              // ignore
+            }
+          }
+
           setUserProfile({
             prefix: userData.prefix || '',
             name: `${userData.first_name || ''} ${userData.last_name || ''}`.trim(),
             title: userData.title || '',
-            organization: dashboardData.dashboard_info?.church_name || '',
-            location: dashboardData.dashboard_info?.country_name || '',
+            organization,
+            location,
             profileImage: userData.photo_url || '',
             bannerImage: dashboardData.dashboard_info?.photo_url || '',
           });
-          
+
           console.log('church_region_logo_url:', dashboardData.dashboard_info?.church_region_logo_url);
           setDashboardData(dashboardData);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
+        bootstrapDoneRef.current = true;
         if (mounted) setLoading(false);
       }
     })();
     return () => { mounted = false; };
   }, []);
+
+  // Same screen instance receives a new church_id (e.g. stack reuse) after bootstrap finished.
+  useEffect(() => {
+    if (!bootstrapDoneRef.current) {
+      return;
+    }
+    const id = parseRouteChurchId(route?.params?.church_id);
+    if (id == null) {
+      return;
+    }
+    const churchName = route?.params?.church_name;
+    const churchCountryName = route?.params?.church_country_name;
+    let cancelled = false;
+    void (async () => {
+      try {
+        await handleSelectAssignedChurch({
+          id,
+          name: typeof churchName === 'string' ? churchName : undefined,
+          country_name: churchCountryName,
+        });
+      } catch {
+        // keep current data
+      }
+      try {
+        if (!cancelled) {
+          navigation.setParams({
+            church_id: undefined,
+            church_name: undefined,
+            church_country_name: undefined,
+          });
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [route?.params?.church_id, route?.params?.church_name, route?.params?.church_country_name]);
+
+  /**
+   * Overseer view: when dashboard_info.pastor_id is available, fetch that pastor's profile
+   * and replace the profile card data (name, photo, title) with the pastor's details.
+   */
+  useEffect(() => {
+    if (!isOverseerUser) {
+      setPastorProfileUserId(null);
+      return;
+    }
+    const pastorId = dashboardData?.dashboard_info?.pastor_id;
+    if (!pastorId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await getUserById(Number(pastorId));
+        if (cancelled) return;
+        // getUserById returns response.data (the API envelope); unwrap the inner data object
+        const pastor: any = (res as any)?.data ?? res;
+        if (!pastor) return;
+        if (typeof pastor.id === 'number') {
+          setPastorProfileUserId(pastor.id);
+        }
+        setUserProfile((prev: any) => ({
+          ...(prev || {}),
+          prefix: pastor.prefix || '',
+          name:
+            pastor.name ||
+            `${pastor.first_name || ''} ${pastor.last_name || ''}`.trim(),
+          title: pastor.title || '',
+          profileImage: pastor.photo_url || '',
+        }));
+      } catch {
+        // leave current profile unchanged on error
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [isOverseerUser, dashboardData?.dashboard_info?.pastor_id]);
 
   const handleLogout = async () => {
     try {
@@ -676,28 +1392,48 @@ export default function DashboardPastorLeaderScreen() {
       if (!Array.isArray(source)) return [];
       return source
         .map((item: any) => {
-          if (typeof item === 'string') return item;
+          if (typeof item === 'string') return item.trim();
           if (!item || typeof item !== 'object') return '';
-          return item.url || item.photo_url || item.image_url || item.image || item.path || '';
+          return String(
+            item.url || item.photo_url || item.image_url || item.image || item.path || '',
+          ).trim();
         })
         .filter((url: string) => typeof url === 'string' && url.trim() !== '');
     });
-    const single = typeof data?.photo_url === 'string' ? [data.photo_url] : [];
-    return Array.from(new Set([...fromArrays, ...single]));
+    const singleFields = [data?.photo_url, data?.photo, data?.image, data?.image_url];
+    const single = singleFields
+      .filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+      .flatMap(v => [v.trim()]);
+    const merged = dedupeResolvedChurchPictureUrls(Array.from(new Set([...fromArrays, ...single])));
+    return merged.filter(isRenderableChurchImageUri);
   };
+
+  const displayChurchPictures = useMemo(
+    () =>
+      dedupeResolvedChurchPictureUrls(churchPictures.map(s => String(s || '').trim())).filter(
+        isRenderableChurchImageUri,
+      ),
+    [churchPictures],
+  );
+
+  const churchPicturesForDisplay = useMemo(() => {
+    if (displayChurchPictures.length > 0) {
+      return displayChurchPictures;
+    }
+    return DEFAULT_CHURCH_PICTURE_URI ? [DEFAULT_CHURCH_PICTURE_URI] : [];
+  }, [displayChurchPictures]);
 
   const getCurrentChurchId = async (): Promise<number | null> => {
     try {
       const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-      if (savedChurchId) {
-        const parsed = parseInt(savedChurchId, 10);
-        if (!isNaN(parsed)) return parsed;
+      const fromSaved = parseRouteChurchId(savedChurchId);
+      if (fromSaved != null) {
+        return fromSaved;
       }
     } catch (error) {
       console.log('Failed to read selectedChurchId:', error);
     }
-    const dashboardChurchId = dashboardData?.dashboard_info?.church_id;
-    return typeof dashboardChurchId === 'number' ? dashboardChurchId : null;
+    return parseRouteChurchId(dashboardData?.dashboard_info?.church_id);
   };
 
   const refreshChurchPictures = useCallback(async () => {
@@ -717,11 +1453,14 @@ export default function DashboardPastorLeaderScreen() {
   const uploadAndApplyChurchPictureFromPicker = useCallback(
     async (imagePath: string) => {
       const churchId = await getCurrentChurchId();
-      if (!churchId) return;
+      if (!churchId) {
+        Alert.alert(t('error'), 'Could not determine church ID. Please try again.');
+        return;
+      }
 
       let uploadedPhotoPath: string | null = null;
+      let uploadError: string | null = null;
       try {
-        // Same upload flow as EditChurchScreen.tsx
         const form = new FormData();
         const fileName = imagePath.split('/').pop() || 'photo.jpg';
         form.append('file', {
@@ -734,13 +1473,24 @@ export default function DashboardPastorLeaderScreen() {
         const uploadRes = await api.post('images/upload', form, {
           headers: {'Content-Type': 'multipart/form-data'},
         });
-        uploadedPhotoPath = uploadRes?.data?.data?.path || null;
-      } catch {
+        uploadedPhotoPath =
+          uploadRes?.data?.data?.path ||
+          uploadRes?.data?.data?.url ||
+          uploadRes?.data?.path ||
+          uploadRes?.data?.url ||
+          null;
+      } catch (e: any) {
+        console.error('[church photo upload] error:', e?.response?.status, e?.response?.data, e?.message);
+        uploadError =
+          e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          'Upload failed';
         uploadedPhotoPath = null;
       }
 
       if (!uploadedPhotoPath) {
-        Alert.alert(t('error'), t('imageDownloadError'));
+        Alert.alert(t('error'), uploadError || t('failedToLoadData'));
         return;
       }
 
@@ -757,6 +1507,9 @@ export default function DashboardPastorLeaderScreen() {
 
   const openSelectedImageChurchPhotoPicker = useCallback(() => {
     const pickFromLibrary = async () => {
+      const cancelText = t('cancel') || 'Cancel';
+      const ok = await ensureAndroidPermission('library', cancelText);
+      if (!ok) return;
       try {
         const image: any = await ImagePicker.openPicker({
           width: 1600,
@@ -773,10 +1526,17 @@ export default function DashboardPastorLeaderScreen() {
           setImageModalVisible(false);
           void uploadAndApplyChurchPictureFromPicker(image.path);
         }
-      } catch {}
+      } catch (err) {
+        if (isPermissionError(err)) {
+          promptPermissionSettings('library', t('cancel') || 'Cancel');
+        }
+      }
     };
 
     const takePhoto = async () => {
+      const cancelText = t('cancel') || 'Cancel';
+      const ok = await ensureAndroidPermission('camera', cancelText);
+      if (!ok) return;
       try {
         const image: any = await ImagePicker.openCamera({
           width: 1600,
@@ -792,7 +1552,11 @@ export default function DashboardPastorLeaderScreen() {
           setImageModalVisible(false);
           void uploadAndApplyChurchPictureFromPicker(image.path);
         }
-      } catch {}
+      } catch (err) {
+        if (isPermissionError(err)) {
+          promptPermissionSettings('camera', t('cancel') || 'Cancel');
+        }
+      }
     };
 
     if (Platform.OS === 'ios') {
@@ -809,13 +1573,24 @@ export default function DashboardPastorLeaderScreen() {
       return;
     }
 
-    setSelectedImageMenuVisible(true);
+    // Android: dismiss any open modal first so the native picker is not blocked,
+    // then show the action choices via a native Alert.
+    setImageModalVisible(false);
+    setSelectedImageMenuVisible(false);
+    requestAnimationFrame(() => {
+      Alert.alert(t('changePhoto') || 'Change Photo', '', [
+        {text: t('takePhoto') || 'Take Photo', onPress: () => void takePhoto()},
+        {text: t('uploadImage') || 'Choose Photo', onPress: () => void pickFromLibrary()},
+        {text: t('cancel') || 'Cancel', style: 'cancel'},
+      ]);
+    });
   }, [t, uploadAndApplyChurchPictureFromPicker]);
 
   const handleToggleChurchPictures = async () => {
     const nextExpanded = !churchPictureExpanded;
     setChurchPictureExpanded(nextExpanded);
-    if (!nextExpanded || churchPicturesLoaded || churchPicturesLoading) {
+    // Always re-fetch when expanding so the latest picture is shown after an upload.
+    if (!nextExpanded || churchPicturesLoading) {
       return;
     }
     try {
@@ -840,98 +1615,76 @@ export default function DashboardPastorLeaderScreen() {
   };
 
   useEffect(() => {
-    const churchId = dashboardData?.dashboard_info?.church_id;
-    if (!churchId || churchPicturesLoaded || churchPicturesLoading) return;
+    if (!dashboardData || churchPicturesLoaded || churchPicturesLoading) {
+      return;
+    }
     let mounted = true;
     (async () => {
+      let churchId = parseRouteChurchId(dashboardData?.dashboard_info?.church_id);
+      if (churchId == null) {
+        try {
+          const saved = await AsyncStorage.getItem('selectedChurchId');
+          churchId = parseRouteChurchId(saved);
+        } catch {
+          // ignore
+        }
+      }
+      if (!churchId || !mounted) {
+        return;
+      }
       try {
         setChurchPicturesLoading(true);
         setChurchPicturesError(null);
         const response = await api.get(`churches/${churchId}`);
-        if (!mounted) return;
+        if (!mounted) {
+          return;
+        }
         const pictureUrls = extractChurchPictures(response);
         setChurchPictures(pictureUrls);
         setChurchPicturesLoaded(true);
       } catch {
         // silent fail – user can still manually expand to retry
       } finally {
-        if (mounted) setChurchPicturesLoading(false);
+        if (mounted) {
+          setChurchPicturesLoading(false);
+        }
       }
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [dashboardData]);
 
-  const handleOrganizationTextLayout = (event: any) => {
+  const handleOrganizationTextLayout = useCallback((event: any) => {
     const lines = event?.nativeEvent?.lines || [];
-    if (!Array.isArray(lines) || lines.length === 0) {
-      return;
+    if (!Array.isArray(lines) || lines.length === 0) return;
+    const lastLine = lines[lines.length - 1];
+    const w = Number(lastLine?.width || 0);
+    const y = Number(lastLine?.y || 0);
+    if (w > 0) {
+      setOrgLastLineInfo(prev => {
+        if (prev && Math.abs(prev.width - w) < 1 && Math.abs(prev.y - y) < 1) return prev;
+        return {width: w, y};
+      });
     }
-    const firstLineWidth = Number(lines[0]?.width || 0);
-    if (Math.abs(firstLineWidth - organizationFirstLineWidth) > 1) {
-      setOrganizationFirstLineWidth(firstLineWidth);
-    }
-  };
+  }, []);
 
-  useEffect(() => {
-    if (organizationRowWidth <= 0 || organizationFirstLineWidth <= 0) {
-      setOrganizationChevronLeft(null);
-      return;
-    }
-    const iconWidth = ws(10);
-    const desiredLeft = organizationFirstLineWidth + ms(4);
-    const maxLeft = Math.max(0, organizationRowWidth - iconWidth);
-    const nextLeft = Math.min(desiredLeft, maxLeft);
-    if (Number.isNaN(nextLeft)) {
-      return;
-    }
-    setOrganizationChevronLeft(prev => {
-      if (prev == null || Math.abs(nextLeft - prev) > 1) {
-        return nextLeft;
-      }
-      return prev;
-    });
-  }, [organizationFirstLineWidth, organizationRowWidth]);
-
-  useEffect(() => {
-    // reset and let layout recalculate for new organization text
-    setOrganizationFirstLineWidth(0);
-    setOrganizationChevronLeft(null);
-  }, [userProfile?.organization]);
+  const orgChevronLeft = orgLastLineInfo != null
+    ? Math.min(
+        orgLastLineInfo.width + ms(4),
+        Math.max(0, organizationRowWidthRef.current - ws(10)),
+      )
+    : null;
+  const orgChevronTop = orgLastLineInfo != null
+    ? orgLastLineInfo.y + Math.max(0, (fs(22) - hs(10)) / 2)
+    : ms(7);
 
   const handleDownloadImage = async () => {
     if (!selectedImage) return;
     try {
-      
-      // On both iOS and Android, CameraRoll works more reliably with local file paths.
-      // We download the remote image to a temporary file, then save that file.
-        const fileName = `dash-image-${Date.now()}.jpg`;
-        const localPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
-
-        const downloadRes = await RNFS.downloadFile({
-          fromUrl: selectedImage,
-          toFile: localPath,
-        }).promise;
-
-        if (downloadRes.statusCode && downloadRes.statusCode >= 200 && downloadRes.statusCode < 300) {
-        // Use the local file path for CameraRoll.save
-        await CameraRoll.save(`file://${localPath}`, { type: 'photo' });
-        
-        // Clean up the temporary file after saving
-        try {
-          await RNFS.unlink(localPath);
-        } catch (cleanupError) {
-          console.log('Failed to cleanup temp file:', cleanupError);
-        }
-        
-        // Close image modal
-        setImageModalVisible(false);
-
-        // Temporary: show alert for reliable feedback
-        Alert.alert(t('success'), t('imageDownloadSuccess'));
-        } else {
-          console.log('Download failed with status', downloadRes.statusCode);
-          throw new Error('Failed to download image');
-        }
+      await downloadImageToCameraRoll(selectedImage, {filePrefix: 'dash-image'});
+      setImageModalVisible(false);
+      Alert.alert(t('success'), t('imageDownloadSuccess'));
     } catch (error) {
       console.error('Error downloading image:', error);
       Alert.alert(t('error'), t('imageDownloadError'));
@@ -943,9 +1696,10 @@ export default function DashboardPastorLeaderScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: C.textPrimary }}>{t('loading')}...</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(16) }}>
+          <ActivityIndicator size="large" color={COLORS.mainColor} />
+          <Text style={{ color: C.textPrimary, fontSize: fs(15) }}>{t('loading')}...</Text>
         </View>
       </SafeAreaView>
     );
@@ -953,9 +1707,10 @@ export default function DashboardPastorLeaderScreen() {
 
   if (!userProfile) {
     return (
-      <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-          <Text style={{ color: C.textPrimary }}>{t('failedToLoadUserData')}</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
+        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(16) }}>
+          <ActivityIndicator size="large" color={COLORS.mainColor} />
+          <Text style={{ color: C.textPrimary, fontSize: fs(15) }}>{t('failedToLoadUserData')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -1010,23 +1765,32 @@ export default function DashboardPastorLeaderScreen() {
           {/* Row 1: Organization + dropdown */}
           <TouchableOpacity
             style={styles.organizationRow}
-            onPress={() => setOrgModalVisible(true)}
-            onLayout={(event) => setOrganizationRowWidth(event.nativeEvent.layout.width)}
+            disabled={isOverseerUser}
+            activeOpacity={isOverseerUser ? 1 : 0.7}
+            onPress={() => {
+              if (!isOverseerUser) {
+                setOrgModalVisible(true);
+              }
+            }}
+            onLayout={(event) => { organizationRowWidthRef.current = event.nativeEvent.layout.width; }}
           >
             <RNText style={[styles.organizationText, { color: C.textPrimary }]} onTextLayout={handleOrganizationTextLayout}>
               {userProfile.organization}
             </RNText>
-            <Image
-              source={require('../../../../app/assets/images/icon/arrow-down-bold.png')}
-              style={[
-                styles.dropdownIcon,
-                {
-                  tintColor: C.textPrimary,
-                  left: organizationChevronLeft ?? 0,
-                  opacity: organizationChevronLeft == null ? 0 : 1,
-                },
-              ]}
-            />
+            {!isOverseerUser && (
+              <Image
+                source={require('../../../../app/assets/images/icon/arrow-down-bold.png')}
+                style={[
+                  styles.dropdownIcon,
+                  {
+                    tintColor: C.textPrimary,
+                    left: orgChevronLeft ?? 0,
+                    top: orgChevronTop,
+                    opacity: orgChevronLeft == null ? 0 : 1,
+                  },
+                ]}
+              />
+            )}
           </TouchableOpacity>
 
           {/* Row 2-3: Location left | Last Report + Verification right */}
@@ -1087,9 +1851,12 @@ export default function DashboardPastorLeaderScreen() {
 
             {/* Name & title — tappable to view profile */}
             <TouchableOpacity
-              onPress={() => { if (currentUserId) navigation.navigate('User', { userId: currentUserId }); }}
+              onPress={() => {
+                const navId = pastorProfileUserId ?? currentUserId;
+                if (navId) navigation.navigate('User', { userId: navId });
+              }}
               activeOpacity={0.7}
-              disabled={!currentUserId}
+              disabled={!(pastorProfileUserId ?? currentUserId)}
               style={styles.nameBlock}
             >
               <Text style={styles.profileNameLink} numberOfLines={2}>
@@ -1114,7 +1881,7 @@ export default function DashboardPastorLeaderScreen() {
                   <Text style={[styles.modalCloseText, { color: C.textPrimary }]}>✕</Text>
                 </TouchableOpacity>
               </View>
-              <ScrollView style={styles.modalList} showsVerticalScrollIndicator={false}>
+              <ScrollView style={styles.modalList}>
                 {(dashboardData?.assigned_churches || []).map((ch: any) => (
                   <TouchableOpacity
                     key={String(ch.id)}
@@ -1395,7 +2162,7 @@ export default function DashboardPastorLeaderScreen() {
                 {isNewChurchItem ? (
                   <>
                     <TouchableOpacity
-                      style={[styles.menuItem, styles.subMenuItem, { borderBottomColor: C.border, borderBottomWidth: (!churchPictureExpanded && churchPictures.length > 0) ? 0 : 1 }]}
+                      style={[styles.menuItem, styles.subMenuItem, { borderBottomColor: C.border, borderBottomWidth: (!churchPictureExpanded && churchPicturesForDisplay.length > 0) ? 0 : 1 }]}
                       onPress={handleToggleChurchPictures}
                       activeOpacity={0.7}
                     >
@@ -1407,31 +2174,29 @@ export default function DashboardPastorLeaderScreen() {
                       />
                     </TouchableOpacity>
                     {churchPictureExpanded ? (
-                      <View style={[styles.churchPicturesContainer, { borderBottomColor: C.border }]}>
+                      <View style={styles.churchPicturesContainer}>
                         {churchPicturesLoading ? (
                           <ActivityIndicator size="small" color={C.textSecondary} style={{ marginVertical: ms(12) }} />
                         ) : churchPicturesError ? (
                           <Text style={[styles.churchPictureStatusText, { color: C.error || '#ff4444' }]}>{churchPicturesError}</Text>
                         ) : (
                           <View style={styles.churchPicturesList}>
-                            {(churchPictures.length === 0
-                              ? [null]
-                              : churchPictures
-                            ).map((url, pictureIndex) => (
+                            {churchPicturesForDisplay.map((url, pictureIndex, arr) => (
                               <TouchableOpacity
-                                key={url ? `${url}-${pictureIndex}` : 'default'}
-                                style={styles.churchPictureItem}
-                                activeOpacity={url ? 0.85 : 1}
+                                key={`${url}-${pictureIndex}`}
+                                style={[
+                                  styles.churchPictureItem,
+                                  pictureIndex === arr.length - 1 ? styles.churchPictureItemLast : null,
+                                ]}
+                                activeOpacity={0.85}
                                 onPress={() => {
-                                  if (url) {
-                                    setSelectedImage(url);
-                                    setImageModalVisible(true);
-                                  }
+                                  setSelectedImage(url);
+                                  setImageModalVisible(true);
                                 }}
                               >
                                 <Image
-                                  source={url ? { uri: url } : require('../../../../app/assets/images/group-user.jpg')}
-                                  style={[styles.churchPictureThumb, { borderColor: C.border }]}
+                                  source={{ uri: url }}
+                                  style={styles.churchPictureThumb}
                                   resizeMode="cover"
                                 />
                               </TouchableOpacity>
@@ -1445,11 +2210,17 @@ export default function DashboardPastorLeaderScreen() {
                       <TouchableOpacity
                         activeOpacity={0.88}
                         style={styles.churchPicturePeek}
-                        onPress={handleToggleChurchPictures}
+                        onPress={() => {
+                          void handleToggleChurchPictures();
+                        }}
                       >
                         <View style={[styles.churchPicturePeekFrame, { backgroundColor: C.border }]}>
                           <Image
-                            source={churchPictures.length > 0 ? { uri: churchPictures[0] } : require('../../../../app/assets/images/group-user.jpg')}
+                            source={
+                              churchPicturesForDisplay[0]
+                                ? { uri: churchPicturesForDisplay[0] }
+                                : DEFAULT_CHURCH_PHOTO_ASSET
+                            }
                             style={styles.churchPicturePeekImg}
                             resizeMode="cover"
                           />
@@ -1732,7 +2503,7 @@ const styles = StyleSheet.create({
     paddingLeft: 0,
   },
   churchPicturesContainer: {
-    borderBottomWidth: 1,
+    borderBottomWidth: 0,
     paddingBottom: ms(12),
     paddingLeft: 0,
     paddingRight: 0,
@@ -1744,6 +2515,9 @@ const styles = StyleSheet.create({
   churchPictureItem: {
     marginBottom: ms(10),
   },
+  churchPictureItemLast: {
+    marginBottom: 0,
+  },
   churchPictureStatusText: {
     fontSize: fs(12),
     marginTop: ms(4),
@@ -1752,8 +2526,7 @@ const styles = StyleSheet.create({
     width: '100%',
     height: ws(180),
     borderRadius: 8,
-    borderWidth: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'transparent',
   },
   churchPicturePeek: {
     paddingTop: ms(4),

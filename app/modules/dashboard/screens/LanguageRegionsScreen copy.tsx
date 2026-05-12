@@ -10,7 +10,7 @@ export const LanguageRegionsScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
     <BackButton title="Language Regions" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
       <PlaceholderScreen screenName="Language Regions" />
       </ScrollView>
     </Layout>

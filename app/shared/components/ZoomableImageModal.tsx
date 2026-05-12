@@ -22,7 +22,6 @@ import {
   type TapGestureHandlerStateChangeEvent,
 } from 'react-native-gesture-handler';
 import {fs, hs, ms} from '../utils/scale';
-import {HamburgerMenuIcon} from './HamburgerMenuIcon';
 
 type Props = {
   visible: boolean;
@@ -391,9 +390,13 @@ export default function ZoomableImageModal({
             <View style={styles.headerRight}>
               {React.isValidElement(headerRight) &&
               typeof (headerRight as any)?.props?.onPress === 'function' ? (
-                <View style={{transform: [{scale: 0.75}]}}>
-                  <HamburgerMenuIcon onPress={(headerRight as any).props.onPress} />
-                </View>
+                <TouchableOpacity
+                  onPress={(headerRight as any).props.onPress}
+                  hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                  style={styles.headerMenuBtn}
+                >
+                  <RNText style={styles.headerMenuDots}>⋯</RNText>
+                </TouchableOpacity>
               ) : (
                 headerRight
               )}
@@ -434,6 +437,18 @@ const styles = StyleSheet.create({
     transform: [{scale: 1.5}],
   },
   closeText: {color: '#fff', fontSize: fs(18), fontWeight: '700'},
+  headerMenuBtn: {
+    paddingHorizontal: ms(6),
+    paddingVertical: ms(4),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerMenuDots: {
+    color: '#fff',
+    fontSize: fs(22),
+    fontWeight: '700',
+    lineHeight: fs(26),
+  },
   headerRight: {
     minHeight: hs(40),
     justifyContent: 'center',

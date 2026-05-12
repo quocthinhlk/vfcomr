@@ -28,6 +28,7 @@ interface ElementDropdownProps {
   activeItemColor?: string; // background for selected row in dropdown
   error?: boolean;
   search?: boolean;
+  disabled?: boolean;
   onSearchText?: (text: string) => void;
   onEndReached?: () => void;
   onFocus?: () => void;
@@ -46,6 +47,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   activeItemColor,
   error = false,
   search = true,
+  disabled = false,
   onSearchText,
   onEndReached,
   onFocus,
@@ -130,6 +132,9 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
     })
   , [C]);
   const renderRightIcon = () => {
+    if (disabled) {
+      return <RNText style={[themed.downArrow, {opacity: 0.5}]}>⌵</RNText>;
+    }
     if (!value) {
       return <RNText style={themed.downArrow}>⌵</RNText>;
     }
@@ -164,16 +169,25 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   return (
     <View ref={anchorRef}>
       <Dropdown
-        style={[themed.dropdown, error ? {borderColor: C.error || '#ff4444'} : null, containerStyle]}
+        style={[
+          themed.dropdown,
+          error ? {borderColor: C.error || '#ff4444'} : null,
+          disabled ? {opacity: 0.6} : null,
+          containerStyle,
+        ]}
         containerStyle={[themed.dropdownContainer, dropdownContainerStyle]}
         data={data}
         labelField="label"
         valueField="value"
         placeholder={placeholder}
         value={value as any}
-        search={search}
+        search={disabled ? false : search}
         searchPlaceholder={placeholder}
+        disable={disabled}
         onChange={item => {
+          if (disabled) {
+            return;
+          }
           // Preserve selected label in internal display by setting value to match items
           onChange((item?.value as any) ?? null);
           // Prevent previously-focused TextInput from regaining focus and auto-scrolling
@@ -191,12 +205,14 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
             style={themed.searchInput}
             onChangeText={(t) => {
               onSearch(t);
-              onSearchText && onSearchText(t);
+              if (!disabled) {
+                onSearchText && onSearchText(t);
+              }
             }}
           />
         )}
         flatListProps={
-          onEndReached
+          !disabled && onEndReached
             ? { onEndReached: onEndReached, onEndReachedThreshold: 0.2 }
             : undefined
         }
@@ -210,6 +226,9 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         dropdownPosition={dropdownPosition as any}
         maxHeight={dropdownMaxHeight as any}
         onFocus={() => {
+          if (disabled) {
+            return;
+          }
           // Ensure dropdown is fully visible near keyboard/screen edges
           onOpen && onOpen();
           onFocus && onFocus();

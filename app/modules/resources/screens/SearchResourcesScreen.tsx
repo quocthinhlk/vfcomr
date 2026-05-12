@@ -279,7 +279,7 @@ export default function SearchResourcesScreen() {
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
+>
             <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
               <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
                 {t('resourceSearchByName')}

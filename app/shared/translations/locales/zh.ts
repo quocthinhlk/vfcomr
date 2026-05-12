@@ -84,6 +84,8 @@ const zh = {
     churchesListMenu: '教会列表',
     churchAttendanceChart: '教会出席图表',
     churchGivingChart: '教会奉献图表',
+    churchList: '教会列表',
+    attendanceGraph: '出席图表',
     attendanceLast12Months: '出席 - 过去12个月',
     givingLast12Months: '奉献 - 过去12个月',
     tithesAndOfferingsLabel: '十一奉献与奉献',
@@ -492,7 +494,7 @@ const zh = {
     worshipServicesMscFaqNote:
       '若需在另一地点、以另一语言或在另一时段增加教会聚会，请使用 OMR 的多重聚会教会功能。了解做法请查看右上角下拉菜单中的「常见问题（FAQ）」。',
     // Dashboard Stats
-    enterVisits: '输入访问',
+    enterVisits: '访问与活动',
     editMyProfile: '编辑我的个人资料',
     churchesGrowing: '增长的教会',
     churchesReporting: '报告的教会',
@@ -601,8 +603,8 @@ const zh = {
     totalAttendanceInAllGtLiwClasses: '所有GT/LIW课程的总出席人数',
     noOfLeadersInTrainingForPastoralOrChurchPlantingDuties: '接受牧师或教会植堂职责培训的领袖人数',
     giving: '奉献',
-    tithesOfferings: '十一奉献 + 奉献 (VNĐ)',
-    missionsGivingMfp: '宣教奉献 [MFP] (VNĐ)',
+    tithesOfferings: '十一奉献 + 奉献',
+    missionsGivingMfp: '宣教奉献 [MFP]',
     noWorshipServicesFound: '未找到敬拜服务',
     dataSavedSuccessfully: '数据保存成功',
     allDataSavedSuccessfully: '所有数据保存成功',
@@ -633,6 +635,7 @@ const zh = {
     failedToDeleteGoalPeriod: 'Failed to delete goal period',
     back: 'Back',
     languageCode: 'zh',
+    churchesPlantedLast10Years: '过去10年开拓的教会 ',
 } satisfies TranslationDictionary;
 
 export default zh;

@@ -139,7 +139,7 @@ export const EditEventTypeScreen: React.FC = () => {
             keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : ((StatusBar.currentHeight || 0) + hs(50))}
             style={{flex: 1}}>
             <ScrollView
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled">
               <View style={styles.form}>

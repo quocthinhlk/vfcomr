@@ -84,6 +84,8 @@ const pt = {
     churchesListMenu: 'Lista de Igrejas',
     churchAttendanceChart: 'Grafico de Presenca da Igreja',
     churchGivingChart: 'Grafico de Contribuicoes da Igreja',
+    churchList: 'Lista de Igrejas',
+    attendanceGraph: 'Gráfico de Presença',
     attendanceLast12Months: 'Presenca - Ultimos 12 Meses',
     givingLast12Months: 'Contribuicoes - Ultimos 12 Meses',
     tithesAndOfferingsLabel: 'Dizimos e Ofertas',
@@ -496,7 +498,7 @@ const pt = {
     worshipServicesMscFaqNote:
       'Se precisar de acrescentar outro culto da igreja, noutro local, noutra língua ou noutro horário, utilize o recurso Igreja de vários cultos da OMR. Para saber como, aceda às FAQ [Perguntas frequentes] no menu suspenso, no canto superior direito.',
     // Dashboard Stats
-    enterVisits: 'Inserir Visitas',
+    enterVisits: 'Visitas e Eventos',
     editMyProfile: 'Editar Meu Perfil',
     churchesGrowing: 'Igrejas em Crescimento',
     churchesReporting: 'Igrejas Reportando',
@@ -605,8 +607,8 @@ const pt = {
     totalAttendanceInAllGtLiwClasses: 'Participação Total em todas as Aulas GT/LIW',
     noOfLeadersInTrainingForPastoralOrChurchPlantingDuties: 'Número de Líderes em treinamento para deveres Pastorais ou de Plantação de Igrejas',
     giving: 'Ofertas',
-    tithesOfferings: 'Dízimos + Ofertas (VNĐ)',
-    missionsGivingMfp: 'Ofertas Missionárias [MFP] (VNĐ)',
+    tithesOfferings: 'Dízimos + Ofertas',
+    missionsGivingMfp: 'Ofertas Missionárias [MFP]',
     noWorshipServicesFound: 'Nenhum serviço de adoração encontrado',
     dataSavedSuccessfully: 'Dados salvos com sucesso',
     allDataSavedSuccessfully: 'Todos os dados foram salvos com sucesso',
@@ -641,6 +643,7 @@ const pt = {
     dob: 'DOB',
     back: 'Back',
     languageCode: 'pt',
+    churchesPlantedLast10Years: 'Igrejas Plantadas nos últimos 10 anos ',
 } satisfies TranslationDictionary;
 
 export default pt;

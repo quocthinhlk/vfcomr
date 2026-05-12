@@ -11,7 +11,7 @@ export default function EnterVisitsScreen() {
     <Header />
     <Layout style={globalStyles.layout}>
     <BackButton title="Enter Visits" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
       <PlaceholderScreen screenName="Enter Visits" />
       </ScrollView>
     </Layout>

@@ -177,7 +177,7 @@ export default function HelpIcon({
                 {/* Body */}
                 <View style={helpStyles.bodyWrap}>
                   <ScrollView
-                    showsVerticalScrollIndicator={false}
+
                     bounces={false}
                   >
                     <Text style={[helpStyles.body, {color: C.textSecondary}]}>

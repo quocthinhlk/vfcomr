@@ -26,7 +26,7 @@ export type RootStackParamList = {
   NewPastorAndChurch: undefined;
   User: { userId?: number } | undefined;
   UserRoles: undefined;
-  Churches: undefined;
+  Churches: { refresh?: boolean; openChurchInPastorDashboard?: boolean } | undefined;
   WatchList: undefined;
   OverseerGoals: undefined;
   AddOverseerGoals: undefined;
@@ -35,7 +35,10 @@ export type RootStackParamList = {
   EditOverseerGoalDefaults: { goalPeriodId: number } | undefined;
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: undefined;
-  
+  ChurchesPlantedLast10Years: undefined;
+  OverseerChurchAttendanceChart: undefined;
+  OverseerChurchesPlantedLast10Years: undefined;
+
   AddChurchNetwork: undefined;
   EditChurchNetwork: { churchNetworkId: number } | undefined;
   DeleteChurchNetwork: { churchNetworkId: number } | undefined;
@@ -89,7 +92,11 @@ export type RootStackParamList = {
   DeleteCountry: { countryId: number } | undefined;
   AddCountry: undefined;
   ChangePasswordForOtherUser: { id: number } | undefined;
-  DashboardPastorLeader: undefined;
+  DashboardPastorLeader: {
+    church_id: number;
+    church_name?: string;
+    church_country_name?: string;
+  } | undefined;
   ChurchAttendanceChart: {churchId?: number} | undefined;
   ChurchGivingChart: {churchId?: number} | undefined;
   ChurchRegions: undefined;
@@ -171,6 +178,8 @@ import { ChurchesListScreen } from '../modules/church/screens/ListChurchScreen';
 import ChangePasswordForOtherUserScreen from '../modules/user/screens/ChangePasswordForOtherUserScreen';
 import DashboardPastorLeaderScreen from '../modules/dashboard/screens/DashboardPastorLeaderScreen';
 import ChurchAttendanceChartScreen from '../modules/dashboard/screens/ChurchAttendanceChartScreen';
+import OverseerChurchAttendanceChartScreen from '../modules/dashboard/screens/OverseerChurchAttendanceChartScreen';
+import OverseerChurchesPlantedLast10YearsScreen from '../modules/dashboard/screens/OverseerChurchesPlantedLast10YearsScreen';
 import ChurchGivingChartScreen from '../modules/dashboard/screens/ChurchGivingChartScreen';
 import { WatchListScreen } from '../modules/dashboard/screens/WatchListScreen';
 import { OverseerGoalsScreen } from '../modules/overseer/screens/OverseerGoalsScreen';
@@ -178,6 +187,7 @@ import AddOverseerGoalsScreen from '../modules/overseer/screens/AddOverseerGoals
 import DeleteOverseerGoalPeriodScreen from '../modules/overseer/screens/DeleteOverseerGoalPeriodScreen';
 import EditOverseerGoalDefaultsScreen from '../modules/overseer/screens/EditOverseerGoalDefaultsScreen';
 import { GenerateReportsScreen } from '../modules/report/screens/GenerateReportsScreen';
+import { ChurchesPlantedLast10YearsScreen } from '../modules/dashboard/screens/ChurchesPlantedLast10YearsScreen';
  
 import AddChurchNetworkScreen from '../modules/churchnetwork/screens/AddChurchNetworkScreen';
 import EditChurchNetworkScreen from '../modules/churchnetwork/screens/EditChurchNetworkScreen';
@@ -357,7 +367,11 @@ export default function Navigation() {
                 component={EditOverseerGoalsScreen}
               />
               <Stack.Screen name="GenerateReports" component={GenerateReportsScreen} />
-              
+              <Stack.Screen
+                name="ChurchesPlantedLast10Years"
+                component={ChurchesPlantedLast10YearsScreen}
+              />
+
               <Stack.Screen name="ChurchNetworks" component={ChurchNetworksScreen} />
       <Stack.Screen name="ChurchRegions" component={ChurchRegionsScreen} />
       <Stack.Screen name="AddChurchRegion" component={AddChurchRegionScreen} />
@@ -416,6 +430,14 @@ export default function Navigation() {
               <Stack.Screen name="ChangePasswordForOtherUser" component={ChangePasswordForOtherUserScreen} />
               <Stack.Screen name="DashboardPastorLeader" component={DashboardPastorLeaderScreen} />
               <Stack.Screen name="ChurchAttendanceChart" component={ChurchAttendanceChartScreen} />
+              <Stack.Screen
+                name="OverseerChurchAttendanceChart"
+                component={OverseerChurchAttendanceChartScreen}
+              />
+              <Stack.Screen
+                name="OverseerChurchesPlantedLast10Years"
+                component={OverseerChurchesPlantedLast10YearsScreen}
+              />
               <Stack.Screen name="ChurchGivingChart" component={ChurchGivingChartScreen} />
               <Stack.Screen name="EditCountry" component={EditCountryScreen} />
               <Stack.Screen name="DeleteCountry" component={DeleteCountryScreen} />

@@ -10,7 +10,7 @@ export const ProfileScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
       <BackButton title="Profile" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
         <View style={{ flex: 1 }}>
           <PlaceholderScreen screenName="Profile" />
         </View>

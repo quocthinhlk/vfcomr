@@ -290,7 +290,7 @@ export const OverseerGoalsScreen = () => {
             styles.listContent,
             items.length === 0 ? styles.emptyContent : null,
           ]}
-          showsVerticalScrollIndicator={false}
+
         />
 
         <Text style={[styles.subTitle, {color: C.textSecondary}]}>

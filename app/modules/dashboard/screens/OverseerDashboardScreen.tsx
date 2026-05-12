@@ -1,10 +1,14 @@
-import React, {useContext, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {
+  ActionSheetIOS,
+  Alert,
   Animated,
   Easing,
   Image,
+  Platform,
   ScrollView,
   StyleSheet,
+  Text as RNText,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -24,6 +28,11 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
+import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
+import IosActionSheet from '../../../shared/components/IosActionSheet';
+import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
+import ImagePicker from 'react-native-image-crop-picker';
+import {updateUser} from '../../user/services/user.service';
 
 type OverseerDashboardData = {
   overseer_profile?: {
@@ -58,6 +67,13 @@ type OverseerIndicatorData = {
   percent_churches_with_mfp?: number;
   percent_churches_visited_2_years?: number;
   church_ids?: number[];
+};
+
+type OverseerActionItem = {
+  icon: any;
+  label: string;
+  routeName: string;
+  disabled?: boolean;
 };
 
 const resolveRoleId = (userData: any): number | null => {
@@ -136,6 +152,11 @@ export default function OverseerDashboardScreen() {
   const fade = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
 
+  const [avatarModalVisible, setAvatarModalVisible] = useState(false);
+  const [localAvatarPath, setLocalAvatarPath] = useState<string | null>(null);
+  const [avatarHeaderMenuVisible, setAvatarHeaderMenuVisible] = useState(false);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+
   const translatedMenu = useMemo(
     () =>
       getTranslatedMenuItems(
@@ -193,6 +214,192 @@ export default function OverseerDashboardScreen() {
     };
   }, []);
 
+  const normalizeFileUri = useCallback((p: string) => (p.startsWith('file://') ? p : `file://${p}`), []);
+
+  const zoomableAvatarUri = useMemo(() => {
+    if (localAvatarPath) {
+      return normalizeFileUri(localAvatarPath);
+    }
+    if (typeof profile.image === 'string' && profile.image.trim()) {
+      return profile.image.trim();
+    }
+    return Image.resolveAssetSource(BLANK_AVATAR)?.uri ?? null;
+  }, [localAvatarPath, normalizeFileUri, profile.image]);
+
+  const closeAvatarModal = useCallback(() => {
+    setAvatarHeaderMenuVisible(false);
+    setAvatarModalVisible(false);
+  }, []);
+
+  const refreshProfilePhoto = useCallback(async () => {
+    try {
+      const dashboardRes = await api.get('dashboard');
+      const dashboardData: OverseerDashboardData = dashboardRes?.data?.data ?? {};
+      const p = dashboardData?.overseer_profile;
+      setProfile(prev => ({
+        ...prev,
+        image: p?.photo_url || BLANK_AVATAR,
+      }));
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  const uploadAndApplyAvatar = useCallback(
+    async (imagePath: string) => {
+      if (!currentUserId || avatarUploading) {
+        return;
+      }
+      setAvatarUploading(true);
+      let uploadedUserPhotoPath: string | null = null;
+      let uploadError: string | null = null;
+      try {
+        const form = new FormData();
+        const fileName = imagePath.split('/').pop() || 'photo.jpg';
+        form.append('file', {
+          uri: imagePath,
+          name: fileName,
+          type: 'image/jpeg',
+        } as any);
+        form.append('entity_type', 'users');
+        form.append('alt_text', String(profile.name || '').trim());
+
+        const uploadRes = await api.post('images/upload', form, {
+          headers: {'Content-Type': 'multipart/form-data'},
+        });
+        uploadedUserPhotoPath =
+          uploadRes?.data?.data?.path ||
+          uploadRes?.data?.data?.url ||
+          uploadRes?.data?.path ||
+          uploadRes?.data?.url ||
+          null;
+      } catch (e: any) {
+        console.error('[overseer avatar upload]', e?.response?.data, e?.message);
+        uploadError =
+          e?.response?.data?.message ||
+          e?.response?.data?.error ||
+          e?.message ||
+          null;
+        uploadedUserPhotoPath = null;
+      }
+
+      if (!uploadedUserPhotoPath) {
+        setAvatarUploading(false);
+        Alert.alert(t('error'), uploadError || t('failedToLoadData') || 'Upload failed');
+        return;
+      }
+
+      try {
+        await updateUser(currentUserId, {user_photo: uploadedUserPhotoPath} as any);
+        setLocalAvatarPath(null);
+        await refreshProfilePhoto();
+        closeAvatarModal();
+        Alert.alert(t('success'), t('profileUpdatedSuccess') || 'Profile updated');
+      } catch (e: any) {
+        Alert.alert(
+          t('error'),
+          e?.response?.data?.message || e?.message || t('couldNotUpdateUser') || 'Could not update user',
+        );
+      } finally {
+        setAvatarUploading(false);
+      }
+    },
+    [
+      avatarUploading,
+      closeAvatarModal,
+      currentUserId,
+      profile.name,
+      refreshProfilePhoto,
+      t,
+    ],
+  );
+
+  const openAvatarPhotoSourcePicker = useCallback(() => {
+    const pickFromLibrary = async () => {
+      try {
+        const image: any = await ImagePicker.openPicker({
+          width: 300,
+          height: 300,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 1024,
+          compressImageMaxHeight: 1024,
+          compressImageQuality: 0.8,
+          includeBase64: false,
+        });
+        if (image?.size && image.size > 1572864) {
+          Alert.alert('File too large', 'Please select an image under 1.5MB');
+          return;
+        }
+        if (image?.path) {
+          closeAvatarModal();
+          setLocalAvatarPath(image.path);
+          void uploadAndApplyAvatar(image.path);
+        }
+      } catch {
+        // cancelled
+      }
+    };
+
+    const takePhoto = async () => {
+      try {
+        const image: any = await ImagePicker.openCamera({
+          width: 300,
+          height: 300,
+          cropping: true,
+          cropperCircleOverlay: false,
+          compressImageMaxWidth: 1024,
+          compressImageMaxHeight: 1024,
+          compressImageQuality: 0.8,
+          includeBase64: false,
+        });
+        if (image?.size && image.size > 1572864) {
+          Alert.alert('File too large', 'Please select an image under 1.5MB');
+          return;
+        }
+        if (image?.path) {
+          closeAvatarModal();
+          setLocalAvatarPath(image.path);
+          void uploadAndApplyAvatar(image.path);
+        }
+      } catch {
+        // cancelled
+      }
+    };
+
+    if (Platform.OS === 'ios') {
+      const takeLabel = t('takePhoto') || 'Take Photo';
+      const chooseLabel = t('uploadImage') || 'Choose Photo';
+      const cancelLabel = t('cancel') || 'Cancel';
+      ActionSheetIOS.showActionSheetWithOptions(
+        {
+          options: [takeLabel, chooseLabel, cancelLabel],
+          cancelButtonIndex: 2,
+          userInterfaceStyle: 'light',
+        },
+        (idx: number) => {
+          if (idx === 0) {
+            void takePhoto();
+          }
+          if (idx === 1) {
+            void pickFromLibrary();
+          }
+        },
+      );
+      return;
+    }
+
+    setAvatarModalVisible(false);
+    setAvatarHeaderMenuVisible(false);
+    requestAnimationFrame(() => {
+      Alert.alert(t('changePhoto') || 'Change Photo', '', [
+        {text: t('takePhoto') || 'Take Photo', onPress: () => void takePhoto()},
+        {text: t('uploadImage') || 'Choose Photo', onPress: () => void pickFromLibrary()},
+        {text: t('cancel') || 'Cancel', style: 'cancel'},
+      ]);
+    });
+  }, [closeAvatarModal, t, uploadAndApplyAvatar]);
+
   const handleLogout = async () => {
     try {
       await logout();
@@ -210,6 +417,8 @@ export default function OverseerDashboardScreen() {
         if (currentUserId) {
           navigation.navigate('EditProfile', {id: currentUserId});
         }
+      } else if (item.routeName === 'Churches') {
+        navigation.navigate('Churches', {openChurchInPastorDashboard: true});
       } else {
         navigation.navigate(item.routeName);
       }
@@ -260,25 +469,18 @@ export default function OverseerDashboardScreen() {
         helpMessage: t('indicatorInfoPeople'),
       },
       {
-        icon: require('../../../../app/assets/images/icon/reporting.png'),
-        value: formatPercent(indicatorData.percent_churches_reporting),
-        label: t('churchesReporting') || 'Churches Reporting',
-        helpTitle: t('indicatorTitleChurchesReporting'),
-        helpMessage: t('indicatorInfoChurchesReporting'),
-      },
-      {
-        icon: require('../../../../app/assets/images/icon/more.png'),
-        value: formatPercent(indicatorData.percent_growth_churches_number),
-        label: t('moreChurches') || 'More Churches',
-        helpTitle: t('indicatorTitleMoreChurches'),
-        helpMessage: t('indicatorInfoMoreChurches'),
-      },
-      {
         icon: require('../../../../app/assets/images/icon/growth.png'),
         value: formatPercent(indicatorData.percent_churches_growing),
         label: t('churchesGrowing') || 'Churches Growing',
         helpTitle: t('indicatorTitleChurchesGrowing'),
         helpMessage: t('indicatorInfoChurchesGrowing'),
+      },
+      {
+        icon: require('../../../../app/assets/images/icon/reporting.png'),
+        value: formatPercent(indicatorData.percent_churches_reporting),
+        label: t('churchesReporting') || 'Churches Reporting',
+        helpTitle: t('indicatorTitleChurchesReporting'),
+        helpMessage: t('indicatorInfoChurchesReporting'),
       },
       {
         icon: require('../../../../app/assets/images/icon/earth.png'),
@@ -323,6 +525,13 @@ export default function OverseerDashboardScreen() {
         helpMessage: t('indicatorInfoChurchesWithMfp'),
       },
       {
+        icon: require('../../../../app/assets/images/icon/more.png'),
+        value: formatPercent(indicatorData.percent_growth_churches_number),
+        label: t('moreChurches') || 'More Churches',
+        helpTitle: t('indicatorTitleMoreChurches'),
+        helpMessage: t('indicatorInfoMoreChurches'),
+      },
+      {
         icon: require('../../../../app/assets/images/icon/worldwide.png'),
         value: formatPercent(indicatorData.percent_churches_visited_2_years),
         label: t('churchesVisited') || 'Churches Visited',
@@ -333,18 +542,53 @@ export default function OverseerDashboardScreen() {
     [indicatorData, t],
   );
 
-  const actionItems = [
+  const actionItems: OverseerActionItem[] = [
+    {
+      icon: require('../../../../app/assets/images/icon/chart.png'),
+      label: t('monthlyData') || 'Monthly Data',
+      routeName: 'MonthlyDataSelect',
+    },
     {
       icon: require('../../../../app/assets/images/icon/car.png'),
-      label: t('enterVisits') || 'Enter Visits',
+      label: t('enterVisits') || 'Visits & Events',
       routeName: 'EnterVisits',
     },
     {
-      icon: require('../../../../app/assets/images/icon/edit.png'),
-      label: t('editMyProfile') || 'Edit My Profile',
-      routeName: 'EditProfile',
-      disabled: !currentUserId,
+      icon: require('../../../../app/assets/images/icon/house-user.png'),
+      label: t('newPastorAndNewChurch') || 'New Pastor & New Church',
+      routeName: 'NewPastorAndChurch',
     },
+    {
+      icon: require('../../../../app/assets/images/icon/user.png'),
+      label: t('addNewPastor') || 'New Pastor',
+      routeName: 'AddUser',
+    },
+    {
+      icon: require('../../../../app/assets/images/icon/home.png'),
+      label: t('addNewChurch') || 'New Church',
+      routeName: 'AddChurch',
+    },
+    {
+      icon: require('../../../../app/assets/images/icon/list.png'),
+      label: t('churchList') || 'Church List',
+      routeName: 'Churches',
+    },
+    {
+      icon: require('../../../../app/assets/images/icon/line-chart.png'),
+      label: t('attendanceGraph') || 'Attendance Graph',
+      routeName: 'OverseerChurchAttendanceChart',
+    },
+    {
+      icon: require('../../../../app/assets/images/icon/replay-10.png'),
+      label: t('churchesPlantedLast10Years') || 'Churches Planted last 10 years ',
+      routeName: 'OverseerChurchesPlantedLast10Years',
+    },
+    // {
+    //   icon: require('../../../../app/assets/images/icon/edit.png'),
+    //   label: t('editMyProfile') || 'Edit My Profile',
+    //   routeName: 'EditProfile',
+    //   disabled: !currentUserId,
+    // },
   ];
 
   const arrowRotate = rotation.interpolate({
@@ -371,11 +615,22 @@ export default function OverseerDashboardScreen() {
       <ScrollView style={[dashboardStyles.container, {backgroundColor: C.background}]}>
         <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: ms(10)}}>
           <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
-            <Image
-              source={typeof profile.image === 'string' ? {uri: profile.image} : profile.image}
-              style={{width: ws(50), height: ws(50), borderRadius: rs(25), marginRight: ms(12)}}
-              onError={() => setProfile(prev => ({...prev, image: BLANK_AVATAR}))}
-            />
+            <TouchableOpacity
+              onPress={() => setAvatarModalVisible(true)}
+              activeOpacity={0.85}
+              hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
+              <Image
+                source={
+                  localAvatarPath
+                    ? {uri: normalizeFileUri(localAvatarPath)}
+                    : typeof profile.image === 'string'
+                      ? {uri: profile.image}
+                      : profile.image
+                }
+                style={{width: ws(50), height: ws(50), borderRadius: rs(25), marginRight: ms(12)}}
+                onError={() => setProfile(prev => ({...prev, image: BLANK_AVATAR}))}
+              />
+            </TouchableOpacity>
             <TouchableOpacity
               style={{flex: 1}}
               onPress={() => {
@@ -462,6 +717,99 @@ export default function OverseerDashboardScreen() {
           ))}
         </View>
       </ScrollView>
+
+      <ZoomableImageModal
+        visible={avatarModalVisible}
+        uri={zoomableAvatarUri}
+        onClose={closeAvatarModal}
+        headerRight={
+          zoomableAvatarUri ? (
+            <TouchableOpacity
+              onPress={() => {
+                if (Platform.OS === 'ios') {
+                  const downloadLabel = t('download') || 'Download';
+                  const changePhotoLabel = t('changePhoto') || 'Change Photo';
+                  const cancelLabel = t('cancel') || 'Cancel';
+                  ActionSheetIOS.showActionSheetWithOptions(
+                    {
+                      options: [downloadLabel, changePhotoLabel, cancelLabel],
+                      cancelButtonIndex: 2,
+                      userInterfaceStyle: 'light',
+                    },
+                    async (buttonIndex: number) => {
+                      if (buttonIndex === 0) {
+                        if (!zoomableAvatarUri || avatarUploading) {
+                          return;
+                        }
+                        try {
+                          await downloadImageToCameraRoll(zoomableAvatarUri, {
+                            filePrefix: 'user-avatar',
+                          });
+                          Alert.alert(t('success'), t('imageDownloadSuccess'));
+                        } catch {
+                          Alert.alert(t('error'), t('imageDownloadError'));
+                        }
+                        return;
+                      }
+                      if (buttonIndex === 1) {
+                        if (!currentUserId) {
+                          return;
+                        }
+                        requestAnimationFrame(() => openAvatarPhotoSourcePicker());
+                      }
+                    },
+                  );
+                  return;
+                }
+                setAvatarHeaderMenuVisible(true);
+              }}
+              hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+              style={{paddingHorizontal: ms(6), paddingVertical: ms(4)}}>
+              <RNText
+                style={{
+                  color: '#fff',
+                  fontSize: fs(22),
+                  fontWeight: '700',
+                  opacity: avatarUploading ? 0.6 : 1,
+                }}>
+                ⋯
+              </RNText>
+            </TouchableOpacity>
+          ) : null
+        }
+      />
+
+      {Platform.OS === 'android' ? (
+        <IosActionSheet
+          visible={avatarHeaderMenuVisible}
+          onClose={() => setAvatarHeaderMenuVisible(false)}
+          cancelLabel={t('cancel') || 'Cancel'}
+          items={[
+            {
+              label: t('download') || 'Download',
+              disabled: !zoomableAvatarUri || avatarUploading,
+              onPress: async () => {
+                if (!zoomableAvatarUri || avatarUploading) {
+                  return;
+                }
+                try {
+                  await downloadImageToCameraRoll(zoomableAvatarUri, {filePrefix: 'user-avatar'});
+                  Alert.alert(t('success'), t('imageDownloadSuccess'));
+                } catch {
+                  Alert.alert(t('error'), t('imageDownloadError'));
+                }
+              },
+            },
+            {
+              label: t('changePhoto') || 'Change Photo',
+              disabled: !currentUserId || avatarUploading,
+              onPress: () => {
+                requestAnimationFrame(() => openAvatarPhotoSourcePicker());
+              },
+            },
+          ]}
+        />
+      ) : null}
     </SafeAreaView>
   );
 }

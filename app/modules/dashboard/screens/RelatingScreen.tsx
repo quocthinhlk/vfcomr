@@ -10,7 +10,7 @@ export const RelatingScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
     <BackButton title="Relating" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
       <PlaceholderScreen screenName="Relating" />
       </ScrollView>
     </Layout>

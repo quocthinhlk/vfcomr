@@ -10,7 +10,7 @@ export const WatchListScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
     <BackButton title="Watch List" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
       <PlaceholderScreen screenName="Watch List" />
       </ScrollView>
     </Layout>

@@ -238,7 +238,7 @@ export const ListOverseerScreen: React.FC = () => {
             data={items}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             contentContainerStyle={{paddingBottom: ms(24)}}
             refreshControl={

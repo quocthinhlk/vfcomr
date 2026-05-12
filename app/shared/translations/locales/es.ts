@@ -94,6 +94,8 @@ const es = {
   churchesListMenu: 'Lista de iglesias',
   churchAttendanceChart: 'Gráfico de asistencia',
   churchGivingChart: 'Gráfico de ofrendas',
+  churchList: 'Lista de iglesias',
+  attendanceGraph: 'Gráfico de asistencia',
   attendanceLast12Months: 'Asistencia - últimos 12 meses',
   givingLast12Months: 'Ofrendas - últimos 12 meses',
   tithesAndOfferingsLabel: 'Diezmos y ofrendas',
@@ -532,7 +534,7 @@ const es = {
   worshipServicesMscFaqNote:
     'Si necesita añadir otro servicio, en otro lugar, en otro idioma o en otro horario, use la función Multi Service Church de OMR. Para saber cómo, vaya a FAQ [Preguntas frecuentes] en el menú desplegable, arriba a la derecha.',
   // Dashboard Stats
-  enterVisits: 'Ingresar visitas',
+  enterVisits: 'Visitas y eventos',
   editMyProfile: 'Editar mi perfil',
   churchesGrowing: 'Iglesias creciendo',
   churchesReporting: 'Iglesias reportando',
@@ -661,8 +663,8 @@ const es = {
   noOfLeadersInTrainingForPastoralOrChurchPlantingDuties:
     'Nº de líderes en entrenamiento para tareas pastorales o plantación',
   giving: 'Ofrendas',
-  tithesOfferings: 'Diezmos + ofrendas (VNĐ)',
-  missionsGivingMfp: 'Ofrendas de misiones [MFP] (VNĐ)',
+  tithesOfferings: 'Diezmos + ofrendas',
+  missionsGivingMfp: 'Ofrendas de misiones [MFP]',
   noWorshipServicesFound: 'No se encontraron servicios de adoración',
   dataSavedSuccessfully: 'Datos guardados correctamente',
   allDataSavedSuccessfully: 'Todos los datos guardados correctamente',
@@ -684,6 +686,7 @@ const es = {
   verifiedBy: 'Verificado por',
   needsVerificationVisit: 'Necesita visita de verificación',
   languageCode: 'es',
+  churchesPlantedLast10Years: 'Iglesias plantadas en los últimos 10 años ',
 } as const;
 
 export default es;

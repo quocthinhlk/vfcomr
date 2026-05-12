@@ -10,7 +10,7 @@ export const PushMailScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
     <BackButton title="Push Mail" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
       <PlaceholderScreen screenName="Push Mail" />
       </ScrollView>
     </Layout>

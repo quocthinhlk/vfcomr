@@ -40,6 +40,7 @@ import {useMonthlyData} from '../context/MonthlyDataContext';
 import api from '../../../config/api';
 import {getIsoWeekDateRangeLabel, getIsoWeekDisplayYear} from '../../../shared/utils/isoWeek';
 import {listWorshipServicesByChurch} from '../../worshipservices/services/worshipService.service';
+import {getChurchDetail} from '../../church/services/church.service';
 
 interface RouteParams {
   churchId: number;
@@ -88,6 +89,8 @@ export default function MonthlyDataEntryScreen() {
     churchName || '',
   );
   const [lastReportDate, setLastReportDate] = useState<string>('');
+  /** From `GET /churches/:id` → `data.currency_name` (for giving field labels). */
+  const [churchCurrencyName, setChurchCurrencyName] = useState<string>('');
   const dashboardInfoLoadKeyRef = useRef<string | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
   const [weekData, setWeekData] = useState<Map<number, WeeklyReportData>>(
@@ -161,6 +164,35 @@ export default function MonthlyDataEntryScreen() {
       mounted = false;
     };
   }, [routeChurchId]);
+
+  useEffect(() => {
+    setChurchCurrencyName('');
+  }, [churchId]);
+
+  // Church currency label for monthly giving fields (`data.currency_name` on church detail)
+  useEffect(() => {
+    if (!churchId) {
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await getChurchDetail(churchId);
+        if (cancelled) {
+          return;
+        }
+        const name = String(data?.currency_name ?? '').trim();
+        if (name) {
+          setChurchCurrencyName(name);
+        }
+      } catch {
+        // ignore — labels work without suffix
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [churchId]);
 
   // Resolve church name for display (route param -> AsyncStorage -> dashboard API)
   useEffect(() => {
@@ -244,6 +276,16 @@ export default function MonthlyDataEntryScreen() {
     },
     [selectedLanguage],
   );
+
+  const tithesOfferingsLabel = useMemo(() => {
+    const base = String(t('tithesOfferings') || 'Tithes + Offerings').trim();
+    return churchCurrencyName ? `${base} (${churchCurrencyName})` : base;
+  }, [t, churchCurrencyName]);
+
+  const missionsGivingMfpLabel = useMemo(() => {
+    const base = String(t('missionsGivingMfp') || 'Missions Giving [MFP]').trim();
+    return churchCurrencyName ? `${base} (${churchCurrencyName})` : base;
+  }, [t, churchCurrencyName]);
 
   // Load worship sessions structure and first week data
   useEffect(() => {
@@ -1306,7 +1348,7 @@ export default function MonthlyDataEntryScreen() {
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets={false}
             contentInsetAdjustmentBehavior="never">
@@ -1317,7 +1359,7 @@ export default function MonthlyDataEntryScreen() {
             ref={scrollViewRef}
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets={false}
             contentInsetAdjustmentBehavior="never"
@@ -2094,10 +2136,7 @@ export default function MonthlyDataEntryScreen() {
                       );}
                   }}>
                   <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('tithesOfferings') || 'Tithes + Offerings (VNĐ)',
-                      true,
-                    )}
+                    {renderRowLabel(tithesOfferingsLabel, true)}
                   </View>
                   <AppInput
                     value={formatNumber(
@@ -2128,10 +2167,7 @@ export default function MonthlyDataEntryScreen() {
                       );}
                   }}>
                   <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('missionsGivingMfp') || 'Missions Giving [MFP] (VNĐ)',
-                      true,
-                    )}
+                    {renderRowLabel(missionsGivingMfpLabel, true)}
                   </View>
                   <AppInput
                     value={formatNumber(currentMetrics.mfp_in_local_currency)}

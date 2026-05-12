@@ -28,7 +28,7 @@ export default function GeneralScreen() {
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('general')} />
         <ScrollView
-          showsVerticalScrollIndicator={false}
+
           contentContainerStyle={{padding: 0}}>
           <View
             style={{

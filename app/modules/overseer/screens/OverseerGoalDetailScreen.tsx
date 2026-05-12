@@ -144,7 +144,7 @@ const OverseerGoalDetailScreen = () => {
           </View>
         ) : (
           <ScrollView
-            showsVerticalScrollIndicator={false}
+
             contentContainerStyle={styles.scrollContent}>
             <View
               style={[

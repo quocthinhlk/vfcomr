@@ -340,7 +340,7 @@ export const EditVisitScreen: React.FC = () => {
               ref={ref => {
                 scrollRef.current = ref;
               }}
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}>
               <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.border}]}>
                 <Text style={[styles.headingTitle, {color: C.textPrimary}]}>

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   ActionSheetIOS,
@@ -19,7 +19,6 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import {getUserById, updateUser, UserDetailData} from '../services/user.service';
-import {getChurchDetail} from '../../church/services/church.service';
 import api from '../../../config/api';
 import {COLORS} from '../../../shared/constants/colors';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -37,6 +36,28 @@ const editIcon = require('../../../assets/icons/edit.png');
 const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
 const USER_DETAIL_TIMEOUT_MS = 15000;
 const REQUEST_TIMEOUT_ERROR = 'REQUEST_TIMEOUT';
+
+/** Normalize `getUserById` / axios body: user may be at root, under `data`, or double-wrapped. */
+function unwrapUserDetailPayload(res: any): UserDetailData | null {
+  if (res == null || typeof res !== 'object') {
+    return null;
+  }
+  const looksLikeUser = (o: any) =>
+    o &&
+    typeof o === 'object' &&
+    (typeof o.username === 'string' || typeof o.id === 'number');
+  if (looksLikeUser(res)) {
+    return res as UserDetailData;
+  }
+  const d1 = res.data;
+  if (looksLikeUser(d1)) {
+    return d1 as UserDetailData;
+  }
+  if (d1 && typeof d1 === 'object' && looksLikeUser((d1 as any).data)) {
+    return (d1 as any).data as UserDetailData;
+  }
+  return (d1 ?? null) as UserDetailData | null;
+}
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
   return new Promise((resolve, reject) => {
@@ -75,8 +96,6 @@ export const UserScreen = () => {
   const [avatarError, setAvatarError] = useState<boolean>(false);
   const [roleId, setRoleId] = useState<number | null>(null);
   const [isOwnProfile, setIsOwnProfile] = useState<boolean>(false);
-  const [pastorChurches, setPastorChurches] = useState<any[]>([]);
-  const [loadingChurches, setLoadingChurches] = useState<boolean>(false);
   const [imageModalVisible, setImageModalVisible] = useState<boolean>(false);
   const [downloadingImage, setDownloadingImage] = useState(false);
   const [imageMenuVisible, setImageMenuVisible] = useState(false);
@@ -85,6 +104,7 @@ export const UserScreen = () => {
   const toastOpacity = useRef(new Animated.Value(0)).current;
   const [toastMessage, setToastMessage] = useState<string>('');
   const lastHandledRefetchKeyRef = useRef<number | null>(null);
+  const [fromChurchesExpanded, setFromChurchesExpanded] = useState(false);
 
   const closeImagePopup = useCallback(() => {
     // Important: if the sheet is visible (even behind the image modal),
@@ -107,29 +127,6 @@ export const UserScreen = () => {
     return hasPlus ? `+${grouped}` : grouped;
   };
 
-  const loadPastorChurches = useCallback(async (ids: number[]) => {
-    if (!Array.isArray(ids) || ids.length === 0) {
-      setPastorChurches([]);
-      setLoadingChurches(false);
-      return;
-    }
-
-    setLoadingChurches(true);
-    try {
-      const churches = await Promise.all(
-        ids.map((churchId: number) =>
-          getChurchDetail(churchId).catch(() => null),
-        ),
-      );
-      const validChurches = churches.filter(ch => !!ch);
-      setPastorChurches(validChurches);
-    } catch {
-      setPastorChurches([]);
-    } finally {
-      setLoadingChurches(false);
-    }
-  }, []);
-
   const fetchUserDetails = useCallback(
     async (opts?: {showLoading?: boolean}) => {
       const shouldShowLoading = opts?.showLoading !== false;
@@ -140,29 +137,20 @@ export const UserScreen = () => {
 
       if (!userId) {
         setUser(null);
-        setPastorChurches([]);
-        setLoadingChurches(false);
         setError(tRef.current('userIDMissing'));
         if (shouldShowLoading) setLoading(false);
         return;
       }
 
       try {
-        const res = await withTimeout(getUserById(Number(userId)), USER_DETAIL_TIMEOUT_MS);
-        const userData = res?.data ?? null;
+        const res = await withTimeout(
+          getUserById(Number(userId), true),
+          USER_DETAIL_TIMEOUT_MS,
+        );
+        const userData = unwrapUserDetailPayload(res);
         setUser(userData);
-
-        const pastorChurchIds = (userData as any)?.pastor_church_ids;
-        if (Array.isArray(pastorChurchIds) && pastorChurchIds.length > 0) {
-          void loadPastorChurches(pastorChurchIds);
-        } else {
-          setPastorChurches([]);
-          setLoadingChurches(false);
-        }
       } catch (e: any) {
         setUser(null);
-        setPastorChurches([]);
-        setLoadingChurches(false);
         if (e?.message === REQUEST_TIMEOUT_ERROR) {
           setError(tRef.current('requestTimedOut'));
         } else {
@@ -174,7 +162,7 @@ export const UserScreen = () => {
         }
       }
     },
-    [loadPastorChurches, userId],
+    [userId],
   );
 
   useEffect(() => {
@@ -206,14 +194,48 @@ export const UserScreen = () => {
     })();
   }, [userId]);
 
-  const churchName = (user as any)?.church_name || (user as any)?.church?.name || '-';
+  useEffect(() => {
+    setFromChurchesExpanded(false);
+  }, [userId]);
+
+  /** Primary church for "Pastor of" — API `church_name`. */
+  const pastorOfChurchDisplay = useMemo(() => {
+    const n = String((user as any)?.church_name || (user as any)?.church?.name || '').trim();
+    return n || '-';
+  }, [user]);
+
+  /** Sending / planted from — API `from_churches[].name` (or camelCase / nested). */
+  const fromChurchNames = useMemo(() => {
+    const u = user as any;
+    const list =
+      u?.from_churches ??
+      u?.fromChurches ??
+      u?.data?.from_churches ??
+      u?.data?.fromChurches;
+    if (!Array.isArray(list) || list.length === 0) {
+      return [] as string[];
+    }
+    return list
+      .map((c: any) => String(c?.name || '').trim())
+      .filter(Boolean);
+  }, [user]);
+
+  const displayedFromChurchNames = useMemo(() => {
+    if (fromChurchNames.length === 0) {
+      return ['-'];
+    }
+    if (fromChurchNames.length === 1 || fromChurchesExpanded) {
+      return fromChurchNames;
+    }
+    return [fromChurchNames[0]];
+  }, [fromChurchNames, fromChurchesExpanded]);
+
   const displayName = (() => {
     const fullName = user?.name?.trim();
     if (!fullName) return '-';
     const prefix = ((user as any)?.prefix || '').toString().trim();
     return prefix ? `${prefix} ${fullName}` : fullName;
   })();
-  const pastorOfName = pastorChurches?.[0]?.name || churchName;
   const omrNumberRaw =
     (user as any)?.omr_number ||
     (user as any)?.omr_no ||
@@ -245,8 +267,8 @@ export const UserScreen = () => {
   const refreshUser = useCallback(
     async (id: number) => {
       try {
-        const res = await withTimeout(getUserById(Number(id)), USER_DETAIL_TIMEOUT_MS);
-        const userData = res?.data ?? null;
+        const res = await withTimeout(getUserById(Number(id), true), USER_DETAIL_TIMEOUT_MS);
+        const userData = unwrapUserDetailPayload(res);
         setUser(userData);
       } catch {
         // ignore refresh errors
@@ -463,7 +485,7 @@ export const UserScreen = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('pastorLeaderDetails')} />
-        <ScrollView showsVerticalScrollIndicator={false}>
+        <ScrollView>
           <View style={[styles.profileCard, {backgroundColor: C.surface, borderColor: C.border}]}>
             <View style={[styles.summaryRow, {borderBottomColor: C.border}]}>
               <TouchableOpacity
@@ -515,20 +537,53 @@ export const UserScreen = () => {
                 <Text style={[styles.detailLabel, {color: C.textPrimary}]}>
                   {t('pastorOf')}
                 </Text>
-                {loadingChurches ? (
-                  <ActivityIndicator size="small" color={COLORS.mainColor} style={{flex: 1}} />
-                ) : (
+                <View style={styles.pastorOfValueWrap}>
                   <Text
                     style={[
                       styles.detailValue,
                       styles.detailValueStrong,
+                      styles.pastorOfValueLine,
                       {color: C.textPrimary},
                     ]}>
-                    {pastorOfName}
+                    {pastorOfChurchDisplay}
                   </Text>
-                )}
+                </View>
               </View>
-              {renderDetailRow(t('from'), churchName)}
+              <View style={[styles.detailRow, {borderBottomColor: C.border}]}>
+                <Text style={[styles.detailLabel, {color: C.textPrimary}]}>{t('from')}</Text>
+                <View style={styles.pastorOfValueWrap}>
+                  {displayedFromChurchNames.map((name: string, idx: number) => (
+                    <Text
+                      key={`${name}-${idx}`}
+                      style={[
+                        styles.detailValue,
+                        styles.detailValueStrong,
+                        styles.pastorOfValueLine,
+                        {color: C.textPrimary},
+                      ]}>
+                      {name}
+                    </Text>
+                  ))}
+                  {fromChurchNames.length > 1 ? (
+                    <TouchableOpacity
+                      onPress={() => setFromChurchesExpanded(v => !v)}
+                      activeOpacity={0.7}
+                      hitSlop={{top: 6, bottom: 6, left: 0, right: 8}}>
+                      <Text
+                        style={{
+                          color: COLORS.mainColor,
+                          fontSize: fs(13),
+                          fontWeight: '600',
+                          marginTop: ms(6),
+                        }}>
+                        {fromChurchesExpanded
+                          ? t('viewLess') || 'View less'
+                          : t('viewMore') || 'View more'}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              </View>
               {renderDetailRow(t('nation'), user?.country_name || '-', styles.detailValueStrong)}
               {renderDetailRow(t('role'), user?.title || '-')}
               {renderDetailRow(
@@ -806,6 +861,14 @@ const styles = StyleSheet.create({
   },
   detailValueStrong: {
     fontWeight: '700',
+  },
+  pastorOfValueWrap: {
+    flex: 1,
+    gap: ms(2),
+    paddingVertical: ms(1),
+  },
+  pastorOfValueLine: {
+    lineHeight: fs(18),
   },
   redText: {
     color: '#c0392b',

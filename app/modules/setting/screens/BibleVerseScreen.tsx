@@ -65,7 +65,7 @@ export default function BibleVerseScreen() {
           style={{ flex: 1 }}
         >
           <ScrollView
-            showsVerticalScrollIndicator={false}
+
             contentContainerStyle={{ paddingHorizontal: 0, paddingBottom: ms(16), paddingTop: ms(10) }}
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets>

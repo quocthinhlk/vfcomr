@@ -304,7 +304,7 @@ export default function RelatingSearchScreen() {
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}>
+>
           <View style={styles.card}>
             <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
               {t('search') || 'Search'}

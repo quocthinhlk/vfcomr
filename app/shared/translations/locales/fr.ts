@@ -84,6 +84,8 @@ const fr = {
     churchesListMenu: 'Liste des Eglises',
     churchAttendanceChart: "Graphique de Presence de l'Eglise",
     churchGivingChart: "Graphique des Offrandes de l'Eglise",
+    churchList: 'Liste des Églises',
+    attendanceGraph: 'Graphique de présence',
     attendanceLast12Months: 'Presence - 12 Derniers Mois',
     givingLast12Months: 'Offrandes - 12 Derniers Mois',
     tithesAndOfferingsLabel: 'Dimes et Offrandes',
@@ -465,7 +467,7 @@ const fr = {
     worshipServicesMscFaqNote:
       "Si vous devez ajouter un autre culte, dans un autre lieu, dans une autre langue ou à un autre moment, utilisez la fonction Église multi-service d'OMR. Pour savoir comment, ouvrez la FAQ [Foire aux questions] du menu déroulant, en haut à droite.",
     // Dashboard Stats
-    enterVisits: 'Saisir les Visites',
+    enterVisits: 'Visites et Événements',
     editMyProfile: 'Modifier Mon Profil',
     churchesGrowing: 'Églises en Croissance',
     churchesReporting: 'Églises Rapportant',
@@ -574,8 +576,8 @@ const fr = {
     totalAttendanceInAllGtLiwClasses: 'Présence Totale dans toutes les Classes GT/LIW',
     noOfLeadersInTrainingForPastoralOrChurchPlantingDuties: 'Nombre de Leaders en formation pour les devoirs Pastoraux ou de Plantation d\'Églises',
     giving: 'Offrandes',
-    tithesOfferings: 'Dîmes + Offrandes (VNĐ)',
-    missionsGivingMfp: 'Offrandes Missionnaires [MFP] (VNĐ)',
+    tithesOfferings: 'Dîmes + Offrandes',
+    missionsGivingMfp: 'Offrandes Missionnaires [MFP]',
     noWorshipServicesFound: 'Aucun service de culte trouvé',
     dataSavedSuccessfully: 'Données enregistrées avec succès',
     allDataSavedSuccessfully: 'Toutes les données ont été enregistrées avec succès',
@@ -645,6 +647,7 @@ const fr = {
     failedToDeleteProjection: 'Failed to delete Church Planting Projection',
     failedToUpdateStepsChart: 'Failed to update Steps Chart',
     languageCode: 'fr',
+    churchesPlantedLast10Years: 'Églises Plantées il y a 10 ans ',
 } satisfies TranslationDictionary;
 
 export default fr;

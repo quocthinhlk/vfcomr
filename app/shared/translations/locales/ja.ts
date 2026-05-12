@@ -84,6 +84,8 @@ const ja = {
     churchesListMenu: '教会一覧',
     churchAttendanceChart: '教会出席チャート',
     churchGivingChart: '教会献金チャート',
+    churchList: '教会一覧',
+    attendanceGraph: '出席グラフ',
     attendanceLast12Months: '出席 - 過去12か月',
     givingLast12Months: '献金 - 過去12か月',
     tithesAndOfferingsLabel: '十分の一献金と献金',
@@ -500,7 +502,7 @@ const ja = {
     worshipServicesMscFaqNote:
       '別の場所・別の言語・別の時間帯に教会の礼拝を追加する場合は、OMRのマルチサービス教会機能をご利用ください。手順は、右上のドロップダウンメニューにある「よくある質問（FAQ）」をご覧ください。',
     // Dashboard Stats
-    enterVisits: '訪問を入力',
+    enterVisits: '訪問とイベント',
     editMyProfile: 'マイプロフィールを編集',
     churchesGrowing: '成長している教会',
     churchesReporting: '報告している教会',
@@ -609,8 +611,8 @@ const ja = {
     totalAttendanceInAllGtLiwClasses: '全GT/LIWクラスの総出席者数',
     noOfLeadersInTrainingForPastoralOrChurchPlantingDuties: '牧師または教会開拓の任務のための訓練中のリーダー数',
     giving: '献金',
-    tithesOfferings: '十分の一 + 献金 (VNĐ)',
-    missionsGivingMfp: '宣教献金 [MFP] (VNĐ)',
+    tithesOfferings: '十分の一 + 献金',
+    missionsGivingMfp: '宣教献金 [MFP]',
     noWorshipServicesFound: '礼拝サービスが見つかりません',
     dataSavedSuccessfully: 'データが正常に保存されました',
     allDataSavedSuccessfully: 'すべてのデータが正常に保存されました',
@@ -644,6 +646,7 @@ const ja = {
     tag: 'Tag',
     back: 'Back',
     languageCode: 'ja',
+    churchesPlantedLast10Years: '過去10年間に開拓した教会',
 } satisfies TranslationDictionary;
 
 export default ja;

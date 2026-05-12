@@ -86,13 +86,49 @@ export function useFormOptions() {
     async function fetchOptions() {
       try {
         setLoading(true);
-        // languages (lazy: first page only)
-        const languages = await api.get('languages', { params: { page: 1, limit: 10, sort_by: 'name', sort_desc: false } });
-        const languageOptions = ((languages.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
+        const fetchAllPagedOptions = async (
+          endpoint: string,
+          params: Record<string, any>,
+          mapItem: (i: any) => {label: string; value: string},
+        ) => {
+          const seen = new Set<string>();
+          const out: {label: string; value: string}[] = [];
+          let page = 1;
+          let hasNext = true;
+          let safety = 0;
 
-        // mother churches (lazy: first page only)
-        const mothers = await api.get('churches', { params: { page: 1, limit: 10, sort_by: 'name', sort_desc: false } });
-        const motherChurchOptions = ((mothers.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
+          while (hasNext && safety < 200) {
+            safety += 1;
+            const res = await api.get(endpoint, {params: {...params, page}});
+            const data = res?.data?.data;
+            const items = (data?.items ?? []) as any[];
+            for (const i of items) {
+              const opt = mapItem(i);
+              if (!opt?.value) continue;
+              if (seen.has(opt.value)) continue;
+              seen.add(opt.value);
+              out.push(opt);
+            }
+            hasNext = Boolean(data?.has_next);
+            page += 1;
+          }
+
+          return out;
+        };
+
+        // languages: load all pages so dropdown shows full list without searching
+        const languageOptions = await fetchAllPagedOptions(
+          'languages',
+          {limit: 200, sort_by: 'name', sort_desc: false},
+          i => ({label: i.name, value: String(i.id)}),
+        );
+
+        // mother churches: load all pages so dropdown shows full list without searching
+        const motherChurchOptions = await fetchAllPagedOptions(
+          'churches',
+          {limit: 200, sort_by: 'name', sort_desc: false},
+          i => ({label: i.name, value: String(i.id)}),
+        );
 
         // church types
         const types = await api.get('church-types', { params: { sort_by: 'name', sort_desc: false } });

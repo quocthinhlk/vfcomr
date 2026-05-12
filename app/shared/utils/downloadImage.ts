@@ -17,6 +17,17 @@ export async function downloadImageToCameraRoll(
   if (!remoteUrl) {
     throw new Error('Missing image url');
   }
+
+  if (!CameraRoll || typeof CameraRoll.save !== 'function') {
+    throw new Error('CameraRoll module not available');
+  }
+
+  // Bundled / on-device files: save straight to the photo library (no HTTP download).
+  if (/^file:\/\//i.test(remoteUrl) || remoteUrl.startsWith('content://')) {
+    await CameraRoll.save(remoteUrl, {type: 'photo'});
+    return;
+  }
+
   const fileName = `${opts?.filePrefix || 'image'}-${Date.now()}.jpg`;
   const localPath = `${RNFS.CachesDirectoryPath}/${fileName}`;
 
@@ -37,10 +48,6 @@ export async function downloadImageToCameraRoll(
 
   if (!(downloadRes.statusCode >= 200 && downloadRes.statusCode < 300)) {
     throw new Error(`Download failed with status ${downloadRes.statusCode}`);
-  }
-
-  if (!CameraRoll || typeof CameraRoll.save !== 'function') {
-    throw new Error('CameraRoll module not available');
   }
 
   await CameraRoll.save(`file://${localPath}`, {type: 'photo'});

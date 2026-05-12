@@ -568,7 +568,7 @@ export default function NewPastorAndChurchScreen() {
           style={{flex: 1, backgroundColor: C.background}}>
           <ScrollView
             ref={scrollRef}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             contentInsetAdjustmentBehavior="always"
             style={{backgroundColor: C.background}}

@@ -73,7 +73,7 @@ export default function LanguageSelectModal({
             </View>
             <ScrollView
               style={styles.dropdownList}
-              showsVerticalScrollIndicator={false}>
+>
               {LANGUAGES.map((lang, idx) => (
                 <TouchableOpacity
                   key={lang.code}

@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ScrollView,
   View,
@@ -64,18 +64,63 @@ export default function AddChurchScreen() {
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
   const PAGE_LIMIT = 10;
 
-  // Lazy-load states for paginated dropdowns
-  const [langOptions, setLangOptions] = useState<{label: string; value: string}[]>(languageOptions);
-  const [langPage, setLangPage] = useState(1);
-  const [langHasNext, setLangHasNext] = useState(false);
+  // Language dropdown: baseline from `languageOptions` (full list from hook); search uses a separate list.
+  const [langSearchOptions, setLangSearchOptions] = useState<{label: string; value: string}[]>([]);
+  const [langSearchPage, setLangSearchPage] = useState(1);
+  const [langSearchHasNext, setLangSearchHasNext] = useState(false);
   const [langQuery, setLangQuery] = useState('');
+  /** Fetched-by-id rows when edit payload references a language not in `languageOptions`. */
+  const [languageExtraOptions, setLanguageExtraOptions] = useState<{label: string; value: string}[]>([]);
   const [selectedLanguageId, setSelectedLanguageId] = useState<string | null>(null);
   const lastLanguageFetchRef = useRef<string | null>(null);
 
-  const [motherOptions, setMotherOptions] = useState<{label: string; value: string}[]>(motherChurchOptions);
-  const [motherPage, setMotherPage] = useState(1);
-  const [motherHasNext, setMotherHasNext] = useState(false);
+  const resetLangSearchState = useCallback(() => {
+    setLangQuery('');
+    setLangSearchOptions([]);
+    setLangSearchPage(1);
+    setLangSearchHasNext(false);
+  }, []);
+
+  const languageDropdownData = useMemo(() => {
+    if (langQuery.trim()) {
+      return langSearchOptions;
+    }
+    const seen = new Set<string>();
+    const out: {label: string; value: string}[] = [];
+    for (const o of languageExtraOptions) {
+      if (seen.has(o.value)) {
+        continue;
+      }
+      seen.add(o.value);
+      out.push(o);
+    }
+    for (const o of languageOptions) {
+      if (seen.has(o.value)) {
+        continue;
+      }
+      seen.add(o.value);
+      out.push(o);
+    }
+    return out;
+  }, [langQuery, langSearchOptions, languageOptions, languageExtraOptions]);
+
+  /** Server search results only; baseline list always comes from `motherChurchOptions`. */
+  const [motherSearchOptions, setMotherSearchOptions] = useState<{label: string; value: string}[]>([]);
+  const [motherSearchPage, setMotherSearchPage] = useState(1);
+  const [motherSearchHasNext, setMotherSearchHasNext] = useState(false);
   const [motherQuery, setMotherQuery] = useState('');
+
+  const resetMotherSearchState = useCallback(() => {
+    setMotherQuery('');
+    setMotherSearchOptions([]);
+    setMotherSearchPage(1);
+    setMotherSearchHasNext(false);
+  }, []);
+
+  const motherDropdownData = useMemo(
+    () => (motherQuery.trim() ? motherSearchOptions : motherChurchOptions),
+    [motherQuery, motherSearchOptions, motherChurchOptions],
+  );
 
   const [pastorOpts, setPastorOpts] = useState<{label: string; value: string}[]>(pastorOptions);
   const [pastorPage, setPastorPage] = useState(1);
@@ -146,22 +191,38 @@ export default function AddChurchScreen() {
     } catch {}
   };
 
-  const loadLanguages = async (page: number, name?: string) => {
+  /** Paginated language search only; does not replace `languageOptions` baseline. */
+  const loadLanguageSearchResults = async (page: number, searchName: string) => {
+    const q = searchName.trim();
+    if (!q) {
+      return;
+    }
     try {
       const res = await api.get('languages', {
-        params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
+        params: {
+          page,
+          limit: PAGE_LIMIT,
+          sort_by: 'name',
+          sort_desc: false,
+          name: q,
+        },
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
       }));
-      setLangOptions(prev => (page === 1 ? items : [...prev, ...items]));
-      setLangPage(page);
-      setLangHasNext(!!res.data?.data?.has_next);
+      setLangSearchOptions(prev => (page === 1 ? items : [...prev, ...items]));
+      setLangSearchPage(page);
+      setLangSearchHasNext(!!res.data?.data?.has_next);
     } catch {}
   };
 
-  const loadMothers = async (page: number, name?: string) => {
+  /** Loads paginated churches for the search box only; never mutates the full baseline list. */
+  const loadMotherSearchResults = async (page: number, searchName: string) => {
+    const q = searchName.trim();
+    if (!q) {
+      return;
+    }
     try {
       const res = await api.get('churches', {
         params: {
@@ -169,16 +230,16 @@ export default function AddChurchScreen() {
           limit: PAGE_LIMIT,
           sort_by: 'name',
           sort_desc: false,
-          ...(name?.trim() ? {name: name.trim()} : {}),
+          name: q,
         },
       });
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
       }));
-      setMotherOptions(prev => (page === 1 ? items : [...prev, ...items]));
-      setMotherPage(page);
-      setMotherHasNext(!!res.data?.data?.has_next);
+      setMotherSearchOptions(prev => (page === 1 ? items : [...prev, ...items]));
+      setMotherSearchPage(page);
+      setMotherSearchHasNext(!!res.data?.data?.has_next);
     } catch {}
   };
 
@@ -213,16 +274,6 @@ export default function AddChurchScreen() {
   };
 
   // Sync base options from useFormOptions into local lazy lists on first load or when not searching
-  useEffect(() => {
-    if (!langQuery && langPage === 1) {
-      setLangOptions(languageOptions);
-    }
-  }, [languageOptions]);
-  useEffect(() => {
-    if (!motherQuery && motherPage === 1) {
-      setMotherOptions(motherChurchOptions);
-    }
-  }, [motherChurchOptions]);
   useEffect(() => {
     if (!pastorQuery && pastorPage === 1) {
       setPastorOpts(pastorOptions);
@@ -343,23 +394,24 @@ export default function AddChurchScreen() {
     date_of_birth: null,
   });
 
-  // Keep the selected language option visible in the dropdown list.
-  // Without this, switching search/scroll can reset `langOptions` back to page 1,
-  // causing the selected value to disappear from the data set.
   useEffect(() => {
     const v = initialFormValues.language_id?.toString?.() ?? '';
     setSelectedLanguageId(v.trim() ? v : null);
   }, [initialFormValues.language_id]);
 
+  // Ensure selected language appears in the dropdown when it is missing from hook + search lists (edit mode).
   useEffect(() => {
     const selectedId = selectedLanguageId;
     if (!selectedId) {
       lastLanguageFetchRef.current = null;
       return;
     }
-
-    const exists = langOptions.some(opt => String(opt.value) === String(selectedId));
-    if (exists) {
+    const id = String(selectedId);
+    const inExtra = languageExtraOptions.some(opt => String(opt.value) === id);
+    const inBaseline = languageOptions.some(opt => String(opt.value) === id);
+    const inSearch =
+      !!langQuery.trim() && langSearchOptions.some(opt => String(opt.value) === id);
+    if (inExtra || inBaseline || inSearch) {
       lastLanguageFetchRef.current = null;
       return;
     }
@@ -378,19 +430,26 @@ export default function AddChurchScreen() {
         }
 
         const option = {label: String(lang.name), value: String(lang.id)};
-        setLangOptions(prev => {
+        setLanguageExtraOptions(prev => {
           const already = prev.some(x => String(x.value) === option.value);
-          if (already) return prev;
+          if (already) {
+            return prev;
+          }
           return [option, ...prev];
         });
       } catch {
         // Keep previous options; dropdown will remain placeholder if request fails.
       } finally {
-        // Allow retry if still missing after a future re-render.
         lastLanguageFetchRef.current = null;
       }
     })();
-  }, [selectedLanguageId, langOptions]);
+  }, [
+    selectedLanguageId,
+    languageOptions,
+    langQuery,
+    langSearchOptions,
+    languageExtraOptions,
+  ]);
 
   return (
     <SafeAreaView
@@ -408,7 +467,7 @@ export default function AddChurchScreen() {
         >
           <ScrollView
             ref={scrollRef}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"
@@ -724,7 +783,7 @@ export default function AddChurchScreen() {
                       </Text>
                     </View>
                     <ElementDropdown
-                      data={motherOptions}
+                      data={motherDropdownData}
                       value={values.parent_id as any}
                       onChange={v => setFieldValue('parent_id', v as any)}
                       placeholder={t('selectOption')}
@@ -734,13 +793,23 @@ export default function AddChurchScreen() {
                           borderColor: C.inputBorder,
                         } as any
                       }
+                      onOpen={resetMotherSearchState}
                       onSearchText={async text => {
                         setMotherQuery(text);
-                        await loadMothers(1, text);
+                        if (!text.trim()) {
+                          setMotherSearchOptions([]);
+                          setMotherSearchPage(1);
+                          setMotherSearchHasNext(false);
+                          return;
+                        }
+                        await loadMotherSearchResults(1, text);
                       }}
                       onEndReached={async () => {
-                        if (motherHasNext) {
-                          await loadMothers(motherPage + 1, motherQuery);
+                        if (motherQuery.trim() && motherSearchHasNext) {
+                          await loadMotherSearchResults(
+                            motherSearchPage + 1,
+                            motherQuery,
+                          );
                         }
                       }}
                     />
@@ -761,7 +830,7 @@ export default function AddChurchScreen() {
                         </Text>
                       </View>
                       <ElementDropdown
-                        data={motherOptions}
+                        data={motherDropdownData}
                         value={values.msc_parent_id as any}
                         onChange={v => {
                           setFieldValue('msc_parent_id', v as any);
@@ -777,13 +846,23 @@ export default function AddChurchScreen() {
                               : C.inputBorder,
                           } as any
                         }
+                        onOpen={resetMotherSearchState}
                         onSearchText={async text => {
                           setMotherQuery(text);
-                          await loadMothers(1, text);
+                          if (!text.trim()) {
+                            setMotherSearchOptions([]);
+                            setMotherSearchPage(1);
+                            setMotherSearchHasNext(false);
+                            return;
+                          }
+                          await loadMotherSearchResults(1, text);
                         }}
                         onEndReached={async () => {
-                          if (motherHasNext) {
-                            await loadMothers(motherPage + 1, motherQuery);
+                          if (motherQuery.trim() && motherSearchHasNext) {
+                            await loadMotherSearchResults(
+                              motherSearchPage + 1,
+                              motherQuery,
+                            );
                           }
                         }}
                         error={!!invalid?.msc_parent_id}
@@ -806,7 +885,7 @@ export default function AddChurchScreen() {
                       </Text>
                     </View>
                     <ElementDropdown
-                      data={langOptions}
+                      data={languageDropdownData}
                       value={values.language_id as any}
                       onChange={v => {
                         const next = v == null ? null : String(v);
@@ -824,18 +903,23 @@ export default function AddChurchScreen() {
                             : C.inputBorder,
                         } as any
                       }
-                      onFocus={async () => {
-                        if (langOptions.length === 0) {
-                          await loadLanguages(1);
-                        }
-                      }}
+                      onOpen={resetLangSearchState}
                       onSearchText={async text => {
                         setLangQuery(text);
-                        await loadLanguages(1, text);
+                        if (!text.trim()) {
+                          setLangSearchOptions([]);
+                          setLangSearchPage(1);
+                          setLangSearchHasNext(false);
+                          return;
+                        }
+                        await loadLanguageSearchResults(1, text);
                       }}
                       onEndReached={async () => {
-                        if (langHasNext) {
-                          await loadLanguages(langPage + 1, langQuery);
+                        if (langQuery.trim() && langSearchHasNext) {
+                          await loadLanguageSearchResults(
+                            langSearchPage + 1,
+                            langQuery,
+                          );
                         }
                       }}
                       error={!!invalid?.language_id}

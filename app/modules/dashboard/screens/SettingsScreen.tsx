@@ -10,7 +10,7 @@ export const SettingsScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
     <BackButton title="Settings" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
       <PlaceholderScreen screenName="Settings" />
       </ScrollView>
     </Layout>

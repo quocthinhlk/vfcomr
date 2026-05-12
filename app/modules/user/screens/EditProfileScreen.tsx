@@ -34,6 +34,15 @@ import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 
+/** Coerce API ids (number | string) to number for dropdown value matching. */
+function parseNullableId(v: unknown): number | null {
+  if (v === null || v === undefined || v === '') {
+    return null;
+  }
+  const n = typeof v === 'number' ? v : Number(String(v).trim());
+  return Number.isFinite(n) ? n : null;
+}
+
 const countryCodeToFlag = (code: string) => {
   if (!code) {
     return '🏳️';
@@ -79,6 +88,9 @@ export default function EditProfileScreen() {
   const [churchTotal, setChurchTotal] = useState<number>(0);
   const [churchPage, setChurchPage] = useState<number>(1);
   const [churchQuery, setChurchQuery] = useState<string>('');
+
+  /** Keeps the edited user's church in `churchItems` even when it is not on the first API page. */
+  const userChurchForDropdownRef = useRef<{id: number; name: string} | null>(null);
 
   const clearInvalid = (key: string) =>
     setInvalid(prev => ({...prev, [key]: false}));
@@ -143,8 +155,23 @@ export default function EditProfileScreen() {
         sort_by: 'name',
         sort_desc: false,
       });
-      const items = (data?.items ?? []).map((c: any) => ({id: c.id, name: c.name}));
-      setChurchItems(prev => (page === 1 ? items : [...prev, ...items]));
+      const items = (data?.items ?? []).map((c: any) => ({
+        id: Number(c.id),
+        name: String(c.name ?? ''),
+      }));
+      setChurchItems(prev => {
+        let base = page === 1 ? items : [...prev, ...items];
+        const seed = page === 1 ? userChurchForDropdownRef.current : null;
+        if (
+          seed &&
+          seed.id > 0 &&
+          seed.name.trim() !== '' &&
+          !base.some(c => c.id === seed.id)
+        ) {
+          base = [{id: seed.id, name: seed.name.trim()}, ...base];
+        }
+        return base;
+      });
       setChurchTotal(data?.total ?? items.length);
       setChurchPage(data?.page ?? page);
     } catch {}
@@ -162,18 +189,53 @@ export default function EditProfileScreen() {
           return;
         }
         const d = form.data?.data || {};
+        const formRoles: {id: number; name: string}[] = Array.isArray(d?.roles)
+          ? d.roles.map((r: any) => ({
+              id: Number(r.id),
+              name: String(r.name ?? ''),
+            }))
+          : [];
         setPrefixOptions(d?.prefixes || []);
-        setRoleOptions(d?.roles || []);
         setCredentialOptions(d?.credentials || []);
 
         try {
           const lg = await api.get('/language-regions', {params: {sort_by: 'name', sort_desc: false}});
           const arr = Array.isArray(lg.data?.data) ? lg.data.data : [];
           const roots = arr.filter((x: any) => x.parent_id == null && !x.disabled);
-          setLanguageOptions(roots.map((x: any) => ({id: x.id, name: x.name})));
+          setLanguageOptions(roots.map((x: any) => ({id: Number(x.id), name: String(x.name ?? '')})));
         } catch {}
 
-        const u = userRes?.data;
+        // Support both `{ data: user }` and occasional `{ data: { data: user } }` envelopes.
+        let u: any = (userRes as any)?.data ?? userRes;
+        if (u && u.username == null && u.data && typeof u.data === 'object' && u.data.username != null) {
+          u = u.data;
+        }
+
+        const roleIdResolved = parseNullableId(
+          u?.role?.id ?? u?.role_id ?? (u as any)?.Role?.id ?? (u as any)?.omr_role_id,
+        );
+        const roleNameFromUser = String(
+          u?.role?.name ?? (u as any)?.role_name ?? (u as any)?.roleName ?? '',
+        ).trim();
+        let mergedRoles = formRoles;
+        if (roleIdResolved != null && !mergedRoles.some(r => r.id === roleIdResolved)) {
+          mergedRoles = [
+            {
+              id: roleIdResolved,
+              name: roleNameFromUser || `Role #${roleIdResolved}`,
+            },
+            ...formRoles,
+          ];
+        }
+        setRoleOptions(mergedRoles);
+
+        const churchIdResolved = parseNullableId(
+          u?.church_id ?? u?.church?.id ?? (u as any)?.default_church_id,
+        );
+        const churchNameResolved = String(
+          (u as any)?.church_name ?? u?.church?.name ?? '',
+        ).trim();
+
         const rawDigits = (u?.mobile_phone || '').replace(/\D/g, '');
         let resolvedCca2: string | undefined;
         let resolvedCode: string | undefined;
@@ -209,12 +271,12 @@ export default function EditProfileScreen() {
           title: (u as any)?.title || '',
           first_name: u?.first_name || '',
           last_name: u?.last_name || '',
-          role_id: u?.role?.id ?? null,
+          role_id: roleIdResolved,
           user_photo: u?.user_photo || '',
           photo_url: (u as any)?.photo_url || '',
           sensitive_nation: !!u?.sensitive_nation,
-          language_id: u?.language_id ?? null,
-          church_id: u?.church_id ?? null,
+          language_id: parseNullableId(u?.language_id),
+          church_id: churchIdResolved,
           email_address: u?.email_address || '',
           mobile_phone: subscriberDigits,
           credentials: u?.credentials || '',
@@ -225,10 +287,28 @@ export default function EditProfileScreen() {
             ? new Date(u.credentials_expiry_date)
             : null,
         });
+
+        userChurchForDropdownRef.current =
+          churchIdResolved != null && churchNameResolved
+            ? {id: churchIdResolved, name: churchNameResolved}
+            : churchIdResolved != null
+              ? {id: churchIdResolved, name: `Church #${churchIdResolved}`}
+              : null;
+
+        await loadChurches(1);
+        if (mounted) {
+          const seed = userChurchForDropdownRef.current;
+          if (seed && seed.id > 0 && seed.name.trim() !== '') {
+            setChurchItems(prev =>
+              prev.some(c => c.id === seed.id) ? prev : [{id: seed.id, name: seed.name.trim()}, ...prev],
+            );
+          }
+        }
       } catch (e: any) {
         Alert.alert(t('error'), t('failedToChangePassword'));
         // Set fallback so the form doesn't get stuck on loading state
         if (mounted) {
+          userChurchForDropdownRef.current = null;
           setInitial({
             username: '', password: '', prefix: '', title: '',
             first_name: '', last_name: '', role_id: null,
@@ -245,11 +325,31 @@ export default function EditProfileScreen() {
       }
     }
     run();
-    loadChurches(1);
     return () => {
       mounted = false;
     };
   }, [userId, loadChurches]);
+
+  const prefixDropdownData = useMemo(
+    () => prefixOptions.map(p => ({label: p, value: p})),
+    [prefixOptions],
+  );
+  const credentialDropdownData = useMemo(
+    () => credentialOptions.map(c => ({label: c, value: c})),
+    [credentialOptions],
+  );
+  const roleDropdownData = useMemo(
+    () => roleOptions.map(r => ({label: r.name, value: r.id})),
+    [roleOptions],
+  );
+  const languageDropdownData = useMemo(
+    () => languageOptions.map(o => ({label: o.name, value: o.id})),
+    [languageOptions],
+  );
+  const churchDropdownData = useMemo(
+    () => churchItems.map(c => ({label: c.name, value: c.id})),
+    [churchItems],
+  );
 
   if (loading || !initial) {
     return (
@@ -258,7 +358,7 @@ export default function EditProfileScreen() {
         edges={['top', 'bottom', 'left', 'right']}>
         <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
           <Header title={t('editUser')} showMenu={false} />
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView>
             <Text style={{color: C.textPrimary}}>{t('loading')}</Text>
           </ScrollView>
         </Layout>
@@ -280,7 +380,7 @@ export default function EditProfileScreen() {
           style={{flex: 1}}>
           <ScrollView
             ref={scrollRef}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"
@@ -440,10 +540,7 @@ export default function EditProfileScreen() {
                       {t('prefix')}
                     </Text>
                     <ElementDropdown
-                      data={useMemo(
-                        () => prefixOptions.map(p => ({label: p, value: p})),
-                        [prefixOptions],
-                      )}
+                      data={prefixDropdownData}
                       value={values.prefix as any}
                       onChange={v => setFieldValue('prefix', (v as string) || '')}
                       placeholder={t('selectOption')}
@@ -543,10 +640,8 @@ export default function EditProfileScreen() {
                       <HelpIcon title={t('omrStatus')} message={t('helpOmrStatus')} size={16} offsetY={-2} />
                     </View>
                     <ElementDropdown
-                      data={useMemo(
-                        () => roleOptions.map(r => ({label: r.name, value: r.id})),
-                        [roleOptions],
-                      )}
+                      key={`role-${roleOptions.length > 0}`}
+                      data={roleDropdownData}
                       value={values.role_id as any}
                       onChange={v => {
                         setFieldValue('role_id', (typeof v === 'number' ? v : Number(v)) || null);
@@ -644,10 +739,8 @@ export default function EditProfileScreen() {
                       <HelpIcon title={t('language')} message={t('helpUserLanguage')} size={16} offsetY={-2} />
                     </View>
                     <ElementDropdown
-                      data={useMemo(
-                        () => languageOptions.map(o => ({label: o.name, value: o.id})),
-                        [languageOptions],
-                      )}
+                      key={`language-${languageOptions.length > 0}`}
+                      data={languageDropdownData}
                       value={values.language_id as any}
                       onChange={v => {
                         setFieldValue('language_id', (typeof v === 'number' ? v : Number(v)) || null);
@@ -673,10 +766,8 @@ export default function EditProfileScreen() {
                       <HelpIcon title={t('church')} message={t('helpUserChurch')} size={16} offsetY={-2} />
                     </View>
                     <ElementDropdown
-                      data={useMemo(
-                        () => churchItems.map(c => ({label: c.name, value: c.id})),
-                        [churchItems],
-                      )}
+                      key={`church-${churchItems.length > 0}`}
+                      data={churchDropdownData}
                       value={values.church_id as any}
                       onChange={v => {
                         setFieldValue('church_id', (typeof v === 'number' ? v : Number(v)) || null);
@@ -813,10 +904,7 @@ export default function EditProfileScreen() {
                       {t('credentials')}
                     </Text>
                     <ElementDropdown
-                      data={useMemo(
-                        () => credentialOptions.map(c => ({label: c, value: c})),
-                        [credentialOptions],
-                      )}
+                      data={credentialDropdownData}
                       value={values.credentials as any}
                       onChange={v => {
                         setFieldValue('credentials', (v as string) || '');

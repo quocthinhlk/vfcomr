@@ -10,7 +10,7 @@ export const UserRolesScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
     <BackButton title="User Roles" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
       <PlaceholderScreen screenName="User Roles" />
       </ScrollView>
     </Layout>

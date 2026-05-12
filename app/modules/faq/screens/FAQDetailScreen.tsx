@@ -111,7 +111,7 @@ export const FAQDetailScreen: React.FC = () => {
             </Text>
           ) : (
             <ScrollView
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}>
               <View style={styles.content}>
                 <Text style={[styles.questionHeader, {color: C.textPrimary}]}>

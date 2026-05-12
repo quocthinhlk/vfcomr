@@ -242,7 +242,7 @@ export default function AddUserScreen() {
           style={{flex: 1}}>
           <ScrollView
             ref={scrollRef}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"

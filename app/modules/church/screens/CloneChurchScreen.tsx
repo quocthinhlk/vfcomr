@@ -239,7 +239,7 @@ export const CloneChurchScreen: React.FC = () => {
           data={items}
           keyExtractor={keyExtractor}
           renderItem={renderItem}
-          showsVerticalScrollIndicator={false}
+
           refreshControl={
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }

@@ -177,7 +177,7 @@ const EditOverseerGoalsScreen = () => {
         ) : (
           <>
             <ScrollView
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}>
               {GOAL_SECTION_OPTIONS.map(section => (
                 <View

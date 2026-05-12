@@ -195,7 +195,7 @@ export const FAQsScreen: React.FC = () => {
               data={items}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
-              showsVerticalScrollIndicator={false}
+
               keyboardShouldPersistTaps="handled"
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />

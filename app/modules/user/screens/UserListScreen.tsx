@@ -312,7 +312,7 @@ export const UserListScreen: React.FC = () => {
             data={items}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
-            showsVerticalScrollIndicator={false}
+
             keyboardShouldPersistTaps="handled"
             automaticallyAdjustKeyboardInsets
             contentInsetAdjustmentBehavior="always"

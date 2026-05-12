@@ -59,7 +59,7 @@ export default function ChangePasswordForOtherUserScreen() {
       <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
         <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
           <BackButton title={t('changePassword')} />
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView>
             <Text style={{ color: C.textPrimary }}>{t('loading')}</Text>
           </ScrollView>
         </Layout>
@@ -80,7 +80,7 @@ export default function ChangePasswordForOtherUserScreen() {
           }
           style={{ flex: 1 }}
         >
-          <ScrollView ref={scrollRef} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentInsetAdjustmentBehavior="always" contentContainerStyle={{ paddingBottom: 24 }}>
+          <ScrollView ref={scrollRef} keyboardShouldPersistTaps="handled" automaticallyAdjustKeyboardInsets contentInsetAdjustmentBehavior="always" contentContainerStyle={{ paddingBottom: 24 }}>
             
             <Formik
               initialValues={{

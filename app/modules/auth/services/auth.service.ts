@@ -19,12 +19,16 @@ export async function login(payload: LoginPayload) {
     user?.default_church_id ??
     user?.default_church?.id ??
     user?.church_id ??
-    user?.assigned_churches?.[0]?.id;
+    user?.assigned_churches?.[0]?.id ??
+    user?.pastor_of_churches?.[0]?.id ??
+    user?.pastor_churches?.[0]?.id;
   const defaultChurchName =
     user?.default_church_name ??
     user?.default_church?.name ??
     user?.church_name ??
-    user?.assigned_churches?.[0]?.name;
+    user?.assigned_churches?.[0]?.name ??
+    user?.pastor_of_churches?.[0]?.name ??
+    user?.pastor_churches?.[0]?.name;
 
   if (defaultChurchId) {
     await AsyncStorage.setItem('selectedChurchId', String(defaultChurchId));
@@ -45,6 +49,7 @@ export async function logout() {
   await AsyncStorage.removeItem('token');
   await AsyncStorage.removeItem('selectedChurchId');
   await AsyncStorage.removeItem('selectedChurchName');
+  await AsyncStorage.removeItem('selectedChurchCountryName');
 }
 
 export async function forgotPassword(email: string) {

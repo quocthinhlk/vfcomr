@@ -84,6 +84,8 @@ const en = {
     churchesListMenu: 'List of Churches',
     churchAttendanceChart: 'Church Attendance Chart',
     churchGivingChart: 'Church Giving Chart',
+    churchList: 'Church List',
+    attendanceGraph: 'Attendance Graph',
     attendanceLast12Months: 'Attendance - Last 12 Months',
     givingLast12Months: 'Giving - Last 12 Months',
     tithesAndOfferingsLabel: 'Tithes & Offerings',
@@ -506,7 +508,7 @@ const en = {
     worshipServicesMscFaqNote:
       "If you need to add another church service, at another location, or in another language, or at another time, use OMR's Multi Service Church feature. To find out how, go to FAQ [Frequently Asked Questions] found in the drop-down menu, top right.",
     // Dashboard Stats
-    enterVisits: 'Enter Visits',
+    enterVisits: 'Visits & Events',
     editMyProfile: 'Edit My Profile',
     churchesGrowing: 'Churches Growing',
     churchesReporting: 'Churches Reporting',
@@ -615,8 +617,8 @@ const en = {
     totalAttendanceInAllGtLiwClasses: 'Total Attendance in all GT/LIW Classes',
     noOfLeadersInTrainingForPastoralOrChurchPlantingDuties: 'No of Leaders in training for Pastoral or Church Planting duties',
     giving: 'Giving',
-    tithesOfferings: 'Tithes + Offerings (VNĐ)',
-    missionsGivingMfp: 'Missions Giving [MFP] (VNĐ)',
+    tithesOfferings: 'Tithes + Offerings',
+    missionsGivingMfp: 'Missions Giving [MFP]',
     noWorshipServicesFound: 'No worship services found',
     dataSavedSuccessfully: 'Data saved successfully',
     allDataSavedSuccessfully: 'All data saved successfully',
@@ -636,6 +638,7 @@ const en = {
     verifiedBy: 'Verified by',
     needsVerificationVisit: 'Needs a Verification Visit',
     languageCode: 'en',
+    churchesPlantedLast10Years: 'Churches Planted last 10 years ',
 } as const;
 
 export default en;

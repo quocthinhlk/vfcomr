@@ -10,7 +10,7 @@ export const SupportScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
       <BackButton title="Support" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
         <View style={{ flex: 1 }}>
           <PlaceholderScreen screenName="Support" />
         </View>

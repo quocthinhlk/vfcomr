@@ -84,6 +84,8 @@ const ms = {
     churchesListMenu: 'Senarai Gereja',
     churchAttendanceChart: 'Carta Kehadiran Gereja',
     churchGivingChart: 'Carta Pemberian Gereja',
+    churchList: 'Senarai Gereja',
+    attendanceGraph: 'Graf Kehadiran',
     attendanceLast12Months: 'Kehadiran - 12 Bulan Terakhir',
     givingLast12Months: 'Pemberian - 12 Bulan Terakhir',
     tithesAndOfferingsLabel: 'Persepuluhan dan Persembahan',
@@ -499,7 +501,7 @@ const ms = {
     worshipServicesMscFaqNote:
       'Jika perlu menambah sesi ibadah gereja lain, di lokasi lain, dalam bahasa lain, atau pada waktu lain, gunakan ciri Gereja Berbilang Perkhidmatan OMR. Untuk cara melakukannya, rujuk Soalan Lazim [FAQ] pada menu lungsur, kanan atas.',
     // Dashboard Stats
-    enterVisits: 'Masukkan Lawatan',
+    enterVisits: 'Lawatan & Acara',
     editMyProfile: 'Edit Profil Saya',
     churchesGrowing: 'Gereja yang Berkembang',
     churchesReporting: 'Gereja yang Melaporkan',
@@ -608,8 +610,8 @@ const ms = {
     totalAttendanceInAllGtLiwClasses: 'Jumlah Kehadiran dalam semua Kelas GT/LIW',
     noOfLeadersInTrainingForPastoralOrChurchPlantingDuties: 'Bilangan Pemimpin dalam latihan untuk tugas Pastoral atau Penanaman Gereja',
     giving: 'Pemberian',
-    tithesOfferings: 'Persepuluhan + Persembahan (VNĐ)',
-    missionsGivingMfp: 'Pemberian Misi [MFP] (VNĐ)',
+    tithesOfferings: 'Persepuluhan + Persembahan',
+    missionsGivingMfp: 'Pemberian Misi [MFP]',
     noWorshipServicesFound: 'Tiada perkhidmatan ibadah ditemui',
     dataSavedSuccessfully: 'Data berjaya disimpan',
     allDataSavedSuccessfully: 'Semua data berjaya disimpan',
@@ -643,6 +645,7 @@ const ms = {
     tag: 'Tag',
     back: 'Back',
     languageCode: 'ms',
+    churchesPlantedLast10Years: 'Gereja Ditanam 10 Tahun Terakhir ',
 } satisfies TranslationDictionary;
 
 export default ms;

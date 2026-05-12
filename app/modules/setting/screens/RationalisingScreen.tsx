@@ -11,7 +11,7 @@ export default function RationalisingScreen() {
     <SafeAreaView style={globalStyles.safeAreaView}>
       <Layout style={globalStyles.layout}>
         <Header title={t('rationalisingTownNames')} />
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 16 }}>
+        <ScrollView contentContainerStyle={{ padding: 16 }}>
           <View>
             <Text category="s1">{t('rationalisingTownNames')}</Text>
           </View>

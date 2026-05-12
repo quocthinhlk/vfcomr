@@ -177,7 +177,7 @@ export default function ChurchDetailScreen() {
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('churchDetail')} />
         <ScrollView
-          showsVerticalScrollIndicator={false}
+
           contentContainerStyle={{paddingBottom: ms(24)}}>
           {loading ? (
             <View style={styles.loadingWrap}>

@@ -165,7 +165,7 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
                 </TouchableOpacity>
 
                 {/* Menu items (scrollable) */}
-                <ScrollView style={styles.menuList} showsVerticalScrollIndicator={false}>
+                <ScrollView style={styles.menuList}>
                   {filteredMenuItems.map((item, idx) => {
                     const hasChildren = Array.isArray(item.children) && item.children.length > 0;
                     const isOpen = expandedIndex === idx;

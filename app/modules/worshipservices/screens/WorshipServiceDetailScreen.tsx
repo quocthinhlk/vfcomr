@@ -137,7 +137,7 @@ export const WorshipServiceDetailScreen: React.FC = () => {
             </View>
           ) : (
             <ScrollView
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled">
               <View style={styles.card}>

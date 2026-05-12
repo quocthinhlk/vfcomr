@@ -10,7 +10,7 @@ export const SwitchUserScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
       <BackButton title="Switch User" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
         <View style={{ flex: 1 }}>
           <PlaceholderScreen screenName="Switch User" />
         </View>

@@ -10,7 +10,7 @@ export const EventTypeScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
       <BackButton title="Event Type" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
         <View style={{ flex: 1 }}>
           <PlaceholderScreen screenName="Event Type" />
         </View>

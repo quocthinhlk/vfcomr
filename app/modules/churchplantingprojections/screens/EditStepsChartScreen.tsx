@@ -243,7 +243,7 @@ export const EditStepsChartScreen: React.FC = () => {
             }
             style={{flex: 1}}>
             <ScrollView
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled">
               <View style={styles.form}>

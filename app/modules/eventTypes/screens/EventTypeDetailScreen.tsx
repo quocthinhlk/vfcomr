@@ -61,7 +61,7 @@ export const EventTypeDetailScreen: React.FC = () => {
             </Text>
           ) : (
             <ScrollView
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}>
               <View style={styles.content}>
                 <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>

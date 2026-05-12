@@ -200,7 +200,7 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
             </Text>
           ) : (
             <ScrollView
-              showsVerticalScrollIndicator={false}
+
               contentContainerStyle={styles.scrollContent}>
               <View style={styles.content}>
                 {/* Projection Details */}

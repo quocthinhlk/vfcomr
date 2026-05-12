@@ -10,7 +10,7 @@ export const FAQScreen = () => (
     <Header />
     <Layout style={globalStyles.layout}>
       <BackButton title="FAQ" />
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView>
         <View style={{ flex: 1 }}>
           <PlaceholderScreen screenName="FAQ" />
         </View>
