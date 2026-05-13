@@ -30,6 +30,7 @@ import ActionSheetModal, {
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import SearchInput from '../../../shared/components/SearchInput';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 
 export const UserListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -308,26 +309,34 @@ export const UserListScreen: React.FC = () => {
             onSubmitEditing={() => goToPage(1)}
           />
 
-          <FlatList
-            data={items}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-
-            keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets
-            contentInsetAdjustmentBehavior="always"
-            contentContainerStyle={{paddingBottom: ms(24)}}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              !loading ? (
-                <Text style={[styles.empty, {color: C.textSecondary}]}>
-                  {t('noUsersFound')}
-                </Text>
-              ) : null
-            }
-          />
+          <View style={{flex: 1, minHeight: 0}}>
+            <PaginatedListPager
+              page={page}
+              totalPages={totalPages}
+              onPageChange={goToPage}>
+              <FlatList
+                data={items}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+                contentInsetAdjustmentBehavior="always"
+                contentContainerStyle={{paddingBottom: ms(24)}}
+                nestedScrollEnabled={Platform.OS === 'android'}
+                style={{flex: 1}}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                ListEmptyComponent={
+                  !loading ? (
+                    <Text style={[styles.empty, {color: C.textSecondary}]}>
+                      {t('noUsersFound')}
+                    </Text>
+                  ) : null
+                }
+              />
+            </PaginatedListPager>
+          </View>
           <Text
             style={[styles.subTitle, {color: C.textSecondary}]}
           >{`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}</Text>

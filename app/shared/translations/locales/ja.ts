@@ -647,6 +647,13 @@ const ja = {
     back: 'Back',
     languageCode: 'ja',
     churchesPlantedLast10Years: '過去10年間に開拓した教会',
+    churchesPlantedClosedLast10Years: '過去10年間の開拓教会と閉鎖教会',
+    numberOfChurchesPlantedAxis: '開拓教会の数',
+    numberOfChurchesClosedAxis: '閉鎖教会の数',
+    churchesPlantedLegend: '開拓教会',
+    churchesClosedLegend: '閉鎖教会',
+    ytdYearToDate: 'YTD（年初来）',
+    pastoralVisits: '牧師訪問',
 } satisfies TranslationDictionary;
 
 export default ja;

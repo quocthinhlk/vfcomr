@@ -37,6 +37,7 @@ export type RootStackParamList = {
   GenerateReports: undefined;
   ChurchesPlantedLast10Years: undefined;
   OverseerChurchAttendanceChart: undefined;
+  PastoralVisitsChart: undefined;
   OverseerChurchesPlantedLast10Years: undefined;
 
   AddChurchNetwork: undefined;
@@ -179,6 +180,7 @@ import ChangePasswordForOtherUserScreen from '../modules/user/screens/ChangePass
 import DashboardPastorLeaderScreen from '../modules/dashboard/screens/DashboardPastorLeaderScreen';
 import ChurchAttendanceChartScreen from '../modules/dashboard/screens/ChurchAttendanceChartScreen';
 import OverseerChurchAttendanceChartScreen from '../modules/dashboard/screens/OverseerChurchAttendanceChartScreen';
+import PastoralVisitsChartScreen from '../modules/dashboard/screens/PastoralVisitsChartScreen';
 import OverseerChurchesPlantedLast10YearsScreen from '../modules/dashboard/screens/OverseerChurchesPlantedLast10YearsScreen';
 import ChurchGivingChartScreen from '../modules/dashboard/screens/ChurchGivingChartScreen';
 import { WatchListScreen } from '../modules/dashboard/screens/WatchListScreen';
@@ -433,6 +435,10 @@ export default function Navigation() {
               <Stack.Screen
                 name="OverseerChurchAttendanceChart"
                 component={OverseerChurchAttendanceChartScreen}
+              />
+              <Stack.Screen
+                name="PastoralVisitsChart"
+                component={PastoralVisitsChartScreen}
               />
               <Stack.Screen
                 name="OverseerChurchesPlantedLast10Years"

@@ -644,6 +644,14 @@ const pt = {
     back: 'Back',
     languageCode: 'pt',
     churchesPlantedLast10Years: 'Igrejas Plantadas nos últimos 10 anos ',
+    churchesPlantedClosedLast10Years:
+      'Igrejas plantadas e encerradas nos últimos 10 anos',
+    numberOfChurchesPlantedAxis: 'Número de igrejas plantadas',
+    numberOfChurchesClosedAxis: 'Número de igrejas encerradas',
+    churchesPlantedLegend: 'Igrejas plantadas',
+    churchesClosedLegend: 'Igrejas encerradas',
+    ytdYearToDate: 'YTD (ano até a data)',
+    pastoralVisits: 'Visitas Pastorais',
 } satisfies TranslationDictionary;
 
 export default pt;

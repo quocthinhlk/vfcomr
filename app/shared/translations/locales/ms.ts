@@ -646,6 +646,14 @@ const ms = {
     back: 'Back',
     languageCode: 'ms',
     churchesPlantedLast10Years: 'Gereja Ditanam 10 Tahun Terakhir ',
+    churchesPlantedClosedLast10Years:
+      'Gereja Ditanam & Ditutup Sepanjang 10 Tahun Lepas',
+    numberOfChurchesPlantedAxis: 'Bilangan Gereja Ditanam',
+    numberOfChurchesClosedAxis: 'Bilangan Gereja Ditutup',
+    churchesPlantedLegend: 'Gereja Ditanam',
+    churchesClosedLegend: 'Gereja Ditutup',
+    ytdYearToDate: 'YTD Setakat Tahun Ini',
+    pastoralVisits: 'Lawatan Pastoral',
 } satisfies TranslationDictionary;
 
 export default ms;

@@ -1,7 +1,8 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {COLORS} from '../constants/colors';
 import {LANGUAGES} from '../../config/languages';
 import {
+  Alert,
   Modal,
   View,
   TouchableOpacity,
@@ -102,6 +103,24 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
       setSelectedIndex(idx);
     }
   }, [selectedLanguage]);
+
+  const handleLogoutPress = useCallback(() => {
+    Alert.alert(
+      t('logoutConfirmTitle'),
+      t('logoutConfirmMessage'),
+      [
+        {text: t('cancel'), style: 'cancel'},
+        {
+          text: t('logout'),
+          style: 'destructive',
+          onPress: () => {
+            onClose();
+            onLogout();
+          },
+        },
+      ],
+    );
+  }, [t, onClose, onLogout]);
 
   // role-based filtering state MUST be declared before any early returns
   const [roleId, setRoleId] = useState<number | null>(null);
@@ -250,7 +269,7 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
                   {/* Logout button */}
                   <TouchableOpacity
                     style={styles.logoutButton}
-                    onPress={onLogout}>
+                    onPress={handleLogoutPress}>
                     <Image
                       source={require('../../assets/images/logout.png')}
                       style={styles.logoutIcon}

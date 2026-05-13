@@ -639,6 +639,14 @@ const en = {
     needsVerificationVisit: 'Needs a Verification Visit',
     languageCode: 'en',
     churchesPlantedLast10Years: 'Churches Planted last 10 years ',
+    churchesPlantedClosedLast10Years:
+      'Churches Planted & Closed Over the Last 10 Years',
+    numberOfChurchesPlantedAxis: 'Number of Churches Planted',
+    numberOfChurchesClosedAxis: 'Number of Churches Closed',
+    churchesPlantedLegend: 'Churches Planted',
+    churchesClosedLegend: 'Churches Closed',
+    ytdYearToDate: 'YTD Year To Date',
+    pastoralVisits: 'Pastoral Visits',
 } as const;
 
 export default en;

@@ -648,6 +648,14 @@ const fr = {
     failedToUpdateStepsChart: 'Failed to update Steps Chart',
     languageCode: 'fr',
     churchesPlantedLast10Years: 'Églises Plantées il y a 10 ans ',
+    churchesPlantedClosedLast10Years:
+      'Églises plantées et fermées sur les 10 dernières années',
+    numberOfChurchesPlantedAxis: "Nombre d'églises plantées",
+    numberOfChurchesClosedAxis: "Nombre d'églises fermées",
+    churchesPlantedLegend: 'Églises plantées',
+    churchesClosedLegend: 'Églises fermées',
+    ytdYearToDate: 'YTD (année en cours)',
+    pastoralVisits: 'Visites pastorales',
 } satisfies TranslationDictionary;
 
 export default fr;

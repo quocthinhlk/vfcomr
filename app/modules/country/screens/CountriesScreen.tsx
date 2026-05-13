@@ -5,6 +5,7 @@ import {
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
@@ -25,6 +26,7 @@ import ActionSheetModal, {
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import SearchInput from '../../../shared/components/SearchInput';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 
 export const CountriesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -181,49 +183,58 @@ export const CountriesScreen: React.FC = () => {
             onSubmitEditing={() => goToPage(1)}
           />
 
-          <FlatList
-            data={items}
-            keyExtractor={keyExtractor}
-            renderItem={({item}) => (
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => handleEdit(item)}
-                onLongPress={() => {
-                  setSelectedCountry(item);
-                  setActionsVisible(true);
-                }}
-                delayLongPress={300}>
-                <View style={L.itemCard as any}>
-                  <View style={L.itemRow as any}>
-                    <View style={styles.itemCol}>
-                      <Text style={[styles.name, {color: C.textPrimary}]}>
-                        {item.name}
-                      </Text>
-                    </View>
-                    <View style={styles.itemColRight}>
-                      <View style={styles.actionRow}>
-                        <TouchableOpacity
-                          style={[styles.actionBtn, styles.editBtn]}
-                          onPress={() => handleEdit(item)}>
-                          <EditSvgIcon width={ws(15)} height={hs(15)} />
-                        </TouchableOpacity>
+          <View style={{flex: 1, minHeight: 0}}>
+            <PaginatedListPager
+              page={page}
+              totalPages={totalPages}
+              onPageChange={goToPage}>
+              <FlatList
+                data={items}
+                keyExtractor={keyExtractor}
+                nestedScrollEnabled={Platform.OS === 'android'}
+                style={{flex: 1}}
+                renderItem={({item}) => (
+                  <TouchableOpacity
+                    activeOpacity={0.8}
+                    onPress={() => handleEdit(item)}
+                    onLongPress={() => {
+                      setSelectedCountry(item);
+                      setActionsVisible(true);
+                    }}
+                    delayLongPress={300}>
+                    <View style={L.itemCard as any}>
+                      <View style={L.itemRow as any}>
+                        <View style={styles.itemCol}>
+                          <Text style={[styles.name, {color: C.textPrimary}]}>
+                            {item.name}
+                          </Text>
+                        </View>
+                        <View style={styles.itemColRight}>
+                          <View style={styles.actionRow}>
+                            <TouchableOpacity
+                              style={[styles.actionBtn, styles.editBtn]}
+                              onPress={() => handleEdit(item)}>
+                              <EditSvgIcon width={ws(15)} height={hs(15)} />
+                            </TouchableOpacity>
+                          </View>
+                        </View>
                       </View>
                     </View>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              !loading ? (
-                <Text style={[styles.empty, {color: C.textSecondary}]}>
-                  {t('noChurchesFound')}
-                </Text>
-              ) : null
-            }
-          />
+                  </TouchableOpacity>
+                )}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                ListEmptyComponent={
+                  !loading ? (
+                    <Text style={[styles.empty, {color: C.textSecondary}]}>
+                      {t('noChurchesFound')}
+                    </Text>
+                  ) : null
+                }
+              />
+            </PaginatedListPager>
+          </View>
           <Text style={[styles.subTitle, {color: C.textSecondary}]}>
             {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
           </Text>

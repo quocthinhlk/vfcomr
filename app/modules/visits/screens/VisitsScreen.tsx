@@ -7,6 +7,7 @@ import {
   TouchableOpacity,
   Alert,
   Image,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
@@ -28,6 +29,7 @@ import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import SearchInput from '../../../shared/components/SearchInput';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {getIsoWeekDateRangeLabelFull} from '../../../shared/utils/isoWeek';
 
@@ -308,21 +310,31 @@ export const VisitsScreen: React.FC = () => {
             }
           />
 
-          <FlatList
-            data={items}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              !loading ? (
-                <Text style={[styles.empty, {color: C.textSecondary}]}>
-                  {t('noDataFound') || 'No data found'}
-                </Text>
-              ) : null
-            }
-          />
+          <View style={{flex: 1, minHeight: 0}}>
+            <PaginatedListPager
+              page={page}
+              totalPages={totalPages}
+              onPageChange={goToPage}
+              pagerRemountKey={`${year}-${weekNumber ?? ''}`}>
+              <FlatList
+                data={items}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                nestedScrollEnabled={Platform.OS === 'android'}
+                style={{flex: 1}}
+                refreshControl={
+                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+                }
+                ListEmptyComponent={
+                  !loading ? (
+                    <Text style={[styles.empty, {color: C.textSecondary}]}>
+                      {t('noDataFound') || 'No data found'}
+                    </Text>
+                  ) : null
+                }
+              />
+            </PaginatedListPager>
+          </View>
 
           <Text style={[styles.subTitle, {color: C.textSecondary}]}>
             {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}

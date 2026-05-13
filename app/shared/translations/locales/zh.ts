@@ -636,6 +636,13 @@ const zh = {
     back: 'Back',
     languageCode: 'zh',
     churchesPlantedLast10Years: '过去10年开拓的教会 ',
+    churchesPlantedClosedLast10Years: '过去10年新建与关闭的教会',
+    numberOfChurchesPlantedAxis: '新建教会数量',
+    numberOfChurchesClosedAxis: '关闭教会数量',
+    churchesPlantedLegend: '新建教会',
+    churchesClosedLegend: '关闭教会',
+    ytdYearToDate: '年初至今 (YTD)',
+    pastoralVisits: '牧师访问',
 } satisfies TranslationDictionary;
 
 export default zh;

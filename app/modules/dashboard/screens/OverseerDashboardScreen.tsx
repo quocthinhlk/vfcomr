@@ -579,6 +579,11 @@ export default function OverseerDashboardScreen() {
       routeName: 'OverseerChurchAttendanceChart',
     },
     {
+      icon: require('../../../../app/assets/images/icon/visit.png'),
+      label: t('pastoralVisits') || 'Pastoral Visits',
+      routeName: 'PastoralVisitsChart',
+    },
+    {
       icon: require('../../../../app/assets/images/icon/replay-10.png'),
       label: t('churchesPlantedLast10Years') || 'Churches Planted last 10 years ',
       routeName: 'OverseerChurchesPlantedLast10Years',

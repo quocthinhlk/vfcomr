@@ -38,6 +38,7 @@ import {getListStyles} from '../../../shared/styles/list';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import SearchInput from '../../../shared/components/SearchInput';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
@@ -435,25 +436,33 @@ export const ChurchesListScreen: React.FC = () => {
             </View>
           )}
 
-          <FlatList
-            data={isInitialLoad ? [] : items}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-
-            keyboardShouldPersistTaps="handled"
-            automaticallyAdjustKeyboardInsets
-            contentInsetAdjustmentBehavior="always"
-            contentContainerStyle={{paddingBottom: ms(8)}}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                tintColor={COLORS.mainColor}
-                colors={[COLORS.mainColor]}
+          <View style={{flex: 1, minHeight: 0}}>
+            <PaginatedListPager
+              page={page}
+              totalPages={totalPages}
+              onPageChange={goToPage}>
+              <FlatList
+                data={isInitialLoad ? [] : items}
+                keyExtractor={keyExtractor}
+                renderItem={renderItem}
+                keyboardShouldPersistTaps="handled"
+                automaticallyAdjustKeyboardInsets
+                contentInsetAdjustmentBehavior="always"
+                contentContainerStyle={{paddingBottom: ms(8)}}
+                nestedScrollEnabled={Platform.OS === 'android'}
+                style={{flex: 1}}
+                refreshControl={
+                  <RefreshControl
+                    refreshing={refreshing}
+                    onRefresh={onRefresh}
+                    tintColor={COLORS.mainColor}
+                    colors={[COLORS.mainColor]}
+                  />
+                }
+                ListEmptyComponent={renderEmptyOrSkeleton()}
               />
-            }
-            ListEmptyComponent={renderEmptyOrSkeleton()}
-          />
+            </PaginatedListPager>
+          </View>
 
           {/* Footer: info + stats + pagination */}
           {!isInitialLoad && (

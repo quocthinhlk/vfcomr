@@ -14,8 +14,18 @@ export type OverseerAttendanceGraph = {
 
 export type OverseerChurchPlantedYear = {
   year: number;
-  count: number;
-  disabled_count: number;
+  /** Planted count (preferred). */
+  planted?: number;
+  /** Closed count (positive; drawn downward). */
+  closed?: number;
+  closed_count?: number;
+  /** Legacy: stacked as "closed" in divergent chart when `closed` missing. */
+  count?: number;
+  disabled_count?: number;
+  is_ytd?: boolean;
+  ytd?: boolean;
+  is_ytd_year?: boolean;
+  year_to_date?: boolean;
 };
 
 export type OverseerChurchPlantedGraph = {
@@ -23,10 +33,22 @@ export type OverseerChurchPlantedGraph = {
   data?: OverseerChurchPlantedYear[];
 };
 
+export type PastoralVisitWeekPoint = {
+  week_key?: {year: number; week: number};
+  dates?: string;
+  visit_days?: number | null;
+};
+
+export type PastoralVisitsGraph = {
+  graph_title?: string;
+  data?: PastoralVisitWeekPoint[];
+};
+
 export type OverseerIndicatorsPayload = {
   total_churches?: number;
   attendance_graph?: OverseerAttendanceGraph;
   church_planted_graph?: OverseerChurchPlantedGraph;
+  pastoral_visits_graph?: PastoralVisitsGraph;
   [key: string]: unknown;
 };
 

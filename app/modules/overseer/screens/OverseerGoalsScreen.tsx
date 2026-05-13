@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   View,
+  Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
@@ -20,6 +21,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {getListStyles} from '../../../shared/styles/list';
 import SearchInput from '../../../shared/components/SearchInput';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {
   listOverseerGoalPeriods,
   OverseerGoalPeriodItem,
@@ -254,44 +256,52 @@ export const OverseerGoalsScreen = () => {
           />
         </View>
 
-        <FlatList
-          data={isInitialLoad ? [] : items}
-          keyExtractor={item => String(item.id)}
-          renderItem={renderItem}
-          keyboardShouldPersistTaps="handled"
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              colors={[COLORS.mainColor]}
-              tintColor={COLORS.mainColor}
+        <View style={{flex: 1, minHeight: 0}}>
+          <PaginatedListPager
+            page={page}
+            totalPages={totalPages}
+            onPageChange={goToPage}>
+            <FlatList
+              data={isInitialLoad ? [] : items}
+              keyExtractor={item => String(item.id)}
+              renderItem={renderItem}
+              keyboardShouldPersistTaps="handled"
+              nestedScrollEnabled={Platform.OS === 'android'}
+              style={{flex: 1}}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={onRefresh}
+                  colors={[COLORS.mainColor]}
+                  tintColor={COLORS.mainColor}
+                />
+              }
+              ListEmptyComponent={
+                isInitialLoad ? (
+                  <View style={styles.emptyWrap}>
+                    <ActivityIndicator size="small" color={COLORS.mainColor} />
+                  </View>
+                ) : !loading ? (
+                  <View style={styles.emptyWrap}>
+                    <Text style={styles.emptyIcon}>🎯</Text>
+                    <Text style={[styles.emptyTitle, {color: C.textPrimary}]}>
+                      {t('noDataFound')}
+                    </Text>
+                    {!!query && (
+                      <Text style={[styles.emptyHint, {color: C.textSecondary}]}>
+                        {t('tryDifferentSearchKeyword')}
+                      </Text>
+                    )}
+                  </View>
+                ) : null
+              }
+              contentContainerStyle={[
+                styles.listContent,
+                items.length === 0 ? styles.emptyContent : null,
+              ]}
             />
-          }
-          ListEmptyComponent={
-            isInitialLoad ? (
-              <View style={styles.emptyWrap}>
-                <ActivityIndicator size="small" color={COLORS.mainColor} />
-              </View>
-            ) : !loading ? (
-              <View style={styles.emptyWrap}>
-                <Text style={styles.emptyIcon}>🎯</Text>
-                <Text style={[styles.emptyTitle, {color: C.textPrimary}]}>
-                  {t('noDataFound')}
-                </Text>
-                {!!query && (
-                  <Text style={[styles.emptyHint, {color: C.textSecondary}]}>
-                    {t('tryDifferentSearchKeyword')}
-                  </Text>
-                )}
-              </View>
-            ) : null
-          }
-          contentContainerStyle={[
-            styles.listContent,
-            items.length === 0 ? styles.emptyContent : null,
-          ]}
-
-        />
+          </PaginatedListPager>
+        </View>
 
         <Text style={[styles.subTitle, {color: C.textSecondary}]}>
           {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
