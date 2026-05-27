@@ -33,6 +33,9 @@ const ja = {
     perPage: '件/ページ',
     addMonthlyData: '月次データを追加',
     monthlyData: '月次データ',
+    monthlyDataEntryLayout: 'レイアウト',
+    monthlyDataEntryLayoutSingle: '1列',
+    monthlyDataEntryLayoutDouble: '2列',
     worshipServices: '礼拝',
     churchPlantingProjections: '教会開拓予測',
     addProjections: '予測を追加',
@@ -84,6 +87,9 @@ const ja = {
     churchesListMenu: '教会一覧',
     churchAttendanceChart: '教会出席チャート',
     churchGivingChart: '教会献金チャート',
+    attendanceAndGivingCharts: '出席・献金チャート',
+    chartsLandscapeTip:
+      'ヒント：端末を横向きにすると、グラフがより見やすくなります。',
     churchList: '教会一覧',
     attendanceGraph: '出席グラフ',
     attendanceLast12Months: '出席 - 過去12か月',
@@ -425,7 +431,9 @@ const ja = {
     // Help texts (to be localized)
     helpChurchName: '教会の正式名称（都市名および地区名・町名・村名を含む）。例：Victory Family Centre – New Lynn',
     helpShortName: '教会の略称を10文字で表したもの。例：VFC-NewLyn',
-    helpIsMsc: 'これはマルチサービスまたはマルチサイト教会ですか？',
+    isMultiServiceChurchMsc: 'この教会はマルチサービス教会（MSC）ですか？',
+    helpIsMsc:
+      'マルチサービス教会（MSC）とは、別の時間帯・別の場所・別の言語で礼拝が2つ以上ある教会のことです。',
     helpEnableCp: 'これは「ビジョン2:25」教会開拓運動戦略の一環であるパイオニア・ハウス・チャーチ・プラントですか？',
     helpLanguage: 'この教会の礼拝で使用される言語',
     helpMotherChurch: 'この教会を開拓した責任を持つ母教会',
@@ -499,8 +507,15 @@ const ja = {
     failedToCreateWorshipService: '礼拝の作成に失敗しました',
     failedToUpdateWorshipService: '礼拝の更新に失敗しました',
     failedToDeleteWorshipService: '礼拝の削除に失敗しました',
-    worshipServicesMscFaqNote:
-      '別の場所・別の言語・別の時間帯に教会の礼拝を追加する場合は、OMRのマルチサービス教会機能をご利用ください。手順は、右上のドロップダウンメニューにある「よくある質問（FAQ）」をご覧ください。',
+    worshipServicesMscNoteTitle: '礼拝が複数ありますか？',
+    worshipServicesMscNoteP1:
+      'ほとんどの教会は日曜日に礼拝を1つだけ行っています。',
+    worshipServicesMscNoteP2:
+      '別の時間帯・別の場所・別の言語で礼拝が2つまたは3つある場合は、OMRのマルチサービス教会（MSC）機能をご利用いただけます。',
+    worshipServicesMscNoteP3:
+      '詳しい手順は、よくある質問（FAQ）セクションをご覧いただくか、OMRサポートにお問い合わせください',
+    worshipServicesMscGoToFaq: 'MSCのFAQへ',
+    worshipServicesMscGoToSupport: 'OMRサポートへ',
     // Dashboard Stats
     enterVisits: '訪問とイベント',
     editMyProfile: 'マイプロフィールを編集',

@@ -502,7 +502,8 @@ const getStatsData = (dashboardData: any, t?: (k: string) => string) => {
 const menuItems = [
   { icon: require('../../../../app/assets/images/icon/chart.png'), label: 'Add Monthly Data', routeName: 'MonthlyDataSelect' },
   { icon: require('../../../../app/assets/images/icon/edit.png'), label: 'Edit Church', routeName: 'EditChurch' },
-  { icon: require('../../../../app/assets/images/icon/worship1.png'), label: 'Worship Services', routeName: 'WorshipServices' },
+  // { icon: require('../../../../app/assets/images/icon/worship1.png'), label: 'Worship Services', routeName: 'WorshipServices' },
+  { icon: require('../../../../app/assets/images/icon/line-chart.png'), label: 'Attendance & Giving Charts', routeName: 'AttendanceAndGivingCharts' },
   { icon: require('../../../../app/assets/images/icon/house-user.png'), label: 'New Pastor & New Church', routeName: 'NewPastorAndChurch' },
   { icon: require('../../../../app/assets/images/icon/user.png'), label: 'New Pastor', routeName: 'AddUser' },
   { icon: require('../../../../app/assets/images/icon/home.png'), label: 'New Church', routeName: 'AddChurch' },
@@ -1364,6 +1365,19 @@ export default function DashboardPastorLeaderScreen() {
           console.error('Error getting selected church ID for chart:', error);
           navigation.navigate('ChurchGivingChart');
         }
+      } else if (item.routeName === 'AttendanceAndGivingCharts') {
+        try {
+          const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+          const parsedChurchId = savedChurchId ? parseInt(savedChurchId, 10) : NaN;
+          if (!isNaN(parsedChurchId) && parsedChurchId > 0) {
+            navigation.navigate('AttendanceAndGivingCharts', {churchId: parsedChurchId});
+          } else {
+            navigation.navigate('AttendanceAndGivingCharts');
+          }
+        } catch (error) {
+          console.error('Error getting selected church ID for combined charts:', error);
+          navigation.navigate('AttendanceAndGivingCharts');
+        }
       } else {
         navigation.navigate(item.routeName);
       }
@@ -1833,20 +1847,18 @@ export default function DashboardPastorLeaderScreen() {
                 }
               }}
             >
-              <View style={[styles.avatarRing, { borderColor: COLORS.mainColor + '55' }]}>
-                {userProfile.profileImage && !profileError ? (
-                  <Image
-                    source={{ uri: userProfile.profileImage }}
-                    style={styles.profileImage}
-                    onError={() => setProfileError(true)}
-                  />
-                ) : (
-                  <Image
-                    source={require('../../../../app/assets/images/blank-avatar.png')}
-                    style={styles.profileImage}
-                  />
-                )}
-              </View>
+              {userProfile.profileImage && !profileError ? (
+                <Image
+                  source={{ uri: userProfile.profileImage }}
+                  style={styles.profileImage}
+                  onError={() => setProfileError(true)}
+                />
+              ) : (
+                <Image
+                  source={require('../../../../app/assets/images/blank-avatar.png')}
+                  style={styles.profileImage}
+                />
+              )}
             </TouchableOpacity>
 
             {/* Name & title — tappable to view profile */}
@@ -2152,6 +2164,7 @@ export default function DashboardPastorLeaderScreen() {
                      item.label === 'Monthly Data' ? t('monthlyData') :
                      item.label === 'Edit Church' ? t('editChurch') :
                      item.label === 'Worship Services' ? t('worshipServices') :
+                     item.label === 'Attendance & Giving Charts' ? t('attendanceAndGivingCharts') :
                      item.label === 'New Pastor & New Church' ? t('newPastorAndNewChurch') :
                      item.label === 'New Pastor' ? t('addNewPastor') :
                      item.label === 'New Church' ? t('addNewChurch') : item.label}
@@ -2290,7 +2303,7 @@ const styles = StyleSheet.create({
     height: ws(40),
   },
   verificationText: {
-    fontSize: fs(12),
+    fontSize: fs(14),
     textAlign: 'right',
     fontWeight: '600',
     marginTop: ms(3),
@@ -2323,11 +2336,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-  },
-  avatarRing: {
-    borderWidth: 2.5,
-    borderRadius: ws(46),
-    padding: ms(2),
   },
   avatarBadge: {
     position: 'absolute',
@@ -2452,9 +2460,8 @@ const styles = StyleSheet.create({
   viewMoreButton: {
     alignItems: 'flex-end',
     fontSize: fs(12),
-    paddingHorizontal: ms(16),
+    paddingHorizontal: ms(12),
     paddingVertical: ms(10),
-    marginBottom: ms(8),
   },
   viewMoreRow: {
     flexDirection: 'row',
@@ -2477,7 +2484,7 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: ms(12),
+    paddingVertical: ms(11),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },

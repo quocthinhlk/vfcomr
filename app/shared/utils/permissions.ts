@@ -1,23 +1,22 @@
-import {Alert, Linking, PermissionsAndroid, Platform} from 'react-native';
+import {
+  requestCameraPermission,
+  requestPhotoPermission,
+  showBlockedPermissionAlert,
+} from '../services/permissions.service';
 
 // ---------------------------------------------------------------------------
 // Image / camera permission helpers (shared across screens and hooks)
+// Delegates to permissions.service (react-native-permissions) on all platforms.
 // ---------------------------------------------------------------------------
 
-/** Shows an Alert prompting the user to open system Settings to grant access. */
+/** @deprecated Use showBlockedPermissionAlert from permissions.service */
 export const promptPermissionSettings = (
   source: 'camera' | 'library',
   cancelText = 'Cancel',
 ): void => {
-  const title =
-    source === 'camera' ? 'Camera permission required' : 'Photo access required';
-  const message = `Please enable ${
-    source === 'camera' ? 'camera' : 'photo library'
-  } access in system settings to continue.`;
-  Alert.alert(title, message, [
-    {text: cancelText, style: 'cancel'},
-    {text: 'Open Settings', onPress: () => void Linking.openSettings()},
-  ]);
+  showBlockedPermissionAlert(source === 'camera' ? 'camera' : 'photo', {
+    cancel: cancelText,
+  });
 };
 
 /** Returns true if an error thrown by react-native-image-crop-picker is permission-related. */
@@ -31,43 +30,19 @@ export const isPermissionError = (error: unknown): boolean => {
 };
 
 /**
- * Android-only: checks and requests the required permission before accessing
- * the camera or photo library. Returns `true` if the permission is granted.
- * On iOS this always returns `true` (the OS dialog is triggered by the picker itself).
+ * Requests camera or photo library access when the user is about to pick/take a photo.
+ * On iOS and Android uses react-native-permissions (runtime dialogs when needed).
  */
 export const ensureAndroidPermission = async (
   source: 'camera' | 'library',
   cancelText = 'Cancel',
 ): Promise<boolean> => {
-  if (Platform.OS !== 'android') return true;
-
-  const requestOne = async (permission: any): Promise<boolean> => {
-    try {
-      const result = await PermissionsAndroid.request(permission);
-      if (result === PermissionsAndroid.RESULTS.GRANTED) return true;
-      // NEVER_ASK_AGAIN: the OS will never show the dialog again — direct user to Settings.
-      // DENIED: the OS dialog will re-appear on the next attempt, so just return false silently.
-      if (result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN) {
-        promptPermissionSettings(source, cancelText);
-      }
-      return false;
-    } catch {
-      promptPermissionSettings(source, cancelText);
-      return false;
-    }
-  };
-
-  if (source === 'camera') {
-    return requestOne(PermissionsAndroid.PERMISSIONS.CAMERA);
-  }
-
-  // Photo library: Android 13+ uses READ_MEDIA_IMAGES; older uses READ_EXTERNAL_STORAGE.
-  const androidVersion = Number(Platform.Version) || 0;
-  const perm =
-    androidVersion >= 33
-      ? (PermissionsAndroid.PERMISSIONS as any).READ_MEDIA_IMAGES
-      : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
-  return requestOne(perm);
+  const copy = {cancel: cancelText};
+  const res =
+    source === 'camera'
+      ? await requestCameraPermission({blockedCopy: copy})
+      : await requestPhotoPermission({blockedCopy: copy});
+  return res.granted;
 };
 
 // ---------------------------------------------------------------------------

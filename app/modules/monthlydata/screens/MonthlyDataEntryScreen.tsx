@@ -41,6 +41,137 @@ import api from '../../../config/api';
 import {getIsoWeekDateRangeLabel, getIsoWeekDisplayYear} from '../../../shared/utils/isoWeek';
 import {listWorshipServicesByChurch} from '../../worshipservices/services/worshipService.service';
 import {getChurchDetail} from '../../church/services/church.service';
+import type {MonthlyDataEntryColumnLayout} from '../constants/monthlyDataEntryLayout';
+import {MonthlyDataEntryLayoutToggle} from '../components/MonthlyDataEntryLayoutToggle';
+import {useMonthlyDataEntryColumnLayout} from '../hooks/useMonthlyDataEntryColumnLayout';
+import {
+  MONTHLY_DATA_ENTRY_DOUBLE_FIELD_WIDTH,
+  MONTHLY_DATA_ENTRY_SINGLE_INPUT_WIDTH,
+  MONTHLY_DATA_ENTRY_SINGLE_LABEL_WIDTH,
+} from '../constants/monthlyDataEntryLayout';
+
+type AppInputProps = React.ComponentProps<typeof AppInput>;
+
+const MONTHLY_DATA_INPUT_FONT_SIZE = fs(15);
+
+const MonthlyDataInput = ({style, ...props}: AppInputProps) => (
+  <AppInput
+    {...props}
+    style={[{fontSize: MONTHLY_DATA_INPUT_FONT_SIZE}, style]}
+  />
+);
+
+type MonthlyDataFieldSlot = {
+  label: React.ReactNode;
+  input: React.ReactNode;
+};
+
+type MonthlyDataFieldPairProps = {
+  layout: MonthlyDataEntryColumnLayout;
+  left: MonthlyDataFieldSlot;
+  right: MonthlyDataFieldSlot;
+  leftRefKey?: string;
+  rightRefKey?: string;
+  fieldRefs: React.MutableRefObject<Map<string, unknown>>;
+};
+
+function bindFieldRef(
+  fieldRefs: React.MutableRefObject<Map<string, unknown>>,
+  key?: string,
+) {
+  return (ref: View | null) => {
+    if (ref && key) {
+      fieldRefs.current.set(key, ref);
+    }
+  };
+}
+
+/** 1 col: label + input on one row (70% / 30%). 2 col: label above input, two equal 50% columns. */
+function renderFormField(
+  layout: MonthlyDataEntryColumnLayout,
+  label: React.ReactNode,
+  input: React.ReactNode,
+  fieldRefs: React.MutableRefObject<Map<string, unknown>>,
+  refKey?: string,
+) {
+  const labelWrap = (
+    <View
+      style={[
+        styles.rowLabelWrapper,
+        layout === 'double' && styles.rowLabelWrapperDouble,
+        layout === 'single' && styles.rowLabelWrapperInline,
+      ]}>
+      {label}
+    </View>
+  );
+
+  if (layout === 'single') {
+    return (
+      <View
+        style={[styles.fieldContainer, styles.fieldInlineRow]}
+        ref={bindFieldRef(fieldRefs, refKey)}>
+        <View style={styles.fieldInlineLabel}>{labelWrap}</View>
+        <View style={styles.fieldInlineInput}>
+          <View style={styles.fieldInlineInputInner}>{input}</View>
+        </View>
+      </View>
+    );
+  }
+
+  return (
+    <View
+      style={[
+        styles.fieldContainer,
+        styles.fieldContainerRow,
+        styles.fieldContainerDouble,
+      ]}
+      ref={bindFieldRef(fieldRefs, refKey)}>
+      {labelWrap}
+      <View style={styles.fieldDoubleInputInner}>{input}</View>
+    </View>
+  );
+}
+
+/** Renders two fields: paired horizontally (2-col layout) or stacked (1-col). */
+function MonthlyDataFieldPair({
+  layout,
+  left,
+  right,
+  leftRefKey,
+  rightRefKey,
+  fieldRefs,
+}: MonthlyDataFieldPairProps) {
+  const leftField = renderFormField(
+    layout,
+    left.label,
+    left.input,
+    fieldRefs,
+    leftRefKey,
+  );
+  const rightField = renderFormField(
+    layout,
+    right.label,
+    right.input,
+    fieldRefs,
+    rightRefKey,
+  );
+
+  if (layout === 'double') {
+    return (
+      <View style={styles.fieldRow}>
+        <View style={[styles.fieldHalf, styles.fieldHalfLeft]}>{leftField}</View>
+        <View style={[styles.fieldHalf, styles.fieldHalfRight]}>{rightField}</View>
+      </View>
+    );
+  }
+
+  return (
+    <>
+      {leftField}
+      {rightField}
+    </>
+  );
+}
 
 interface RouteParams {
   churchId: number;
@@ -116,6 +247,8 @@ export default function MonthlyDataEntryScreen() {
   const loadingWeeksRef = useRef<Set<number>>(new Set());
   const loadedWeeksRef = useRef<Set<number>>(new Set());
   const worshipServicesRef = useRef<WorshipSession[] | null>(null);
+  const {columnLayout, setColumnLayout: setColumnLayoutPreference} =
+    useMonthlyDataEntryColumnLayout();
 
   const sortedWeekNumbers = useMemo(() => {
     return weekNumbers.length > 0 ? [...weekNumbers].sort((a, b) => a - b) : [];
@@ -125,7 +258,13 @@ export default function MonthlyDataEntryScreen() {
   }, [sortedWeekNumbers, currentWeekIndex]);
 
   const renderRowLabel = (text: string, required = false) => (
-    <Text style={[styles.rowLabel, {color: C.textSecondary}]} category="label">
+    <Text
+      style={[
+        styles.rowLabel,
+        columnLayout === 'single' && styles.rowLabelInline,
+        {color: C.textSecondary},
+      ]}
+      category="label">
       {text}
       {required ? <Text style={styles.requiredMark}> *</Text> : null}
     </Text>
@@ -1528,6 +1667,16 @@ export default function MonthlyDataEntryScreen() {
               </ScrollView>
             )}
 
+            <View style={styles.layoutToggleRow}>
+              <Text style={[styles.layoutToggleHint, {color: COLORS.mainColor}]}>
+                {t('monthlyDataEntryLayout') || 'Layout'}
+              </Text>
+              <MonthlyDataEntryLayoutToggle
+                value={columnLayout}
+                onChange={setColumnLayoutPreference}
+              />
+            </View>
+
             {/* Main Worship Service Attendance */}
             <View style={styles.section}>
               {loading && worshipSessions.length === 0 ? (
@@ -1560,7 +1709,11 @@ export default function MonthlyDataEntryScreen() {
                   return (
                     <View
                       key={session.id}
-                      style={styles.sessionContainer}
+                      style={[
+                        styles.sessionContainer,
+                        index < worshipSessions.length - 1 &&
+                          styles.sessionContainerDivider,
+                      ]}
                       ref={ref => {
                         if (ref)
                           {fieldRefs.current.set(
@@ -1577,141 +1730,120 @@ export default function MonthlyDataEntryScreen() {
                         {session.time?.substring(0, 5)})
                       </Text>
 
-                      <View style={styles.fieldRow}>
-                        <View
-                          style={[
-                            styles.fieldContainer,
-                            styles.fieldContainerRow,
-                            styles.fieldHalf,
-                          ]}
-                          ref={ref => {
-                            if (ref)
-                              {fieldRefs.current.set(
-                                `worship_session_${session.id}_attendance`,
-                                ref,
-                              );}
-                          }}>
-                          <View style={styles.rowLabelWrapper}>
-                            {renderRowLabel(t('adults') || 'Adults', true)}
-                          </View>
-                          <AppInput
-                            value={formatNumber(
-                              session.attendance.adult_attendance,
-                            )}
-                            onChangeText={value => {
-                              updateWorshipSession(
-                                session.id,
-                                'adult_attendance',
-                                value,
-                              );
-                            }}
-                            keyboardType="numeric"
-                            placeholder="0"
-                            error={
-                              attendanceError &&
-                              session.attendance.adult_attendance === null &&
-                              session.attendance.youth_attendance === null &&
-                              session.attendance.child_attendance === null
-                            }
-                          />
-                        </View>
+                      <MonthlyDataFieldPair
+                        layout={columnLayout}
+                        fieldRefs={fieldRefs}
+                        leftRefKey={`worship_session_${session.id}_attendance`}
+                        left={{
+                          label: renderRowLabel(t('adults') || 'Adults', true),
+                          input: (
+                            <MonthlyDataInput
+                              value={formatNumber(
+                                session.attendance.adult_attendance,
+                              )}
+                              onChangeText={value => {
+                                updateWorshipSession(
+                                  session.id,
+                                  'adult_attendance',
+                                  value,
+                                );
+                              }}
+                              keyboardType="numeric"
+                              placeholder="0"
+                              error={
+                                attendanceError &&
+                                session.attendance.adult_attendance === null &&
+                                session.attendance.youth_attendance === null &&
+                                session.attendance.child_attendance === null
+                              }
+                            />
+                          ),
+                        }}
+                        right={{
+                          label: renderRowLabel(t('youth') || 'Youth [13-22]'),
+                          input: (
+                            <MonthlyDataInput
+                              value={formatNumber(
+                                session.attendance.youth_attendance,
+                              )}
+                              onChangeText={value =>
+                                updateWorshipSession(
+                                  session.id,
+                                  'youth_attendance',
+                                  value,
+                                )
+                              }
+                              keyboardType="numeric"
+                              placeholder="0"
+                            />
+                          ),
+                        }}
+                      />
 
-                        <View
-                          style={[
-                            styles.fieldContainer,
-                            styles.fieldContainerRow,
-                            styles.fieldHalf,
-                          ]}>
-                        <View style={styles.rowLabelWrapper}>
-                          {renderRowLabel(t('youth') || 'Youth [13-22]')}
-                        </View>
-                          <AppInput
-                            value={formatNumber(
-                              session.attendance.youth_attendance,
-                            )}
-                            onChangeText={value =>
-                              updateWorshipSession(
-                                session.id,
-                                'youth_attendance',
-                                value,
-                              )
-                            }
-                            keyboardType="numeric"
-                            placeholder="0"
-                          />
-                        </View>
-                      </View>
-
-                      <View style={styles.fieldRow}>
-                        <View
-                          style={[
-                            styles.fieldContainer,
-                            styles.fieldContainerRow,
-                            styles.fieldHalf,
-                          ]}>
-                        <View style={styles.rowLabelWrapper}>
-                          {renderRowLabel(t('children') || 'Children [0-12]')}
-                        </View>
-                          <AppInput
-                            value={formatNumber(
-                              session.attendance.child_attendance,
-                            )}
-                            onChangeText={value =>
-                              updateWorshipSession(
-                                session.id,
-                                'child_attendance',
-                                value,
-                              )
-                            }
-                            keyboardType="numeric"
-                            placeholder="0"
-                          />
-                        </View>
-
-                        <View
-                          style={[
-                            styles.fieldContainer,
-                            styles.fieldContainerRow,
-                            styles.fieldHalf,
-                          ]}>
-                        <View style={styles.rowLabelWrapper}>
-                          {renderRowLabel(
+                      <MonthlyDataFieldPair
+                        layout={columnLayout}
+                        fieldRefs={fieldRefs}
+                        left={{
+                          label: renderRowLabel(
+                            t('children') || 'Children [0-12]',
+                          ),
+                          input: (
+                            <MonthlyDataInput
+                              value={formatNumber(
+                                session.attendance.child_attendance,
+                              )}
+                              onChangeText={value =>
+                                updateWorshipSession(
+                                  session.id,
+                                  'child_attendance',
+                                  value,
+                                )
+                              }
+                              keyboardType="numeric"
+                              placeholder="0"
+                            />
+                          ),
+                        }}
+                        right={{
+                          label: renderRowLabel(
                             t('numberOfServicesForChildren') ||
                               'Number of Services for Children',
-                          )}
-                        </View>
-                          <AppInput
-                            value={formatNumber(
-                              session.attendance.number_of_service_for_children,
-                            )}
-                            onChangeText={value =>
-                              updateWorshipSession(
-                                session.id,
-                                'number_of_service_for_children',
-                                value,
-                              )
-                            }
-                            keyboardType="numeric"
-                            placeholder="0"
-                          />
-                        </View>
-                      </View>
+                          ),
+                          input: (
+                            <MonthlyDataInput
+                              value={formatNumber(
+                                session.attendance
+                                  .number_of_service_for_children,
+                              )}
+                              onChangeText={value =>
+                                updateWorshipSession(
+                                  session.id,
+                                  'number_of_service_for_children',
+                                  value,
+                                )
+                              }
+                              keyboardType="numeric"
+                              placeholder="0"
+                            />
+                          ),
+                        }}
+                      />
 
-                      <View style={styles.fieldContainer}>
-                      <View style={styles.rowLabelWrapper}>
-                        {renderRowLabel(
+                      {renderFormField(
+                        columnLayout,
+                        renderRowLabel(
                           t('totalAttendance') || 'Total Attendance',
-                        )}
-                      </View>
-                        <AppInput
+                        ),
+                        <MonthlyDataInput
                           value={formatNumber(
                             session.attendance.total_attendance,
                           )}
-                        keyboardType="numeric"
+                          keyboardType="numeric"
                           editable={false}
                           containerStyle={{backgroundColor: C.bgSelectedOption}}
-                        />
-                      </View>
+                        />,
+                        fieldRefs,
+                      )}
                     </View>
                   );
                 })
@@ -1728,73 +1860,55 @@ export default function MonthlyDataEntryScreen() {
                 {worshipSessions.length + 1}. {t('cellGroups') || 'Cell Groups'}
               </Text>
 
-              <View style={styles.fieldRow}>
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
+              <MonthlyDataFieldPair
+                layout={columnLayout}
+                fieldRefs={fieldRefs}
+                leftRefKey="church_metrics.number_of_cell_groups"
+                rightRefKey="church_metrics.cell_group_weekly_attendance"
+                left={{
+                  label: renderRowLabel(
+                    t('numberOfCellGroups') || 'Number of Cell Groups',
+                    true,
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(currentMetrics.number_of_cell_groups)}
+                      onChangeText={value =>
+                        updateChurchMetrics('number_of_cell_groups', value)
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
                         'church_metrics.number_of_cell_groups',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('numberOfCellGroups') || 'Number of Cell Groups',
-                      true,
-                    )}
-                  </View>
-                  <AppInput
-                    value={formatNumber(currentMetrics.number_of_cell_groups)}
-                    onChangeText={value =>
-                      updateChurchMetrics('number_of_cell_groups', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.number_of_cell_groups',
-                    )}
-                  />
-                </View>
-
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
+                      )}
+                    />
+                  ),
+                }}
+                right={{
+                  label: renderRowLabel(
+                    t('totalAttendanceInAll') || 'Total Attendance in All',
+                    true,
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(
+                        currentMetrics.cell_group_weekly_attendance,
+                      )}
+                      onChangeText={value =>
+                        updateChurchMetrics(
+                          'cell_group_weekly_attendance',
+                          value,
+                        )
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
                         'church_metrics.cell_group_weekly_attendance',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('totalAttendanceInAll') || 'Total Attendance in All',
-                      true,
-                    )}
-                  </View>
-                  <AppInput
-                    value={formatNumber(
-                      currentMetrics.cell_group_weekly_attendance,
-                    )}
-                    onChangeText={value =>
-                      updateChurchMetrics('cell_group_weekly_attendance', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.cell_group_weekly_attendance',
-                    )}
-                  />
-                </View>
-              </View>
+                      )}
+                    />
+                  ),
+                }}
+              />
             </View>
 
             {/* Prayer Meetings */}
@@ -1804,78 +1918,57 @@ export default function MonthlyDataEntryScreen() {
                 {t('prayerMeetings') || 'Prayer Meetings'}
               </Text>
 
-              <View style={styles.fieldRow}>
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
+              <MonthlyDataFieldPair
+                layout={columnLayout}
+                fieldRefs={fieldRefs}
+                leftRefKey="church_metrics.number_of_prayer_meetings"
+                rightRefKey="church_metrics.prayer_meeting_weekly_attendance"
+                left={{
+                  label: renderRowLabel(
+                    t('numberOfPrayerMeetings') || 'Number of Prayer Meetings',
+                    true,
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(
+                        currentMetrics.number_of_prayer_meetings,
+                      )}
+                      onChangeText={value =>
+                        updateChurchMetrics('number_of_prayer_meetings', value)
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
                         'church_metrics.number_of_prayer_meetings',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('numberOfPrayerMeetings') || 'Number of Prayer Meetings',
-                      true,
-                    )}
-                  </View>
-                  <AppInput
-                    value={formatNumber(
-                      currentMetrics.number_of_prayer_meetings,
-                    )}
-                    onChangeText={value =>
-                      updateChurchMetrics('number_of_prayer_meetings', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.number_of_prayer_meetings',
-                    )}
-                  />
-                </View>
-
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
+                      )}
+                    />
+                  ),
+                }}
+                right={{
+                  label: renderRowLabel(
+                    t('totalAttendanceInAll') || 'Total Attendance in All',
+                    true,
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(
+                        currentMetrics.prayer_meeting_weekly_attendance,
+                      )}
+                      onChangeText={value =>
+                        updateChurchMetrics(
+                          'prayer_meeting_weekly_attendance',
+                          value,
+                        )
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
                         'church_metrics.prayer_meeting_weekly_attendance',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('totalAttendanceInAll') || 'Total Attendance in All',
-                      true,
-                    )}
-                  </View>
-                  <AppInput
-                    value={formatNumber(
-                      currentMetrics.prayer_meeting_weekly_attendance,
-                    )}
-                    onChangeText={value =>
-                      updateChurchMetrics(
-                        'prayer_meeting_weekly_attendance',
-                        value,
-                      )
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.prayer_meeting_weekly_attendance',
-                    )}
-                  />
-                </View>
-              </View>
+                      )}
+                    />
+                  ),
+                }}
+              />
             </View>
 
             {/* Decisions, Discipling & Water Baptisms */}
@@ -1886,105 +1979,89 @@ export default function MonthlyDataEntryScreen() {
                   'Decisions, Discipling & Water Baptisms'}
               </Text>
 
-              <View style={styles.fieldRow}>
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
-                        'church_metrics.weekly_decisions_made',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.labelWithHelpRow}>
-                    <View style={styles.rowLabelWrapper}>
-                      {renderRowLabel(
-                        t('numberOfNewDecisions') || 'Number of New Decisions',
-                        true,
-                      )}
+              <MonthlyDataFieldPair
+                layout={columnLayout}
+                fieldRefs={fieldRefs}
+                leftRefKey="church_metrics.weekly_decisions_made"
+                rightRefKey="church_metrics.being_actively_discipled"
+                left={{
+                  label: (
+                    <View
+                      style={[
+                        styles.labelWithHelpRow,
+                        columnLayout === 'single' &&
+                          styles.labelWithHelpRowInline,
+                      ]}>
+                      <View style={styles.labelWithHelpTextWrap}>
+                        {renderRowLabel(
+                          t('numberOfNewDecisions') ||
+                            'Number of New Decisions',
+                          true,
+                        )}
+                      </View>
+                      <HelpIcon
+                        title={
+                          t('numberOfNewDecisions') ||
+                          'Number of New Decisions'
+                        }
+                        message={
+                          t('helpNumberOfNewDecisions') ||
+                          'Number of people who gave their lives to Christ in that week'
+                        }
+                        offsetY={0}
+                        marginLeft={4}
+                        size={16}
+                        containerStyle={styles.helpIconInline}
+                      />
                     </View>
-                    <HelpIcon
-                      title={
-                        t('numberOfNewDecisions') || 'Number of New Decisions'
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(
+                        currentMetrics.weekly_decisions_made,
+                      )}
+                      onChangeText={value =>
+                        updateChurchMetrics('weekly_decisions_made', value)
                       }
-                      message={
-                        t('helpNumberOfNewDecisions') ||
-                        'Number of people who gave their lives to Christ in that week'
-                      }
-                      offsetY={0}
-                      marginLeft={0}
-                      containerStyle={styles.helpIconInline}
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
+                        'church_metrics.weekly_decisions_made',
+                      )}
                     />
-                  </View>
-                  <AppInput
-                    value={formatNumber(currentMetrics.weekly_decisions_made)}
-                    onChangeText={value =>
-                      updateChurchMetrics('weekly_decisions_made', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.weekly_decisions_made',
-                    )}
-                  />
-                </View>
-
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
-                        'church_metrics.being_actively_discipled',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('numberBeingActivelyDiscipled') ||
-                        'Number being Actively Discipled',
-                      true,
-                    )}
-                  </View>
-                  <AppInput
-                    value={formatNumber(
-                      currentMetrics.being_actively_discipled,
-                    )}
-                    onChangeText={value =>
-                      updateChurchMetrics('being_actively_discipled', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.being_actively_discipled',
-                    )}
-                  />
-                </View>
-              </View>
-
-              <View
-                style={styles.fieldContainer}
-                ref={ref => {
-                  if (ref)
-                    {fieldRefs.current.set(
-                      'church_metrics.weekly_water_baptism',
-                      ref,
-                    );}
-                }}>
-                <View style={styles.rowLabelWrapper}>
-                  {renderRowLabel(
-                    t('numberOfWaterBaptised') || 'Number of Water Baptised',
+                  ),
+                }}
+                right={{
+                  label: renderRowLabel(
+                    t('numberBeingActivelyDiscipled') ||
+                      'Number being Actively Discipled',
                     true,
-                  )}
-                </View>
-                <AppInput
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(
+                        currentMetrics.being_actively_discipled,
+                      )}
+                      onChangeText={value =>
+                        updateChurchMetrics('being_actively_discipled', value)
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
+                        'church_metrics.being_actively_discipled',
+                      )}
+                    />
+                  ),
+                }}
+              />
+
+              {renderFormField(
+                columnLayout,
+                renderRowLabel(
+                  t('numberOfWaterBaptised') || 'Number of Water Baptised',
+                  true,
+                ),
+                <MonthlyDataInput
                   value={formatNumber(currentMetrics.weekly_water_baptism)}
                   onChangeText={value =>
                     updateChurchMetrics('weekly_water_baptism', value)
@@ -1992,14 +2069,16 @@ export default function MonthlyDataEntryScreen() {
                   keyboardType="numeric"
                   placeholder="0"
                   error={fieldErrors.has('church_metrics.weekly_water_baptism')}
-                />
-              </View>
+                />,
+                fieldRefs,
+                'church_metrics.weekly_water_baptism',
+              )}
 
               {/* <View style={styles.fieldContainer}>
               <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                 {t('numberInEncounterNextStepWeekend') || 'Number in an Encounter / Next Step Weekend'}
               </Text>
-              <AppInput
+              <MonthlyDataInput
                 value={''} // This field is not in the API, keeping for UI consistency
                 onChangeText={() => {}}
                 keyboardType="numeric"
@@ -2015,88 +2094,60 @@ export default function MonthlyDataEntryScreen() {
                 {t('teachingTraining') || 'Teaching & Training'}
               </Text>
 
-              <View style={styles.fieldRow}>
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
-                        'church_metrics.number_of_liw_classes',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('numberOfGtLiwClasses') || 'Number of GT/LIW Classes',
-                      true,
-                    )}
-                  </View>
-                  <AppInput
-                    value={formatNumber(currentMetrics.number_of_liw_classes)}
-                    onChangeText={value =>
-                      updateChurchMetrics('number_of_liw_classes', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.number_of_liw_classes',
-                    )}
-                  />
-                </View>
-
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
-                        'church_metrics.liw_total_students',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(
-                      t('totalAttendanceInAllGtLiwClasses') ||
-                        'Total Attendance in all GT/LIW Classes',
-                      true,
-                    )}
-                  </View>
-                  <AppInput
-                    value={formatNumber(currentMetrics.liw_total_students)}
-                    onChangeText={value =>
-                      updateChurchMetrics('liw_total_students', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has('church_metrics.liw_total_students')}
-                  />
-                </View>
-              </View>
-
-              <View
-                style={styles.fieldContainer}
-                ref={ref => {
-                  if (ref)
-                    {fieldRefs.current.set(
-                      'church_metrics.number_of_leaders_in_training_for_cpm',
-                      ref,
-                    );}
-                }}>
-                <View style={styles.rowLabelWrapper}>
-                  {renderRowLabel(
-                    t('noOfLeadersInTrainingForPastoralOrChurchPlantingDuties') ||
-                      'No of Leaders in training for Pastoral or Church Planting duties',
+              <MonthlyDataFieldPair
+                layout={columnLayout}
+                fieldRefs={fieldRefs}
+                leftRefKey="church_metrics.number_of_liw_classes"
+                rightRefKey="church_metrics.liw_total_students"
+                left={{
+                  label: renderRowLabel(
+                    t('numberOfGtLiwClasses') || 'Number of GT/LIW Classes',
                     true,
-                  )}
-                </View>
-                <AppInput
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(currentMetrics.number_of_liw_classes)}
+                      onChangeText={value =>
+                        updateChurchMetrics('number_of_liw_classes', value)
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
+                        'church_metrics.number_of_liw_classes',
+                      )}
+                    />
+                  ),
+                }}
+                right={{
+                  label: renderRowLabel(
+                    t('totalAttendanceInAllGtLiwClasses') ||
+                      'Total Attendance in all GT/LIW Classes',
+                    true,
+                  ),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(currentMetrics.liw_total_students)}
+                      onChangeText={value =>
+                        updateChurchMetrics('liw_total_students', value)
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
+                        'church_metrics.liw_total_students',
+                      )}
+                    />
+                  ),
+                }}
+              />
+
+              {renderFormField(
+                columnLayout,
+                renderRowLabel(
+                  t('noOfLeadersInTrainingForPastoralOrChurchPlantingDuties') ||
+                    'No of Leaders in training for Pastoral or Church Planting duties',
+                  true,
+                ),
+                <MonthlyDataInput
                   value={formatNumber(
                     currentMetrics.number_of_leaders_in_training_for_cpm,
                   )}
@@ -2111,8 +2162,10 @@ export default function MonthlyDataEntryScreen() {
                   error={fieldErrors.has(
                     'church_metrics.number_of_leaders_in_training_for_cpm',
                   )}
-                />
-              </View>
+                />,
+                fieldRefs,
+                'church_metrics.number_of_leaders_in_training_for_cpm',
+              )}
             </View>
 
             {/* Giving */}
@@ -2121,67 +2174,48 @@ export default function MonthlyDataEntryScreen() {
                 {worshipSessions.length + 5}. {t('giving') || 'Giving'}
               </Text>
 
-              <View style={styles.fieldRow}>
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
+              <MonthlyDataFieldPair
+                layout={columnLayout}
+                fieldRefs={fieldRefs}
+                leftRefKey="church_metrics.giving_in_local_currency"
+                rightRefKey="church_metrics.mfp_in_local_currency"
+                left={{
+                  label: renderRowLabel(tithesOfferingsLabel, true),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(
+                        currentMetrics.giving_in_local_currency,
+                      )}
+                      onChangeText={value =>
+                        updateChurchMetrics('giving_in_local_currency', value)
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
                         'church_metrics.giving_in_local_currency',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(tithesOfferingsLabel, true)}
-                  </View>
-                  <AppInput
-                    value={formatNumber(
-                      currentMetrics.giving_in_local_currency,
-                    )}
-                    onChangeText={value =>
-                      updateChurchMetrics('giving_in_local_currency', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.giving_in_local_currency',
-                    )}
-                  />
-                </View>
-
-                <View
-                  style={[
-                    styles.fieldContainer,
-                    styles.fieldContainerRow,
-                    styles.fieldHalf,
-                  ]}
-                  ref={ref => {
-                    if (ref)
-                      {fieldRefs.current.set(
+                      )}
+                    />
+                  ),
+                }}
+                right={{
+                  label: renderRowLabel(missionsGivingMfpLabel, true),
+                  input: (
+                    <MonthlyDataInput
+                      value={formatNumber(
+                        currentMetrics.mfp_in_local_currency,
+                      )}
+                      onChangeText={value =>
+                        updateChurchMetrics('mfp_in_local_currency', value)
+                      }
+                      keyboardType="numeric"
+                      placeholder="0"
+                      error={fieldErrors.has(
                         'church_metrics.mfp_in_local_currency',
-                        ref,
-                      );}
-                  }}>
-                  <View style={styles.rowLabelWrapper}>
-                    {renderRowLabel(missionsGivingMfpLabel, true)}
-                  </View>
-                  <AppInput
-                    value={formatNumber(currentMetrics.mfp_in_local_currency)}
-                    onChangeText={value =>
-                      updateChurchMetrics('mfp_in_local_currency', value)
-                    }
-                    keyboardType="numeric"
-                    placeholder="0"
-                    error={fieldErrors.has(
-                      'church_metrics.mfp_in_local_currency',
-                    )}
-                  />
-                </View>
-              </View>
+                      )}
+                    />
+                  ),
+                }}
+              />
             </View>
 
             {currentWeekIndex === sortedWeekNumbers.length - 1 && (
@@ -2301,7 +2335,7 @@ const styles = StyleSheet.create({
   },
   loadingText: {
     marginTop: ms(16),
-    fontSize: fs(14),
+    fontSize: fs(15),
   },
   headerWrapper: {
     paddingHorizontal: ms(16),
@@ -2311,31 +2345,41 @@ const styles = StyleSheet.create({
     marginBottom: ms(10),
   },
   infoLabel: {
-    fontSize: fs(12),
+    fontSize: fs(13),
     textAlign: 'center',
     fontWeight: '500',
     marginBottom: ms(2),
   },
+  layoutToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: ms(8),
+  },
+  layoutToggleHint: {
+    fontSize: fs(13),
+    fontWeight: '500',
+  },
   churchNameStrong: {
-    fontSize: fs(12),
+    fontSize: fs(13),
     fontWeight: '700',
     textAlign: 'center',
     marginBottom: ms(6),
   },
   lastRecordDate: {
-    fontSize: fs(12),
+    fontSize: fs(13),
     color: COLORS.mainColor,
     textAlign: 'center',
     fontWeight: '600',
     flexShrink: 1,
   },
   lastRecordDateValue: {
-    fontSize: fs(12),
+    fontSize: fs(13),
     color: COLORS.mainColor,
     fontWeight: '700',
   },
   weekInfo: {
-    fontSize: fs(12),
+    fontSize: fs(13),
     textAlign: 'center',
     fontWeight: '500',
     marginBottom: ms(6),
@@ -2360,12 +2404,12 @@ const styles = StyleSheet.create({
     position: 'relative',
   },
   weekNavDateText: {
-    fontSize: fs(11),
+    fontSize: fs(12),
     fontWeight: '400',
     textAlign: 'center',
   },
   weekNavYearText: {
-    fontSize: fs(11),
+    fontSize: fs(12),
     fontWeight: '400',
     textAlign: 'center',
   },
@@ -2377,61 +2421,138 @@ const styles = StyleSheet.create({
     gap: ms(6),
   },
   weekNavCheckmarkInline: {
-    fontSize: fs(13),
+    fontSize: fs(14),
     fontWeight: 'bold',
     color: '#fff',
   },
   section: {
-    // padding: ms(16),
+    width: '100%',
+    alignSelf: 'stretch',
     borderRadius: rs(8),
-    marginBottom: ms(12),
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(0,0,0,0.1)',
+    paddingTop: ms(12),
+    paddingBottom: ms(12),
   },
   sectionTitle: {
-    fontSize: fs(14),
+    fontSize: fs(15),
     fontWeight: '600',
     marginBottom: ms(12),
   },
   sessionContainer: {
-    marginBottom: ms(6),
-    paddingBottom: ms(6),
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  sessionContainerDivider: {
     borderBottomWidth: 1,
     borderBottomColor: 'rgba(0,0,0,0.1)',
+    marginBottom: ms(12),
   },
   sessionName: {
-    fontSize: fs(14),
+    fontSize: fs(15),
     fontWeight: '600',
     marginBottom: ms(8),
   },
   fieldRow: {
     flexDirection: 'row',
-    gap: ms(12),
+    width: '100%',
+    alignSelf: 'stretch',
     marginBottom: ms(12),
     alignItems: 'flex-end',
   },
   fieldHalf: {
-    flex: 1,
+    width: MONTHLY_DATA_ENTRY_DOUBLE_FIELD_WIDTH,
+    maxWidth: MONTHLY_DATA_ENTRY_DOUBLE_FIELD_WIDTH,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  fieldHalfLeft: {
+    paddingRight: ms(6),
+  },
+  fieldHalfRight: {
+    paddingLeft: ms(6),
+  },
+  fieldContainerDouble: {
+    width: '100%',
+    maxWidth: '100%',
+  },
+  fieldDoubleInputInner: {
+    width: '100%',
+    alignSelf: 'stretch',
   },
   rowLabelWrapper: {
-    minHeight: fs(12) * 2,
+    minHeight: fs(13) * 2,
     justifyContent: 'flex-end',
-    flex: 1,
     minWidth: 0,
+    width: '100%',
+  },
+  rowLabelWrapperDouble: {
+    width: '100%',
   },
 
   rowLabel: {
-    fontSize: fs(11),
-    lineHeight: fs(15),
+    fontSize: fs(12),
+    lineHeight: fs(16),
     includeFontPadding: false,
-    textAlignVertical: 'bottom',
+    textAlignVertical: 'center',
     paddingBlock: ms(5),
     flexShrink: 1,
-    flexWrap: 'wrap',
+  },
+  rowLabelInline: {
+    width: '100%',
   },
   fieldContainer: {
     marginBottom: ms(12),
+    width: '100%',
+    alignSelf: 'stretch',
   },
   fieldContainerRow: {
     marginBottom: 0,
+  },
+  fieldInlineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  fieldInlineLabel: {
+    width: MONTHLY_DATA_ENTRY_SINGLE_LABEL_WIDTH,
+    maxWidth: MONTHLY_DATA_ENTRY_SINGLE_LABEL_WIDTH,
+    flexGrow: 0,
+    flexShrink: 0,
+    paddingRight: ms(8),
+    overflow: 'hidden',
+  },
+  fieldInlineInput: {
+    width: MONTHLY_DATA_ENTRY_SINGLE_INPUT_WIDTH,
+    maxWidth: MONTHLY_DATA_ENTRY_SINGLE_INPUT_WIDTH,
+    flexGrow: 0,
+    flexShrink: 0,
+  },
+  fieldInlineInputInner: {
+    width: '100%',
+    alignSelf: 'stretch',
+  },
+  rowLabelWrapperInline: {
+    width: '100%',
+    minHeight: undefined,
+    flex: 0,
+    flexGrow: 0,
+    flexShrink: 1,
+    justifyContent: 'center',
+    paddingBlock: 0,
+  },
+  labelWithHelpTextWrap: {
+    flexShrink: 1,
+    minWidth: 0,
+    maxWidth: '100%',
+  },
+  labelWithHelpRowInline: {
+    marginBottom: 0,
+    alignItems: 'center',
+    flexWrap: 'nowrap',
+    width: '100%',
+    columnGap: ms(2),
   },
   labelWithHelp: {
     flexDirection: 'row',
@@ -2448,18 +2569,19 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   helpIconInline: {
-    marginTop: ms(2),
+    marginLeft: 0,
+    marginTop: 0,
     flexShrink: 0,
-    alignSelf: 'flex-start',
+    alignSelf: 'center',
   },
   helpIcon: {
-    fontSize: fs(16),
+    fontSize: fs(17),
     marginLeft: ms(4),
   },
   noDataText: {
     textAlign: 'center',
     paddingVertical: ms(20),
-    fontSize: fs(14),
+    fontSize: fs(15),
   },
   buttonContainer: {
     flexDirection: 'row',
@@ -2494,7 +2616,7 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.mainColor,
   },
   saveOptionText: {
-    fontSize: fs(14),
+    fontSize: fs(15),
     fontWeight: '500',
   },
   navButton: {
@@ -2513,13 +2635,13 @@ const styles = StyleSheet.create({
     padding: ms(16),
   },
   successTitle: {
-    fontSize: fs(16),
+    fontSize: fs(17),
     fontWeight: '600',
     textAlign: 'center',
     marginBottom: ms(8),
   },
   successMessage: {
-    fontSize: fs(14),
+    fontSize: fs(15),
     textAlign: 'center',
     marginBottom: ms(16),
   },
@@ -2534,13 +2656,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   successButtonText: {
-    fontSize: fs(12),
+    fontSize: fs(13),
     fontWeight: '600',
     color: '#fff',
   },
   requiredMark: {
     color: '#db2d2d',
-    fontSize: fs(13),
+    fontSize: fs(14),
   },
   skeletonContainer: {
     padding: ms(16),

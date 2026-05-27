@@ -36,6 +36,12 @@ import {fs, hs, ms, rs} from '../../../shared/utils/scale';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {ROLES} from '../../../shared/utils/permissions';
 
+/** Sentinel value for credentials dropdown when user has no credential type. */
+const CREDENTIALS_NONE_VALUE = 'No';
+
+const hasCredentialsSelection = (credentials: string) =>
+  !!credentials && credentials !== CREDENTIALS_NONE_VALUE;
+
 const countryCodeToFlag = (code: string) => {
   if (!code) {
     return '🏳️';
@@ -193,11 +199,18 @@ export default function NewPastorAndChurchScreen() {
   const [prefixOptions, setPrefixOptions] = useState<string[]>([]);
   const [roleOptions, setRoleOptions] = useState<Array<{id: number; name: string}>>([]);
   const [credentialOptions, setCredentialOptions] = useState<string[]>([]);
+  const credentialDropdownData = useMemo(
+    () => [
+      {label: t('no'), value: CREDENTIALS_NONE_VALUE},
+      ...credentialOptions.map(c => ({label: c, value: c})),
+    ],
+    [credentialOptions, t],
+  );
   const [userCountryCode, setUserCountryCode] = useState<string>('SG');
   const [userCallingCode, setUserCallingCode] = useState<string>('65');
   const [showUserCountryPicker, setShowUserCountryPicker] = useState(false);
   const [initialValues, setInitialValues] = useState<CombinedFormValues>({
-    name: '', short_name: '', is_msc: '', is_first_msc: '', enable_cpm: '', parent_id: '', msc_parent_id: '', language_id: '',
+    name: '', short_name: '', is_msc: 'No', is_first_msc: '', enable_cpm: '', parent_id: '', msc_parent_id: '', language_id: '',
     church_type_id: '', pastor_id: '', church_network_id: '', church_region_id: '',
     geographical_region_id: '', language_region_id: '', sensitive_nation: '', country_id: '',
     currency_id: '', city_id: '', photo_dir: '', service_address_street: '',
@@ -206,7 +219,9 @@ export default function NewPastorAndChurchScreen() {
     website: '', facebook: '', instagram: '', twitter: '', date_of_birth: null,
     username: '', password: '', prefix: '', title: '', first_name: '', last_name: '',
     user_role_id: '', user_sensitive_nation: '', user_language_id: '', user_church_id: '', user_country_id: '',
-    credentials: '', credentials_from: '', credentials_expiry_date: null,
+    credentials: CREDENTIALS_NONE_VALUE,
+    credentials_from: '',
+    credentials_expiry_date: null,
     user_email_address: '', user_mobile_phone: '',
   });
   const [draftLoaded, setDraftLoaded] = useState(false);
@@ -281,7 +296,7 @@ export default function NewPastorAndChurchScreen() {
             ...prev,
             name: saved.name ?? prev.name,
             short_name: saved.short_name ?? prev.short_name,
-            is_msc: saved.is_msc ?? prev.is_msc,
+            is_msc: saved.is_msc || prev.is_msc || 'No',
             is_first_msc: (saved as any).is_first_msc ?? prev.is_first_msc,
             enable_cpm: saved.enable_cpm ?? prev.enable_cpm,
             parent_id: saved.parent_id ?? prev.parent_id,
@@ -704,11 +719,17 @@ export default function NewPastorAndChurchScreen() {
                       country_id: values.user_country_id ? Number(values.user_country_id) : null,
                       mobile_phone: formattedUserPhone,
                       email_address: values.user_email_address,
-                      credentials: values.credentials || undefined,
-                      credentials_from: values.credentials_from || undefined,
-                      credentials_expiry_date: values.credentials_expiry_date
-                        ? `${values.credentials_expiry_date.getFullYear()}-${String(values.credentials_expiry_date.getMonth() + 1).padStart(2, '0')}-${String(values.credentials_expiry_date.getDate()).padStart(2, '0')}`
+                      credentials: hasCredentialsSelection(values.credentials)
+                        ? values.credentials
                         : undefined,
+                      credentials_from: hasCredentialsSelection(values.credentials)
+                        ? values.credentials_from || undefined
+                        : undefined,
+                      credentials_expiry_date:
+                        hasCredentialsSelection(values.credentials) &&
+                        values.credentials_expiry_date
+                          ? `${values.credentials_expiry_date.getFullYear()}-${String(values.credentials_expiry_date.getMonth() + 1).padStart(2, '0')}-${String(values.credentials_expiry_date.getDate()).padStart(2, '0')}`
+                          : undefined,
                     };
 
                     const payload = {church: churchPayload, user: userPayload};
@@ -852,8 +873,9 @@ export default function NewPastorAndChurchScreen() {
                                 <View>
                                   <View style={{flexDirection: 'row', alignItems: 'center'}}>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      {t('msc')}?
+                                      {t('isMultiServiceChurchMsc')}
                                     </Text>
+                                    <HelpIcon title={t('msc')} message={t('helpIsMsc')} />
                                   </View>
                                   <ElementDropdown
                                     data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
@@ -1815,16 +1837,33 @@ export default function NewPastorAndChurchScreen() {
                                     {t('credentials')}
                                   </Text>
                                   <ElementDropdown
-                                    data={credentialOptions.map(c => ({label: c, value: c}))}
-                                    value={values.credentials as any}
-                                    onChange={v => setFieldValue('credentials', (v as string) || '')}
-                                    placeholder={t('no')}
-                                    containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
+                                    data={credentialDropdownData}
+                                    value={
+                                      (values.credentials as string) ||
+                                      CREDENTIALS_NONE_VALUE
+                                    }
+                                    onChange={v => {
+                                      const next =
+                                        (v as string) || CREDENTIALS_NONE_VALUE;
+                                      setFieldValue('credentials', next);
+                                      if (!hasCredentialsSelection(next)) {
+                                        setFieldValue('credentials_from', '');
+                                        setFieldValue(
+                                          'credentials_expiry_date',
+                                          null,
+                                        );
+                                      }
+                                    }}
+                                    placeholder={t('selectOption')}
+                                    containerStyle={{
+                                      backgroundColor: C.inputBg,
+                                      borderColor: C.inputBorder,
+                                    } as any}
                                   />
                                 </View>
                               </View>
 
-                              {!!values.credentials && (
+                              {hasCredentialsSelection(values.credentials) && (
                                 <>
                                   <View>
                                     <View>

@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react';
 import { login } from '../services/auth.service';
 import { AuthContext } from '../../../config/navigation';
+import { requestNotificationPermissionAfterLogin } from '../../../shared/services/permissions.service';
 
 export function useLoginForm() {
   const [username, setUsername] = useState('');
@@ -25,6 +26,9 @@ export function useLoginForm() {
       const response = await login({ username, password });
       console.log('Login successful, response:', response);
       setIsAuthenticated(true);
+      void requestNotificationPermissionAfterLogin().catch(err =>
+        console.warn('Post-login notification permission:', err),
+      );
     } catch (error: any) {
       // Debug logging
       if (error && typeof error === 'object') {

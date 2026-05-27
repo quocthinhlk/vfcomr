@@ -34,6 +34,9 @@ const es = {
   perPage: 'por página',
   addMonthlyData: 'Agregar datos mensuales',
   monthlyData: 'Datos mensuales',
+  monthlyDataEntryLayout: 'Formato',
+  monthlyDataEntryLayoutSingle: '1 columna',
+  monthlyDataEntryLayoutDouble: '2 columnas',
   worshipServices: 'Servicios de adoración',
   churchPlantingProjections: 'Proyecciones de plantación de iglesias',
   addProjections: 'Agregar proyecciones',
@@ -94,6 +97,9 @@ const es = {
   churchesListMenu: 'Lista de iglesias',
   churchAttendanceChart: 'Gráfico de asistencia',
   churchGivingChart: 'Gráfico de ofrendas',
+  attendanceAndGivingCharts: 'Gráficos de asistencia y ofrendas',
+  chartsLandscapeTip:
+    'Consejo: gire el dispositivo al modo horizontal para ver mejor los gráficos.',
   churchList: 'Lista de iglesias',
   attendanceGraph: 'Gráfico de asistencia',
   attendanceLast12Months: 'Asistencia - últimos 12 meses',
@@ -307,7 +313,7 @@ const es = {
   assignedTo: 'Asignado a',
   tryDifferentSearchKeyword: 'Prueba otra palabra clave',
   yourOtherChurches: 'Tus otras iglesias',
-  emailAddress: 'Dirección de e-mail',
+  emailAddress: 'Dirección de E-mail',
   infoEmailAddress:
     'Esto es necesario para poder recuperar el acceso a OMR si se olvida la contraseña',
   mobilePhone: 'Teléfono móvil',
@@ -319,7 +325,7 @@ const es = {
   pickDate: 'Elegir fecha',
   contact: 'Contacto',
   phone: 'Teléfono',
-  email: 'Email',
+  email: 'E-mail',
   name: 'Nombre',
   color: 'Color',
   selectColor: 'Seleccionar color',
@@ -444,7 +450,9 @@ const es = {
     'El nombre completo de la iglesia, incluyendo ciudad y barrio/pueblo.',
   helpShortName:
     'Un nombre corto en 10 caracteres, por ejemplo VFC-NewLyn',
-  helpIsMsc: '¿Es una iglesia multi-servicio o multi-sitio?',
+  isMultiServiceChurchMsc: '¿Es una iglesia de múltiples servicios (MSC)?',
+  helpIsMsc:
+    'Una iglesia de múltiples servicios (MSC) es aquella que tiene dos o más servicios, en otro horario, en otro lugar o en otro idioma.',
   helpEnableCp:
     '¿Es una iglesia pionera (House Church Plant) como parte de la estrategia Vision 2:25?',
   helpLanguage: 'El idioma usado en este servicio',
@@ -531,8 +539,15 @@ const es = {
   failedToCreateWorshipService: 'No se pudo crear el servicio',
   failedToUpdateWorshipService: 'No se pudo actualizar el servicio',
   failedToDeleteWorshipService: 'No se pudo eliminar el servicio',
-  worshipServicesMscFaqNote:
-    'Si necesita añadir otro servicio, en otro lugar, en otro idioma o en otro horario, use la función Multi Service Church de OMR. Para saber cómo, vaya a FAQ [Preguntas frecuentes] en el menú desplegable, arriba a la derecha.',
+  worshipServicesMscNoteTitle: '¿Más de un servicio?',
+  worshipServicesMscNoteP1:
+    'La mayoría de las iglesias tienen solo un servicio dominical.',
+  worshipServicesMscNoteP2:
+    'Sin embargo, si tiene dos o tres servicios, en otro horario, en otro lugar o en otro idioma, puede usar la función Iglesia de Múltiples Servicios (MSC) de OMR.',
+  worshipServicesMscNoteP3:
+    'Para saber cómo hacerlo, vaya a la sección de Preguntas frecuentes (FAQ) o contacte con Soporte OMR',
+  worshipServicesMscGoToFaq: 'Ir a FAQ sobre MSC',
+  worshipServicesMscGoToSupport: 'Ir a Soporte OMR',
   // Dashboard Stats
   enterVisits: 'Visitas y eventos',
   editMyProfile: 'Editar mi perfil',

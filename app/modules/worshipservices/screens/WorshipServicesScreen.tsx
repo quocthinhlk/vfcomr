@@ -24,6 +24,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
+import {COLORS} from '../../../shared/constants/colors';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 const editIcon = require('../../../assets/icons/edit.png');
@@ -168,6 +169,63 @@ export const WorshipServicesScreen: React.FC = () => {
 
   const keyExtractor = (item: WorshipServiceItem) => String(item.id);
 
+  const renderMscNoteFooter = () => (
+    <View
+      style={[
+        styles.infoNote,
+        {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+      ]}>
+      <Text
+        style={[styles.infoNoteTitle, {color: C.textPrimary}]}
+        allowFontScaling={false}>
+        {t('worshipServicesMscNoteTitle')}
+      </Text>
+      <Text
+        style={[styles.infoNoteText, {color: C.textSecondary}]}
+        allowFontScaling={false}>
+        {t('worshipServicesMscNoteP1')}
+      </Text>
+      <Text
+        style={[styles.infoNoteText, {color: C.textSecondary}]}
+        allowFontScaling={false}>
+        {t('worshipServicesMscNoteP2')}
+      </Text>
+      <Text
+        style={[styles.infoNoteText, {color: C.textSecondary}]}
+        allowFontScaling={false}>
+        {t('worshipServicesMscNoteP3')}
+      </Text>
+      <View style={styles.infoNoteActions}>
+        <TouchableOpacity
+          style={[
+            styles.infoNoteBtn,
+            {borderColor: COLORS.mainColor, backgroundColor: C.surface},
+          ]}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('SearchFAQ')}>
+          <Text
+            style={[styles.infoNoteBtnText, {color: C.textPrimary}]}
+            allowFontScaling={false}>
+            {t('worshipServicesMscGoToFaq')}
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[
+            styles.infoNoteBtn,
+            {borderColor: COLORS.mainColor, backgroundColor: C.surface},
+          ]}
+          activeOpacity={0.7}
+          onPress={() => navigation.navigate('OmrSupport')}>
+          <Text
+            style={[styles.infoNoteBtnText, {color: C.textPrimary}]}
+            allowFontScaling={false}>
+            {t('worshipServicesMscGoToSupport')}
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  );
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -183,21 +241,6 @@ export const WorshipServicesScreen: React.FC = () => {
               </Text>
             </View>
           ) : null}
-
-          <View
-            style={[
-              styles.infoNote,
-              {
-                backgroundColor: C.inputBg,
-                borderColor: C.inputBorder,
-              },
-            ]}>
-            <Text
-              style={[styles.infoNoteText, {color: C.textSecondary}]}
-              allowFontScaling={false}>
-              {t('worshipServicesMscFaqNote')}
-            </Text>
-          </View>
 
           {/* <View style={styles.headerRow}>
             <AddNewHeaderButton
@@ -220,6 +263,7 @@ export const WorshipServicesScreen: React.FC = () => {
                 </Text>
               ) : null
             }
+            ListFooterComponent={renderMscNoteFooter}
           />
 
           <ActionSheetModal
@@ -291,16 +335,43 @@ const styles = StyleSheet.create({
     paddingVertical: ms(4),
   },
   infoNote: {
-    marginTop: ms(2),
-    marginBottom: ms(8),
+    marginTop: ms(12),
+    marginBottom: ms(16),
     paddingHorizontal: ms(10),
     paddingVertical: ms(10),
     borderRadius: rs(8),
     borderWidth: StyleSheet.hairlineWidth,
   },
+  infoNoteTitle: {
+    fontSize: fs(15),
+    fontWeight: '700',
+    lineHeight: fs(22),
+    marginBottom: ms(8),
+  },
   infoNoteText: {
     fontSize: fs(13),
     lineHeight: fs(20),
+    marginBottom: ms(8),
+  },
+  infoNoteActions: {
+    flexDirection: 'row',
+    gap: ms(8),
+    marginTop: ms(4),
+  },
+  infoNoteBtn: {
+    flex: 1,
+    paddingHorizontal: ms(8),
+    paddingVertical: ms(10),
+    borderRadius: rs(6),
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  infoNoteBtnText: {
+    fontSize: fs(12),
+    lineHeight: fs(16),
+    fontWeight: '500',
+    textAlign: 'center',
   },
   churchNameLabel: {
     fontSize: fs(14),

@@ -91,9 +91,9 @@ const cardStyles = StyleSheet.create({
   card: {
     width: '48.5%',
     marginBottom: ms(4),
-    paddingVertical: ms(10),
+    paddingVertical: ms(8),
     paddingHorizontal: ms(10),
-    borderRadius: rs(10),
+    borderRadius: rs(6),
     borderWidth: 1.2,
     flexDirection: 'row',
     alignItems: 'center',

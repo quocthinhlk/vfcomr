@@ -33,6 +33,9 @@ const zh = {
     perPage: '每页',
     addMonthlyData: '添加月度数据',
     monthlyData: '每月数据',
+    monthlyDataEntryLayout: '布局',
+    monthlyDataEntryLayoutSingle: '1列',
+    monthlyDataEntryLayoutDouble: '2列',
     worshipServices: '敬拜聚会',
     churchPlantingProjections: '植堂预测',
     addProjections: '添加预测',
@@ -84,6 +87,8 @@ const zh = {
     churchesListMenu: '教会列表',
     churchAttendanceChart: '教会出席图表',
     churchGivingChart: '教会奉献图表',
+    attendanceAndGivingCharts: '出席与奉献图表',
+    chartsLandscapeTip: '提示：将设备旋转至横屏模式，可获得更好的图表浏览体验。',
     churchList: '教会列表',
     attendanceGraph: '出席图表',
     attendanceLast12Months: '出席 - 过去12个月',
@@ -417,7 +422,9 @@ const zh = {
     // Help texts (to be localized)
     helpChurchName: '教会的完整名称，包括城市以及郊区、城镇或乡村名称，例如：Victory Family Centre – New Lynn',
     helpShortName: '教会的简称，用 10 个字符表示，例如：VFC-NewLyn',
-    helpIsMsc: '这是一间多堂会或多地点的教会吗？',
+    isMultiServiceChurchMsc: '这是多重聚会教会（MSC）吗？',
+    helpIsMsc:
+      '多重聚会教会（MSC）是指教会有两场或以上聚会，且时间、地点或语言不同。',
     helpEnableCp: '这是一间先锋家庭教会植堂，属于“2:25 愿景植堂运动”策略的一部分吗？',
     helpLanguage: '这间教会礼拜所使用的语言',
     helpMotherChurch: '负责开拓这间教会的母会',
@@ -491,8 +498,14 @@ const zh = {
     failedToCreateWorshipService: '创建敬拜聚会失败',
     failedToUpdateWorshipService: '更新敬拜聚会失败',
     failedToDeleteWorshipService: '删除敬拜聚会失败',
-    worshipServicesMscFaqNote:
-      '若需在另一地点、以另一语言或在另一时段增加教会聚会，请使用 OMR 的多重聚会教会功能。了解做法请查看右上角下拉菜单中的「常见问题（FAQ）」。',
+    worshipServicesMscNoteTitle: '不止一个聚会？',
+    worshipServicesMscNoteP1: '大多数教会每个主日只有一次聚会。',
+    worshipServicesMscNoteP2:
+      '若您有两个或三个聚会，且时间、地点或语言不同，可使用 OMR 的多重聚会教会（MSC）功能。',
+    worshipServicesMscNoteP3:
+      '了解做法请前往常见问题（FAQ）栏目，或联系 OMR 支持',
+    worshipServicesMscGoToFaq: '前往 MSC 常见问题',
+    worshipServicesMscGoToSupport: '前往 OMR 支持',
     // Dashboard Stats
     enterVisits: '访问与活动',
     editMyProfile: '编辑我的个人资料',

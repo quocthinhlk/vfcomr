@@ -843,6 +843,7 @@ const styles = StyleSheet.create({
   },
   detailRow: {
     flexDirection: 'row',
+    gap: 10,
     paddingVertical: ms(8),
     paddingHorizontal: ms(12),
     borderBottomWidth: 1,

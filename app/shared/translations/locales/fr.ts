@@ -33,6 +33,9 @@ const fr = {
     perPage: 'par page',
     addMonthlyData: 'Ajouter des données mensuelles',
     monthlyData: 'Données Mensuelles',
+    monthlyDataEntryLayout: 'Disposition',
+    monthlyDataEntryLayoutSingle: '1 colonne',
+    monthlyDataEntryLayoutDouble: '2 colonnes',
     worshipServices: 'Culte',
     churchPlantingProjections: 'Projections de Plantation d\'Églises',
     addProjections: 'Ajouter des Projections',
@@ -70,11 +73,11 @@ const fr = {
     forgotPassword: 'Mot de passe oublié ?',
     forgotPasswordTitle: 'Mot de passe oublié',
     backToLogin: 'Retour à la connexion',
-    enterEmailAddress: 'Veuillez saisir votre adresse e-mail.',
-    forgotPasswordInstructions: 'Saisissez votre e-mail pour recevoir un lien de réinitialisation du mot de passe.',
+    enterEmailAddress: 'Veuillez saisir votre adresse E-mail.',
+    forgotPasswordInstructions: 'Saisissez votre E-mail pour recevoir un lien de réinitialisation du mot de passe.',
     sendResetLink: 'Envoyer le lien de réinitialisation',
     sending: 'Envoi...',
-    resetLinkSent: 'Lien de réinitialisation envoyé à votre e-mail !',
+    resetLinkSent: 'Lien de réinitialisation envoyé à votre E-mail !',
     resetLinkFailed: 'Échec de l’envoi du lien de réinitialisation.',
     continue: 'Continuer',
     // Dashboard Menu
@@ -84,6 +87,9 @@ const fr = {
     churchesListMenu: 'Liste des Eglises',
     churchAttendanceChart: "Graphique de Presence de l'Eglise",
     churchGivingChart: "Graphique des Offrandes de l'Eglise",
+    attendanceAndGivingCharts: 'Graphiques de presence et des offrandes',
+    chartsLandscapeTip:
+      'Astuce : faites pivoter votre appareil en mode paysage pour une meilleure lecture des graphiques.',
     churchList: 'Liste des Églises',
     attendanceGraph: 'Graphique de présence',
     attendanceLast12Months: 'Presence - 12 Derniers Mois',
@@ -288,7 +294,7 @@ const fr = {
     assignedTo: 'Attribué à',
     tryDifferentSearchKeyword: 'Essayez un autre mot-clé de recherche',
     yourOtherChurches: 'Vos Autres Églises',
-    emailAddress: 'Adresse e-mail',
+    emailAddress: 'Adresse E-mail',
     infoEmailAddress: "Ceci est nécessaire pour pouvoir récupérer l'accès à OMR si le mot de passe est oublié",
     mobilePhone: 'Téléphone Portable',
     credentials: 'Je détiens des Accréditations Ministérielles',
@@ -299,7 +305,7 @@ const fr = {
     pickDate: 'Choisir date',
     contact: 'Contact',
     phone: 'Téléphone',
-    email: 'Email',
+    email: 'E-mail',
     name: 'Nom',
     color: 'Couleur',
     selectColor: 'Sélectionner la Couleur',
@@ -424,7 +430,9 @@ const fr = {
     // Help texts (to be localized)
     helpChurchName: 'Le nom complet de l’église, incluant la ville et le quartier, la ville ou le village. Ex. : Victory Family Centre – New Lynn',
     helpShortName: 'Un nom abrégé pour l’église, exprimé en 10 caractères. Ex. : VFC-NewLyn',
-    helpIsMsc: "S'agit-il d'une église à services multiples ou à sites multiples ?",
+    isMultiServiceChurchMsc: "S'agit-il d'une église multi-services (MSC) ?",
+    helpIsMsc:
+      "Une église multi-services (MSC) est une église qui propose deux cultes ou plus, à un autre moment, dans un autre lieu ou dans une autre langue.",
     helpEnableCp: "S'agit-il d'une Église Pionnière faisant partie de la stratégie du Mouvement de Plantation d'Églises Vision 2:25 ?",
     helpLanguage: "La langue utilisée lors de ce culte de l'église",
     helpMotherChurch: "L'église responsable de la fondation (pionnière) de cette église",
@@ -464,8 +472,15 @@ const fr = {
     failedToCreateWorshipService: 'Échec de la création du Culte',
     failedToUpdateWorshipService: 'Échec de la mise à jour du Culte',
     failedToDeleteWorshipService: 'Échec de la suppression du Culte',
-    worshipServicesMscFaqNote:
-      "Si vous devez ajouter un autre culte, dans un autre lieu, dans une autre langue ou à un autre moment, utilisez la fonction Église multi-service d'OMR. Pour savoir comment, ouvrez la FAQ [Foire aux questions] du menu déroulant, en haut à droite.",
+    worshipServicesMscNoteTitle: "Plus d'un culte ?",
+    worshipServicesMscNoteP1:
+      'La plupart des églises n’ont qu’un seul culte le dimanche.',
+    worshipServicesMscNoteP2:
+      "Cependant, si vous avez deux ou trois cultes, à un autre moment, dans un autre lieu ou dans une autre langue, vous pouvez utiliser la fonction Église multi-services (MSC) d'OMR.",
+    worshipServicesMscNoteP3:
+      'Pour savoir comment faire, consultez la section Foire aux questions (FAQ) ou contactez le support OMR',
+    worshipServicesMscGoToFaq: 'Aller à la FAQ sur les MSC',
+    worshipServicesMscGoToSupport: 'Aller au support OMR',
     // Dashboard Stats
     enterVisits: 'Visites et Événements',
     editMyProfile: 'Modifier Mon Profil',

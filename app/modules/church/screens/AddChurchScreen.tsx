@@ -362,7 +362,7 @@ export default function AddChurchScreen() {
   const [initialFormValues, setInitialFormValues] = useState<AddChurchFormValues>({
     name: '',
     short_name: '',
-    is_msc: '',
+    is_msc: 'No',
     is_first_msc: '',
     enable_cpm: '',
     parent_id: '',
@@ -684,8 +684,9 @@ export default function AddChurchScreen() {
                       <Text
                         style={[formStyles.label, {color: C.textSecondary}]}
                         category="label">
-                        {t('msc')}?{' '}
+                        {t('isMultiServiceChurchMsc')}
                       </Text>
+                      <HelpIcon title={t('msc')} message={t('helpIsMsc')} />
                     </View>
                     <ElementDropdown
                       data={[

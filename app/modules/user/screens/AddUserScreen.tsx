@@ -34,6 +34,12 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {ROLES} from '../../../shared/utils/permissions';
 
+/** Sentinel value for credentials dropdown when user has no credential type. */
+const CREDENTIALS_NONE_VALUE = 'No';
+
+const hasCredentialsSelection = (credentials: string) =>
+  !!credentials && credentials !== CREDENTIALS_NONE_VALUE;
+
 const countryCodeToFlag = (code: string) => {
   if (!code) {
     return '🏳️';
@@ -83,6 +89,14 @@ export default function AddUserScreen() {
   const [countryPage, setCountryPage] = useState<number>(1);
   const [countryQuery, setCountryQuery] = useState<string>('');
   const [showPassword, setShowPassword] = useState(false);
+
+  const credentialDropdownData = useMemo(
+    () => [
+      {label: t('no'), value: CREDENTIALS_NONE_VALUE},
+      ...credentialOptions.map(c => ({label: c, value: c})),
+    ],
+    [credentialOptions, t],
+  );
 
   const scrollRef = useRef<ScrollView>(null);
   const formikRef = useRef<FormikProps<any> | null>(null);
@@ -264,7 +278,7 @@ export default function AddUserScreen() {
                 language_id: null as number | null,
                 email_address: '',
                 mobile_phone: '',
-                credentials: '',
+                credentials: CREDENTIALS_NONE_VALUE,
                 credentials_number: '',
                 credentials_form: '',
                 credentials_expiry_date: null as Date | null,
@@ -352,16 +366,24 @@ export default function AddUserScreen() {
                   country_id: values.country_id,
                   email_address: values.email_address,
                   mobile_phone: formattedPhone,
-                  credentials: values.credentials,
-                  credentials_number: values.credentials_number,
-                  credentials_form: values.credentials_form,
-                  credentials_expiry_date: values.credentials_expiry_date
-                    ? `${values.credentials_expiry_date.getFullYear()}-${String(
-                        values.credentials_expiry_date.getMonth() + 1,
-                      ).padStart(2, '0')}-${String(
-                        values.credentials_expiry_date.getDate(),
-                      ).padStart(2, '0')}`
-                    : null,
+                  credentials: hasCredentialsSelection(values.credentials)
+                    ? values.credentials
+                    : '',
+                  credentials_number: hasCredentialsSelection(values.credentials)
+                    ? values.credentials_number
+                    : '',
+                  credentials_form: hasCredentialsSelection(values.credentials)
+                    ? values.credentials_form
+                    : '',
+                  credentials_expiry_date:
+                    hasCredentialsSelection(values.credentials) &&
+                    values.credentials_expiry_date
+                      ? `${values.credentials_expiry_date.getFullYear()}-${String(
+                          values.credentials_expiry_date.getMonth() + 1,
+                        ).padStart(2, '0')}-${String(
+                          values.credentials_expiry_date.getDate(),
+                        ).padStart(2, '0')}`
+                      : null,
                 } as any;
 
                 try {
@@ -859,21 +881,24 @@ export default function AddUserScreen() {
                       {t('credentials')}
                     </Text>
                     <ElementDropdown
-                      data={useMemo(
-                        () => credentialOptions.map(c => ({label: c, value: c})),
-                        [credentialOptions],
-                      )}
-                      value={values.credentials as any}
+                      data={credentialDropdownData}
+                      value={(values.credentials as string) || CREDENTIALS_NONE_VALUE}
                       onChange={v => {
-                        setFieldValue('credentials', (v as string) || '');
+                        const next = (v as string) || CREDENTIALS_NONE_VALUE;
+                        setFieldValue('credentials', next);
+                        if (!hasCredentialsSelection(next)) {
+                          setFieldValue('credentials_number', '');
+                          setFieldValue('credentials_form', '');
+                          setFieldValue('credentials_expiry_date', null);
+                        }
                         clearInvalid('credentials');
                       }}
-                      placeholder={t('no')}
+                      placeholder={t('selectOption')}
                       containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
                     />
                   </View>
 
-                  {!!values.credentials && (
+                  {hasCredentialsSelection(values.credentials) && (
                     <>
                       {/* Credentials Number */}
                       <View onLayout={e => setFieldPos('credentials_number', e.nativeEvent.layout.y)}>

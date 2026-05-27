@@ -44,8 +44,9 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
     label: t('myChurchProfile'),
     children: [
       {label: t('myDashboard'), routeName: 'Dashboard'},
-      {label: t('churchAttendanceChart'), routeName: 'ChurchAttendanceChart'},
-      {label: t('churchGivingChart'), routeName: 'ChurchGivingChart'},
+      // {label: t('churchAttendanceChart'), routeName: 'ChurchAttendanceChart'},
+      // {label: t('churchGivingChart'), routeName: 'ChurchGivingChart'},
+      {label: t('worshipServices'), routeName: 'WorshipServices'},
       // {label: t('last4WeeksDetails'), routeName: 'Dashboard'},
       // {label: t('multiServiceChurchDetails'), routeName: 'Dashboard'},
       // {label: t('daughterChurchesList'), routeName: 'Dashboard'},

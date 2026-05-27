@@ -44,13 +44,17 @@
 		</dict>
 	</dict>
 	<key>NSCameraUsageDescription</key>
-	<string>We need access to your camera</string>
+	<string>OMR uses the camera when you take a profile or church photo.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>OMR uses your location while the app is open when you use map or location-based features.</string>
 	<key>NSPhotoLibraryAddUsageDescription</key>
-	<string>We need permission to save images to your photo library</string>
+	<string>OMR can save images you export to your photo library when you choose to.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>We need access to your photo library</string>
+	<string>OMR accesses your photo library when you choose or upload an image.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIRequiredDeviceCapabilities</key>

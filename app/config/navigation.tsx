@@ -82,6 +82,7 @@ export type RootStackParamList = {
   SettingsGeneral: undefined;
   SettingsBibleVerse: undefined;
   SettingsRationalising: undefined;
+  PermissionExamples: undefined;
   Profile: undefined;
   SwitchUser: undefined;
   Support: undefined;
@@ -100,6 +101,7 @@ export type RootStackParamList = {
   } | undefined;
   ChurchAttendanceChart: {churchId?: number} | undefined;
   ChurchGivingChart: {churchId?: number} | undefined;
+  AttendanceAndGivingCharts: {churchId?: number} | undefined;
   ChurchRegions: undefined;
   WorshipServices: undefined;
   WorshipServiceDetail: { worshipServiceId: number } | undefined;
@@ -183,6 +185,7 @@ import OverseerChurchAttendanceChartScreen from '../modules/dashboard/screens/Ov
 import PastoralVisitsChartScreen from '../modules/dashboard/screens/PastoralVisitsChartScreen';
 import OverseerChurchesPlantedLast10YearsScreen from '../modules/dashboard/screens/OverseerChurchesPlantedLast10YearsScreen';
 import ChurchGivingChartScreen from '../modules/dashboard/screens/ChurchGivingChartScreen';
+import AttendanceAndGivingChartsScreen from '../modules/dashboard/screens/AttendanceAndGivingCharts';
 import { WatchListScreen } from '../modules/dashboard/screens/WatchListScreen';
 import { OverseerGoalsScreen } from '../modules/overseer/screens/OverseerGoalsScreen';
 import AddOverseerGoalsScreen from '../modules/overseer/screens/AddOverseerGoalsScreen';
@@ -235,6 +238,7 @@ import EditEventTypeScreen from '../modules/eventTypes/screens/EditEventTypeScre
 import DeleteEventTypeScreen from '../modules/eventTypes/screens/DeleteEventTypeScreen';
 import { PushMailScreen } from '../modules/dashboard/screens/PushMailScreen';
 import { SettingsScreen } from '../modules/dashboard/screens/SettingsScreen';
+import { PermissionExamplesScreen } from '../shared/screens/PermissionExamplesScreen';
 import GeneralScreen from '../modules/setting/screens/GeneralScreen';
 import BibleVerseScreen from '../modules/setting/screens/BibleVerseScreen';
 import RationalisingScreen from '../modules/setting/screens/RationalisingScreen';
@@ -424,6 +428,7 @@ export default function Navigation() {
               <Stack.Screen name="OmrSupport" component={OmrSupportScreen} />
               <Stack.Screen name="AboutOmr" component={AboutOmrScreen} />
               <Stack.Screen name="Settings" component={SettingsScreen} />
+              <Stack.Screen name="PermissionExamples" component={PermissionExamplesScreen} />
               <Stack.Screen name="SettingsGeneral" component={GeneralScreen} />
               <Stack.Screen name="SettingsBibleVerse" component={BibleVerseScreen} />
               <Stack.Screen name="SettingsRationalising" component={RationalisingScreen} />
@@ -445,6 +450,10 @@ export default function Navigation() {
                 component={OverseerChurchesPlantedLast10YearsScreen}
               />
               <Stack.Screen name="ChurchGivingChart" component={ChurchGivingChartScreen} />
+              <Stack.Screen
+                name="AttendanceAndGivingCharts"
+                component={AttendanceAndGivingChartsScreen}
+              />
               <Stack.Screen name="EditCountry" component={EditCountryScreen} />
               <Stack.Screen name="DeleteCountry" component={DeleteCountryScreen} />
               <Stack.Screen name="AddCountry" component={AddCountryScreen} />

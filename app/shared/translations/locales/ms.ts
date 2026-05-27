@@ -33,6 +33,9 @@ const ms = {
     perPage: 'setiap halaman',
     addMonthlyData: 'Tambah Data Bulanan',
     monthlyData: 'Data Bulanan',
+    monthlyDataEntryLayout: 'Susun atur',
+    monthlyDataEntryLayoutSingle: '1 lajur',
+    monthlyDataEntryLayoutDouble: '2 lajur',
     worshipServices: 'Ibadah',
     churchPlantingProjections: 'Unjuran Penanaman Gereja',
     addProjections: 'Tambah Unjuran',
@@ -70,7 +73,7 @@ const ms = {
     forgotPassword: 'Lupa kata laluan?',
     forgotPasswordTitle: 'Lupa kata laluan',
     backToLogin: 'Kembali ke log masuk',
-    enterEmailAddress: 'Sila masukkan alamat e-mel anda.',
+    enterEmailAddress: 'Sila masukkan alamat E-mail anda.',
     forgotPasswordInstructions: 'Masukkan e-mel anda untuk menerima pautan tetapan semula kata laluan.',
     sendResetLink: 'Hantar pautan tetapan semula',
     sending: 'Menghantar...',
@@ -84,6 +87,9 @@ const ms = {
     churchesListMenu: 'Senarai Gereja',
     churchAttendanceChart: 'Carta Kehadiran Gereja',
     churchGivingChart: 'Carta Pemberian Gereja',
+    attendanceAndGivingCharts: 'Carta Kehadiran & Pemberian',
+    chartsLandscapeTip:
+      'Petua: putar peranti ke mod landskap untuk pengalaman melihat carta yang lebih baik.',
     churchList: 'Senarai Gereja',
     attendanceGraph: 'Graf Kehadiran',
     attendanceLast12Months: 'Kehadiran - 12 Bulan Terakhir',
@@ -287,7 +293,7 @@ const ms = {
     assignedTo: 'Ditugaskan kepada',
     tryDifferentSearchKeyword: 'Cuba kata kunci carian yang lain',
     yourOtherChurches: 'Gereja Anda Yang Lain',
-    emailAddress: 'Alamat e-mail',
+    emailAddress: 'Alamat E-mail',
     infoEmailAddress: 'Alamat ini diperlukan untuk mendapatkan kembali akses ke OMR jika kata sandi terlupakan',
     mobilePhone: 'Telefon Bimbit',
     credentials: 'Saya Memegang Kelayakan Kementerian',
@@ -298,7 +304,7 @@ const ms = {
     pickDate: 'Pilih tarikh',
     contact: 'Hubungi',
     phone: 'Telefon',
-    email: 'Email',
+    email: 'E-mail',
     name: 'Nama',
     color: 'Warna',
     selectColor: 'Pilih Warna',
@@ -424,7 +430,9 @@ const ms = {
     // Help texts (to be localized)
     helpChurchName: 'Nama penuh gereja, termasuk bandar dan kawasan, pekan atau kampung. Contoh: Victory Family Centre – New Lynn',
     helpShortName: 'Nama ringkas untuk gereja, dinyatakan dalam 10 aksara. Contoh: VFC-NewLyn',
-    helpIsMsc: 'Adakah ini Gereja Multi-Perkhidmatan atau Multi-Lokasi?',
+    isMultiServiceChurchMsc: 'Adakah ini Gereja Berbilang Perkhidmatan (MSC)?',
+    helpIsMsc:
+      'Gereja Berbilang Perkhidmatan (MSC) ialah gereja yang mempunyai dua atau lebih ibadah, pada waktu lain, lokasi lain, atau bahasa lain.',
     helpEnableCp: 'Adakah ini Gereja Perintis House Church, sebahagian daripada strategi Gerakan Penanaman Gereja Vision 2:25?',
     helpLanguage: 'Bahasa yang digunakan dalam perkhidmatan gereja ini',
     helpMotherChurch: 'Gereja yang bertanggungjawab memulakan (merintis) gereja ini',
@@ -498,8 +506,15 @@ const ms = {
     failedToCreateWorshipService: 'Gagal mencipta Ibadah',
     failedToUpdateWorshipService: 'Gagal mengemas kini Ibadah',
     failedToDeleteWorshipService: 'Gagal memadam Ibadah',
-    worshipServicesMscFaqNote:
-      'Jika perlu menambah sesi ibadah gereja lain, di lokasi lain, dalam bahasa lain, atau pada waktu lain, gunakan ciri Gereja Berbilang Perkhidmatan OMR. Untuk cara melakukannya, rujuk Soalan Lazim [FAQ] pada menu lungsur, kanan atas.',
+    worshipServicesMscNoteTitle: 'Lebih daripada satu ibadah?',
+    worshipServicesMscNoteP1:
+      'Kebanyakan gereja hanya mempunyai satu ibadah pada hari Ahad.',
+    worshipServicesMscNoteP2:
+      'Walau bagaimanapun, jika anda mempunyai dua atau tiga ibadah, pada waktu lain, lokasi lain, atau bahasa lain, anda boleh menggunakan ciri Gereja Berbilang Perkhidmatan (MSC) OMR.',
+    worshipServicesMscNoteP3:
+      'Untuk mengetahui caranya, pergi ke bahagian Soalan Lazim (FAQ) atau hubungi Sokongan OMR',
+    worshipServicesMscGoToFaq: 'Pergi ke FAQ MSC',
+    worshipServicesMscGoToSupport: 'Pergi ke Sokongan OMR',
     // Dashboard Stats
     enterVisits: 'Lawatan & Acara',
     editMyProfile: 'Edit Profil Saya',
