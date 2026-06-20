@@ -33,10 +33,18 @@ export type OverseerChurchPlantedGraph = {
   data?: OverseerChurchPlantedYear[];
 };
 
+export type PastoralVisitChurchRef = {
+  church_name?: string;
+  name?: string;
+};
+
 export type PastoralVisitWeekPoint = {
   week_key?: {year: number; week: number};
   dates?: string;
   visit_days?: number | null;
+  churches?: Array<string | PastoralVisitChurchRef>;
+  church_names?: string[];
+  visited_churches?: Array<string | PastoralVisitChurchRef>;
 };
 
 export type PastoralVisitsGraph = {

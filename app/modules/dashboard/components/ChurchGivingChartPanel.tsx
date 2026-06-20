@@ -10,6 +10,16 @@ import {
   getChurchGivingGraph,
   ChurchGivingGraphSeries,
 } from '../services/churchGivingChart.service';
+import {ChartPointTooltip} from './ChartPointTooltip';
+import {
+  formatWeekEndLabel,
+  formatWeekTooltipDate,
+} from '../utils/chartWeekLabel';
+import {
+  ChartDot,
+  SelectedChartPoint,
+  toggleChartPointSelection,
+} from '../utils/chartPointSelection';
 
 const CHART_HEIGHT = 220;
 const POINT_GAP = 24;
@@ -25,6 +35,9 @@ type Props = {
   churchId: number;
   refreshKey: number;
   scrollable?: boolean;
+  period?: '1y' | '2y' | '3y';
+  displayWeeks?: number;
+  titleKey?: string;
 };
 
 const getNiceStep = (rawStep: number) => {
@@ -42,49 +55,22 @@ const getNiceStep = (rawStep: number) => {
   return 10 * magnitude;
 };
 
-const parseWeekEndDate = (label: string) => {
-  if (!label) {
-    return null;
-  }
-
-  const rangeMatch = label.match(/^\s*(.*?)\s*[–-]\s*(.*?)\s*$/);
-  const endPart = rangeMatch?.[2]?.trim();
-  const yearMatch = label.match(/(\d{4})\s*$/);
-  if (!endPart || !yearMatch) {
-    return null;
-  }
-
-  const normalized = /\d{4}$/.test(endPart)
-    ? endPart
-    : `${endPart} ${yearMatch[1]}`;
-  const parsed = new Date(normalized);
-
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
-};
-
-const formatWeekEndLabel = (label: string, locale: string) => {
-  const date = parseWeekEndDate(label);
-  if (!date) {
-    return label;
-  }
-
-  const day = date.getDate();
-  const month = date.toLocaleString(locale, {month: 'short'});
-  const year = String(date.getFullYear()).slice(-2);
-
-  return `${day} ${month} ${year}`;
-};
-
 export function ChurchGivingChartPanel({
   churchId,
   refreshKey,
   scrollable = false,
+  period,
+  displayWeeks = DISPLAY_WEEKS,
+  titleKey = 'givingLast12Months',
 }: Props) {
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
   const [loading, setLoading] = useState(true);
   const [series, setSeries] = useState<ChurchGivingGraphSeries | null>(null);
   const [dates, setDates] = useState<string[]>([]);
+  const [selectedPoint, setSelectedPoint] = useState<SelectedChartPoint | null>(
+    null,
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -94,7 +80,7 @@ export function ChurchGivingChartPanel({
         setLoading(true);
         const result = await getChurchGivingGraph({
           churchId,
-          period: '2y',
+          period,
         });
         if (cancelled) {
           return;
@@ -117,7 +103,7 @@ export function ChurchGivingChartPanel({
     return () => {
       cancelled = true;
     };
-  }, [churchId, refreshKey]);
+  }, [churchId, refreshKey, period]);
 
   const chartSeries = useMemo(() => {
     const giving = (series?.giving_in_usd ?? []).map(value =>
@@ -127,14 +113,18 @@ export function ChurchGivingChartPanel({
       typeof value === 'number' ? Math.max(0, value) : null,
     );
     const totalPoints = Math.max(giving.length, mfp.length, dates.length);
-    const startIndex = Math.max(0, totalPoints - DISPLAY_WEEKS);
+    const startIndex = Math.max(0, totalPoints - displayWeeks);
 
     return {
       giving: giving.slice(startIndex, totalPoints),
       mfp: mfp.slice(startIndex, totalPoints),
       dates: dates.slice(startIndex, totalPoints),
     };
-  }, [dates, series]);
+  }, [dates, displayWeeks, series]);
+
+  useEffect(() => {
+    setSelectedPoint(null);
+  }, [churchId, refreshKey, period, dates, series, displayWeeks]);
 
   const {chartWidth, givingPoints, mfpPoints, givingDots, mfpDots, yAxisTicks} =
     useMemo(() => {
@@ -167,18 +157,12 @@ export function ChurchGivingChartPanel({
                   key: `${idx}-${value}`,
                   cx: PADDING_X + idx * POINT_GAP,
                   cy: toY(value),
+                  index: idx,
+                  value,
                 }
               : null,
           )
-          .filter(
-            (
-              dot,
-            ): dot is {
-              key: string;
-              cx: number;
-              cy: number;
-            } => dot !== null,
-          );
+          .filter((dot): dot is ChartDot => dot !== null);
 
       const tickCount = Math.max(1, Math.round(max / yStep));
       const ticks = Array.from({length: tickCount + 1}, (_, idx) => {
@@ -198,6 +182,56 @@ export function ChurchGivingChartPanel({
       };
     }, [chartSeries]);
 
+  const givingDotSeries = useMemo(
+    () => [
+      {
+        key: 'giving',
+        color: GIVING_COLOR,
+        label: t('tithesAndOfferingsLabel'),
+        dots: givingDots,
+      },
+      {
+        key: 'mfp',
+        color: MFP_COLOR,
+        label: t('missionsMfpGivingLabel'),
+        dots: mfpDots,
+      },
+    ],
+    [givingDots, mfpDots, t],
+  );
+
+  const formatAxisValue = (value: number) => {
+    return Math.round(value).toLocaleString(selectedLanguage || 'en');
+  };
+
+  const handleDotPress = (
+    seriesKey: string,
+    seriesName: string,
+    color: string,
+    dot: ChartDot,
+  ) => {
+    setSelectedPoint(prev =>
+      toggleChartPointSelection(prev, {
+        seriesKey,
+        seriesName,
+        color,
+        weekIndex: dot.index,
+        value: dot.value,
+        cx: dot.cx,
+        cy: dot.cy,
+      }),
+    );
+  };
+
+  const selectedTooltipText = useMemo(() => {
+    if (!selectedPoint) {
+      return '';
+    }
+    const rawDate = chartSeries.dates[selectedPoint.weekIndex] ?? '';
+    const weekLabel = formatWeekTooltipDate(rawDate, selectedLanguage || 'en');
+    return `${selectedPoint.seriesName}, ${t('week')}: ${weekLabel}, ${t('giving')}: ${formatAxisValue(selectedPoint.value)}`;
+  }, [chartSeries.dates, selectedLanguage, selectedPoint, t]);
+
   const xAxisLabels = useMemo(() => {
     if (!chartSeries.dates.length) {
       return [];
@@ -212,10 +246,6 @@ export function ChurchGivingChartPanel({
     }
     return labels;
   }, [chartSeries.dates, selectedLanguage]);
-
-  const formatAxisValue = (value: number) => {
-    return Math.round(value).toLocaleString(selectedLanguage || 'en');
-  };
 
   if (loading) {
     return (
@@ -242,11 +272,8 @@ export function ChurchGivingChartPanel({
         {backgroundColor: C.surface, borderColor: C.inputBorder},
       ]}>
       <View style={styles.headerRow}>
-        <Text style={[styles.churchInfoValue, {color: C.textPrimary}]}>
-          {series.church_name}
-        </Text>
         <Text style={[styles.chartTitle, {color: C.textSecondary}]}>
-          {t('givingLast12Months')}
+          {t(titleKey as any)}
         </Text>
         <View style={styles.legendRow}>
           <View style={styles.legendItem}>
@@ -284,7 +311,7 @@ export function ChurchGivingChartPanel({
           maximumZoomScale={3}
           pinchGestureEnabled
           bouncesZoom>
-          <View style={{width: chartWidth}}>
+          <View style={[styles.chartCanvas, {width: chartWidth}]}>
             <Svg width={chartWidth} height={CHART_HEIGHT}>
               {yAxisTicks.map(tick => (
                 <Line
@@ -339,25 +366,52 @@ export function ChurchGivingChartPanel({
                 stroke={MFP_COLOR}
                 strokeWidth={2}
               />
-              {givingDots.map(dot => (
-                <Circle
-                  key={`giving-dot-${dot.key}`}
-                  cx={dot.cx}
-                  cy={dot.cy}
-                  r={2}
-                  fill={GIVING_COLOR}
-                />
-              ))}
-              {mfpDots.map(dot => (
-                <Circle
-                  key={`mfp-dot-${dot.key}`}
-                  cx={dot.cx}
-                  cy={dot.cy}
-                  r={2}
-                  fill={MFP_COLOR}
-                />
-              ))}
+              {givingDotSeries.map(item =>
+                item.dots.map(dot => {
+                  const isSelected =
+                    selectedPoint?.seriesKey === item.key &&
+                    selectedPoint?.weekIndex === dot.index;
+
+                  return (
+                    <React.Fragment key={`${item.key}-dot-${dot.key}`}>
+                      {isSelected ? (
+                        <Circle
+                          cx={dot.cx}
+                          cy={dot.cy}
+                          r={12}
+                          fill={item.color}
+                          opacity={0.22}
+                        />
+                      ) : null}
+                      <Circle
+                        cx={dot.cx}
+                        cy={dot.cy}
+                        r={isSelected ? 3.5 : 2}
+                        fill={item.color}
+                      />
+                      <Circle
+                        cx={dot.cx}
+                        cy={dot.cy}
+                        r={14}
+                        fill="transparent"
+                        onPress={() =>
+                          handleDotPress(item.key, item.label, item.color, dot)
+                        }
+                      />
+                    </React.Fragment>
+                  );
+                }),
+              )}
             </Svg>
+            {selectedPoint ? (
+              <ChartPointTooltip
+                cx={selectedPoint.cx}
+                cy={selectedPoint.cy}
+                text={selectedTooltipText}
+                chartWidth={chartWidth}
+                chartHeight={CHART_HEIGHT}
+              />
+            ) : null}
 
             <View style={styles.xAxisContainer}>
               {xAxisLabels.map(item => (
@@ -438,12 +492,6 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: ms(14),
   },
-  churchInfoValue: {
-    fontSize: fs(13),
-    fontWeight: '700',
-    lineHeight: fs(24),
-    marginBottom: ms(4),
-  },
   legendRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -473,6 +521,9 @@ const styles = StyleSheet.create({
   chartRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+  },
+  chartCanvas: {
+    position: 'relative',
   },
   yAxisWrap: {
     width: Y_AXIS_WIDTH,

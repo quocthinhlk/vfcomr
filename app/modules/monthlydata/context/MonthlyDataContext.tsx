@@ -21,6 +21,7 @@ interface MonthlyDataContextType {
     worshipSessions: WorshipSession[],
     churchMetrics: any,
   ) => void;
+  removeWeekData: (churchId: number, year: number, weekNumber: number) => void;
   clearData: (churchId?: number, year?: number) => void;
 }
 
@@ -63,6 +64,21 @@ export const MonthlyDataProvider: React.FC<{children: React.ReactNode}> = ({chil
     [getKey],
   );
 
+  const removeWeekData = useCallback(
+    (churchId: number, year: number, weekNumber: number) => {
+      const key = getKey(churchId, year, weekNumber);
+      setState(prev => {
+        if (!prev.weekData.has(key)) {
+          return prev;
+        }
+        const newMap = new Map(prev.weekData);
+        newMap.delete(key);
+        return {weekData: newMap};
+      });
+    },
+    [getKey],
+  );
+
   const clearData = useCallback((churchId?: number, year?: number) => {
     if (!churchId && !year) {
       // Clear all
@@ -89,7 +105,8 @@ export const MonthlyDataProvider: React.FC<{children: React.ReactNode}> = ({chil
   }, []);
 
   return (
-    <MonthlyDataContext.Provider value={{getWeekData, setWeekData, clearData}}>
+    <MonthlyDataContext.Provider
+      value={{getWeekData, setWeekData, removeWeekData, clearData}}>
       {children}
     </MonthlyDataContext.Provider>
   );

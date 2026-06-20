@@ -203,7 +203,11 @@ export default function MonthlyDataEntryScreen() {
   const {t} = useTranslation();
   const {selectedLanguage} = useLanguage();
   const C = useThemedColors();
-  const {getWeekData, setWeekData: saveWeekDataToContext} = useMonthlyData();
+  const {
+    getWeekData,
+    setWeekData: saveWeekDataToContext,
+    removeWeekData: removeWeekDataFromContext,
+  } = useMonthlyData();
 
   const params = (route.params ?? {}) as Partial<RouteParams>;
   const routeChurchId = params.churchId ?? null;
@@ -213,6 +217,7 @@ export default function MonthlyDataEntryScreen() {
     ? params.weekNumbers
     : [];
 
+  const [selectedWeekNumbers, setSelectedWeekNumbers] = useState<number[]>(weekNumbers);
   const [churchId, setChurchId] = useState<number | null>(
     routeChurchId || null,
   );
@@ -246,16 +251,110 @@ export default function MonthlyDataEntryScreen() {
   const loadingQueueRef = useRef<number[]>([]);
   const loadingWeeksRef = useRef<Set<number>>(new Set());
   const loadedWeeksRef = useRef<Set<number>>(new Set());
+  const loadWeekDataRef = useRef<(weekNumber: number) => void>(() => {});
   const worshipServicesRef = useRef<WorshipSession[] | null>(null);
   const {columnLayout, setColumnLayout: setColumnLayoutPreference} =
     useMonthlyDataEntryColumnLayout();
 
   const sortedWeekNumbers = useMemo(() => {
-    return weekNumbers.length > 0 ? [...weekNumbers].sort((a, b) => a - b) : [];
-  }, [weekNumbers]);
+    return selectedWeekNumbers.length > 0
+      ? [...selectedWeekNumbers].sort((a, b) => a - b)
+      : [];
+  }, [selectedWeekNumbers]);
   const currentWeekNumber = useMemo(() => {
     return sortedWeekNumbers[currentWeekIndex] ?? sortedWeekNumbers[0] ?? 0;
   }, [sortedWeekNumbers, currentWeekIndex]);
+
+  useEffect(() => {
+    setSelectedWeekNumbers(weekNumbers);
+    setCurrentWeekIndex(0);
+  }, [weekNumbers]);
+
+  const removeSelectedWeek = useCallback(
+    (weekNum: number) => {
+      if (!churchId || !year) {
+        return;
+      }
+
+      if (sortedWeekNumbers.length <= 1) {
+        Alert.alert(
+          t('error') || 'Error',
+          t('pleaseSelectAtLeastOneWeek') || 'Please keep at least one week',
+        );
+        return;
+      }
+
+      const removedIndex = sortedWeekNumbers.indexOf(weekNum);
+      const nextWeeks = selectedWeekNumbers.filter(w => w !== weekNum);
+      const nextSorted = [...nextWeeks].sort((a, b) => a - b);
+
+      setSelectedWeekNumbers(nextWeeks);
+
+      // Drop unsaved in-memory data for that week
+      setWeekData(prev => {
+        if (!prev.has(weekNum)) {
+          return prev;
+        }
+        const next = new Map(prev);
+        next.delete(weekNum);
+        return next;
+      });
+
+      setCompletedWeeks(prev => {
+        if (!prev.has(weekNum)) {
+          return prev;
+        }
+        const next = new Set(prev);
+        next.delete(weekNum);
+        return next;
+      });
+
+      setLoadingWeeks(prev => {
+        if (!prev.has(weekNum)) {
+          return prev;
+        }
+        const next = new Set(prev);
+        next.delete(weekNum);
+        return next;
+      });
+
+      loadedWeeksRef.current.delete(weekNum);
+      loadingWeeksRef.current.delete(weekNum);
+      loadingQueueRef.current = loadingQueueRef.current.filter(w => w !== weekNum);
+
+      // Remove from context cache too (so it doesn't reappear on tab switch)
+      removeWeekDataFromContext(churchId, year, weekNum);
+
+      // Keep current week index valid + load the new active week if needed
+      setCurrentWeekIndex(prevIdx => {
+        const maxIndex = Math.max(0, nextSorted.length - 1);
+        const nextIdx =
+          removedIndex === -1
+            ? Math.min(prevIdx, maxIndex)
+            : removedIndex < prevIdx
+              ? Math.max(0, prevIdx - 1)
+              : removedIndex === prevIdx
+                ? Math.min(prevIdx, maxIndex)
+                : Math.min(prevIdx, maxIndex);
+
+        const nextWeek = nextSorted[nextIdx];
+        if (nextWeek && nextWeek !== currentWeekNumber) {
+          loadWeekDataRef.current(nextWeek);
+        }
+
+        return nextIdx;
+      });
+    },
+    [
+      churchId,
+      currentWeekNumber,
+      removeWeekDataFromContext,
+      selectedWeekNumbers,
+      sortedWeekNumbers,
+      t,
+      year,
+    ],
+  );
 
   const renderRowLabel = (text: string, required = false) => (
     <Text
@@ -803,6 +902,12 @@ export default function MonthlyDataEntryScreen() {
       mergeWorshipSessions,
     ],
   );
+
+  useEffect(() => {
+    loadWeekDataRef.current = (weekNumber: number) => {
+      loadWeekData(weekNumber).catch(() => {});
+    };
+  }, [loadWeekData]);
 
   const updateWorshipSession = useCallback(
     (sessionId: number, field: string, value: string) => {
@@ -1546,6 +1651,7 @@ export default function MonthlyDataEntryScreen() {
                     completedWeeks.has(weekNum) ||
                     checkWeekCompleted(weekNum, weekDataForCheck);
                   const isCurrent = index === currentWeekIndex;
+                  const canRemoveWeek = sortedWeekNumbers.length > 1;
 
                   // Can access if:
                   // 1. It's the first week (index 0)
@@ -1563,84 +1669,106 @@ export default function MonthlyDataEntryScreen() {
                       !isLoading &&
                       weekData.has(weekNum));
 
+                  const containerStyle = [
+                    styles.weekNavButton,
+                    {
+                      backgroundColor: isCurrent
+                        ? COLORS.mainColor
+                        : isCompleted
+                        ? COLORS.successColor
+                        : C.surface,
+                      borderColor: isCurrent
+                        ? COLORS.mainColor
+                        : isCompleted
+                        ? COLORS.successColor
+                        : C.border,
+                      opacity: canAccess ? 1 : 0.5,
+                    },
+                  ];
+
                   return (
-                    <TouchableOpacity
-                      key={weekNum}
-                      style={[
-                        styles.weekNavButton,
-                        {
-                          backgroundColor: isCurrent
-                            ? COLORS.mainColor
-                            : isCompleted
-                            ? COLORS.successColor
-                            : C.surface,
-                          borderColor: isCurrent
-                            ? COLORS.mainColor
-                            : isCompleted
-                            ? COLORS.successColor
-                            : C.border,
-                          opacity: canAccess ? 1 : 0.5,
-                        },
-                      ]}
-                      onPress={() => {
-                        if (!churchId) {return;}
-                        if (!canAccess) {
-                          if (isLoading) {
-                            Alert.alert(
-                              t('error') || 'Error',
-                              t('loading') || 'Week data is still loading',
-                            );
-                          } else {
-                            Alert.alert(
-                              t('error') || 'Error',
-                              t('pleaseCompletePreviousWeeks') ||
-                                'Please complete previous weeks first',
-                            );
+                    <View key={weekNum} style={containerStyle}>
+                      {canRemoveWeek ? (
+                        <TouchableOpacity
+                          style={[
+                            styles.weekNavRemoveButton,
+                            {
+                              borderColor: COLORS.dangerColor,
+                            },
+                          ]}
+                          hitSlop={{top: 6, right: 6, bottom: 6, left: 6}}
+                          activeOpacity={0.7}
+                          onPress={() => removeSelectedWeek(weekNum)}>
+                          <Text
+                            style={[
+                              styles.weekNavRemoveText,
+                              {color: COLORS.white},
+                            ]}>
+                            ×
+                          </Text>
+                        </TouchableOpacity>
+                      ) : null}
+
+                      <TouchableOpacity
+                        style={styles.weekNavPressArea}
+                        disabled={!canAccess}
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          if (!churchId) {
+                            return;
                           }
-                          return;
-                        }
-                        // Save current week before switching
-                        const currentMetrics =
-                          currentData?.church_metrics || ({} as ChurchMetrics);
-                        const updatedData: WeeklyReportData = {
-                          ...(currentData || {
-                            church_id: churchId,
+                          if (!canAccess) {
+                            if (isLoading) {
+                              Alert.alert(
+                                t('error') || 'Error',
+                                t('loading') || 'Week data is still loading',
+                              );
+                            } else {
+                              Alert.alert(
+                                t('error') || 'Error',
+                                t('pleaseCompletePreviousWeeks') ||
+                                  'Please complete previous weeks first',
+                              );
+                            }
+                            return;
+                          }
+                          // Save current week before switching
+                          const currentMetrics =
+                            currentData?.church_metrics || ({} as ChurchMetrics);
+                          const updatedData: WeeklyReportData = {
+                            ...(currentData || {
+                              church_id: churchId,
+                              year,
+                              week_number: currentWeekNumber,
+                              worship_sessions: [],
+                              church_metrics: {} as ChurchMetrics,
+                            }),
+                            worship_sessions: worshipSessions,
+                            church_metrics: currentMetrics,
+                          };
+                          setWeekData(prev =>
+                            new Map(prev).set(currentWeekNumber, updatedData),
+                          );
+
+                          // Save to context
+                          saveWeekDataToContext(
+                            churchId,
                             year,
-                            week_number: currentWeekNumber,
-                            worship_sessions: [],
-                            church_metrics: {} as ChurchMetrics,
-                          }),
-                          worship_sessions: worshipSessions,
-                          church_metrics: currentMetrics,
-                        };
-                        setWeekData(prev =>
-                          new Map(prev).set(currentWeekNumber, updatedData),
-                        );
+                            currentWeekNumber,
+                            worshipSessions,
+                            currentMetrics,
+                          );
 
-                        // Save to context
-                        saveWeekDataToContext(
-                          churchId,
-                          year,
-                          currentWeekNumber,
-                          worshipSessions,
-                          currentMetrics,
-                        );
-
-                        // Switch week
-                        setCurrentWeekIndex(index);
-                        loadWeekData(weekNum);
-                      }}
-                      disabled={!canAccess}
-                      activeOpacity={0.7}>
-                      <>
+                          // Switch week
+                          setCurrentWeekIndex(index);
+                          loadWeekData(weekNum);
+                        }}>
                         <Text
                           style={[
                             styles.weekNavDateText,
                             {
                               color:
-                                isCurrent || isCompleted
-                                  ? '#fff'
-                                  : C.textPrimary,
+                                isCurrent || isCompleted ? '#fff' : C.textPrimary,
                             },
                           ]}>
                           {getIsoWeekDateRangeLabel(year, weekNum)}
@@ -1651,7 +1779,9 @@ export default function MonthlyDataEntryScreen() {
                               styles.weekNavYearText,
                               {
                                 color:
-                                  isCurrent || isCompleted ? '#fff' : C.textPrimary,
+                                  isCurrent || isCompleted
+                                    ? '#fff'
+                                    : C.textPrimary,
                               },
                             ]}>
                             {getIsoWeekDisplayYear(year, weekNum)}
@@ -1660,8 +1790,8 @@ export default function MonthlyDataEntryScreen() {
                             <Text style={styles.weekNavCheckmarkInline}>✓</Text>
                           )}
                         </View>
-                      </>
-                    </TouchableOpacity>
+                      </TouchableOpacity>
+                    </View>
                   );
                 })}
               </ScrollView>
@@ -2391,17 +2521,43 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: ms(8),
     paddingHorizontal: ms(4),
+    // Give room for the floating close badge (so it isn't clipped by the scroll view)
+    paddingTop: ms(8),
   },
   weekNavButton: {
-    paddingHorizontal: ms(12),
-    paddingVertical: ms(8),
     borderRadius: rs(3),
     borderWidth: 1,
-    minWidth: ws(100),
+    minWidth: ws(88),
+    marginBottom: ms(10),
+    position: 'relative',
+    overflow: 'visible',
+  },
+  weekNavPressArea: {
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(8),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: ms(12),
-    position: 'relative',
+  },
+  weekNavRemoveButton: {
+    position: 'absolute',
+    // Float half outside the tab (badge style)
+    top: -ms(4),
+    right: -ms(7),
+    width: ms(16),
+    height: ms(16),
+    borderRadius: rs(8),
+    borderWidth: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    zIndex: 20,
+    elevation: 6,
+    backgroundColor: COLORS.dangerColor,
+  },
+  weekNavRemoveText: {
+    fontSize: fs(12),
+    lineHeight: fs(14),
+    fontWeight: '600',
+    includeFontPadding: false,
   },
   weekNavDateText: {
     fontSize: fs(12),

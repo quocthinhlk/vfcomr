@@ -3,7 +3,6 @@ import {
   View,
   Image,
   RefreshControl,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -39,6 +38,7 @@ import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
@@ -110,11 +110,12 @@ export const ChurchesListScreen: React.FC = () => {
   const {theme} = useThemeMode();
   const listStyles = getListStyles(C, theme);
 
-  const [items, setItems] = useState<ChurchListItem[]>([]);
+  // Per-page cache so adjacent pages are real, pre-rendered instances (no remount on swipe).
+  const [pages, setPages] = useState<Record<number, ChurchListItem[]>>({});
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [pageLoading, setPageLoading] = useState<Record<number, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [roleId, setRoleId] = useState<number | null>(null);
@@ -122,10 +123,14 @@ export const ChurchesListScreen: React.FC = () => {
   const [selectedChurch, setSelectedChurch] = useState<ChurchListItem | null>(null);
   const [attributeKeyVisible, setAttributeKeyVisible] = useState(false);
 
-  // Refs to avoid stale closures inside fetchData
-  const loadingRef = useRef(false);
+  // Live refs so async fetches read the latest cache/loading without stale closures.
+  const pagesRef = useRef(pages);
+  pagesRef.current = pages;
+  const pageLoadingRef = useRef(pageLoading);
+  pageLoadingRef.current = pageLoading;
   const queryRef = useRef(query);
-  const requestIdRef = useRef(0);
+  // Bumped whenever the query/filter changes, to discard in-flight stale responses.
+  const fetchTokenRef = useRef(0);
 
   // Skeleton shimmer animation
   const shimmer = useRef(new Animated.Value(0)).current;
@@ -144,16 +149,17 @@ export const ChurchesListScreen: React.FC = () => {
     queryRef.current = query;
   }, [query]);
 
-  // Stable fetchData — no external deps, uses refs for latest values
-  const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
-      // For resets (query change/refresh/page nav), always allow; otherwise guard
-      if (loadingRef.current && !reset) {return;}
-      loadingRef.current = true;
-      setLoading(true);
-
-      const reqId = ++requestIdRef.current;
-
+  // Fetch a single page into the cache. Cached / in-flight pages are skipped unless forced.
+  const fetchPage = useCallback(
+    async (targetPage: number, opts?: {force?: boolean}) => {
+      if (targetPage < 1) {return;}
+      const force = !!opts?.force;
+      if (!force) {
+        if (pagesRef.current[targetPage]) {return;}
+        if (pageLoadingRef.current[targetPage]) {return;}
+      }
+      const token = fetchTokenRef.current;
+      setPageLoading(prev => ({...prev, [targetPage]: true}));
       try {
         const q = queryRef.current;
         const data = await getChurchesList({
@@ -163,29 +169,40 @@ export const ChurchesListScreen: React.FC = () => {
           sort_desc: true,
           search: q && q.trim() ? q.trim() : undefined,
         });
-        // Discard stale responses from previous requests
-        if (reqId !== requestIdRef.current) {return;}
+        // Discard responses from a previous query/filter.
+        if (token !== fetchTokenRef.current) {return;}
         const nextItems = (data?.items ?? []) as ChurchListItem[];
         setTotalPages(data?.total_pages ?? 1);
         setTotal(data?.total ?? 0);
-        setPage(data?.page ?? targetPage);
-        setItems(prev => (reset ? nextItems : [...prev, ...nextItems]));
+        setPages(prev => ({...prev, [targetPage]: nextItems}));
       } catch {
-        // noop — errors shown via empty state
+        // noop — errors surface via empty state
       } finally {
-        if (reqId === requestIdRef.current) {
-          loadingRef.current = false;
-          setLoading(false);
+        if (token === fetchTokenRef.current) {
+          setPageLoading(prev => {
+            const next = {...prev};
+            delete next[targetPage];
+            return next;
+          });
         }
       }
     },
     [],
   );
 
-  // Query change → reset list and fetch page 1
+  // Clear the cache and reload from page 1 (search/filter/refresh/focus).
+  const resetAndLoad = useCallback(() => {
+    fetchTokenRef.current += 1;
+    setPages({});
+    setPageLoading({});
+    setPage(1);
+    fetchPage(1, {force: true});
+  }, [fetchPage]);
+
+  // Query change → reset cache and fetch page 1
   useEffect(() => {
-    setItems([]);
-    fetchData(1, true);
+    queryRef.current = query;
+    resetAndLoad();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [query]);
 
@@ -203,29 +220,38 @@ export const ChurchesListScreen: React.FC = () => {
     })();
   }, []);
 
+  // Keep current + adjacent pages pre-fetched so swipes reveal real content instantly.
+  useEffect(() => {
+    fetchPage(page);
+    if (page + 1 <= totalPages) {fetchPage(page + 1);}
+    if (page - 1 >= 1) {fetchPage(page - 1);}
+  }, [page, totalPages, fetchPage]);
+
   // Refresh on screen focus (e.g. after add/edit)
   useEffect(() => {
     const unsubscribe = navigation.addListener('focus', () => {
       if (route?.params?.refresh) {
-        setItems([]);
-        fetchData(1, true);
+        resetAndLoad();
         try {navigation.setParams({refresh: false});} catch {}
       }
     });
     return unsubscribe;
-  }, [navigation, fetchData, route?.params?.refresh]);
+  }, [navigation, resetAndLoad, route?.params?.refresh]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
+    fetchTokenRef.current += 1;
+    setPages({});
+    setPageLoading({});
+    setPage(1);
+    await fetchPage(1, {force: true});
     setRefreshing(false);
   };
 
   const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loadingRef.current) {return;}
-    setItems([]);
-    fetchData(targetPage, true);
+    if (targetPage < 1 || targetPage > totalPages || targetPage === page) {return;}
+    setPage(targetPage);
+    fetchPage(targetPage);
   };
 
   // ─── Item renderer ────────────────────────────────────────────────────────
@@ -234,7 +260,6 @@ export const ChurchesListScreen: React.FC = () => {
     const isMother = !!(item as any)?.is_mother_church;
     const isMsc = !!(item as any)?.is_msc;
     const isOnMap = !!((item as any)?.omr_map_location || (item as any)?.omr_map_url);
-    const hasBadge = isMother || isMsc || isOnMap;
     const metaParts = [item.city, item.country_name].filter(Boolean);
 
     return (
@@ -329,20 +354,20 @@ export const ChurchesListScreen: React.FC = () => {
   // ─── Pagination ───────────────────────────────────────────────────────────
   const renderPagination = () => {
     if (totalPages <= 1) {return null;}
-    const pages: Array<{label: string; page: number; active?: boolean; disabled?: boolean}> = [];
-    pages.push({label: '«', page: 1, disabled: page === 1});
+    const pageButtons: Array<{label: string; page: number; active?: boolean; disabled?: boolean}> = [];
+    pageButtons.push({label: '«', page: 1, disabled: page === 1});
     for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) {pages.push({label: String(p), page: p});}
+      if (p >= 1) {pageButtons.push({label: String(p), page: p});}
     }
-    pages.push({label: String(page), page, active: true});
+    pageButtons.push({label: String(page), page, active: true});
     for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) {pages.push({label: String(p), page: p});}
+      if (p <= totalPages) {pageButtons.push({label: String(p), page: p});}
     }
-    pages.push({label: '»', page: totalPages, disabled: page === totalPages});
+    pageButtons.push({label: '»', page: totalPages, disabled: page === totalPages});
 
     return (
       <View style={listStyles.pageNumbersContainer as any}>
-        {pages.map((p, idx) => (
+        {pageButtons.map((p, idx) => (
           <TouchableOpacity
             key={`${p.label}-${p.page}-${idx}`}
             style={[
@@ -366,10 +391,11 @@ export const ChurchesListScreen: React.FC = () => {
   };
 
   // ─── Empty / skeleton states ──────────────────────────────────────────────
-  const isInitialLoad = loading && items.length === 0 && !refreshing;
+  const loading = !!pageLoading[page];
+  const isInitialLoad = !pages[1] && !!pageLoading[1] && !refreshing;
 
-  const renderEmptyOrSkeleton = () => {
-    if (isInitialLoad) {
+  const renderEmptyOrSkeleton = (pageIsLoading: boolean) => {
+    if (pageIsLoading) {
       return (
         <View>
           {Array.from({length: 7}).map((_, i) => (
@@ -378,22 +404,49 @@ export const ChurchesListScreen: React.FC = () => {
         </View>
       );
     }
-    if (!loading) {
-      return (
-        <View style={styles.emptyWrap}>
-          <Text style={styles.emptyIcon}>⛪</Text>
-          <Text style={[styles.emptyTitle, {color: C.textPrimary}]}>
-            {query ? 'No results found' : t('noChurchesFound')}
+    return (
+      <View style={styles.emptyWrap}>
+        <Text style={styles.emptyIcon}>⛪</Text>
+        <Text style={[styles.emptyTitle, {color: C.textPrimary}]}>
+          {query ? 'No results found' : t('noChurchesFound')}
+        </Text>
+        {!!query && (
+          <Text style={[styles.emptyHint, {color: C.textSecondary}]}>
+            Try a different search term
           </Text>
-          {!!query && (
-            <Text style={[styles.emptyHint, {color: C.textSecondary}]}>
-              Try a different search term
-            </Text>
-          )}
-        </View>
-      );
-    }
-    return null;
+        )}
+      </View>
+    );
+  };
+
+  // ─── Page renderer: one list instance per page, kept mounted by the carousel ──
+  const renderPage = (pageNumber: number) => {
+    const data = pages[pageNumber] ?? [];
+    const pageIsLoading = !!pageLoading[pageNumber] && !pages[pageNumber];
+    return (
+      <FlatListWithVerticalScrollbar
+        data={pageIsLoading ? [] : data}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
+        contentInsetAdjustmentBehavior="always"
+        contentContainerStyle={styles.listContent}
+        nestedScrollEnabled={Platform.OS === 'android'}
+        style={styles.listScroll}
+        refreshControl={
+          pageNumber === page ? (
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              tintColor={COLORS.mainColor}
+              colors={[COLORS.mainColor]}
+            />
+          ) : undefined
+        }
+        ListEmptyComponent={renderEmptyOrSkeleton(pageIsLoading)}
+      />
+    );
   };
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -404,7 +457,7 @@ export const ChurchesListScreen: React.FC = () => {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
-        style={{flex: 1}}>
+        style={{flex: 1, minHeight: 0}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
 
           <Header title={t('churchesList')} />
@@ -436,32 +489,14 @@ export const ChurchesListScreen: React.FC = () => {
             </View>
           )}
 
-          <View style={{flex: 1, minHeight: 0}}>
+          <View style={styles.listScrollWrap}>
             <PaginatedListPager
               page={page}
               totalPages={totalPages}
-              onPageChange={goToPage}>
-              <FlatList
-                data={isInitialLoad ? [] : items}
-                keyExtractor={keyExtractor}
-                renderItem={renderItem}
-                keyboardShouldPersistTaps="handled"
-                automaticallyAdjustKeyboardInsets
-                contentInsetAdjustmentBehavior="always"
-                contentContainerStyle={{paddingBottom: ms(8)}}
-                nestedScrollEnabled={Platform.OS === 'android'}
-                style={{flex: 1}}
-                refreshControl={
-                  <RefreshControl
-                    refreshing={refreshing}
-                    onRefresh={onRefresh}
-                    tintColor={COLORS.mainColor}
-                    colors={[COLORS.mainColor]}
-                  />
-                }
-                ListEmptyComponent={renderEmptyOrSkeleton()}
-              />
-            </PaginatedListPager>
+              onPageChange={goToPage}
+              renderPage={renderPage}
+              pagerRemountKey={query}
+            />
           </View>
 
           {/* Footer: info + stats + pagination */}
@@ -568,8 +603,20 @@ export const ChurchesListScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: 0,
     paddingTop: 0,
     paddingHorizontal: ms(16),
+  },
+  listScrollWrap: {
+    flex: 1,
+    minHeight: 0,
+  },
+  listScroll: {
+    flex: 1,
+  },
+  listContent: {
+    flexGrow: 1,
+    paddingBottom: ms(8),
   },
   headerRow: {
     flexDirection: 'row',

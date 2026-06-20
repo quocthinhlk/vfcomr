@@ -36,6 +36,9 @@ import DashboardPastorLeaderScreen from './DashboardPastorLeaderScreen';
 import OverseerDashboardScreen from './OverseerDashboardScreen';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
+import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
+
+const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
 const resolveRoleId = (userData: any): number | null => {
   const rawRoleId =
@@ -239,8 +242,13 @@ export default function DashboardScreen() {
     <SafeAreaView
       style={{flex: 1, backgroundColor: C.background}}
       edges={['top', 'bottom', 'left', 'right']}>
-      <ScrollView
-        style={[dashboardStyles.container, {backgroundColor: C.background}]}>
+      <FlatListWithVerticalScrollbar
+        style={[dashboardStyles.container, {backgroundColor: C.background}]}
+        data={DASHBOARD_SCROLL_DATA}
+        keyExtractor={item => item.id}
+        renderItem={() => null}
+        ListHeaderComponent={
+          <>
         <View
           style={{
             flexDirection: 'row',
@@ -522,7 +530,9 @@ export default function DashboardScreen() {
           ))}
         </View>
 
-      </ScrollView>
+          </>
+        }
+      />
     </SafeAreaView>
   );
 }

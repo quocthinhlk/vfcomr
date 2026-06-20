@@ -357,11 +357,15 @@ export default function SearchResourcesScreen() {
               {!selectedResourceId ? (
                 <View style={styles.buttonRow}>
                   <SaveButton
-                    label={submitting ? `${t('loading')}...` : t('next')}
-                    onPress={onSubmitSearch}
-                    disabled={submitting}
+                    label={t('next')}
+                    onPress={() => {}}
+                    disabled
                     style={styles.nextButton}
                   />
+                  <Text
+                    style={[styles.underDevelopmentText, {color: C.textSecondary}]}>
+                    This feature is currently under development.
+                  </Text>
                 </View>
               ) : null}
             </View>
@@ -601,11 +605,17 @@ const styles = StyleSheet.create({
   },
   buttonRow: {
     marginTop: ms(12),
-    flexDirection: 'row',
-    justifyContent: 'center',
+    alignItems: 'center',
   },
   nextButton: {
     width: '100%',
+  },
+  underDevelopmentText: {
+    marginTop: ms(8),
+    fontSize: fs(10),
+    lineHeight: fs(14),
+    textAlign: 'center',
+    opacity: 0.75,
   },
   errorText: {
     fontSize: fs(12),

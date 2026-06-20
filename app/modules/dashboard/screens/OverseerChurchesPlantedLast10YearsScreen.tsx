@@ -1,9 +1,9 @@
 import React, {useCallback, useMemo, useState} from 'react';
-import {ActivityIndicator, ScrollView, StyleSheet, View} from 'react-native';
+import {ActivityIndicator, Image, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import Svg, {G, Line, Rect, Text as SvgText} from 'react-native-svg';
-import {useFocusEffect} from '@react-navigation/native';
+import {useFocusEffect, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -15,6 +15,8 @@ import {
   getOverseerIndicators,
   OverseerChurchPlantedYear,
 } from '../services/overseerIndicators.service';
+import {useDashboardChartChurchId} from '../hooks/useDashboardChartChurchId';
+import {useChartChurchName} from '../hooks/useChartChurchName';
 
 /** Normalised row for divergent chart (planted up, closed down). */
 type PlantedClosedYearRow = {
@@ -33,6 +35,8 @@ const PADDING_Y = 14;
 const BAR_SLOT = 46;
 const BAR_WIDTH = 28;
 const PLOT_BOTTOM_Y = CHART_HEIGHT - X_LABEL_REGION - 6;
+
+const TIP_ICON = require('../../../assets/images/icon/tip.png');
 
 const PLANTED_COLOR = COLORS.successColor;
 const PLANTED_YTD_COLOR = 'rgba(40, 167, 69, 0.42)';
@@ -89,6 +93,11 @@ function normaliseYearRows(list: OverseerChurchPlantedYear[]): PlantedClosedYear
 export default function OverseerChurchesPlantedLast10YearsScreen() {
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
+  const route = useRoute<any>();
+  const routeChurchId =
+    typeof route?.params?.churchId === 'number' ? route.params.churchId : undefined;
+  const {churchId, refreshKey} = useDashboardChartChurchId(routeChurchId);
+  const churchName = useChartChurchName(churchId, refreshKey);
   const [loading, setLoading] = useState(true);
   const [graphTitle, setGraphTitle] = useState('');
   const [years, setYears] = useState<PlantedClosedYearRow[]>([]);
@@ -220,7 +229,7 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
         <Header
           title={
             t('churchesPlantedLast10Years')?.trim() ||
-            'Churches Planted (Last 10 Years)'
+            'Churches Planted Last 10 Years'
           }
         />
 
@@ -235,16 +244,40 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            horizontal={years.length > 6}
-            showsHorizontalScrollIndicator>
+          <View style={styles.content}>
             <View
               style={[
-                styles.card,
-                {backgroundColor: C.surface, borderColor: C.inputBorder},
+                styles.landscapeTip,
+                {
+                  backgroundColor: C.surface,
+                  borderColor: C.inputBorder,
+                },
               ]}>
+              <View style={styles.landscapeTipRow}>
+                <Image
+                  source={TIP_ICON}
+                  style={[styles.landscapeTipIcon, {tintColor: C.textSecondary}]}
+                />
+                <Text style={[styles.landscapeTipText, {color: C.textSecondary}]}>
+                  {t('chartsLandscapeTip')}
+                </Text>
+              </View>
+            </View>
+            {churchName ? (
+              <Text style={[styles.churchName, {color: C.textPrimary}]}>
+                {churchName}
+              </Text>
+            ) : null}
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              horizontal={years.length > 6}
+              showsHorizontalScrollIndicator>
+              <View
+                style={[
+                  styles.card,
+                  {backgroundColor: C.surface, borderColor: C.inputBorder},
+                ]}>
               <Text
                 style={[styles.chartTitle, {color: C.textPrimary}]}
                 numberOfLines={3}>
@@ -473,6 +506,7 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
               </View>
             </View>
           </ScrollView>
+          </View>
         )}
       </View>
     </SafeAreaView>
@@ -484,8 +518,37 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: ms(12),
   },
+  content: {
+    flex: 1,
+    paddingTop: ms(8),
+    paddingBottom: ms(20),
+  },
+  landscapeTip: {
+    marginBottom: ms(12),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(8),
+    borderRadius: rs(8),
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  landscapeTipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  landscapeTipIcon: {
+    width: ms(14),
+    height: ms(14),
+    resizeMode: 'contain',
+    marginRight: ms(6),
+    marginTop: ms(1),
+  },
+  landscapeTipText: {
+    fontSize: fs(12),
+    lineHeight: fs(18),
+    fontStyle: 'italic',
+    flex: 1,
+  },
   scroll: {flexGrow: 0},
-  scrollContent: {paddingTop: ms(8), paddingBottom: ms(20), flexGrow: 1},
+  scrollContent: {flexGrow: 1},
   card: {
     borderWidth: 1,
     borderRadius: rs(10),
@@ -498,6 +561,12 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: ms(12),
     lineHeight: fs(19),
+  },
+  churchName: {
+    fontSize: fs(13),
+    fontWeight: '700',
+    lineHeight: fs(20),
+    marginBottom: ms(8),
   },
   legendRow: {
     flexDirection: 'row',

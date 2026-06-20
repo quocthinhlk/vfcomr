@@ -258,8 +258,6 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
     label: t('resources'),
     children: [
       {label: t('search'), routeName: 'Resources'},
-      {label: t('addNewResource'), routeName: 'AddNewResource'},
-      {label: t('editAddTopicList'), routeName: 'EditAddTopicList'},
     ],
   },
   {

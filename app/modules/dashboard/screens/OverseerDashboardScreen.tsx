@@ -6,7 +6,6 @@ import {
   Easing,
   Image,
   Platform,
-  ScrollView,
   StyleSheet,
   Text as RNText,
   TouchableOpacity,
@@ -29,10 +28,13 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
+import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
 import {updateUser} from '../../user/services/user.service';
+
+const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
 type OverseerDashboardData = {
   overseer_profile?: {
@@ -575,7 +577,7 @@ export default function OverseerDashboardScreen() {
     },
     {
       icon: require('../../../../app/assets/images/icon/line-chart.png'),
-      label: t('attendanceGraph') || 'Attendance Graph',
+      label: t('attendanceChart') || 'Attendance Chart',
       routeName: 'OverseerChurchAttendanceChart',
     },
     {
@@ -617,7 +619,13 @@ export default function OverseerDashboardScreen() {
     <SafeAreaView
       style={{flex: 1, backgroundColor: C.background}}
       edges={['top', 'bottom', 'left', 'right']}>
-      <ScrollView style={[dashboardStyles.container, {backgroundColor: C.background}]}>
+      <FlatListWithVerticalScrollbar
+        style={[dashboardStyles.container, {backgroundColor: C.background}]}
+        data={DASHBOARD_SCROLL_DATA}
+        keyExtractor={item => item.id}
+        renderItem={() => null}
+        ListHeaderComponent={
+          <>
         <View style={{flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: ms(10)}}>
           <View style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
             <TouchableOpacity
@@ -713,7 +721,17 @@ export default function OverseerDashboardScreen() {
                 source={item.icon}
                 style={styles.menuItemIcon}
               />
-              <Text style={{flex: 1, color: C.textPrimary, fontSize: fs(14)}}>{item.label}</Text>
+              <Text
+                style={{
+                  flex: 1,
+                  color:
+                    item.routeName === 'MonthlyDataSelect'
+                      ? COLORS.mainColor
+                      : C.textPrimary,
+                  fontSize: fs(14),
+                }}>
+                {item.label}
+              </Text>
               <Image
                 source={require('../../../../app/assets/images/icon-down.png')}
                 style={styles.menuArrow}
@@ -721,7 +739,9 @@ export default function OverseerDashboardScreen() {
             </TouchableOpacity>
           ))}
         </View>
-      </ScrollView>
+          </>
+        }
+      />
 
       <ZoomableImageModal
         visible={avatarModalVisible}

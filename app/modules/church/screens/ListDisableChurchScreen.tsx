@@ -3,7 +3,6 @@ import {
   View,
   Image,
   RefreshControl,
-  FlatList,
   TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
@@ -21,6 +20,7 @@ import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import {
   getChurchesList,
   ChurchListItem,
@@ -267,7 +267,7 @@ export const ChurchesListScreen: React.FC = () => {
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
-        style={{flex: 1, backgroundColor: C.background}}>
+        style={{flex: 1, minHeight: 0, backgroundColor: C.background}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('disabledChurches')} />
 
@@ -286,21 +286,21 @@ export const ChurchesListScreen: React.FC = () => {
           onSubmitEditing={() => goToPage(1)}
         />
 
-        <View style={{flex: 1, minHeight: 0}}>
+        <View style={styles.listScrollWrap}>
           <PaginatedListPager
             page={page}
             totalPages={totalPages}
             onPageChange={goToPage}>
-            <FlatList
+            <FlatListWithVerticalScrollbar
               data={items}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
               keyboardShouldPersistTaps="handled"
               automaticallyAdjustKeyboardInsets
               contentInsetAdjustmentBehavior="always"
-              contentContainerStyle={{paddingBottom: ms(24)}}
+              contentContainerStyle={styles.listContent}
               nestedScrollEnabled={Platform.OS === 'android'}
-              style={{flex: 1}}
+              style={styles.listScroll}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
               }
@@ -342,8 +342,20 @@ export const ChurchesListScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    minHeight: 0,
     paddingTop: 0,
     paddingHorizontal: ms(16),
+  },
+  listScrollWrap: {
+    flex: 1,
+    minHeight: 0,
+  },
+  listScroll: {
+    flex: 1,
+  },
+  listContent: {
+    flexGrow: 1,
+    paddingBottom: ms(24),
   },
   headerRow: {
     flexDirection: 'row',

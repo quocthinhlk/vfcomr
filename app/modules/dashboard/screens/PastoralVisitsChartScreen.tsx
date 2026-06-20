@@ -1,9 +1,9 @@
-import React, {useCallback, useMemo, useState} from 'react';
-import {ActivityIndicator, ScrollView, StyleSheet, View} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import {ActivityIndicator, Image, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import Svg, {G, Line, Rect, Text as SvgText} from 'react-native-svg';
-import {useFocusEffect} from '@react-navigation/native';
+import {useFocusEffect, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -14,8 +14,12 @@ import {
   getOverseerIndicators,
   PastoralVisitWeekPoint,
 } from '../services/overseerIndicators.service';
+import {useDashboardChartChurchId} from '../hooks/useDashboardChartChurchId';
+import {useChartChurchName} from '../hooks/useChartChurchName';
 
-type Row = {dates: string; visitDays: number; sortKey: number};
+type Row = {dates: string; visitDays: number; sortKey: number; churches: string[]};
+
+const TIP_ICON = require('../../../assets/images/icon/tip.png');
 
 const CHART_HEIGHT = 240;
 const X_LABEL_START_BELOW_AXIS = ms(20);
@@ -74,6 +78,41 @@ function parseSortKey(p: PastoralVisitWeekPoint): number {
   return y * 1000 + w;
 }
 
+function extractChurchNames(p: PastoralVisitWeekPoint): string[] {
+  const raw =
+    p.churches ??
+    p.church_names ??
+    p.visited_churches ??
+    (p as {church_list?: unknown}).church_list;
+
+  if (!raw) {
+    return [];
+  }
+
+  if (typeof raw === 'string') {
+    return raw
+      .split(',')
+      .map(name => name.trim())
+      .filter(Boolean);
+  }
+
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+
+  return raw
+    .map(item => {
+      if (typeof item === 'string') {
+        return item.trim();
+      }
+      if (item && typeof item === 'object') {
+        return String(item.church_name ?? item.name ?? '').trim();
+      }
+      return '';
+    })
+    .filter(Boolean);
+}
+
 function normaliseRows(list: PastoralVisitWeekPoint[]): Row[] {
   return list
     .map((p, idx) => {
@@ -84,6 +123,7 @@ function normaliseRows(list: PastoralVisitWeekPoint[]): Row[] {
         dates,
         visitDays,
         sortKey: parseSortKey(p) || idx,
+        churches: extractChurchNames(p),
       };
     })
     .sort((a, b) => a.sortKey - b.sortKey);
@@ -92,16 +132,20 @@ function normaliseRows(list: PastoralVisitWeekPoint[]): Row[] {
 export default function PastoralVisitsChartScreen() {
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
+  const route = useRoute<any>();
+  const routeChurchId =
+    typeof route?.params?.churchId === 'number' ? route.params.churchId : undefined;
+  const {churchId, refreshKey} = useDashboardChartChurchId(routeChurchId);
+  const churchName = useChartChurchName(churchId, refreshKey);
   const [loading, setLoading] = useState(true);
-  const [graphTitle, setGraphTitle] = useState('');
   const [rows, setRows] = useState<Row[]>([]);
+  const [selectedBarIndex, setSelectedBarIndex] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getOverseerIndicators();
       const graph = data?.pastoral_visits_graph;
-      setGraphTitle(graph?.graph_title?.trim() || '');
       const list = graph?.data;
       const raw = Array.isArray(list) ? [...list] : [];
       setRows(normaliseRows(raw));
@@ -117,6 +161,10 @@ export default function PastoralVisitsChartScreen() {
       load();
     }, [load]),
   );
+
+  useEffect(() => {
+    setSelectedBarIndex(null);
+  }, [rows]);
 
   const chartLayout = useMemo(() => {
     const n = Math.max(rows.length, 1);
@@ -168,6 +216,44 @@ export default function PastoralVisitsChartScreen() {
   const formatAxisValue = (value: number) =>
     Math.round(value).toLocaleString(selectedLanguage || 'en');
 
+  const selectedRow =
+    selectedBarIndex != null ? rows[selectedBarIndex] ?? null : null;
+
+  const selectedDetailText = useMemo(() => {
+    if (!selectedRow) {
+      return '';
+    }
+    const weekLabel = formatShortDate(selectedRow.dates, selectedLanguage || 'en');
+    const churchLabel = selectedRow.churches.join(', ');
+    return `${t('week')}: ${weekLabel}, ${t('church')}: ${churchLabel}, ${t('chartTooltipDays')}: ${selectedRow.visitDays}`;
+  }, [selectedRow, selectedLanguage, t]);
+
+  const detailBannerPosition = useMemo(() => {
+    if (selectedBarIndex == null) {
+      return null;
+    }
+    const bar = chartLayout.bars[selectedBarIndex];
+    if (!bar) {
+      return null;
+    }
+    const barCenterX = PADDING_LEFT + selectedBarIndex * BAR_SLOT + BAR_SLOT / 2;
+    const maxWidth = ms(280);
+    let left = barCenterX + ms(8);
+    if (left + maxWidth > chartLayout.chartWidth - PADDING_RIGHT - ms(4)) {
+      left = barCenterX - maxWidth - ms(8);
+    }
+    left = Math.max(
+      PADDING_LEFT,
+      Math.min(left, chartLayout.chartWidth - PADDING_RIGHT - ms(4)),
+    );
+    const top = Math.max(PADDING_Y + ms(4), bar.yTop + ms(6));
+    return {left, top, maxWidth};
+  }, [chartLayout.bars, chartLayout.chartWidth, selectedBarIndex]);
+
+  const handleBarPress = (index: number) => {
+    setSelectedBarIndex(prev => (prev === index ? null : index));
+  };
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -186,25 +272,41 @@ export default function PastoralVisitsChartScreen() {
             </Text>
           </View>
         ) : (
-          <ScrollView
-            style={styles.scroll}
-            contentContainerStyle={styles.scrollContent}
-            horizontal={rows.length > 8}
-            showsHorizontalScrollIndicator>
+          <View style={styles.content}>
             <View
               style={[
-                styles.card,
-                {backgroundColor: C.surface, borderColor: C.inputBorder},
+                styles.landscapeTip,
+                {
+                  backgroundColor: C.surface,
+                  borderColor: C.inputBorder,
+                },
               ]}>
-              {graphTitle ? (
-                <Text
-                  style={[styles.subtitle, {color: C.textSecondary}]}
-                  numberOfLines={3}>
-                  {graphTitle}
+              <View style={styles.landscapeTipRow}>
+                <Image
+                  source={TIP_ICON}
+                  style={[styles.landscapeTipIcon, {tintColor: C.textSecondary}]}
+                />
+                <Text style={[styles.landscapeTipText, {color: C.textSecondary}]}>
+                  {t('chartsLandscapeTip')}
                 </Text>
-              ) : null}
-
-              <View style={styles.chartRow}>
+              </View>
+            </View>
+            {churchName ? (
+              <Text style={[styles.churchName, {color: C.textPrimary}]}>
+                {churchName}
+              </Text>
+            ) : null}
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              horizontal={rows.length > 8}
+              showsHorizontalScrollIndicator>
+              <View
+                style={[
+                  styles.card,
+                  {backgroundColor: C.surface, borderColor: C.inputBorder},
+                ]}>
+                <View style={styles.chartRow}>
                 <View style={[styles.yAxisWrap, {height: SVG_TOTAL_HEIGHT}]}>
                   {chartLayout.yTicks.map(tick => (
                     <View
@@ -217,7 +319,11 @@ export default function PastoralVisitsChartScreen() {
                   ))}
                 </View>
 
-                <View style={{width: chartLayout.chartWidth}}>
+                <View
+                  style={[
+                    styles.chartPlotWrap,
+                    {width: chartLayout.chartWidth},
+                  ]}>
                   <Svg width={chartLayout.chartWidth} height={SVG_TOTAL_HEIGHT}>
                     {rows.map((_, i) => {
                       const x = PADDING_LEFT + i * BAR_SLOT + BAR_SLOT / 2;
@@ -274,10 +380,26 @@ export default function PastoralVisitsChartScreen() {
                           fill={COLORS.mainColor}
                           rx={rs(2)}
                           ry={rs(2)}
-                          opacity={0.92}
+                          opacity={selectedBarIndex === b.index ? 1 : 0.92}
+                          stroke={
+                            selectedBarIndex === b.index ? '#ffffff' : undefined
+                          }
+                          strokeWidth={selectedBarIndex === b.index ? 1 : 0}
                         />
                       ) : null,
                     )}
+
+                    {chartLayout.bars.map(b => (
+                      <Rect
+                        key={`hit-${b.key}`}
+                        x={PADDING_LEFT + b.index * BAR_SLOT}
+                        y={PADDING_Y}
+                        width={BAR_SLOT}
+                        height={chartLayout.plotBottomY - PADDING_Y}
+                        fill="transparent"
+                        onPress={() => handleBarPress(b.index)}
+                      />
+                    ))}
 
                     {chartLayout.bars.map(b =>
                       b.h > ms(14) && b.v > 0 ? (
@@ -317,10 +439,27 @@ export default function PastoralVisitsChartScreen() {
                       );
                     })}
                   </Svg>
+                  {selectedRow && detailBannerPosition ? (
+                    <View
+                      pointerEvents="none"
+                      style={[
+                        styles.detailBanner,
+                        {
+                          left: detailBannerPosition.left,
+                          top: detailBannerPosition.top,
+                          maxWidth: detailBannerPosition.maxWidth,
+                        },
+                      ]}>
+                      <Text style={styles.detailBannerText}>
+                        {selectedDetailText}
+                      </Text>
+                    </View>
+                  ) : null}
                 </View>
               </View>
             </View>
           </ScrollView>
+          </View>
         )}
       </View>
     </SafeAreaView>
@@ -332,8 +471,37 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: ms(12),
   },
+  content: {
+    flex: 1,
+    paddingTop: ms(8),
+    paddingBottom: ms(20),
+  },
+  landscapeTip: {
+    marginBottom: ms(12),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(8),
+    borderRadius: rs(8),
+    borderWidth: StyleSheet.hairlineWidth,
+  },
+  landscapeTipRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  landscapeTipIcon: {
+    width: ms(14),
+    height: ms(14),
+    resizeMode: 'contain',
+    marginRight: ms(6),
+    marginTop: ms(1),
+  },
+  landscapeTipText: {
+    fontSize: fs(12),
+    lineHeight: fs(18),
+    fontStyle: 'italic',
+    flex: 1,
+  },
   scroll: {flexGrow: 0},
-  scrollContent: {paddingTop: ms(8), paddingBottom: ms(20), flexGrow: 1},
+  scrollContent: {flexGrow: 1},
   card: {
     borderWidth: 1,
     borderRadius: rs(10),
@@ -341,10 +509,11 @@ const styles = StyleSheet.create({
     paddingVertical: ms(12),
     minWidth: '100%',
   },
-  subtitle: {
-    fontSize: fs(12),
-    marginBottom: ms(10),
-    lineHeight: fs(16),
+  churchName: {
+    fontSize: fs(13),
+    fontWeight: '700',
+    lineHeight: fs(20),
+    marginBottom: ms(8),
   },
   loadingWrap: {
     flex: 1,
@@ -359,4 +528,22 @@ const styles = StyleSheet.create({
   },
   yAxisTickWrap: {position: 'absolute', right: 0},
   yAxisLabel: {fontSize: fs(9)},
+  chartPlotWrap: {
+    position: 'relative',
+  },
+  detailBanner: {
+    position: 'absolute',
+    alignSelf: 'flex-start',
+    backgroundColor: '#2b2b2b',
+    borderRadius: rs(4),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(6),
+    zIndex: 10,
+  },
+  detailBannerText: {
+    color: '#ffffff',
+    fontSize: fs(11),
+    lineHeight: fs(15),
+    fontWeight: '500',
+  },
 });

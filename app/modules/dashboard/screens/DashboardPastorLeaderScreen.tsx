@@ -22,6 +22,7 @@ import { Col, Row, Grid } from 'react-native-easy-grid';
 import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
+import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
@@ -67,6 +68,8 @@ const formatNumberToM = (num: number): string => {
 };
 
 const REQUEST_TIMEOUT_MS = 15000;
+
+const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
 const withTimeout = <T,>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS) => {
   return new Promise<T>((resolve, reject) => {
@@ -1732,7 +1735,13 @@ export default function DashboardPastorLeaderScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
-      <ScrollView style={styles.scrollView}>
+      <FlatListWithVerticalScrollbar
+        style={styles.scrollView}
+        data={DASHBOARD_SCROLL_DATA}
+        keyExtractor={item => item.id}
+        renderItem={() => null}
+        ListHeaderComponent={
+          <>
         {/* Header with Logo and Menu */}
         <View style={[styles.header, { backgroundColor: C.background }]}>
           <View style={styles.logoContainer}>
@@ -2267,7 +2276,9 @@ export default function DashboardPastorLeaderScreen() {
             );
           })}
         </View>
-      </ScrollView>
+          </>
+        }
+      />
     </SafeAreaView>
   );
 }
