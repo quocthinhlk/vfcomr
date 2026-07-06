@@ -487,13 +487,40 @@ export default function EditProfileScreen() {
                   payload.password = (values as any).password;
                 }
 
+                const navigateAfterSave = () => {
+                  const routes = navigation.getState()?.routes ?? [];
+                  const cameFromUser = routes
+                    .slice(0, -1)
+                    .some((routeEntry: {name?: string}) => routeEntry.name === 'User');
+
+                  if (cameFromUser && typeof navigation.popTo === 'function') {
+                    navigation.popTo('User', {
+                      userId,
+                      refetchKey: Date.now(),
+                    });
+                  } else if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else {
+                    navigation.navigate('User', {userId});
+                  }
+                };
+
                 try {
-                  await updateUser(userId, payload);
+                  const response = await updateUser(userId, payload);
+                  const warning =
+                    typeof response?.warning === 'string'
+                      ? response.warning.trim()
+                      : '';
+
+                  if (warning) {
+                    Alert.alert(t('success'), warning, [
+                      {text: t('ok') || 'OK', onPress: navigateAfterSave},
+                    ]);
+                    return;
+                  }
+
                   Alert.alert(t('success'), t('profileUpdatedSuccess'));
-                  navigation.navigate('User', {
-                    userId,
-                    refetchKey: Date.now(),
-                  });
+                  navigateAfterSave();
                 } catch (error: any) {
                   const apiErrors = error?.response?.data?.errors;
                   if (apiErrors && typeof apiErrors === 'object') {

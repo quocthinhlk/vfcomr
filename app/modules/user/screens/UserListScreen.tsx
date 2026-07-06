@@ -186,10 +186,10 @@ export const UserListScreen: React.FC = () => {
               </Text>
             )}
 
-            {/* Church name */}
-            {!!item.church_name && (
-              <Text style={[styles.churchName, {color: C.textPrimary}]} numberOfLines={1}>
-                {item.church_name}
+            {/* Pastor of */}
+            {!!item.pastor_of && (
+              <Text style={[styles.meta, {color: C.textSecondary, fontWeight: '600'}]} numberOfLines={1}>
+                {item.pastor_of}
               </Text>
             )}
 
@@ -453,11 +453,6 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
     fontWeight: '700',
     marginBottom: ms(2),
-  },
-  churchName: {
-    fontSize: fs(13),
-    fontWeight: '600',
-    marginBottom: ms(1),
   },
   meta: {
     fontSize: fs(12),

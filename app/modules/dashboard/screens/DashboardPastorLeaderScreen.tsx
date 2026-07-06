@@ -28,6 +28,13 @@ import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
 import {getUserById, updateUser} from '../../user/services/user.service';
 import {getChurchDetail, updateChurch} from '../../church/services/church.service';
+import {churchAttributeBadgeStyles} from '../../church/components/ChurchAttributeBadges';
+import {
+  getChurchMscFlags,
+  mergeAssignedChurchesLists,
+  normalizeAssignedChurches,
+  sortChurchesForAssignedList,
+} from '../../church/utils/churchListOrder';
 import {
   ensureAndroidPermission,
   isOverseer,
@@ -137,24 +144,16 @@ const getOrgModalChurchesFromUserMe = (
       userData.fromChurches ??
       null;
     if (Array.isArray(from) && from.length > 0) {
-      const rows = from
-        .filter((c: any) => c && typeof c === 'object' && c.disabled !== true)
-        .map((c: any) => {
-          const id = Number(c.id);
-          const name = String(c.name ?? '').trim();
-          return Number.isFinite(id) && id > 0
-            ? {id, name: name || String(id)}
-            : null;
-        })
-        .filter(Boolean) as any[];
-      return rows.length > 0 ? rows : null;
+      return normalizeAssignedChurches(
+        from.filter((c: any) => c && typeof c === 'object' && c.disabled !== true),
+      );
     }
   }
   const alt =
     userData.pastor_of_churches ??
     userData.pastor_churches ??
     null;
-  return Array.isArray(alt) && alt.length > 0 ? alt : null;
+  return normalizeAssignedChurches(alt);
 };
 
 /** Merge dashboard payload shapes (overseer + church_id query vs pastor) into one `dashboard_info` + stable `church_id`. */
@@ -360,19 +359,17 @@ const normalizePastorLeaderDashboard = (
   out.dashboard_info = info;
   out.dashboard_indicators = indicators && typeof indicators === 'object' && !Array.isArray(indicators) ? indicators : {};
 
-  // Normalize assigned_churches: also check pastor_of_churches for PastorLeader role
-  if (!Array.isArray(out.assigned_churches) || out.assigned_churches.length === 0) {
-    const alt =
-      raw.from_churches ??
-      raw.fromChurches ??
-      raw.pastor_of_churches ??
-      raw.pastor_churches ??
-      raw.churches ??
-      null;
-    if (Array.isArray(alt) && alt.length > 0) {
-      out.assigned_churches = alt;
-    }
-  }
+  // Normalize assigned_churches; merge dashboard list with pastor/from church sources for MSC flags.
+  const fromAssigned = normalizeAssignedChurches(out.assigned_churches);
+  const alt =
+    raw.from_churches ??
+    raw.fromChurches ??
+    raw.pastor_of_churches ??
+    raw.pastor_churches ??
+    raw.churches ??
+    null;
+  const fromAlt = normalizeAssignedChurches(alt);
+  out.assigned_churches = mergeAssignedChurchesLists(fromAssigned, fromAlt);
 
   return out;
 };
@@ -596,6 +593,35 @@ export default function DashboardPastorLeaderScreen() {
   const fade = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const [orgModalVisible, setOrgModalVisible] = useState(false);
+  const userMeRef = useRef<any>(null);
+  const refreshAssignedChurchesFromUserMe = useCallback(() => {
+    const userData = userMeRef.current;
+    if (!userData) {
+      return;
+    }
+    const orgList = getOrgModalChurchesFromUserMe(userData, currentUserRoleId);
+    if (!orgList?.length) {
+      return;
+    }
+    setDashboardData((prev: any) => {
+      if (!prev) {
+        return prev;
+      }
+      return {
+        ...prev,
+        assigned_churches: mergeAssignedChurchesLists(prev.assigned_churches, orgList),
+      };
+    });
+  }, [currentUserRoleId]);
+
+  const openOrgModal = useCallback(() => {
+    refreshAssignedChurchesFromUserMe();
+    setOrgModalVisible(true);
+  }, [refreshAssignedChurchesFromUserMe]);
+  const sortedAssignedChurches = useMemo(
+    () => sortChurchesForAssignedList(dashboardData?.assigned_churches || []),
+    [dashboardData?.assigned_churches],
+  );
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
@@ -962,11 +988,12 @@ export default function DashboardPastorLeaderScreen() {
       }
 
       // Preserve assigned_churches when switching churches (new dashboard won't include the list)
-      if (!Array.isArray(data.assigned_churches) || data.assigned_churches.length === 0) {
-        const prevAssigned = dashboardData?.assigned_churches;
-        if (Array.isArray(prevAssigned) && prevAssigned.length > 0) {
-          data.assigned_churches = prevAssigned;
-        }
+      const prevAssigned = dashboardData?.assigned_churches;
+      if (Array.isArray(prevAssigned) && prevAssigned.length > 0) {
+        data.assigned_churches = mergeAssignedChurchesLists(
+          data.assigned_churches,
+          prevAssigned,
+        );
       }
 
       setDashboardData(data);
@@ -1072,14 +1099,20 @@ export default function DashboardPastorLeaderScreen() {
           });
 
           // Pastor Leader: `from_churches` on users/me powers the org picker; others use pastor assignments.
+          userMeRef.current = userData;
           const orgList = getOrgModalChurchesFromUserMe(userData, resolvedRole);
-          if (Array.isArray(orgList) && orgList.length > 0) {
+          if (orgList?.length) {
             setDashboardData((prev: any) => {
-              if (!prev) return prev;
-              if (Array.isArray(prev.assigned_churches) && prev.assigned_churches.length > 0) {
+              if (!prev) {
                 return prev;
               }
-              return {...prev, assigned_churches: orgList};
+              return {
+                ...prev,
+                assigned_churches: mergeAssignedChurchesLists(
+                  prev.assigned_churches,
+                  orgList,
+                ),
+              };
             });
           }
 
@@ -1109,17 +1142,21 @@ export default function DashboardPastorLeaderScreen() {
         const dashboardRaw = getAxiosDataPayload(dashboardRes);
 
         if (userData && dashboardRaw) {
+          userMeRef.current = userData;
           const dashboardData = normalizePastorLeaderDashboard(dashboardRaw, {
             fallbackChurchId: null,
           });
 
           const roleIdForOrgList = resolveRoleIdFromUser(userData);
-          // Pastor Leader: `from_churches` on users/me; otherwise pastor assignment lists.
-          if (!Array.isArray(dashboardData.assigned_churches) || dashboardData.assigned_churches.length === 0) {
-            const orgList = getOrgModalChurchesFromUserMe(userData, roleIdForOrgList);
-            if (Array.isArray(orgList) && orgList.length > 0) {
-              dashboardData.assigned_churches = orgList;
-            }
+          const orgList = getOrgModalChurchesFromUserMe(userData, roleIdForOrgList);
+          if (orgList?.length) {
+            dashboardData.assigned_churches = mergeAssignedChurchesLists(
+              dashboardData.assigned_churches,
+              orgList,
+            );
+          } else if (Array.isArray(dashboardData.assigned_churches)) {
+            dashboardData.assigned_churches =
+              normalizeAssignedChurches(dashboardData.assigned_churches) ?? [];
           }
 
           // Store user ID for navigation
@@ -1735,6 +1772,45 @@ export default function DashboardPastorLeaderScreen() {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
+      <View style={[styles.header, { backgroundColor: C.background }]}>
+        <View style={styles.logoContainer}>
+          <View style={styles.logo}>
+            {dashboardData?.dashboard_info?.church_region_logo_url && 
+             dashboardData.dashboard_info.church_region_logo_url.trim() !== '' && 
+             !logoError ? (
+              <Image 
+                source={{ uri: dashboardData.dashboard_info.church_region_logo_url }} 
+                style={styles.logoImage}
+                resizeMode="contain"
+                onError={(error) => {
+                  console.log('Logo image error:', error.nativeEvent.error);
+                  console.log('Failed URL:', dashboardData.dashboard_info.church_region_logo_url);
+                  setLogoError(true);
+                }}
+                onLoad={() => {
+                  console.log('Logo loaded successfully:', dashboardData.dashboard_info.church_region_logo_url);
+                }}
+              />
+            ) : (
+              <Image 
+                source={require('../../../../app/assets/images/logo/vfc_white.png')} 
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </View>
+        <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
+        <MenuPopup
+          visible={menuVisible}
+          onClose={() => setMenuVisible(false)}
+          menuItems={getTranslatedMenuItems(selectedLanguage as any, currentUserRoleId ?? undefined)}
+          onMenuItemPress={handleMenuItemPress}
+          onLogout={handleLogout}
+          onChangeLanguage={handleChangeLanguage}
+          selectedLanguage={selectedLanguage}
+        />
+      </View>
       <FlatListWithVerticalScrollbar
         style={styles.scrollView}
         data={DASHBOARD_SCROLL_DATA}
@@ -1742,47 +1818,6 @@ export default function DashboardPastorLeaderScreen() {
         renderItem={() => null}
         ListHeaderComponent={
           <>
-        {/* Header with Logo and Menu */}
-        <View style={[styles.header, { backgroundColor: C.background }]}>
-          <View style={styles.logoContainer}>
-            <View style={styles.logo}>
-              {dashboardData?.dashboard_info?.church_region_logo_url && 
-               dashboardData.dashboard_info.church_region_logo_url.trim() !== '' && 
-               !logoError ? (
-                <Image 
-                  source={{ uri: dashboardData.dashboard_info.church_region_logo_url }} 
-                  style={styles.logoImage}
-                  resizeMode="contain"
-                  onError={(error) => {
-                    console.log('Logo image error:', error.nativeEvent.error);
-                    console.log('Failed URL:', dashboardData.dashboard_info.church_region_logo_url);
-                    setLogoError(true);
-                  }}
-                  onLoad={() => {
-                    console.log('Logo loaded successfully:', dashboardData.dashboard_info.church_region_logo_url);
-                  }}
-                />
-              ) : (
-                <Image 
-                  source={require('../../../../app/assets/images/logo/vfc_white.png')} 
-                  style={styles.logoImage}
-                  resizeMode="contain"
-                />
-              )}
-            </View>
-          </View>
-          <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
-          <MenuPopup
-            visible={menuVisible}
-            onClose={() => setMenuVisible(false)}
-            menuItems={getTranslatedMenuItems(selectedLanguage as any, currentUserRoleId ?? undefined)}
-            onMenuItemPress={handleMenuItemPress}
-            onLogout={handleLogout}
-            onChangeLanguage={handleChangeLanguage}
-            selectedLanguage={selectedLanguage}
-          />
-        </View>
-
         {/* Profile Section */}
         <View style={styles.profileSection}>
           {/* Row 1: Organization + dropdown */}
@@ -1792,7 +1827,7 @@ export default function DashboardPastorLeaderScreen() {
             activeOpacity={isOverseerUser ? 1 : 0.7}
             onPress={() => {
               if (!isOverseerUser) {
-                setOrgModalVisible(true);
+                openOrgModal();
               }
             }}
             onLayout={(event) => { organizationRowWidthRef.current = event.nativeEvent.layout.width; }}
@@ -1822,16 +1857,17 @@ export default function DashboardPastorLeaderScreen() {
             <View style={styles.reportVerifyColumn}>
               {dashboardData?.dashboard_info && (
                 dashboardData.dashboard_info.is_verified ? (
-                  <Text
+                  <RNText
                     style={[styles.verificationText, { color: '#1e7e34' }]}
                     numberOfLines={1}
-                    adjustsFontSizeToFit>
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.85}>
                     {'\u2714\uFE0E'} {t('visited')} {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by {dashboardData.dashboard_info.verified_by_user_name || ''}
-                  </Text>
+                  </RNText>
                 ) : (
-                  <Text style={[styles.verificationText, { color: '#c0392b' }]}>
+                  <RNText style={[styles.verificationText, { color: '#c0392b' }]}>
                     {t('needsVerificationVisit')}
-                  </Text>
+                  </RNText>
                 )
               )}
               <Text style={styles.lastRecordDate} numberOfLines={1}>
@@ -1903,14 +1939,39 @@ export default function DashboardPastorLeaderScreen() {
                 </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalList}>
-                {(dashboardData?.assigned_churches || []).map((ch: any) => (
+                {sortedAssignedChurches.map((ch: any) => (
                   <TouchableOpacity
                     key={String(ch.id)}
                     style={[styles.modalItemRow, { borderBottomColor: C.border }]}
                     onPress={() => handleSelectAssignedChurch(ch)}
                     activeOpacity={0.7}
                   >
-                    <Text style={[styles.modalItemText, { color: C.textPrimary }]}>{ch.name}</Text>
+                    <View style={styles.modalItemContent}>
+                      <Text style={[styles.modalItemName, { color: C.textPrimary }]} numberOfLines={2}>
+                        {ch.name}
+                      </Text>
+                      {(() => {
+                        const flags = getChurchMscFlags(ch);
+                        if (!flags.is_first_msc && !flags.is_msc) {
+                          return null;
+                        }
+                        const badgeStyles = churchAttributeBadgeStyles;
+                        return (
+                          <View style={[badgeStyles.badgeRow, styles.modalMscBadgeRow]}>
+                            {flags.is_first_msc ? (
+                              <View style={[badgeStyles.badge, badgeStyles.badgeMsc]}>
+                                <Text style={badgeStyles.badgeTextMsc}>{t('firstMsc')}</Text>
+                              </View>
+                            ) : null}
+                            {flags.is_msc ? (
+                              <View style={[badgeStyles.badge, badgeStyles.badgeMsc]}>
+                                <Text style={badgeStyles.badgeTextMsc}>{t('msc')}</Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        );
+                      })()}
+                    </View>
                     <Text style={[styles.modalItemChevron, { color: C.textSecondary }]}>›</Text>
                   </TouchableOpacity>
                 ))}
@@ -2133,7 +2194,7 @@ export default function DashboardPastorLeaderScreen() {
             onPress={handleToggleStats}
             style={styles.viewMoreButton}
             activeOpacity={0.75}
-            hitSlop={{top: 10, bottom: 14, left: 16, right: 16}}
+            hitSlop={{top: 6, bottom: 10, left: 16, right: 16}}
           >
             <View style={styles.viewMoreRow}>
               <Text style={[styles.viewMoreText, { color: C.textSecondary }]}>
@@ -2283,6 +2344,8 @@ export default function DashboardPastorLeaderScreen() {
   );
 }
 
+const HEADER_LOGO_SIZE = ws(40);
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -2302,23 +2365,25 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   logo: {
-    width: hs(40),
-    height: hs(40),
-    borderRadius: 20,
+    width: HEADER_LOGO_SIZE,
+    height: HEADER_LOGO_SIZE,
+    borderRadius: HEADER_LOGO_SIZE / 2,
     backgroundColor: '#fff',
     justifyContent: 'center',
     alignItems: 'center',
+    overflow: 'hidden',
   },
   logoImage: {
-    width: ws(40),
-    height: ws(40),
+    width: HEADER_LOGO_SIZE,
+    height: HEADER_LOGO_SIZE,
   },
   verificationText: {
-    fontSize: fs(14),
+    fontSize: fs(11),
+    lineHeight: fs(20),
     textAlign: 'right',
     fontWeight: '600',
     marginTop: ms(3),
-    flexShrink: 1,
+    width: '100%',
   },
   profileSection: {
     flexDirection: 'column',
@@ -2398,8 +2463,8 @@ const styles = StyleSheet.create({
     lineHeight: fs(22),
   },
   dropdownIcon: {
-    width: ws(10),
-    height: hs(10),
+    width: ws(12),
+    height: hs(12),
     position: 'absolute',
     top: ms(7),
     tintColor: '#000',
@@ -2414,9 +2479,8 @@ const styles = StyleSheet.create({
     fontSize: fs(15),
     color: '#000',
     textAlign: 'left',
-    flex: 1,
     flexShrink: 1,
-    minWidth: 0,
+    maxWidth: '32%',
   },
   reportVerifyColumn: {
     flex: 1,
@@ -2429,7 +2493,7 @@ const styles = StyleSheet.create({
     color: COLORS.mainColor,
     textAlign: 'right',
     fontWeight: '600',
-    flexShrink: 1,
+    width: '100%',
   },
   lastRecordDateValue: {
     fontSize: fs(12),
@@ -2470,9 +2534,10 @@ const styles = StyleSheet.create({
   },
   viewMoreButton: {
     alignItems: 'flex-end',
-    fontSize: fs(12),
     paddingHorizontal: ms(12),
-    paddingVertical: ms(10),
+    paddingTop: ms(0),
+    paddingBottom: ms(6),
+    marginTop: ms(0),
   },
   viewMoreRow: {
     flexDirection: 'row',
@@ -2605,7 +2670,18 @@ const styles = StyleSheet.create({
     paddingVertical: ms(14),
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  modalItemText: { fontSize: fs(16), flex: 1, color: '#111' },
+  modalItemContent: {
+    flex: 1,
+    minWidth: 0,
+  },
+  modalItemName: {
+    fontSize: fs(13.5),
+    fontWeight: '600',
+    marginBottom: ms(2),
+  },
+  modalMscBadgeRow: {
+    marginTop: ms(4),
+  },
   modalItemChevron: { fontSize: fs(18), marginLeft: ms(8), color: '#6b7280' },
   fullImageBackdrop: {
     flex: 1,

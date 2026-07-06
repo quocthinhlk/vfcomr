@@ -13,8 +13,8 @@ import {COLORS} from '../../../shared/constants/colors';
 import {fs, hs, ms, rs} from '../../../shared/utils/scale';
 import type {MonthlyDataEntryColumnLayout} from '../constants/monthlyDataEntryLayout';
 
-const ICON = 13;
-const BTN = hs(20);
+const ICON = 18;
+const BTN = hs(23);
 const SW = 1.15;
 
 type LayoutIconProps = {

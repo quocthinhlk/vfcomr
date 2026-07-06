@@ -18,6 +18,7 @@ export interface RelatingChurchExistsResponseData {
 
 export interface SupportRequestPayload {
   name: string;
+  email: string;
   subject: string;
   message: string;
 }

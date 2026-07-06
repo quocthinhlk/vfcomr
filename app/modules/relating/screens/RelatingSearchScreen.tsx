@@ -10,10 +10,13 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
+import {useNavigation} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {SaveButton} from '../../../shared/components/ActionButtons';
+import AppButton from '../../../shared/components/AppButton';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
+import api from '../../../config/api';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -29,13 +32,17 @@ import {
   searchRelatingCountries,
 } from '../services/relating.service';
 
-const getErrorMessage = (error: any): string => {
+const getErrorMessage = (
+  error: any,
+  fallbackMessage: string,
+  statusFailedMessage: string,
+): string => {
   const status = error?.response?.status;
   const apiMessage = error?.response?.data?.message;
   if (status && apiMessage) return `(${status}) ${apiMessage}`;
-  if (status) return `Request failed with status ${status}`;
+  if (status) return `${statusFailedMessage} ${status}`;
   if (apiMessage) return String(apiMessage);
-  return error?.message || 'Unknown error';
+  return error?.message || fallbackMessage;
 };
 
 const getValidationErrors = (
@@ -56,6 +63,7 @@ const getValidationErrors = (
 };
 
 export default function RelatingSearchScreen() {
+  const navigation = useNavigation<any>();
   const C = useThemedColors();
   const {t} = useTranslation();
   const [countries, setCountries] = useState<RelatingCountryItem[]>([]);
@@ -65,6 +73,7 @@ export default function RelatingSearchScreen() {
   const [selectedCountryId, setSelectedCountryId] = useState<number | null>(null);
   const [selectedCityId, setSelectedCityId] = useState<number | null>(null);
   const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
   const [subject, setSubject] = useState('');
   const [message, setMessage] = useState('');
   const [loadingCountries, setLoadingCountries] = useState(false);
@@ -76,10 +85,14 @@ export default function RelatingSearchScreen() {
     country?: string;
     city?: string;
     name?: string;
+    email?: string;
     subject?: string;
     message?: string;
   }>({});
   const [submitError, setSubmitError] = useState('');
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [showEditProfileForEmailError, setShowEditProfileForEmailError] =
+    useState(false);
   const countryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadCountries = useCallback(async (keyword?: string) => {
@@ -115,6 +128,24 @@ export default function RelatingSearchScreen() {
   }, [loadCountries]);
 
   useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const res = await api.get('users/me');
+        const userId = res?.data?.data?.id;
+        if (mounted && typeof userId === 'number') {
+          setCurrentUserId(userId);
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     return () => {
       if (countryDebounceRef.current) {
         clearTimeout(countryDebounceRef.current);
@@ -130,10 +161,12 @@ export default function RelatingSearchScreen() {
     setCities([]);
     setResult(null);
     setName('');
+    setEmail('');
     setSubject('');
     setMessage('');
     setFieldErrors({});
     setSubmitError('');
+    setShowEditProfileForEmailError(false);
     await loadCountries('');
   }, [loadCountries]);
 
@@ -192,10 +225,12 @@ export default function RelatingSearchScreen() {
     setCities([]);
     setResult(null);
     setName('');
+    setEmail('');
     setSubject('');
     setMessage('');
     setFieldErrors(prev => ({...prev, country: undefined, city: undefined}));
     setSubmitError('');
+    setShowEditProfileForEmailError(false);
     if (countryId) {
       await loadCities(countryId);
     }
@@ -229,7 +264,7 @@ export default function RelatingSearchScreen() {
       });
       setResult(data);
     } catch (error) {
-      Alert.alert(t('error') || 'Error', getErrorMessage(error));
+      Alert.alert(t('error'), getErrorMessage(error, t('unknownError'), t('requestFailedWithStatus')));
     } finally {
       setSearching(false);
     }
@@ -238,8 +273,12 @@ export default function RelatingSearchScreen() {
   const onSubmitRequest = async () => {
     const nextErrors: {[key: string]: string} = {};
     if (!selectedCountry || !selectedCity) {
-      if (!selectedCountry) nextErrors.country = 'errors.country';
-      if (!selectedCity) nextErrors.city = 'errors.city';
+      if (!selectedCountry) {
+        nextErrors.country = t('pleaseSelectCountry');
+      }
+      if (!selectedCity) {
+        nextErrors.city = t('pleaseSelectCity');
+      }
     }
     if (Object.keys(nextErrors).length > 0) {
       setFieldErrors(prev => ({...prev, ...nextErrors}));
@@ -254,20 +293,23 @@ export default function RelatingSearchScreen() {
 
     try {
       setSendingRequest(true);
+      setShowEditProfileForEmailError(false);
       setFieldErrors(prev => ({
         ...prev,
         name: undefined,
+        email: undefined,
         subject: undefined,
         message: undefined,
       }));
       await createRelatingSupportRequest({
         name: name.trim(),
+        email: email.trim(),
         subject: subject.trim(),
         message: message.trim(),
       });
-      Alert.alert(t('success') || 'Success', t('requestSentSuccess'), [
+      Alert.alert(t('success'), t('requestSentSuccess'), [
         {
-          text: 'OK',
+          text: t('ok'),
           onPress: () => {
             resetPage();
           },
@@ -276,16 +318,19 @@ export default function RelatingSearchScreen() {
     } catch (error) {
       const validationErrors = getValidationErrors(error);
       if (validationErrors) {
+        const hasEmailError = !!validationErrors.email;
+        setShowEditProfileForEmailError(hasEmailError);
         setFieldErrors(prev => ({
           ...prev,
           name: validationErrors.name || prev.name,
+          email: validationErrors.email || prev.email,
           subject: validationErrors.subject || prev.subject,
           message: validationErrors.message || prev.message,
         }));
         setSubmitError('');
         return;
       }
-      Alert.alert(t('error') || 'Error', getErrorMessage(error));
+      Alert.alert(t('error'), getErrorMessage(error, t('unknownError'), t('requestFailedWithStatus')));
     } finally {
       setSendingRequest(false);
     }
@@ -296,7 +341,7 @@ export default function RelatingSearchScreen() {
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header title={t('relating') || 'Relating'} />
+        <Header title={t('relating')} />
         <KeyboardAvoidingView
           style={styles.keyboardWrap}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -305,9 +350,9 @@ export default function RelatingSearchScreen() {
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
 >
-          <View style={styles.card}>
+          <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
             <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
-              {t('search') || 'Search'}
+              {t('search')}
             </Text>
             <Text style={[styles.subtitle, {color: C.textSecondary}]}>
               {t('relatingSearchSubtitle')}
@@ -315,7 +360,7 @@ export default function RelatingSearchScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, {color: C.textSecondary}]}>
-                {t('country') || 'Country'}
+                {t('country')}
               </Text>
               <ElementDropdown
                 data={countryOptions}
@@ -324,11 +369,17 @@ export default function RelatingSearchScreen() {
                 placeholder={t('pleaseSelectCountry')}
                 search
                 onSearchText={onSearchCountry}
-                containerStyle={styles.dropdown}
+                containerStyle={
+                  {
+                    width: '100%',
+                    backgroundColor: C.inputBg,
+                    borderColor: C.inputBorder,
+                  } as any
+                }
                 error={!!fieldErrors.country}
               />
               {fieldErrors.country ? (
-                <Text style={styles.errorText}>{fieldErrors.country}</Text>
+                <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{fieldErrors.country}</Text>
               ) : null}
               {loadingCountries ? (
                 <Text style={[styles.helperText, {color: C.textSecondary}]}>
@@ -340,7 +391,7 @@ export default function RelatingSearchScreen() {
             {selectedCountryId ? (
               <View style={styles.fieldGroup}>
                 <Text style={[styles.label, {color: C.textSecondary}]}>
-                  {t('city') || 'City'}
+                  {t('city')}
                 </Text>
                 <ElementDropdown
                   data={cityOptions}
@@ -354,11 +405,17 @@ export default function RelatingSearchScreen() {
                   }}
                   placeholder={t('pleaseSelectCity')}
                   search
-                  containerStyle={styles.dropdown}
+                  containerStyle={
+                  {
+                    width: '100%',
+                    backgroundColor: C.inputBg,
+                    borderColor: C.inputBorder,
+                  } as any
+                }
                   error={!!fieldErrors.city}
                 />
                 {fieldErrors.city ? (
-                  <Text style={styles.errorText}>{fieldErrors.city}</Text>
+                  <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{fieldErrors.city}</Text>
                 ) : null}
                 {loadingCities ? (
                   <Text style={[styles.helperText, {color: C.textSecondary}]}>
@@ -370,7 +427,7 @@ export default function RelatingSearchScreen() {
 
             <View style={styles.searchButtonWrap}>
               <SaveButton
-                label={searching ? t('searching') : t('search') || 'Search'}
+                label={searching ? t('searching') : t('search')}
                 onPress={onSearch}
                 disabled={searching}
                 style={styles.searchButton}
@@ -385,7 +442,7 @@ export default function RelatingSearchScreen() {
           ) : null}
 
           {result ? (
-            <View style={styles.card}>
+            <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
               <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
                 {t('searchResult')}
               </Text>
@@ -415,12 +472,56 @@ export default function RelatingSearchScreen() {
                   containerStyle={styles.input}
                 />
                 {fieldErrors.name ? (
-                  <Text style={styles.errorText}>{fieldErrors.name}</Text>
+                  <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{fieldErrors.name}</Text>
                 ) : null}
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={[styles.label, {color: C.textSecondary}]}>Subject</Text>
+                <Text style={[styles.label, {color: C.textSecondary}]}>
+                  {t('email')}
+                </Text>
+                <AppInput
+                  value={email}
+                  onChangeText={value => {
+                    setEmail(value);
+                    if (value.trim()) {
+                      setFieldErrors(prev => ({...prev, email: undefined}));
+                      setShowEditProfileForEmailError(false);
+                    }
+                    if (submitError) {
+                      setSubmitError('');
+                    }
+                  }}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                  keyboardType="email-address"
+                  returnKeyType="next"
+                  error={!!fieldErrors.email}
+                  containerStyle={styles.input}
+                />
+                {fieldErrors.email ? (
+                  <>
+                    <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>
+                      {fieldErrors.email}
+                    </Text>
+                    {showEditProfileForEmailError && currentUserId ? (
+                      <AppButton
+                        variant="gray"
+                        style={styles.editProfileButton}
+                        onPress={() =>
+                          navigation.navigate('EditProfile', {id: currentUserId})
+                        }>
+                        {t('editProfile')}
+                      </AppButton>
+                    ) : null}
+                  </>
+                ) : null}
+              </View>
+
+              <View style={styles.fieldGroup}>
+                <Text style={[styles.label, {color: C.textSecondary}]}>
+                  {t('omrSupportSubjectLabel')}
+                </Text>
                 <AppInput
                   value={subject}
                   onChangeText={value => {
@@ -439,12 +540,14 @@ export default function RelatingSearchScreen() {
                   containerStyle={styles.input}
                 />
                 {fieldErrors.subject ? (
-                  <Text style={styles.errorText}>{fieldErrors.subject}</Text>
+                  <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{fieldErrors.subject}</Text>
                 ) : null}
               </View>
 
               <View style={styles.fieldGroup}>
-                <Text style={[styles.label, {color: C.textSecondary}]}>Message</Text>
+                <Text style={[styles.label, {color: C.textSecondary}]}>
+                  {t('omrSupportMessageLabel')}
+                </Text>
                 <AppInput
                   value={message}
                   onChangeText={value => {
@@ -464,7 +567,7 @@ export default function RelatingSearchScreen() {
                   containerStyle={styles.input}
                 />
                 {fieldErrors.message ? (
-                  <Text style={styles.errorText}>{fieldErrors.message}</Text>
+                  <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{fieldErrors.message}</Text>
                 ) : null}
               </View>
 
@@ -475,7 +578,7 @@ export default function RelatingSearchScreen() {
                 style={styles.searchButton}
               />
               {submitError ? (
-                <Text style={styles.errorText}>{submitError}</Text>
+                <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{submitError}</Text>
               ) : null}
             </View>
           ) : null}
@@ -503,9 +606,7 @@ const styles = StyleSheet.create({
   },
   card: {
     borderWidth: 1,
-    borderColor: '#d8dce3',
     borderRadius: rs(10),
-    backgroundColor: '#fff',
     paddingHorizontal: ms(12),
     paddingVertical: ms(12),
     marginBottom: ms(12),
@@ -528,10 +629,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: ms(8),
   },
-  dropdown: {
-    backgroundColor: '#fff',
-    borderColor: '#d1d1d1',
-  },
   helperText: {
     marginTop: ms(6),
     fontSize: fs(12),
@@ -539,7 +636,9 @@ const styles = StyleSheet.create({
   errorText: {
     marginTop: ms(6),
     fontSize: fs(12),
-    color: '#db2d2d',
+  },
+  editProfileButton: {
+    marginTop: ms(10),
   },
   searchButtonWrap: {
     marginTop: ms(2),

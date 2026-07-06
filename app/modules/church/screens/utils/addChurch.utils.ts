@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { isMscOptions, enableHouseCp, enableCpmOptions } from '../../config/church.constants';
 
+export const ADD_NEW_CITY_VALUE = '__add_new_city__';
+
 export interface AddChurchFormValues {
   name: string;
   short_name: string;
@@ -23,6 +25,7 @@ export interface AddChurchFormValues {
   country_id: string;
   currency_id: string;
   city_id: string;
+  new_city_name: string;
   photo_dir: string;
   service_address_street: string;
   service_address_postal_code: string;

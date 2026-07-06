@@ -131,7 +131,22 @@ export default function ChangePasswordForOtherUserScreen() {
 
                   await api.post(`users/${userId}/password`, payload);
                   Alert.alert(t('success'), t('passwordChangedSuccess'));
-                  navigation.goBack();
+
+                  const routes = navigation.getState()?.routes ?? [];
+                  const cameFromUser = routes
+                    .slice(0, -1)
+                    .some((routeEntry: {name?: string}) => routeEntry.name === 'User');
+
+                  if (cameFromUser && typeof navigation.popTo === 'function') {
+                    navigation.popTo('User', {
+                      userId,
+                      refetchKey: Date.now(),
+                    });
+                  } else if (navigation.canGoBack()) {
+                    navigation.goBack();
+                  } else if (userId) {
+                    navigation.navigate('User', {userId});
+                  }
                 } catch (e: any) {
                   const msg = e?.response?.data?.message || e?.message || t('failedToChangePassword');
                   Alert.alert(t('error'), msg);

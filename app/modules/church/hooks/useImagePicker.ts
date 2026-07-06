@@ -5,13 +5,10 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {
   ensureAndroidPermission,
   isPermissionError,
+  isPickerCancelled,
   promptPermissionSettings,
 } from '../../../shared/utils/permissions';
 
-interface ImagePickerResult {
-  path: string;
-  size: number;
-}
 
 interface ImagePickerConfig {
   /**
@@ -30,20 +27,21 @@ export function useImagePicker(config?: ImagePickerConfig) {
   const [imageError, setImageError] = useState<string | null>(null);
 
   const pick = async (source: 'camera' | 'library') => {
-    const targetWidth = config?.width ?? 300;
-    const targetHeight = config?.height ?? 300;
-
-    const ok = await ensureAndroidPermission(source, t('cancel') || 'Cancel');
-    if (!ok) return;
-
-    const open =
-      source === 'camera'
-        ? ImagePicker.openCamera
-        : ImagePicker.openPicker;
-
-    let image: ImagePickerResult;
     try {
-      image = await open({
+      const targetWidth = config?.width ?? 300;
+      const targetHeight = config?.height ?? 300;
+
+      const ok = await ensureAndroidPermission(source, t('cancel') || 'Cancel');
+      if (!ok) {
+        return;
+      }
+
+      const open =
+        source === 'camera'
+          ? ImagePicker.openCamera
+          : ImagePicker.openPicker;
+
+      const image = await open({
         width: targetWidth,
         height: targetHeight,
         cropping: true,
@@ -53,24 +51,29 @@ export function useImagePicker(config?: ImagePickerConfig) {
         compressImageQuality: 0.8,
         includeBase64: false,
       });
+
+      if (image.size > 1572864) {
+        // 1.5 MB
+        Alert.alert(t('fileTooLargeTitle'), t('fileTooLargeMessage'));
+        setImageError(t('fileTooLargeTitle'));
+        return;
+      }
+
+      if (image?.path) {
+        setImagePath(image.path);
+        setImageError(null);
+      }
     } catch (error) {
+      if (isPickerCancelled(error)) {
+        return;
+      }
       if (isPermissionError(error)) {
         promptPermissionSettings(source, t('cancel') || 'Cancel');
         return;
       }
-      throw error;
-    }
-
-    if (image.size > 1572864) {
-      // 1.5 MB
-      Alert.alert(t('fileTooLargeTitle'), t('fileTooLargeMessage'));
-      setImageError(t('fileTooLargeTitle'));
-      return;
-    }
-
-    if (image?.path) {
-      setImagePath(image.path);
-      setImageError(null);
+      console.warn('Image pick error:', error);
+      Alert.alert(t('error'), t('imageSelectionFailed'));
+      setImageError(t('imageSelectionFailed'));
     }
   };
 

@@ -1,22 +1,51 @@
-import {
-  requestCameraPermission,
-  requestPhotoPermission,
-  showBlockedPermissionAlert,
-} from '../services/permissions.service';
+import {Alert, Linking, PermissionsAndroid, Platform} from 'react-native';
 
 // ---------------------------------------------------------------------------
 // Image / camera permission helpers (shared across screens and hooks)
-// Delegates to permissions.service (react-native-permissions) on all platforms.
+// Uses react-native-permissions only when the native module is linked; otherwise
+// falls back to PermissionsAndroid (Android) or image-crop-picker prompts (iOS).
 // ---------------------------------------------------------------------------
 
-/** @deprecated Use showBlockedPermissionAlert from permissions.service */
+type PermissionSource = 'camera' | 'library';
+
+function getAndroidApiLevel(): number {
+  if (Platform.OS !== 'android') {
+    return 0;
+  }
+  const version = Platform.Version;
+  return typeof version === 'number'
+    ? version
+    : parseInt(String(version), 10) || 0;
+}
+
+function isRNPermissionsLinked(): boolean {
+  try {
+    const {TurboModuleRegistry} = require('react-native') as typeof import('react-native');
+    return TurboModuleRegistry.get('RNPermissions') != null;
+  } catch {
+    return false;
+  }
+}
+
 export const promptPermissionSettings = (
-  source: 'camera' | 'library',
+  source: PermissionSource,
   cancelText = 'Cancel',
 ): void => {
-  showBlockedPermissionAlert(source === 'camera' ? 'camera' : 'photo', {
-    cancel: cancelText,
-  });
+  const title =
+    source === 'camera' ? 'Camera access needed' : 'Photo library access needed';
+  const message =
+    source === 'camera'
+      ? 'Camera access is turned off for this app. You can enable it in system settings.'
+      : 'Photo library access is turned off for this app. You can enable it in system settings.';
+  Alert.alert(title, message, [
+    {text: cancelText, style: 'cancel'},
+    {
+      text: 'Open Settings',
+      onPress: () => {
+        void Linking.openSettings();
+      },
+    },
+  ]);
 };
 
 /** Returns true if an error thrown by react-native-image-crop-picker is permission-related. */
@@ -29,20 +58,113 @@ export const isPermissionError = (error: unknown): boolean => {
   );
 };
 
+/** Returns true when the user dismissed the native image picker without selecting. */
+export const isPickerCancelled = (error: unknown): boolean => {
+  const code = String((error as any)?.code ?? '');
+  if (code === 'E_PICKER_CANCELLED') {
+    return true;
+  }
+  return /cancel/i.test(String((error as any)?.message ?? ''));
+};
+
+async function requestAndroidSystemPermission(
+  source: PermissionSource,
+): Promise<boolean> {
+  if (Platform.OS !== 'android') {
+    return true;
+  }
+
+  try {
+    if (source === 'camera') {
+      const result = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.CAMERA,
+      );
+      return result === PermissionsAndroid.RESULTS.GRANTED;
+    }
+
+    const permission =
+      getAndroidApiLevel() >= 33
+        ? PermissionsAndroid.PERMISSIONS.READ_MEDIA_IMAGES
+        : PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE;
+    const result = await PermissionsAndroid.request(permission);
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
+
+async function requestWithRNPermissions(
+  source: PermissionSource,
+  cancelText: string,
+): Promise<boolean> {
+  const {
+    request,
+    check,
+    PERMISSIONS,
+    RESULTS,
+  } = require('react-native-permissions');
+
+  const isGranted = (status: string) =>
+    status === RESULTS.GRANTED || status === RESULTS.LIMITED;
+
+  let permission: string;
+  if (Platform.OS === 'ios') {
+    permission =
+      source === 'camera'
+        ? PERMISSIONS.IOS.CAMERA
+        : PERMISSIONS.IOS.PHOTO_LIBRARY;
+  } else {
+    permission =
+      source === 'camera'
+        ? PERMISSIONS.ANDROID.CAMERA
+        : getAndroidApiLevel() >= 33
+          ? PERMISSIONS.ANDROID.READ_MEDIA_IMAGES
+          : PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE;
+  }
+
+  let status = await check(permission);
+  if (isGranted(status)) {
+    return true;
+  }
+  if (status === RESULTS.BLOCKED) {
+    promptPermissionSettings(source, cancelText);
+    return false;
+  }
+
+  status = await request(permission);
+  if (isGranted(status)) {
+    return true;
+  }
+  if (status === RESULTS.BLOCKED) {
+    promptPermissionSettings(source, cancelText);
+  }
+  return false;
+}
+
 /**
  * Requests camera or photo library access when the user is about to pick/take a photo.
- * On iOS and Android uses react-native-permissions (runtime dialogs when needed).
  */
 export const ensureAndroidPermission = async (
-  source: 'camera' | 'library',
+  source: PermissionSource,
   cancelText = 'Cancel',
 ): Promise<boolean> => {
-  const copy = {cancel: cancelText};
-  const res =
-    source === 'camera'
-      ? await requestCameraPermission({blockedCopy: copy})
-      : await requestPhotoPermission({blockedCopy: copy});
-  return res.granted;
+  try {
+    if (isRNPermissionsLinked()) {
+      return await requestWithRNPermissions(source, cancelText);
+    }
+
+    if (Platform.OS === 'ios') {
+      return true;
+    }
+
+    return requestAndroidSystemPermission(source);
+  } catch (error) {
+    if (Platform.OS === 'ios') {
+      return true;
+    }
+    console.warn('Permission request failed:', error);
+    return requestAndroidSystemPermission(source);
+  }
 };
 
 // ---------------------------------------------------------------------------

@@ -386,11 +386,27 @@ export default function AddUserScreen() {
                       : null,
                 } as any;
 
+                const navigateAfterSave = () => {
+                  navigation.navigate('UserList');
+                };
+
                 try {
                   const saveResponse = await addUser(payload);
                   console.log('[AddUserScreen] save response:', saveResponse);
+                  const warning =
+                    typeof saveResponse?.warning === 'string'
+                      ? saveResponse.warning.trim()
+                      : '';
+
+                  if (warning) {
+                    Alert.alert(t('success'), warning, [
+                      {text: t('ok') || 'OK', onPress: navigateAfterSave},
+                    ]);
+                    return;
+                  }
+
                   Alert.alert(t('success'), 'User created successfully!');
-                  navigation.navigate('UserList');
+                  navigateAfterSave();
                 } catch (error: any) {
                   console.error('[AddUserScreen] save error:', {
                     message: error?.message,

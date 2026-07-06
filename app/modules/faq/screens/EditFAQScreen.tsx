@@ -52,6 +52,13 @@ const convertHtmlToText = (html: string): string => {
   text = text.replace(/&quot;/g, '"');
   text = text.replace(/&#39;/g, "'");
   text = text.replace(/&apos;/g, "'");
+  text = text.replace(/&rsquo;/g, '\u2019');
+  text = text.replace(/&lsquo;/g, '\u2018');
+  text = text.replace(/&rdquo;/g, '\u201D');
+  text = text.replace(/&ldquo;/g, '\u201C');
+  text = text.replace(/&mdash;/g, '\u2014');
+  text = text.replace(/&ndash;/g, '\u2013');
+  text = text.replace(/&hellip;/g, '\u2026');
   
   // Decode numeric entities (decimal)
   text = text.replace(/&#(\d+);/g, (match, dec) => {

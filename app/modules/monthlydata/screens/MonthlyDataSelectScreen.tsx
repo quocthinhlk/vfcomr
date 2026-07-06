@@ -59,6 +59,8 @@ export default function MonthlyDataSelectScreen() {
   const [loadingWeeks, setLoadingWeeks] = useState(false);
   const lastWeekLoadKeyRef = useRef<string | null>(null);
   const didInitialFocusRef = useRef(false);
+  const tRef = useRef(t);
+  tRef.current = t;
   const localeMap: Record<string, string> = {
     en: 'en',
     pt: 'pt',
@@ -201,21 +203,22 @@ export default function MonthlyDataSelectScreen() {
     } catch (error: any) {
       console.error('Error loading week numbers:', error);
       Alert.alert(
-        t('error') || 'Error',
-        error?.message || t('failedToLoadWeekNumbers') || 'Failed to load week numbers',
+        tRef.current('error') || 'Error',
+        error?.message || tRef.current('failedToLoadWeekNumbers') || 'Failed to load week numbers',
       );
     } finally {
       setLoadingWeeks(false);
     }
-  }, [selectedYear, selectedMonth, churchId, t]);
+  }, [selectedYear, selectedMonth, churchId]);
 
   // Trigger load when year/month change
   useEffect(() => {
     if (selectedYear && selectedMonth && churchId) {
       loadWeekNumbers();
     } else {
-      setWeekInfos([]);
-      setSelectedWeeks(new Set());
+      lastWeekLoadKeyRef.current = null;
+      setWeekInfos(prev => (prev.length === 0 ? prev : []));
+      setSelectedWeeks(prev => (prev.size === 0 ? prev : new Set()));
     }
   }, [selectedYear, selectedMonth, churchId, loadWeekNumbers]);
 
@@ -281,6 +284,7 @@ export default function MonthlyDataSelectScreen() {
           <Header
             title={t('addMonthlyData') || 'Add Monthly Data'}
             showMenu={false}
+            onBackPress={() => navigation.navigate('Dashboard')}
           />
         </View>
         

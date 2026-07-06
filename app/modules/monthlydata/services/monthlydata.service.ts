@@ -18,6 +18,7 @@ export interface WorshipSession {
 
 export interface ChurchMetrics {
   being_actively_discipled: number | null;
+  number_in_an_encounter: number | null;
   number_of_cell_groups: number | null;
   cell_group_weekly_attendance: number | null;
   number_of_leaders_in_training_for_cpm: number | null;
@@ -71,13 +72,15 @@ export interface GetWeekNumbersResponse {
   message: string;
 }
 
+export type WorshipSessionSaveItem = {
+  id: number;
+  attendance: WorshipSessionAttendance;
+};
+
 export interface CreateWeeklyReportPayload {
   year: number;
   week_number: number;
-  worship_sessions: Array<{
-    id: number;
-    attendance: WorshipSessionAttendance;
-  }>;
+  worship_sessions: WorshipSessionSaveItem[];
   church_metrics: ChurchMetrics;
 }
 
@@ -85,11 +88,76 @@ export interface BatchWeeklyReportPayload {
   church_id: number;
   year: number;
   week_number: number;
-  worship_sessions: Array<{
-    id: number;
-    attendance: WorshipSessionAttendance;
-  }>;
+  worship_sessions: Array<WorshipSession | WorshipSessionSaveItem>;
   church_metrics: ChurchMetrics;
+}
+
+export const CHURCH_METRIC_SAVE_FIELDS: (keyof ChurchMetrics)[] = [
+  'being_actively_discipled',
+  'number_in_an_encounter',
+  'number_of_cell_groups',
+  'cell_group_weekly_attendance',
+  'number_of_leaders_in_training_for_cpm',
+  'number_of_liw_classes',
+  'liw_total_students',
+  'number_of_prayer_meetings',
+  'prayer_meeting_weekly_attendance',
+  'weekly_decisions_made',
+  'weekly_water_baptism',
+  'giving_in_local_currency',
+  'giving_in_usd',
+  'mfp_in_local_currency',
+  'mfp_in_usd',
+];
+
+function getApiErrorMessage(err: any, fallback: string): string {
+  const data = err?.response?.data;
+  if (!data) {
+    return err?.message || fallback;
+  }
+
+  const detail =
+    data?.errors?.detail ||
+    (typeof data?.errors === 'string' ? data.errors : null);
+  const message = typeof data?.message === 'string' ? data.message.trim() : '';
+
+  if (detail && message) {
+    if (message.endsWith(':') || message.endsWith(': ')) {
+      return `${message} ${detail}`.trim();
+    }
+    return `${message}: ${detail}`;
+  }
+
+  if (detail) {
+    return String(detail);
+  }
+
+  return message || err?.message || fallback;
+}
+
+export function buildChurchMetricsPayload(
+  metrics: Partial<ChurchMetrics> | undefined,
+): ChurchMetrics {
+  const source = metrics || {};
+  return CHURCH_METRIC_SAVE_FIELDS.reduce((acc, key) => {
+    acc[key] = source[key] ?? null;
+    return acc;
+  }, {} as ChurchMetrics);
+}
+
+export function buildWorshipSessionsPayload(
+  sessions: Array<WorshipSession | WorshipSessionSaveItem>,
+): WorshipSessionSaveItem[] {
+  return sessions.map(session => ({
+    id: session.id,
+    attendance: {
+      adult_attendance: session.attendance.adult_attendance,
+      youth_attendance: session.attendance.youth_attendance,
+      child_attendance: session.attendance.child_attendance,
+      number_of_service_for_children:
+        session.attendance.number_of_service_for_children,
+    },
+  }));
 }
 
 // Get week numbers for a specific year, month, and church
@@ -182,26 +250,38 @@ export async function createOrUpdateWeeklyReport(
   churchId: number,
   payload: CreateWeeklyReportPayload,
 ) {
-  try {
-    const response = await api.post(`/weekly-reports/churches/${churchId}`, payload);
-    return response.data;
-  } catch (err: any) {
-    const message =
-      err?.response?.data?.message || err?.message || 'Failed to save weekly report';
-    console.error('Create/update weekly report error:', message);
-    throw new Error(message);
-  }
+  return batchCreateOrUpdateWeeklyReports([
+    {
+      church_id: churchId,
+      year: payload.year,
+      week_number: payload.week_number,
+      worship_sessions: payload.worship_sessions,
+      church_metrics: buildChurchMetricsPayload(payload.church_metrics),
+    },
+  ]);
 }
 
 // Batch create or update weekly reports
-export async function batchCreateOrUpdateWeeklyReports(payloads: BatchWeeklyReportPayload[]) {
+export async function batchCreateOrUpdateWeeklyReports(
+  payloads: BatchWeeklyReportPayload[],
+) {
   try {
-    const response = await api.post('/weekly-reports/batch', payloads);
+    const normalizedPayloads = payloads.map(payload => ({
+      church_id: payload.church_id,
+      year: payload.year,
+      week_number: payload.week_number,
+      worship_sessions: buildWorshipSessionsPayload(payload.worship_sessions),
+      church_metrics: buildChurchMetricsPayload(payload.church_metrics),
+    }));
+    const response = await api.post('/weekly-reports/batch', normalizedPayloads);
     return response.data;
   } catch (err: any) {
-    const message =
-      err?.response?.data?.message || err?.message || 'Failed to save weekly reports';
-    console.error('Batch create/update weekly reports error:', message);
+    const message = getApiErrorMessage(err, 'Failed to save weekly reports');
+    console.error(
+      'Batch create/update weekly reports error:',
+      message,
+      err?.response?.data,
+    );
     throw new Error(message);
   }
 }

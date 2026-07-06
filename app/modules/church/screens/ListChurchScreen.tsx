@@ -23,6 +23,10 @@ import {
   getChurchesList,
   ChurchListItem,
 } from '../services/church.service';
+import {
+  ChurchAttributeBadges,
+  churchAttributeBadgeStyles,
+} from '../components/ChurchAttributeBadges';
 import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
 import {
   isOverseer,
@@ -257,9 +261,6 @@ export const ChurchesListScreen: React.FC = () => {
   // ─── Item renderer ────────────────────────────────────────────────────────
   const renderItem = ({item}: {item: ChurchListItem}) => {
     const name = item.name || '';
-    const isMother = !!(item as any)?.is_mother_church;
-    const isMsc = !!(item as any)?.is_msc;
-    const isOnMap = !!((item as any)?.omr_map_location || (item as any)?.omr_map_url);
     const metaParts = [item.city, item.country_name].filter(Boolean);
 
     return (
@@ -322,23 +323,16 @@ export const ChurchesListScreen: React.FC = () => {
             )}
             {/* Badges row + ID at right */}
             <View style={styles.badgeIdRow}>
-              <View style={styles.badgeRow}>
-                {isMother && (
-                  <View style={[styles.badge, styles.badgeMother]}>
-                    <Text style={styles.badgeTextMother}>{t('mother') || 'Mother'}</Text>
-                  </View>
-                )}
-                {isMsc && (
-                  <View style={[styles.badge, styles.badgeMsc]}>
-                    <Text style={styles.badgeTextMsc}>{t('msc') || 'MSC'}</Text>
-                  </View>
-                )}
-                {isOnMap && (
-                  <View style={[styles.badge, styles.badgeMap]}>
-                    <Text style={styles.badgeTextMap}>On Map</Text>
-                  </View>
-                )}
-              </View>
+              <ChurchAttributeBadges
+                church={{
+                  is_mother_church: item.is_mother_church,
+                  is_msc: (item as any)?.is_msc,
+                  is_first_msc: (item as any)?.is_first_msc,
+                  omr_map_location: (item as any)?.omr_map_location,
+                  omr_map_url: (item as any)?.omr_map_url,
+                }}
+                style={styles.badgeRowFlex}
+              />
               <Text style={[styles.churchId, {color: C.textSecondary}]}>
                 #{item.id}
               </Text>
@@ -540,27 +534,34 @@ export const ChurchesListScreen: React.FC = () => {
                   {
                     key: 'mother',
                     label: 'Mother',
-                    badge: styles.badgeMother,
-                    text: styles.badgeTextMother,
+                    badge: churchAttributeBadgeStyles.badgeMother,
+                    text: churchAttributeBadgeStyles.badgeTextMother,
                     desc: 'A Mother Church — a church that has planted or oversees other churches.',
+                  },
+                  {
+                    key: 'firstMsc',
+                    label: t('firstMsc') || 'First MSC',
+                    badge: churchAttributeBadgeStyles.badgeMsc,
+                    text: churchAttributeBadgeStyles.badgeTextMsc,
+                    desc: 'The first Multi-Service Church in a region or network.',
                   },
                   {
                     key: 'msc',
                     label: 'MSC',
-                    badge: styles.badgeMsc,
-                    text: styles.badgeTextMsc,
+                    badge: churchAttributeBadgeStyles.badgeMsc,
+                    text: churchAttributeBadgeStyles.badgeTextMsc,
                     desc: 'A Multi-Service Church — holds multiple services per week.',
                   },
                   {
                     key: 'map',
                     label: 'On Map',
-                    badge: styles.badgeMap,
-                    text: styles.badgeTextMap,
+                    badge: churchAttributeBadgeStyles.badgeMap,
+                    text: churchAttributeBadgeStyles.badgeTextMap,
                     desc: 'Location identified on OMR Maps.',
                   },
                 ].map(row => (
                   <View key={row.key} style={styles.modalRow}>
-                    <View style={[styles.badge, row.badge, styles.modalBadge]}>
+                    <View style={[churchAttributeBadgeStyles.badge, row.badge, styles.modalBadge]}>
                       <Text style={row.text}>{row.label}</Text>
                     </View>
                     <Text style={[styles.modalDesc, {color: C.textSecondary}]}>
@@ -638,30 +639,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginTop: ms(1),
   },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: ms(4),
-    flex: 1,
-  },
+  badgeRowFlex: {flex: 1},
   churchId: {
     fontSize: fs(11),
     fontWeight: '500',
     marginLeft: ms(6),
   },
-  badge: {
-    paddingVertical: ms(1),
-    paddingHorizontal: ms(6),
-    borderRadius: rs(3),
-    borderWidth: 1,
-  },
-  badgeMother: {backgroundColor: '#DEEAD4', borderColor: '#BCD4A7'},
-  badgeMsc:    {backgroundColor: '#F1E0D1', borderColor: '#E3BE9D'},
-  badgeMap:    {backgroundColor: '#DDE5F4', borderColor: '#B8C9E8'},
-  badgeTextMother: {color: '#6EA43D', fontSize: fs(11), fontWeight: '500'},
-  badgeTextMsc:    {color: '#B65C16', fontSize: fs(11), fontWeight: '500'},
-  badgeTextMap:    {color: '#3E68B5', fontSize: fs(11), fontWeight: '500'},
   // Loading overlay (paginating)
   loadingOverlay: {
     position: 'absolute',

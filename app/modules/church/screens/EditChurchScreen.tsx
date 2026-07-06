@@ -23,13 +23,15 @@ import ElementDropdown from '../../../shared/components/ElementDropdown';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import api from '../../../config/api';
 import {getChurchDetail, updateChurch} from '../services/church.service';
+import {createCity} from '../services/city.service';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Alert} from 'react-native';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {Col, Row, Grid} from 'react-native-easy-grid';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
-import {ms, hs} from '../../../shared/utils/scale';
+import {ms, hs, fs} from '../../../shared/utils/scale';
+import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {getLanguageById} from '../../language/services/language.service';
 import {isPastorLeader} from '../../../shared/utils/permissions';
@@ -63,6 +65,7 @@ export default function EditChurchScreen() {
   });
   const [existingPhotoUrl, setExistingPhotoUrl] = useState<string | null>(null);
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
+  const [isAddingNewCity, setIsAddingNewCity] = useState(false);
   const PAGE_LIMIT = 10;
 
   const [langOptions, setLangOptions] = useState<{label: string; value: string}[]>(languageOptions);
@@ -163,6 +166,7 @@ export default function EditChurchScreen() {
       pastor_id: t('pastorLeader') || 'Pastor Leader',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
       country_id: t('nation') || 'Nation',
+      new_city_name: t('cityTownVillage') || 'City / Town / Village',
       currency_id: t('currency') || 'Currency',
       email_address: t('emailAddress') || 'Email Address',
       date_of_birth: t('dob') || 'Date of Birth',
@@ -349,6 +353,7 @@ export default function EditChurchScreen() {
             country_id: d.country_id ? String(d.country_id) : '',
             currency_id: d.currency_id ? String(d.currency_id) : '',
             city_id: d.city_id ? String(d.city_id) : '',
+            new_city_name: '',
             photo_dir: d.photo_dir ? String(d.photo_dir) : '',
             service_address_street: d.service_address_street || '',
             service_address_postal_code: d.service_address_postal_code || '',
@@ -428,6 +433,7 @@ export default function EditChurchScreen() {
       country_id: '',
       currency_id: '',
       city_id: '',
+      new_city_name: '',
       photo_dir: '',
       service_address_street: '',
       service_address_postal_code: '',
@@ -540,6 +546,9 @@ export default function EditChurchScreen() {
                     values.is_msc === 'Yes' &&
                     values.is_first_msc === 'No' &&
                     !values.msc_parent_id;
+                  if (isAddingNewCity) {
+                    newInvalid.new_city_name = !values.new_city_name?.trim();
+                  }
                   setInvalid(newInvalid);
 
                   const newFieldErrors: Record<string, string> = {};
@@ -557,6 +566,7 @@ export default function EditChurchScreen() {
                     'geographical_region_id',
                     'country_id',
                     'currency_id',
+                    'new_city_name',
                     'email_address',
                     'date_of_birth',
                     'is_first_msc',
@@ -565,6 +575,27 @@ export default function EditChurchScreen() {
                   if (firstInvalidKey) {
                     scrollToField(firstInvalidKey);
                     return;
+                  }
+
+                  let resolvedCityId: number | null = values.city_id
+                    ? Number(values.city_id)
+                    : null;
+                  if (isAddingNewCity) {
+                    try {
+                      const createdCity = await createCity({
+                        name: values.new_city_name.trim(),
+                        country_id: Number(values.country_id),
+                      });
+                      resolvedCityId = createdCity.id;
+                    } catch (cityErr: any) {
+                      Alert.alert(
+                        t('error'),
+                        cityErr?.response?.data?.message ||
+                          cityErr?.message ||
+                          t('failedToCreateCity'),
+                      );
+                      return;
+                    }
                   }
 
                   let uploadedPhotoPath: string | null = null;
@@ -602,7 +633,7 @@ export default function EditChurchScreen() {
                     church_network_id: values.church_network_id ? Number(values.church_network_id) : null,
                     church_region_id: values.church_region_id ? Number(values.church_region_id) : null,
                     country_id: values.country_id ? Number(values.country_id) : null,
-                    city_id: values.city_id ? Number(values.city_id) : null,
+                    city_id: resolvedCityId,
                     currency_id: values.currency_id ? Number(values.currency_id) : null,
                     sensitive_nation: values.sensitive_nation === 'Yes',
                     service_address_street: values.service_address_street,
@@ -676,7 +707,7 @@ export default function EditChurchScreen() {
                   );
                 }
               }}>
-              {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
+              {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
                 <Grid>
                   <Row>
                     <Col>
@@ -730,8 +761,9 @@ export default function EditChurchScreen() {
                       <View>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('msc')}?
+                            {t('isMultiServiceChurchMsc')}?
                           </Text>
+                          <HelpIcon title={t('multiServiceChurchMsc')} message={t('helpIsMsc')} />
                         </View>
                         <ElementDropdown
                           data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
@@ -1147,11 +1179,23 @@ export default function EditChurchScreen() {
                           value={values.country_id as any}
                           onChange={v => {
                             setFieldValue('country_id', v as any);
-                            setInvalid(prev => ({...prev, country_id: false}));
+                            setFieldValue('city_id', '');
+                            setFieldValue('new_city_name', '');
+                            setIsAddingNewCity(false);
+                            setInvalid(prev => ({
+                              ...prev,
+                              country_id: false,
+                              city_id: false,
+                              new_city_name: false,
+                            }));
                             clearFieldError('country_id');
+                            clearFieldError('city_id');
+                            clearFieldError('new_city_name');
                             const id = v as any;
                             if (id) {
                               loadCities(id);
+                            } else {
+                              setCityOptions([]);
                             }
                           }}
                           placeholder={t('selectOption')}
@@ -1181,21 +1225,96 @@ export default function EditChurchScreen() {
 
                     {/* City */}
                     {values.country_id ? (
-                      <View>
+                      <View
+                        onLayout={e =>
+                          setFieldPos('new_city_name', e.nativeEvent.layout.y)
+                        }>
                         <View>
-                          <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                            <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                              {t('cityTownVillage')}
-                            </Text>
-                            <HelpIcon title={t('cityTownVillage')} message={t('helpCity')} />
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: ms(4),
+                            }}>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                flexShrink: 1,
+                              }}>
+                              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                                {t('cityTownVillage')}
+                              </Text>
+                              <HelpIcon title={t('cityTownVillage')} message={t('helpCity')} />
+                            </View>
+                            <TouchableOpacity
+                              onPress={() => {
+                                if (isAddingNewCity) {
+                                  setIsAddingNewCity(false);
+                                  setFieldValue('new_city_name', '');
+                                  setInvalid(prev => ({
+                                    ...prev,
+                                    new_city_name: false,
+                                  }));
+                                  clearFieldError('new_city_name');
+                                  return;
+                                }
+                                setIsAddingNewCity(true);
+                                setFieldValue('city_id', '');
+                                setInvalid(prev => ({
+                                  ...prev,
+                                  city_id: false,
+                                  new_city_name: false,
+                                }));
+                                clearFieldError('city_id');
+                                clearFieldError('new_city_name');
+                              }}
+                              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                              <Text
+                                style={{
+                                  color: COLORS.mainColor,
+                                  fontSize: fs(13),
+                                  fontWeight: '600',
+                                }}>
+                                {isAddingNewCity
+                                  ? t('selectFromList')
+                                  : t('addNewCity')}
+                              </Text>
+                            </TouchableOpacity>
                           </View>
                           <ElementDropdown
                             data={cityOptions}
                             value={values.city_id as any}
-                            onChange={v => setFieldValue('city_id', v as any)}
+                            disabled={isAddingNewCity}
+                            onChange={v => {
+                              setFieldValue('city_id', v as any);
+                              setInvalid(prev => ({...prev, city_id: false}));
+                              clearFieldError('city_id');
+                            }}
                             placeholder={t('selectOption')}
                             containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
                           />
+                          {isAddingNewCity ? (
+                            <View style={{marginTop: ms(8)}}>
+                              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                                {t('city')}{' '}
+                                <Text style={{color: '#c00000'}}>*</Text>
+                              </Text>
+                              <AppInput
+                                autoCapitalize="words"
+                                value={values.new_city_name}
+                                placeholder={t('enterNewCityName')}
+                                onChangeText={(text: string) => {
+                                  setFieldValue('new_city_name', text);
+                                  setInvalid(prev => ({...prev, new_city_name: false}));
+                                  clearFieldError('new_city_name');
+                                }}
+                                error={!!invalid?.new_city_name}
+                              />
+                              {renderFieldError('new_city_name')}
+                            </View>
+                          ) : null}
                         </View>
                       </View>
                     ) : null}
@@ -1440,7 +1559,9 @@ export default function EditChurchScreen() {
                     <AppButton
                       onPress={() => handleSubmit()}
                       variant="primary"
-                      style={globalStyles.mainButton}>
+                      style={globalStyles.mainButton}
+                      loading={isSubmitting}
+                      disabled={isSubmitting}>
                       {t('save')}
                     </AppButton>
 

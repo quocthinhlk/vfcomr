@@ -1,4 +1,4 @@
-import React, {useState, useContext, useEffect, useMemo} from 'react';
+import React, {useState, useContext, useEffect, useMemo, useCallback} from 'react';
 import {View, StyleSheet, TouchableOpacity, Text, Image} from 'react-native';
 import {HamburgerMenuIcon} from './HamburgerMenuIcon';
 import {MenuPopup} from './MenuPopup';
@@ -19,9 +19,17 @@ import { fs, ws, hs, ms, rs } from '../utils/scale';
 
  
 
-type HeaderProps = { title?: string; showMenu?: boolean };
+type HeaderProps = {
+  title?: string;
+  showMenu?: boolean;
+  onBackPress?: () => void;
+};
 
-export const Header: React.FC<HeaderProps> = ({ title, showMenu = true }) => {
+export const Header: React.FC<HeaderProps> = ({
+  title,
+  showMenu = true,
+  onBackPress,
+}) => {
   const navigation = useNavigation<NavigationProp<ParamListBase>>();
   const route = useRoute<any>();
   const [menuVisible, setMenuVisible] = useState(false);
@@ -71,9 +79,32 @@ export const Header: React.FC<HeaderProps> = ({ title, showMenu = true }) => {
     return getTranslatedMenuItems(selectedLanguage as any, userRoleId);
   }, [selectedLanguage, userRoleId]);
 
+  const handleGoBack = useCallback(() => {
+    if (onBackPress) {
+      onBackPress();
+      return;
+    }
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    const parent = navigation.getParent();
+    if (parent?.canGoBack()) {
+      parent.goBack();
+      return;
+    }
+    navigation.navigate('Dashboard');
+  }, [navigation, onBackPress]);
+
   return (
     <View style={[styles.headerContainer, { backgroundColor: C.background }]}>
-      <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backWrap}>
+      <TouchableOpacity
+        onPress={handleGoBack}
+        style={styles.backWrap}
+        activeOpacity={0.7}
+        hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+        accessibilityRole="button"
+        accessibilityLabel="Go back">
         <Image source={require('../../assets/images/icon/back.png')} style={[styles.backIcon, { tintColor: C.textPrimary }]} />
       </TouchableOpacity>
       <Text style={[styles.title, { color: C.textPrimary }]} numberOfLines={1} ellipsizeMode="tail">

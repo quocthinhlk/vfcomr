@@ -23,13 +23,15 @@ import HelpIcon from '../../../shared/components/HelpIcon';
 import api from '../../../config/api';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {addChurch, getChurchDetail} from '../services/church.service';
+import {createCity} from '../services/city.service';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
 import {AddChurchFormValues, useFormOptions} from './utils/addChurch.utils';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {Col, Row, Grid} from 'react-native-easy-grid';
-import {ms, hs} from '../../../shared/utils/scale';
+import {ms, hs, fs} from '../../../shared/utils/scale';
+import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 
 export const AddCloneChurchScreen: React.FC = () => {
@@ -69,6 +71,7 @@ export const AddCloneChurchScreen: React.FC = () => {
       pastor_id: t('pastorLeader') || 'Pastor Leader',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
       country_id: t('nation') || 'Nation',
+      new_city_name: t('cityTownVillage') || 'City / Town / Village',
       currency_id: t('currency') || 'Currency',
       email_address: t('emailAddress') || 'Email Address',
       date_of_birth: t('dob') || 'Date of Birth',
@@ -107,6 +110,7 @@ export const AddCloneChurchScreen: React.FC = () => {
     height: 900,
   });
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
+  const [isAddingNewCity, setIsAddingNewCity] = useState(false);
   const loadCities = async (countryId: string | number) => {
     try {
       const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
@@ -119,7 +123,7 @@ export const AddCloneChurchScreen: React.FC = () => {
     name: '', short_name: '', is_msc: '', is_first_msc: '', enable_cpm: '', parent_id: '', msc_parent_id: '',
     language_id: '', church_type_id: '', pastor_id: '', church_network_id: '',
     church_region_id: '', geographical_region_id: '', language_region_id: '',
-    sensitive_nation: '', country_id: '', currency_id: '', city_id: '',
+    sensitive_nation: '', country_id: '', currency_id: '', city_id: '', new_city_name: '',
     photo_dir: '', service_address_street: '', service_address_postal_code: '',
     mailing_address_postal_code: '', office_address_street: '', office_address_postal_code: '',
     office_phone: '', office_fax: '', email_address: '', website: '',
@@ -167,6 +171,7 @@ export const AddCloneChurchScreen: React.FC = () => {
           country_id: d.country_id ? String(d.country_id) : '',
           currency_id: d.currency_id ? String(d.currency_id) : '',
           city_id: d.city_id ? String(d.city_id) : '',
+          new_city_name: '',
           photo_dir: d.photo_dir ? String(d.photo_dir) : '',
           service_address_street: d.service_address_street || '',
           service_address_postal_code: d.service_address_postal_code || '',
@@ -236,6 +241,9 @@ export const AddCloneChurchScreen: React.FC = () => {
                     values.is_msc === 'Yes' &&
                     values.is_first_msc === 'No' &&
                     !values.msc_parent_id;
+                  if (isAddingNewCity) {
+                    newInvalid.new_city_name = !values.new_city_name?.trim();
+                  }
                   setInvalid(newInvalid);
 
                   const newFieldErrors: Record<string, string> = {};
@@ -250,12 +258,33 @@ export const AddCloneChurchScreen: React.FC = () => {
                     'name', 'enable_cpm', 'church_type_id',
                     'pastor_id',
                     'geographical_region_id', 'country_id',
-                    'currency_id', 'email_address', 'date_of_birth',
+                    'currency_id', 'new_city_name', 'email_address', 'date_of_birth',
                     'is_first_msc', 'msc_parent_id',
                   ].find(k => newInvalid[k]);
                   if (firstInvalidKey) {
                     scrollToField(firstInvalidKey);
                     return;
+                  }
+
+                  let resolvedCityId: number | null = values.city_id
+                    ? Number(values.city_id)
+                    : null;
+                  if (isAddingNewCity) {
+                    try {
+                      const createdCity = await createCity({
+                        name: values.new_city_name.trim(),
+                        country_id: Number(values.country_id),
+                      });
+                      resolvedCityId = createdCity.id;
+                    } catch (cityErr: any) {
+                      Alert.alert(
+                        t('error'),
+                        cityErr?.response?.data?.message ||
+                          cityErr?.message ||
+                          t('failedToCreateCity'),
+                      );
+                      return;
+                    }
                   }
 
                   const toNum = (v: any) =>
@@ -311,7 +340,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                     geographical_region_id: toNum(values.geographical_region_id) ?? 0,
                     language_region_id: toNum(values.language_region_id) ?? 0,
                     country_id: toNum(values.country_id),
-                    city_id: toNum(values.city_id),
+                    city_id: toNum(resolvedCityId),
                     currency_id: toNum(values.currency_id),
                     sensitive_nation: values.sensitive_nation === 'Yes',
                     photo: uploadedPhotoPath,
@@ -368,7 +397,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                   );
                 }
               }}>
-              {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
+              {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
                 <Grid>
                   <Row>
                     <Col>
@@ -426,9 +455,9 @@ export const AddCloneChurchScreen: React.FC = () => {
                       <View style={churchStyles.input}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('msc')}?
+                            {t('isMultiServiceChurchMsc')}?
                           </Text>
-                          <HelpIcon title={t('msc')} message={t('helpIsMsc')} />
+                          <HelpIcon title={t('multiServiceChurchMsc')} message={t('helpIsMsc')} />
                         </View>
                         <ElementDropdown
                           data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
@@ -814,11 +843,23 @@ export const AddCloneChurchScreen: React.FC = () => {
                           value={values.country_id as any}
                           onChange={v => {
                             setFieldValue('country_id', v as any);
-                            setInvalid(prev => ({...prev, country_id: false}));
+                            setFieldValue('city_id', '');
+                            setFieldValue('new_city_name', '');
+                            setIsAddingNewCity(false);
+                            setInvalid(prev => ({
+                              ...prev,
+                              country_id: false,
+                              city_id: false,
+                              new_city_name: false,
+                            }));
                             clearFieldError('country_id');
+                            clearFieldError('city_id');
+                            clearFieldError('new_city_name');
                             const id = v as any;
                             if (id) {
                               loadCities(id);
+                            } else {
+                              setCityOptions([]);
                             }
                           }}
                           placeholder={t('selectOption')}
@@ -831,21 +872,97 @@ export const AddCloneChurchScreen: React.FC = () => {
 
                     {/* City */}
                     {values.country_id ? (
-                      <View style={churchStyles.row}>
+                      <View
+                        style={churchStyles.row}
+                        onLayout={e =>
+                          setFieldPos('new_city_name', e.nativeEvent.layout.y)
+                        }>
                         <View style={churchStyles.input}>
-                          <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                            <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                              {t('cityTownVillage')}
-                            </Text>
-                            <HelpIcon title={t('cityTownVillage')} message={t('helpCity')} />
+                          <View
+                            style={{
+                              flexDirection: 'row',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              marginBottom: ms(4),
+                            }}>
+                            <View
+                              style={{
+                                flexDirection: 'row',
+                                alignItems: 'center',
+                                flexShrink: 1,
+                              }}>
+                              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                                {t('cityTownVillage')}
+                              </Text>
+                              <HelpIcon title={t('cityTownVillage')} message={t('helpCity')} />
+                            </View>
+                            <TouchableOpacity
+                              onPress={() => {
+                                if (isAddingNewCity) {
+                                  setIsAddingNewCity(false);
+                                  setFieldValue('new_city_name', '');
+                                  setInvalid(prev => ({
+                                    ...prev,
+                                    new_city_name: false,
+                                  }));
+                                  clearFieldError('new_city_name');
+                                  return;
+                                }
+                                setIsAddingNewCity(true);
+                                setFieldValue('city_id', '');
+                                setInvalid(prev => ({
+                                  ...prev,
+                                  city_id: false,
+                                  new_city_name: false,
+                                }));
+                                clearFieldError('city_id');
+                                clearFieldError('new_city_name');
+                              }}
+                              hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                              <Text
+                                style={{
+                                  color: COLORS.mainColor,
+                                  fontSize: fs(13),
+                                  fontWeight: '600',
+                                }}>
+                                {isAddingNewCity
+                                  ? t('selectFromList')
+                                  : t('addNewCity')}
+                              </Text>
+                            </TouchableOpacity>
                           </View>
                           <ElementDropdown
                             data={cityOptions}
                             value={values.city_id as any}
-                            onChange={v => setFieldValue('city_id', v as any)}
+                            disabled={isAddingNewCity}
+                            onChange={v => {
+                              setFieldValue('city_id', v as any);
+                              setInvalid(prev => ({...prev, city_id: false}));
+                              clearFieldError('city_id');
+                            }}
                             placeholder={t('selectOption')}
                             containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
                           />
+                          {isAddingNewCity ? (
+                            <View style={{marginTop: ms(8)}}>
+                              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                                {t('city')}{' '}
+                                <Text style={{color: '#c00000'}}>*</Text>
+                              </Text>
+                              <AppInput
+                                autoCapitalize="words"
+                                value={values.new_city_name}
+                                placeholder={t('enterNewCityName')}
+                                onChangeText={(text: string) => {
+                                  setFieldValue('new_city_name', text);
+                                  setInvalid(prev => ({...prev, new_city_name: false}));
+                                  clearFieldError('new_city_name');
+                                }}
+                                error={!!invalid?.new_city_name}
+                              />
+                              {renderFieldError('new_city_name')}
+                            </View>
+                          ) : null}
                         </View>
                       </View>
                     ) : null}
@@ -1045,7 +1162,9 @@ export const AddCloneChurchScreen: React.FC = () => {
                     <AppButton
                       onPress={() => handleSubmit()}
                       variant="primary"
-                      style={globalStyles.mainButton}>
+                      style={globalStyles.mainButton}
+                      loading={isSubmitting}
+                      disabled={isSubmitting}>
                       {t('save')}
                     </AppButton>
 

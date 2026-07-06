@@ -40,6 +40,7 @@ export interface ResourceWeblinkItem {
 export interface ResourceTypeItem {
   id: number;
   name: string;
+  description?: string;
 }
 
 export interface ResourceCategoryItem {

@@ -14,6 +14,7 @@ import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {Header} from '../../../shared/components/Header';
+import HelpIcon from '../../../shared/components/HelpIcon';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {COLORS} from '../../../shared/constants/colors';
@@ -311,35 +312,50 @@ export default function SearchResourcesScreen() {
               <View style={styles.typeGrid}>
                 {types.map(item => {
                   const isSelected = selectedTypeIds.includes(item.id);
+                  const description = item.description?.trim();
                   return (
-                    <TouchableOpacity
-                      key={item.id}
-                      style={styles.typeItem}
-                      activeOpacity={0.7}
-                      onPress={() => toggleTypeSelection(item.id)}>
-                      <View
-                        style={[
-                          styles.checkbox,
-                          {
-                            borderColor: isSelected ? COLORS.mainColor : C.inputBorder,
-                            backgroundColor: isSelected ? COLORS.mainColor : 'transparent',
-                          },
-                        ]}>
-                        {isSelected ? <Text style={styles.checkmark}>✓</Text> : null}
+                    <View key={item.id} style={styles.typeItem}>
+                      <TouchableOpacity
+                        style={styles.typeItemCheckbox}
+                        activeOpacity={0.7}
+                        onPress={() => toggleTypeSelection(item.id)}>
+                        <View
+                          style={[
+                            styles.checkbox,
+                            {
+                              borderColor: isSelected ? COLORS.mainColor : C.inputBorder,
+                              backgroundColor: isSelected ? COLORS.mainColor : 'transparent',
+                            },
+                          ]}>
+                          {isSelected ? <Text style={styles.checkmark}>✓</Text> : null}
+                        </View>
+                      </TouchableOpacity>
+                      <View style={styles.typeItemLabelRow}>
+                        <TouchableOpacity
+                          style={styles.typeItemLabelPressable}
+                          activeOpacity={0.7}
+                          onPress={() => toggleTypeSelection(item.id)}>
+                          <Text
+                            style={[styles.typeItemLabel, {color: C.textPrimary}]}
+                            numberOfLines={3}>
+                            {item.name}
+                          </Text>
+                        </TouchableOpacity>
+                        {description ? (
+                          <HelpIcon
+                            title={item.name}
+                            message={description}
+                            size={14}
+                            marginLeft={4}
+                            offsetY={-1}
+                          />
+                        ) : null}
                       </View>
-                      <Text
-                        style={[styles.typeItemLabel, {color: C.textPrimary}]}
-                        numberOfLines={3}>
-                        {item.name}
-                      </Text>
-                    </TouchableOpacity>
+                    </View>
                   );
                 })}
               </View>
 
-              <Text style={[styles.fieldLabel, styles.spacingTop, {color: C.textSecondary}]}>
-                {t('resourceSelectTopicLabel')}
-              </Text>
               <ElementDropdown
                 data={topicOptions}
                 value={selectedTopicId}
@@ -583,12 +599,22 @@ const styles = StyleSheet.create({
     alignItems: 'flex-start',
     marginBottom: ms(12),
   },
+  typeItemCheckbox: {
+    marginRight: ms(10),
+  },
+  typeItemLabelRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  typeItemLabelPressable: {
+    flex: 1,
+  },
   checkbox: {
     width: ws(20),
     height: ws(20),
     borderRadius: rs(4),
     borderWidth: 2,
-    marginRight: ms(10),
     justifyContent: 'center',
     alignItems: 'center',
     marginTop: ms(1),

@@ -29,6 +29,8 @@ import {
   getWeeklyReport,
   createOrUpdateWeeklyReport,
   batchCreateOrUpdateWeeklyReports,
+  buildChurchMetricsPayload,
+  buildWorshipSessionsPayload,
 } from '../services/monthlydata.service';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
@@ -195,6 +197,20 @@ const parseNumber = (formattedStr: string): number | null => {
   if (!cleanStr) {return null;}
   const num = parseInt(cleanStr, 10);
   return isNaN(num) ? null : num;
+};
+
+const getAdultAttendanceFieldKey = (sessionId: number) =>
+  `worship_session_${sessionId}_attendance`;
+
+const hasRequiredAdultAttendance = (
+  sessions: WorshipSession[] | undefined,
+): boolean => {
+  if (!sessions || sessions.length === 0) {
+    return false;
+  }
+  return sessions.every(
+    session => session.attendance.adult_attendance !== null,
+  );
 };
 
 export default function MonthlyDataEntryScreen() {
@@ -948,18 +964,12 @@ export default function MonthlyDataEntryScreen() {
           currentMetrics,
         );
 
-        // Clear error for this session only if any attendance has a value
+        // Clear error when Adults has a value
         setFieldErrors(prev => {
           const newSet = new Set(prev);
           const target = updated.find(session => session.id === sessionId);
-          if (target) {
-            const hasAttendance =
-              target.attendance.adult_attendance !== null ||
-              target.attendance.youth_attendance !== null ||
-              target.attendance.child_attendance !== null;
-            if (hasAttendance) {
-              newSet.delete(`worship_session_${sessionId}_attendance`);
-            }
+          if (target?.attendance.adult_attendance !== null) {
+            newSet.delete(getAdultAttendanceFieldKey(sessionId));
           }
           return newSet;
         });
@@ -1033,39 +1043,7 @@ export default function MonthlyDataEntryScreen() {
   const checkWeekCompleted = useCallback(
     (weekNum: number, data: WeeklyReportData | undefined): boolean => {
       if (!data) {return false;}
-
-      // Check worship sessions - at least one session must have attendance
-      const hasWorshipData =
-        data.worship_sessions &&
-        data.worship_sessions.some(
-          session =>
-            session.attendance.adult_attendance !== null ||
-            session.attendance.youth_attendance !== null ||
-            session.attendance.child_attendance !== null,
-        );
-
-      if (!hasWorshipData) {return false;}
-
-      // Check church metrics - all required fields must be filled
-      const metrics = data.church_metrics;
-      const requiredFields: (keyof ChurchMetrics)[] = [
-        'number_of_cell_groups',
-        'cell_group_weekly_attendance',
-        'number_of_prayer_meetings',
-        'prayer_meeting_weekly_attendance',
-        'weekly_decisions_made',
-        'being_actively_discipled',
-        'weekly_water_baptism',
-        'number_of_liw_classes',
-        'liw_total_students',
-        'number_of_leaders_in_training_for_cpm',
-        'giving_in_local_currency',
-        'mfp_in_local_currency',
-      ];
-
-      return requiredFields.every(
-        field => metrics[field] !== null && metrics[field] !== undefined,
-      );
+      return hasRequiredAdultAttendance(data.worship_sessions);
     },
     [],
   );
@@ -1078,85 +1056,19 @@ export default function MonthlyDataEntryScreen() {
     const errors = new Set<string>();
     let firstErrorField: string | undefined;
 
-    // Validate worship sessions
     if (worshipSessions.length === 0) {
       const fieldKey = 'worship_sessions';
       errors.add(fieldKey);
       if (!firstErrorField) {firstErrorField = fieldKey;}
     } else {
-      worshipSessions.forEach((session, index) => {
-        if (
-          session.attendance.adult_attendance === null &&
-          session.attendance.youth_attendance === null &&
-          session.attendance.child_attendance === null
-        ) {
-          const fieldKey = `worship_session_${session.id}_attendance`;
+      worshipSessions.forEach(session => {
+        if (session.attendance.adult_attendance === null) {
+          const fieldKey = getAdultAttendanceFieldKey(session.id);
           errors.add(fieldKey);
           if (!firstErrorField) {firstErrorField = fieldKey;}
         }
       });
     }
-
-    // Validate church metrics
-    const metrics = currentData?.church_metrics || ({} as ChurchMetrics);
-    const requiredFields: Array<{key: keyof ChurchMetrics; fieldKey: string}> =
-      [
-        {
-          key: 'number_of_cell_groups',
-          fieldKey: 'church_metrics.number_of_cell_groups',
-        },
-        {
-          key: 'cell_group_weekly_attendance',
-          fieldKey: 'church_metrics.cell_group_weekly_attendance',
-        },
-        {
-          key: 'number_of_prayer_meetings',
-          fieldKey: 'church_metrics.number_of_prayer_meetings',
-        },
-        {
-          key: 'prayer_meeting_weekly_attendance',
-          fieldKey: 'church_metrics.prayer_meeting_weekly_attendance',
-        },
-        {
-          key: 'weekly_decisions_made',
-          fieldKey: 'church_metrics.weekly_decisions_made',
-        },
-        {
-          key: 'being_actively_discipled',
-          fieldKey: 'church_metrics.being_actively_discipled',
-        },
-        {
-          key: 'weekly_water_baptism',
-          fieldKey: 'church_metrics.weekly_water_baptism',
-        },
-        {
-          key: 'number_of_liw_classes',
-          fieldKey: 'church_metrics.number_of_liw_classes',
-        },
-        {
-          key: 'liw_total_students',
-          fieldKey: 'church_metrics.liw_total_students',
-        },
-        {
-          key: 'number_of_leaders_in_training_for_cpm',
-          fieldKey: 'church_metrics.number_of_leaders_in_training_for_cpm',
-        },
-        {
-          key: 'giving_in_local_currency',
-          fieldKey: 'church_metrics.giving_in_local_currency',
-        },
-        {
-          key: 'mfp_in_local_currency',
-          fieldKey: 'church_metrics.mfp_in_local_currency',
-        },
-      ];
-
-    requiredFields.forEach(({key, fieldKey}) => {
-      if (metrics[key] === null || metrics[key] === undefined) {
-        errors.add(fieldKey);
-        if (!firstErrorField) {firstErrorField = fieldKey;}
-      }
-    });
 
     setFieldErrors(errors);
     return {isValid: errors.size === 0, firstErrorField};
@@ -1209,28 +1121,57 @@ export default function MonthlyDataEntryScreen() {
     scrollAnimRef.current = setTimeout(step, 16);
   };
 
+  const persistCurrentWeekData = useCallback((): WeeklyReportData | null => {
+    if (!churchId || !currentWeekNumber) {
+      return null;
+    }
+
+    const currentMetrics =
+      currentData?.church_metrics || ({} as ChurchMetrics);
+    const updatedData: WeeklyReportData = {
+      ...(currentData || {
+        church_id: churchId,
+        year,
+        week_number: currentWeekNumber,
+        worship_sessions: [],
+        church_metrics: {} as ChurchMetrics,
+      }),
+      worship_sessions: worshipSessions,
+      church_metrics: currentMetrics,
+    };
+
+    setWeekData(prev => new Map(prev).set(currentWeekNumber, updatedData));
+    saveWeekDataToContext(
+      churchId,
+      year,
+      currentWeekNumber,
+      worshipSessions,
+      currentMetrics,
+    );
+
+    return updatedData;
+  }, [
+    churchId,
+    year,
+    currentWeekNumber,
+    currentData,
+    worshipSessions,
+    saveWeekDataToContext,
+  ]);
+
   const handleSave = async () => {
     if (!currentWeekNumber || !churchId) {return;}
 
     setSaving(true);
     try {
-      const data = weekData.get(currentWeekNumber);
+      const data = persistCurrentWeekData();
       const metrics = data?.church_metrics || ({} as ChurchMetrics);
 
       const payload = {
         year,
         week_number: currentWeekNumber,
-        worship_sessions: worshipSessions.map(session => ({
-          id: session.id,
-          attendance: {
-            adult_attendance: session.attendance.adult_attendance,
-            youth_attendance: session.attendance.youth_attendance,
-            child_attendance: session.attendance.child_attendance,
-            number_of_service_for_children:
-              session.attendance.number_of_service_for_children,
-          },
-        })),
-        church_metrics: metrics,
+        worship_sessions: buildWorshipSessionsPayload(worshipSessions),
+        church_metrics: buildChurchMetricsPayload(metrics),
       };
 
       await createOrUpdateWeeklyReport(churchId, payload);
@@ -1279,8 +1220,14 @@ export default function MonthlyDataEntryScreen() {
 
     setSaving(true);
     try {
+      const persistedWeek = persistCurrentWeekData();
+      const latestWeekData = new Map(weekData);
+      if (persistedWeek) {
+        latestWeekData.set(currentWeekNumber, persistedWeek);
+      }
+
       const payloads = sortedWeekNumbers.map(weekNumber => {
-        const data = weekData.get(weekNumber);
+        const data = latestWeekData.get(weekNumber);
         const metrics = data?.church_metrics || ({} as ChurchMetrics);
         const sessions =
           weekNumber === currentWeekNumber
@@ -1291,16 +1238,7 @@ export default function MonthlyDataEntryScreen() {
           church_id: churchId,
           year,
           week_number: weekNumber,
-          worship_sessions: sessions.map(session => ({
-            id: session.id,
-            attendance: {
-              adult_attendance: session.attendance.adult_attendance,
-              youth_attendance: session.attendance.youth_attendance,
-              child_attendance: session.attendance.child_attendance,
-              number_of_service_for_children:
-                session.attendance.number_of_service_for_children,
-            },
-          })),
+          worship_sessions: sessions,
           church_metrics: metrics,
         };
       });
@@ -1342,29 +1280,10 @@ export default function MonthlyDataEntryScreen() {
       }
 
       // Save current week data before switching
-      const currentMetrics =
-        currentData?.church_metrics || ({} as ChurchMetrics);
-      const updatedData: WeeklyReportData = {
-        ...(currentData || {
-          church_id: churchId,
-          year,
-          week_number: currentWeekNumber,
-          worship_sessions: [],
-          church_metrics: {} as ChurchMetrics,
-        }),
-        worship_sessions: worshipSessions,
-        church_metrics: currentMetrics,
-      };
-      setWeekData(prev => new Map(prev).set(currentWeekNumber, updatedData));
-
-      // Save to context
-      saveWeekDataToContext(
-        churchId,
-        year,
-        currentWeekNumber,
-        worshipSessions,
-        currentMetrics,
-      );
+      const updatedData = persistCurrentWeekData();
+      if (!updatedData) {
+        return;
+      }
 
       // Mark week as completed
       if (checkWeekCompleted(currentWeekNumber, updatedData)) {
@@ -1407,29 +1326,10 @@ export default function MonthlyDataEntryScreen() {
     if (!churchId) {return;}
     if (currentWeekIndex > 0) {
       // Save current week data before switching
-      const currentMetrics =
-        currentData?.church_metrics || ({} as ChurchMetrics);
-      const updatedData: WeeklyReportData = {
-        ...(currentData || {
-          church_id: churchId,
-          year,
-          week_number: currentWeekNumber,
-          worship_sessions: [],
-          church_metrics: {} as ChurchMetrics,
-        }),
-        worship_sessions: worshipSessions,
-        church_metrics: currentMetrics,
-      };
-      setWeekData(prev => new Map(prev).set(currentWeekNumber, updatedData));
-
-      // Save to context
-      saveWeekDataToContext(
-        churchId,
-        year,
-        currentWeekNumber,
-        worshipSessions,
-        currentMetrics,
-      );
+      const updatedData = persistCurrentWeekData();
+      if (!updatedData) {
+        return;
+      }
 
       // Switch to previous week
       const prevIndex = currentWeekIndex - 1;
@@ -1442,39 +1342,8 @@ export default function MonthlyDataEntryScreen() {
 
   // Check if current week is completed based on current form state
   const isCurrentWeekCompleted = useCallback(() => {
-    // Check worship sessions - at least one session must have attendance
-    const hasWorshipData =
-      worshipSessions.length > 0 &&
-      worshipSessions.some(
-        session =>
-          session.attendance.adult_attendance !== null ||
-          session.attendance.youth_attendance !== null ||
-          session.attendance.child_attendance !== null,
-      );
-
-    if (!hasWorshipData) {return false;}
-
-    // Check church metrics - all required fields must be filled
-    const metrics = currentData?.church_metrics || ({} as ChurchMetrics);
-    const requiredFields: (keyof ChurchMetrics)[] = [
-      'number_of_cell_groups',
-      'cell_group_weekly_attendance',
-      'number_of_prayer_meetings',
-      'prayer_meeting_weekly_attendance',
-      'weekly_decisions_made',
-      'being_actively_discipled',
-      'weekly_water_baptism',
-      'number_of_liw_classes',
-      'liw_total_students',
-      'number_of_leaders_in_training_for_cpm',
-      'giving_in_local_currency',
-      'mfp_in_local_currency',
-    ];
-
-    return requiredFields.every(
-      field => metrics[field] !== null && metrics[field] !== undefined,
-    );
-  }, [worshipSessions, currentData]);
+    return hasRequiredAdultAttendance(worshipSessions);
+  }, [worshipSessions]);
 
   // Update worship sessions when switching weeks
   useEffect(() => {
@@ -1585,7 +1454,11 @@ export default function MonthlyDataEntryScreen() {
         keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
       >
         <View style={styles.headerWrapper}>
-          <Header title={t('addMonthlyData') || 'Add Monthly Data'} showMenu={false} />
+          <Header
+            title={t('addMonthlyData') || 'Add Monthly Data'}
+            showMenu={false}
+            onBackPress={() => navigation.navigate('MonthlyDataSelect')}
+          />
         </View>
 
         {showSkeleton ? (
@@ -1834,7 +1707,7 @@ export default function MonthlyDataEntryScreen() {
               ) : worshipSessions.length > 0 ? (
                 worshipSessions.map((session, index) => {
                   const attendanceError = fieldErrors.has(
-                    `worship_session_${session.id}_attendance`,
+                    getAdultAttendanceFieldKey(session.id),
                   );
                   return (
                     <View
@@ -1882,9 +1755,7 @@ export default function MonthlyDataEntryScreen() {
                               placeholder="0"
                               error={
                                 attendanceError &&
-                                session.attendance.adult_attendance === null &&
-                                session.attendance.youth_attendance === null &&
-                                session.attendance.child_attendance === null
+                                session.attendance.adult_attendance === null
                               }
                             />
                           ),
@@ -1998,7 +1869,6 @@ export default function MonthlyDataEntryScreen() {
                 left={{
                   label: renderRowLabel(
                     t('numberOfCellGroups') || 'Number of Cell Groups',
-                    true,
                   ),
                   input: (
                     <MonthlyDataInput
@@ -2017,7 +1887,6 @@ export default function MonthlyDataEntryScreen() {
                 right={{
                   label: renderRowLabel(
                     t('totalAttendanceInAll') || 'Total Attendance in All',
-                    true,
                   ),
                   input: (
                     <MonthlyDataInput
@@ -2056,7 +1925,6 @@ export default function MonthlyDataEntryScreen() {
                 left={{
                   label: renderRowLabel(
                     t('numberOfPrayerMeetings') || 'Number of Prayer Meetings',
-                    true,
                   ),
                   input: (
                     <MonthlyDataInput
@@ -2077,7 +1945,6 @@ export default function MonthlyDataEntryScreen() {
                 right={{
                   label: renderRowLabel(
                     t('totalAttendanceInAll') || 'Total Attendance in All',
-                    true,
                   ),
                   input: (
                     <MonthlyDataInput
@@ -2126,7 +1993,6 @@ export default function MonthlyDataEntryScreen() {
                         {renderRowLabel(
                           t('numberOfNewDecisions') ||
                             'Number of New Decisions',
-                          true,
                         )}
                       </View>
                       <HelpIcon
@@ -2165,7 +2031,6 @@ export default function MonthlyDataEntryScreen() {
                   label: renderRowLabel(
                     t('numberBeingActivelyDiscipled') ||
                       'Number being Actively Discipled',
-                    true,
                   ),
                   input: (
                     <MonthlyDataInput
@@ -2189,7 +2054,6 @@ export default function MonthlyDataEntryScreen() {
                 columnLayout,
                 renderRowLabel(
                   t('numberOfWaterBaptised') || 'Number of Water Baptised',
-                  true,
                 ),
                 <MonthlyDataInput
                   value={formatNumber(currentMetrics.weekly_water_baptism)}
@@ -2204,17 +2068,26 @@ export default function MonthlyDataEntryScreen() {
                 'church_metrics.weekly_water_baptism',
               )}
 
-              {/* <View style={styles.fieldContainer}>
-              <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                {t('numberInEncounterNextStepWeekend') || 'Number in an Encounter / Next Step Weekend'}
-              </Text>
-              <MonthlyDataInput
-                value={''} // This field is not in the API, keeping for UI consistency
-                onChangeText={() => {}}
-                keyboardType="numeric"
-                placeholder="0"
-              />
-            </View> */}
+              {renderFormField(
+                columnLayout,
+                renderRowLabel(
+                  t('numberInEncounterNextStepWeekend') ||
+                    'Number in an Encounter / Next Step Weekend',
+                ),
+                <MonthlyDataInput
+                  value={formatNumber(currentMetrics.number_in_an_encounter)}
+                  onChangeText={value =>
+                    updateChurchMetrics('number_in_an_encounter', value)
+                  }
+                  keyboardType="numeric"
+                  placeholder="0"
+                  error={fieldErrors.has(
+                    'church_metrics.number_in_an_encounter',
+                  )}
+                />,
+                fieldRefs,
+                'church_metrics.number_in_an_encounter',
+              )}
             </View>
 
             {/* Teaching & Training */}
@@ -2232,7 +2105,6 @@ export default function MonthlyDataEntryScreen() {
                 left={{
                   label: renderRowLabel(
                     t('numberOfGtLiwClasses') || 'Number of GT/LIW Classes',
-                    true,
                   ),
                   input: (
                     <MonthlyDataInput
@@ -2252,7 +2124,6 @@ export default function MonthlyDataEntryScreen() {
                   label: renderRowLabel(
                     t('totalAttendanceInAllGtLiwClasses') ||
                       'Total Attendance in all GT/LIW Classes',
-                    true,
                   ),
                   input: (
                     <MonthlyDataInput
@@ -2275,7 +2146,6 @@ export default function MonthlyDataEntryScreen() {
                 renderRowLabel(
                   t('noOfLeadersInTrainingForPastoralOrChurchPlantingDuties') ||
                     'No of Leaders in training for Pastoral or Church Planting duties',
-                  true,
                 ),
                 <MonthlyDataInput
                   value={formatNumber(
@@ -2310,7 +2180,7 @@ export default function MonthlyDataEntryScreen() {
                 leftRefKey="church_metrics.giving_in_local_currency"
                 rightRefKey="church_metrics.mfp_in_local_currency"
                 left={{
-                  label: renderRowLabel(tithesOfferingsLabel, true),
+                  label: renderRowLabel(tithesOfferingsLabel),
                   input: (
                     <MonthlyDataInput
                       value={formatNumber(
@@ -2328,7 +2198,7 @@ export default function MonthlyDataEntryScreen() {
                   ),
                 }}
                 right={{
-                  label: renderRowLabel(missionsGivingMfpLabel, true),
+                  label: renderRowLabel(missionsGivingMfpLabel),
                   input: (
                     <MonthlyDataInput
                       value={formatNumber(

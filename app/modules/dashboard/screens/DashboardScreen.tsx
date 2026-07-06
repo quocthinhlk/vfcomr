@@ -242,6 +242,87 @@ export default function DashboardScreen() {
     <SafeAreaView
       style={{flex: 1, backgroundColor: C.background}}
       edges={['top', 'bottom', 'left', 'right']}>
+      <View
+        style={{
+          flexDirection: 'row',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: ms(10),
+          paddingHorizontal: ms(16),
+          backgroundColor: C.background,
+        }}>
+        <View
+          style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
+          <Image
+            source={
+              typeof profile.image === 'string'
+                ? {uri: profile.image}
+                : profile.image
+            }
+            style={{
+              width: ws(50),
+              height: ws(50),
+              borderRadius: rs(25),
+              marginRight: ms(12),
+            }}
+            onError={() =>
+              setProfile(prev => ({...prev, image: BLANK_AVATAR}))
+            }
+          />
+          <TouchableOpacity
+            style={{flex: 1}}
+            onPress={() => {
+              if (currentUserId) {
+                navigation.navigate('User', {userId: currentUserId});
+              }
+            }}
+            activeOpacity={0.7}
+            disabled={!currentUserId}>
+            <View
+              style={{flexDirection: 'row', alignItems: 'center'}}>
+              <Text
+                category="h6"
+                style={{
+                  fontWeight: 'bold',
+                  color: COLORS.mainColor,
+                  fontSize: fs(14),
+                }}>
+                {profile.name}
+              </Text>
+            </View>
+            <Text
+              category="s2"
+              appearance="hint"
+              style={{
+                color: C.textSecondary,
+                fontSize: fs(12),
+                }}>
+              {profile.role}
+            </Text>
+            <Text
+              category="s2"
+              appearance="hint"
+              style={{
+                color: C.textSecondary,
+                fontSize: fs(12),
+                }}>
+              {profile.location}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <View style={{marginBottom: ms(18)}}>
+          <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
+          <MenuPopup
+            visible={menuVisible}
+            onClose={() => setMenuVisible(false)}
+            menuItems={translatedMenu}
+            onMenuItemPress={handleMenuItemPress}
+            onLogout={handleLogout}
+            onChangeLanguage={handleChangeLanguage}
+            selectedLanguage={selectedLanguage}
+          />
+        </View>
+      </View>
       <FlatListWithVerticalScrollbar
         style={[dashboardStyles.container, {backgroundColor: C.background}]}
         data={DASHBOARD_SCROLL_DATA}
@@ -249,86 +330,6 @@ export default function DashboardScreen() {
         renderItem={() => null}
         ListHeaderComponent={
           <>
-        <View
-          style={{
-            flexDirection: 'row',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: ms(10),
-          }}>
-          <View
-            style={{flexDirection: 'row', alignItems: 'center', flex: 1}}>
-            <Image
-              source={
-                typeof profile.image === 'string'
-                  ? {uri: profile.image}
-                  : profile.image
-              }
-              style={{
-                width: ws(50),
-                height: ws(50),
-                borderRadius: rs(25),
-                marginRight: ms(12),
-              }}
-              onError={() =>
-                setProfile(prev => ({...prev, image: BLANK_AVATAR}))
-              }
-            />
-            <TouchableOpacity
-              style={{flex: 1}}
-              onPress={() => {
-                if (currentUserId) {
-                  navigation.navigate('User', {userId: currentUserId});
-                }
-              }}
-              activeOpacity={0.7}
-              disabled={!currentUserId}>
-              <View
-                style={{flexDirection: 'row', alignItems: 'center'}}>
-                <Text
-                  category="h6"
-                  style={{
-                    fontWeight: 'bold',
-                    color: COLORS.mainColor,
-                    fontSize: fs(14),
-                  }}>
-                  {profile.name}
-                </Text>
-              </View>
-              <Text
-                category="s2"
-                appearance="hint"
-                style={{
-                  color: C.textSecondary,
-                  fontSize: fs(12),
-                  }}>
-                {profile.role}
-              </Text>
-              <Text
-                category="s2"
-                appearance="hint"
-                style={{
-                  color: C.textSecondary,
-                  fontSize: fs(12),
-                  }}>
-                {profile.location}
-              </Text>
-            </TouchableOpacity>
-          </View>
-          <View style={{marginBottom: ms(18)}}>
-            <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
-            <MenuPopup
-              visible={menuVisible}
-              onClose={() => setMenuVisible(false)}
-              menuItems={translatedMenu}
-              onMenuItemPress={handleMenuItemPress}
-              onLogout={handleLogout}
-              onChangeLanguage={handleChangeLanguage}
-              selectedLanguage={selectedLanguage}
-            />
-          </View>
-        </View>
-
         {/* Assigned Churches Modal (effect copied) */}
         <Modal
           visible={orgModalVisible}

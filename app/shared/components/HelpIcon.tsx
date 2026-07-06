@@ -1,4 +1,4 @@
-import React, {useState, useRef, useCallback} from 'react';
+import React, {useState, useRef, useCallback, useMemo} from 'react';
 import {
   Pressable,
   View,
@@ -9,9 +9,14 @@ import {
   ScrollView,
   Animated,
   TouchableOpacity,
+  useWindowDimensions,
 } from 'react-native';
+import RenderHTML from 'react-native-render-html';
 import {useThemedColors} from '../styles/theme';
 import {fs, hs, ms, rs} from '../utils/scale';
+
+const HTML_TAG_PATTERN = /<[a-z][\s\S]*?>/i;
+const HELP_CARD_MAX_WIDTH = 380;
 
 type Props = {
   onPress?: () => void;
@@ -37,8 +42,54 @@ export default function HelpIcon({
   hitSlopSize = 12,
 }: Props) {
   const C = useThemedColors();
+  const {width: windowWidth} = useWindowDimensions();
   const [visible, setVisible] = useState(false);
   const iconColor = C.textSecondary || '#8a8f98';
+
+  const htmlContentWidth = useMemo(() => {
+    const backdropPadding = ms(24) * 2;
+    const cardPadding = ms(18) * 2;
+    const cardWidth = Math.min(HELP_CARD_MAX_WIDTH, windowWidth - backdropPadding);
+    return cardWidth - cardPadding;
+  }, [windowWidth]);
+
+  const messageIsHtml = !!message && HTML_TAG_PATTERN.test(message);
+
+  const htmlBaseStyle = useMemo(
+    () => ({
+      color: C.textSecondary,
+      fontSize: fs(13),
+      lineHeight: fs(20),
+    }),
+    [C.textSecondary],
+  );
+
+  const htmlTagsStyles = useMemo(
+    () => ({
+      body: {
+        color: C.textSecondary,
+      },
+      p: {
+        marginTop: 0,
+        marginBottom: ms(8),
+      },
+      strong: {
+        fontWeight: '700' as const,
+        color: C.textSecondary,
+      },
+      b: {
+        fontWeight: '700' as const,
+        color: C.textSecondary,
+      },
+      em: {
+        fontStyle: 'italic' as const,
+      },
+      i: {
+        fontStyle: 'italic' as const,
+      },
+    }),
+    [C.textSecondary],
+  );
 
   // Animation values
   const scaleAnim = useRef(new Animated.Value(0.85)).current;
@@ -176,13 +227,19 @@ export default function HelpIcon({
 
                 {/* Body */}
                 <View style={helpStyles.bodyWrap}>
-                  <ScrollView
-
-                    bounces={false}
-                  >
-                    <Text style={[helpStyles.body, {color: C.textSecondary}]}>
-                      {message}
-                    </Text>
+                  <ScrollView bounces={false}>
+                    {messageIsHtml ? (
+                      <RenderHTML
+                        contentWidth={htmlContentWidth}
+                        source={{html: message}}
+                        baseStyle={htmlBaseStyle}
+                        tagsStyles={htmlTagsStyles}
+                      />
+                    ) : (
+                      <Text style={[helpStyles.body, {color: C.textSecondary}]}>
+                        {message}
+                      </Text>
+                    )}
                   </ScrollView>
                 </View>
 

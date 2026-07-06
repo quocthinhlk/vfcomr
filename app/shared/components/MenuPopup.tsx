@@ -212,7 +212,14 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
                           <Text style={[styles.menuBulletText, item.disabled && styles.disabledText]}>{'›'}</Text>
                           <Text style={[styles.menuLabel, item.disabled && styles.disabledText]}>{item.label}</Text>
                           {hasChildren && (
-                            <Text style={[styles.expandIndicator, item.disabled && styles.disabledText]}>{isOpen ? '▾' : '▸'}</Text>
+                            <Text
+                              style={[
+                                styles.expandIndicator,
+                                isOpen && styles.expandIndicatorOpen,
+                                item.disabled && styles.disabledText,
+                              ]}>
+                              {'›'}
+                            </Text>
                           )}
                         </TouchableOpacity>
 
@@ -372,7 +379,10 @@ const styles = StyleSheet.create({
   expandIndicator: {
     color: '#fff',
     marginLeft: ms(6),
-    fontSize: fs(20),
+    fontSize: fs(24),
+  },
+  expandIndicatorOpen: {
+    transform: [{rotate: '90deg'}],
   },
   subMenuList: {
     marginLeft: ms(14),

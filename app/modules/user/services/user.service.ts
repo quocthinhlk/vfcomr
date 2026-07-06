@@ -133,6 +133,7 @@ export interface ListUsersItem {
   prefix?: string;
   title?: string;
   church_name?: string;
+  pastor_of?: string;
   city?: string;
   photo_url?: string;
 }
