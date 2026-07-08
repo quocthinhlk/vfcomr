@@ -5,16 +5,7 @@
  * UX: call these helpers only when a feature needs them — not on cold start.
  */
 
-import {Alert, Platform} from 'react-native';
-import {
-  check,
-  checkNotifications,
-  openSettings,
-  request,
-  requestNotifications,
-  PERMISSIONS,
-  RESULTS,
-} from 'react-native-permissions';
+import {Alert, Linking, Platform} from 'react-native';
 import type {Permission, PermissionStatus} from 'react-native-permissions';
 
 // ---------------------------------------------------------------------------
@@ -36,10 +27,43 @@ export type NotificationPermissionResult = PermissionRequestResult & {
   fcmToken: string | null;
 };
 
-const isGranted = (status: PermissionStatus): boolean =>
-  status === RESULTS.GRANTED || status === RESULTS.LIMITED;
+type RNPermissionsModule = typeof import('react-native-permissions');
 
-const isBlocked = (status: PermissionStatus): boolean => status === RESULTS.BLOCKED;
+const UNAVAILABLE_RESULT: PermissionRequestResult = {
+  status: 'unavailable',
+  granted: false,
+  blocked: false,
+};
+
+function unavailableNotificationResult(): NotificationPermissionResult {
+  return {...UNAVAILABLE_RESULT, fcmToken: null};
+}
+
+function isRNPermissionsLinked(): boolean {
+  try {
+    const {TurboModuleRegistry} = require('react-native') as typeof import('react-native');
+    return TurboModuleRegistry.get('RNPermissions') != null;
+  } catch {
+    return false;
+  }
+}
+
+let rnPermissionsModule: RNPermissionsModule | null = null;
+
+function getRNPermissions(): RNPermissionsModule | null {
+  if (!isRNPermissionsLinked()) {
+    return null;
+  }
+  if (!rnPermissionsModule) {
+    rnPermissionsModule = require('react-native-permissions');
+  }
+  return rnPermissionsModule;
+}
+
+const isGranted = (status: PermissionStatus): boolean =>
+  status === 'granted' || status === 'limited';
+
+const isBlocked = (status: PermissionStatus): boolean => status === 'blocked';
 
 // ---------------------------------------------------------------------------
 // Settings + blocked UX
@@ -85,7 +109,12 @@ const defaultBlockedCopy: Record<PermissionFeature, OpenSettingsAlertCopy> = {
 
 /** Opens the app’s page in system settings (iOS / Android). */
 export async function openAppSettings(): Promise<void> {
-  await openSettings();
+  const rn = getRNPermissions();
+  if (rn) {
+    await rn.openSettings();
+    return;
+  }
+  await Linking.openSettings();
 }
 
 /**
@@ -102,7 +131,7 @@ export function showBlockedPermissionAlert(
   const openLabel = copy?.openSettings ?? base.openSettings;
   Alert.alert(title, message, [
     {text: cancel, style: 'cancel'},
-    {text: openLabel, onPress: () => openSettings().catch(() => {})},
+    {text: openLabel, onPress: () => void openAppSettings()},
   ]);
 }
 
@@ -111,8 +140,13 @@ async function runRequest(
   feature: PermissionFeature,
   options?: {showAlertIfBlocked?: boolean; blockedCopy?: Partial<OpenSettingsAlertCopy>},
 ): Promise<PermissionRequestResult> {
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+
   const showAlert = options?.showAlertIfBlocked !== false;
-  let current = await check(permission);
+  let current = await rn.check(permission);
   if (isGranted(current)) {
     return {status: current, granted: true, blocked: false};
   }
@@ -122,7 +156,7 @@ async function runRequest(
     }
     return {status: current, granted: false, blocked: true};
   }
-  current = await request(permission);
+  current = await rn.request(permission);
   const granted = isGranted(current);
   const blocked = isBlocked(current);
   if (blocked && showAlert) {
@@ -139,24 +173,24 @@ function androidApiLevel(): number {
   return typeof v === 'number' ? v : parseInt(String(v), 10) || 0;
 }
 
-function androidPhotoPermission(): Permission {
+function androidPhotoPermission(rn: RNPermissionsModule): Permission {
   return androidApiLevel() >= 33
-    ? PERMISSIONS.ANDROID.READ_MEDIA_IMAGES
-    : PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE;
+    ? rn.PERMISSIONS.ANDROID.READ_MEDIA_IMAGES
+    : rn.PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE;
 }
 
-function iosCameraPermission(): Permission {
-  return PERMISSIONS.IOS.CAMERA;
+function iosCameraPermission(rn: RNPermissionsModule): Permission {
+  return rn.PERMISSIONS.IOS.CAMERA;
 }
 
-function iosPhotoPermission(): Permission {
-  return PERMISSIONS.IOS.PHOTO_LIBRARY;
+function iosPhotoPermission(rn: RNPermissionsModule): Permission {
+  return rn.PERMISSIONS.IOS.PHOTO_LIBRARY;
 }
 
-function locationWhenInUsePermission(): Permission {
+function locationWhenInUsePermission(rn: RNPermissionsModule): Permission {
   return Platform.OS === 'ios'
-    ? PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
-    : PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
+    ? rn.PERMISSIONS.IOS.LOCATION_WHEN_IN_USE
+    : rn.PERMISSIONS.ANDROID.ACCESS_FINE_LOCATION;
 }
 
 // ---------------------------------------------------------------------------
@@ -164,8 +198,12 @@ function locationWhenInUsePermission(): Permission {
 // ---------------------------------------------------------------------------
 
 export async function checkCameraPermission(): Promise<PermissionRequestResult> {
-  const p = Platform.OS === 'ios' ? iosCameraPermission() : PERMISSIONS.ANDROID.CAMERA;
-  const status = await check(p);
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+  const p = Platform.OS === 'ios' ? iosCameraPermission(rn) : rn.PERMISSIONS.ANDROID.CAMERA;
+  const status = await rn.check(p);
   return {
     status,
     granted: isGranted(status),
@@ -176,13 +214,21 @@ export async function checkCameraPermission(): Promise<PermissionRequestResult> 
 export async function requestCameraPermission(
   options?: {showAlertIfBlocked?: boolean; blockedCopy?: Partial<OpenSettingsAlertCopy>},
 ): Promise<PermissionRequestResult> {
-  const p = Platform.OS === 'ios' ? iosCameraPermission() : PERMISSIONS.ANDROID.CAMERA;
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+  const p = Platform.OS === 'ios' ? iosCameraPermission(rn) : rn.PERMISSIONS.ANDROID.CAMERA;
   return runRequest(p, 'camera', options);
 }
 
 export async function checkPhotoPermission(): Promise<PermissionRequestResult> {
-  const p = Platform.OS === 'ios' ? iosPhotoPermission() : androidPhotoPermission();
-  const status = await check(p);
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+  const p = Platform.OS === 'ios' ? iosPhotoPermission(rn) : androidPhotoPermission(rn);
+  const status = await rn.check(p);
   return {
     status,
     granted: isGranted(status),
@@ -193,13 +239,21 @@ export async function checkPhotoPermission(): Promise<PermissionRequestResult> {
 export async function requestPhotoPermission(
   options?: {showAlertIfBlocked?: boolean; blockedCopy?: Partial<OpenSettingsAlertCopy>},
 ): Promise<PermissionRequestResult> {
-  const p = Platform.OS === 'ios' ? iosPhotoPermission() : androidPhotoPermission();
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+  const p = Platform.OS === 'ios' ? iosPhotoPermission(rn) : androidPhotoPermission(rn);
   return runRequest(p, 'photo', options);
 }
 
 export async function checkLocationPermission(): Promise<PermissionRequestResult> {
-  const p = locationWhenInUsePermission();
-  const status = await check(p);
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+  const p = locationWhenInUsePermission(rn);
+  const status = await rn.check(p);
   return {
     status,
     granted: isGranted(status),
@@ -210,12 +264,20 @@ export async function checkLocationPermission(): Promise<PermissionRequestResult
 export async function requestLocationPermission(
   options?: {showAlertIfBlocked?: boolean; blockedCopy?: Partial<OpenSettingsAlertCopy>},
 ): Promise<PermissionRequestResult> {
-  const p = locationWhenInUsePermission();
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+  const p = locationWhenInUsePermission(rn);
   return runRequest(p, 'location', options);
 }
 
 export async function checkNotificationPermission(): Promise<PermissionRequestResult> {
-  const {status} = await checkNotifications();
+  const rn = getRNPermissions();
+  if (!rn) {
+    return UNAVAILABLE_RESULT;
+  }
+  const {status} = await rn.checkNotifications();
   return {
     status,
     granted: isGranted(status),
@@ -230,8 +292,13 @@ export async function checkNotificationPermission(): Promise<PermissionRequestRe
 export async function requestNotificationPermission(
   options?: {showAlertIfBlocked?: boolean; blockedCopy?: Partial<OpenSettingsAlertCopy>},
 ): Promise<NotificationPermissionResult> {
+  const rn = getRNPermissions();
+  if (!rn) {
+    return unavailableNotificationResult();
+  }
+
   const showAlert = options?.showAlertIfBlocked !== false;
-  const pre = await checkNotifications();
+  const pre = await rn.checkNotifications();
   if (isGranted(pre.status)) {
     const fcmToken = await tryGetFcmToken();
     return {status: pre.status, granted: true, blocked: false, fcmToken};
@@ -243,7 +310,7 @@ export async function requestNotificationPermission(
     return {status: pre.status, granted: false, blocked: true, fcmToken: null};
   }
 
-  const post = await requestNotifications(['alert', 'badge', 'sound']);
+  const post = await rn.requestNotifications(['alert', 'badge', 'sound']);
   const granted = isGranted(post.status);
   const blocked = isBlocked(post.status);
   if (blocked && showAlert) {
@@ -272,7 +339,17 @@ async function tryGetFcmToken(): Promise<string | null> {
  * Does not show blocked alert by default (non-intrusive after login).
  */
 export async function requestNotificationPermissionAfterLogin(): Promise<NotificationPermissionResult> {
-  const pre = await checkNotifications();
+  const rn = getRNPermissions();
+  if (!rn) {
+    if (__DEV__) {
+      console.warn(
+        '[permissions.service] RNPermissions not linked; skipping post-login notification prompt',
+      );
+    }
+    return unavailableNotificationResult();
+  }
+
+  const pre = await rn.checkNotifications();
   if (isGranted(pre.status)) {
     const fcmToken = await tryGetFcmToken();
     return {status: pre.status, granted: true, blocked: false, fcmToken};

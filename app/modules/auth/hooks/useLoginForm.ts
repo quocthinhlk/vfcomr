@@ -1,7 +1,27 @@
 import { useState, useContext } from 'react';
+import axios from 'axios';
 import { login } from '../services/auth.service';
 import { AuthContext } from '../../../config/navigation';
 import { requestNotificationPermissionAfterLogin } from '../../../shared/services/permissions.service';
+
+function getLoginErrorMessage(error: unknown): string {
+  if (!axios.isAxiosError(error)) {
+    return 'loginFailed';
+  }
+
+  const backendMessage = error.response?.data?.message;
+  const status = error.response?.status;
+
+  if (
+    backendMessage === 'sql: no rows in result set' ||
+    status === 401 ||
+    status === 404
+  ) {
+    return 'invalidCredentials';
+  }
+
+  return 'loginFailed';
+}
 
 export function useLoginForm() {
   const [username, setUsername] = useState('');
@@ -29,26 +49,15 @@ export function useLoginForm() {
       void requestNotificationPermissionAfterLogin().catch(err =>
         console.warn('Post-login notification permission:', err),
       );
-    } catch (error: any) {
-      // Debug logging
-      if (error && typeof error === 'object') {
+    } catch (error: unknown) {
+      if (__DEV__) {
+        const status = axios.isAxiosError(error) ? error.response?.status : undefined;
+        const data = axios.isAxiosError(error) ? error.response?.data : undefined;
         console.log('Login failed for username:', username);
-        console.log('Error status:', error.response?.status);
-        console.log('Error data:', JSON.stringify(error.response?.data));
-        
-        // Check for specific error messages
-        const backendMessage = error.response?.data?.message || error.message;
-        
-        if (backendMessage === 'sql: no rows in result set' || 
-            error.response?.status === 401 ||
-            error.response?.status === 404) {
-          setErrorMessage('invalidCredentials');
-        } else {
-          setErrorMessage('loginFailed');
-        }
-      } else {
-        setErrorMessage('loginFailed');
+        console.log('Error status:', status);
+        console.log('Error data:', data != null ? JSON.stringify(data) : undefined);
       }
+      setErrorMessage(getLoginErrorMessage(error));
     } finally {
       setIsLoading(false);
     }

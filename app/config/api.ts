@@ -1,5 +1,5 @@
 // app/config/api.ts
-import axios from 'axios';
+import axios, { AxiosError } from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const DEFAULT_PAGE_LIMIT = 10;
@@ -49,5 +49,29 @@ api.interceptors.request.use(async config => {
   }
   return config;
 });
+
+function normalizeAxiosError(error: AxiosError): Error {
+  const normalized = new Error(error.message);
+  normalized.name = error.name;
+  Object.assign(normalized, {
+    code: error.code,
+    config: error.config,
+    request: error.request,
+    response: error.response,
+    status: error.response?.status,
+    isAxiosError: true,
+  });
+  return normalized;
+}
+
+api.interceptors.response.use(
+  response => response,
+  (error: unknown) => {
+    if (axios.isAxiosError(error)) {
+      return Promise.reject(normalizeAxiosError(error));
+    }
+    return Promise.reject(error);
+  },
+);
 
 export default api;
