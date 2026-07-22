@@ -20,14 +20,15 @@ setup_permissions([
   'LocationWhenInUse',
 ])
 
-linkage = ENV['USE_FRAMEWORKS']
-if linkage != nil
-  Pod::UI.puts "Configuring Pod with #{linkage}ally linked Frameworks".green
-  use_frameworks! :linkage => linkage.to_sym
-end
-
 target 'vfcomr' do
   config = use_native_modules!
+
+  # firebase-ios-sdk v9+ (used by @react-native-firebase/*) requires CocoaPods
+  # to link Firebase as static frameworks rather than static libraries, since
+  # its Swift pods (FirebaseCoreInternal, etc.) can't be consumed otherwise.
+  # See: https://rnfirebase.io/#altering-cocoapods-to-use-frameworks
+  use_frameworks! :linkage => :static
+  $RNFirebaseAsStaticFramework = true
 
   use_react_native!(
     :path => config[:reactNativePath],

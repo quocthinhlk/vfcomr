@@ -1,9 +1,10 @@
 // app/config/navigation.tsx
 import React, { useState, useEffect } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkReloadListener } from '../shared/components/NetworkReloadListener';
+import { isBiometricLoginEnabled } from '../shared/services/biometrics.service';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -281,6 +282,8 @@ const EditVisitScreen =
 
 const Stack = createNativeStackNavigator();
 
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
 // Create a context for authentication
 export const AuthContext = React.createContext<{
   isAuthenticated: boolean;
@@ -302,9 +305,25 @@ export default function Navigation() {
   const checkAuthStatus = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      setIsAuthenticated(!!token);
+      if (!token) {
+        setIsAuthenticated(false);
+        return;
+      }
+
+      const biometricEnabled = await isBiometricLoginEnabled();
+      if (biometricEnabled) {
+        // Keep the stored session, but require biometric unlock on the Login
+        // screen (button + auto-prompt). Do not change behaviour for users
+        // who never enabled biometrics.
+        setIsAuthenticated(false);
+        return;
+      }
+
+      // Existing behaviour, unchanged for users who never enabled biometrics.
+      setIsAuthenticated(true);
     } catch (error) {
       console.error('Error checking auth status:', error);
+      setIsAuthenticated(false);
     } finally {
       setIsLoading(false);
     }
@@ -317,7 +336,7 @@ export default function Navigation() {
 
   return (
     <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated }}>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <NetworkReloadListener />
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (

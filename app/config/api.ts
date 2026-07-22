@@ -13,7 +13,7 @@ const DEFAULT_LANGUAGE = 'en';
 export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
-  baseURL: 'http://34.126.158.119/api/v1/',
+  baseURL: 'https://tintran.cloud-ip.cc/api/v1/',
   headers: {
     'Content-Type': 'application/json',
   },

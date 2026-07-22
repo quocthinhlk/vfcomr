@@ -50,6 +50,9 @@ export async function logout() {
   await AsyncStorage.removeItem('selectedChurchId');
   await AsyncStorage.removeItem('selectedChurchName');
   await AsyncStorage.removeItem('selectedChurchCountryName');
+  // Keep biometric enrollment so the Login screen can offer Face ID / Fingerprint
+  // as a password replacement. Credentials are cleared only when the user disables
+  // the setting, or when the stored session is rejected as invalid/expired.
 }
 
 export async function forgotPassword(email: string) {

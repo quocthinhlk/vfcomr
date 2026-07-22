@@ -6,6 +6,34 @@ const es = {
   darkMode: 'Modo oscuro',
   lightMode: 'Modo claro',
   themeDescription: 'Cambia entre apariencia clara y oscura.',
+  biometricLogin: 'Activar inicio de sesión biométrico',
+  biometricLoginDescription: 'Usa {biometryName} para iniciar sesión más rápido la próxima vez.',
+  biometricLoginEnableFailedMessage:
+    'No pudimos activar el inicio de sesión con {biometryName}. Asegúrate de que {biometryName} esté configurado en este dispositivo e inténtalo de nuevo.',
+  enableBiometricLoginTitle: 'Activar inicio de sesión biométrico',
+  enableBiometricLoginMessage:
+    '¿Te gustaría usar {biometryName} para iniciar sesión en lugar de introducir tu contraseña?',
+  enableBiometricLogin: 'Activar',
+  notNow: 'Ahora no',
+  goToSettings: 'Ir a Ajustes',
+  biometricPromptTitle: 'Iniciar sesión en OMR',
+  loginWithBiometrics: 'Iniciar sesión con {biometryName}',
+  switchAccount: 'Cambiar de cuenta',
+  biometricFailed:
+    'La autenticación biométrica falló. Inténtalo de nuevo o inicia sesión con tu contraseña.',
+  biometricCancelled:
+    'Se canceló la autenticación biométrica. Puedes iniciar sesión con tu contraseña.',
+  biometricLockout:
+    'Demasiados intentos fallidos. Inténtalo más tarde o inicia sesión con tu contraseña.',
+  biometricUnavailable: 'La autenticación biométrica no está disponible en este dispositivo.',
+  biometricNotEnrolled:
+    'No hay biometría configurada en este dispositivo. Añádela en los ajustes del dispositivo e inténtalo de nuevo.',
+  biometricPermissionDenied:
+    'Se denegó el permiso para usar biometría. Aún puedes iniciar sesión con tu contraseña.',
+  biometricSessionExpired:
+    'Tu sesión ha caducado. Inicia sesión con tu usuario y contraseña.',
+  fingerprint: 'Huella Digital',
+  biometrics: 'Biometría',
   noChurchesFound: 'No se encontraron iglesias',
   prefix: 'Prefijo',
   logoutConfirmTitle: 'Cerrar sesión',
@@ -89,7 +117,7 @@ const es = {
   invalidCredentials:
     'Ese usuario o contraseña no coinciden. Revisa e inténtalo de nuevo.',
   loginFailed:
-    'No pudimos iniciar sesión. Revisa tu conexión e inténtalo de nuevo.',
+    'No pudimos iniciar sesión en este momento. Inténtalo de nuevo en unos instantes.',
   // Dashboard Menu
   myDashboard: 'Mi panel',
   myChurchProfile: 'Perfil de mi iglesia',

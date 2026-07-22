@@ -2,7 +2,6 @@
 import React, { useState, useRef } from 'react';
 import { View, Image, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, TextInput } from 'react-native';
 import { Text } from '@ui-kitten/components';
-import { globalStyles } from '../../../shared/styles/global';
 import { authStyles } from '../styles';
 import { authImages } from '../config/auth.constants';
 import { useLoginForm } from '../hooks/useLoginForm';
@@ -18,6 +17,9 @@ import LanguageSelectModal from '../../../shared/components/LanguageSelectModal'
 import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
 import AppInput from '../../../shared/components/AppInput';
 import { SaveButton } from '../../../shared/components/ActionButtons';
+import { BiometricSvgIcon } from '../../../shared/components/icons';
+
+const blankAvatar = require('../../../assets/images/blank-avatar.png');
 
 export default function LoginScreen() {
   const { navigate } = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
@@ -36,6 +38,14 @@ export default function LoginScreen() {
     setShowPassword,
     errorMessage,
     handleLogin,
+    showBiometricButton,
+    useSavedAccount,
+    savedAccount,
+    biometryType,
+    biometryName,
+    isBiometricLoading,
+    handleBiometricLogin,
+    handleSwitchAccount,
   } = useLoginForm();
   const passwordInputRef = useRef<TextInput>(null);
 
@@ -52,16 +62,38 @@ export default function LoginScreen() {
           <Image source={authImages.logo} style={authStyles.logo} />
           <Text category="h1" style={[authStyles.title, { color: C.textPrimary }]}>{t('login')}</Text>
           <Text style={[authStyles.subTitle, { color: C.textSecondary }]}>{t('welcomeBack')}</Text>
-
         </View>
 
-        <AppInput
-          placeholder={t('username')}
-          value={username}
-          onChangeText={setUsername}
-          autoCapitalize="none"
-          containerStyle={{ width: '100%', marginBottom: ms(15) }}
-        />
+        {useSavedAccount && savedAccount ? (
+          <View
+            style={[
+              styles.savedAccountCard,
+              {backgroundColor: C.surface, borderColor: COLORS.mainColor},
+            ]}>
+            <View style={styles.savedAccountTextWrap}>
+              <Text style={[styles.savedAccountName, {color: C.textPrimary}]} numberOfLines={2}>
+                {savedAccount.displayName}
+              </Text>
+              {!!savedAccount.username && (
+                <Text style={[styles.savedAccountUsername, {color: C.textSecondary}]} numberOfLines={1}>
+                  {savedAccount.username}
+                </Text>
+              )}
+            </View>
+            <Image
+              source={savedAccount.avatarUrl ? {uri: savedAccount.avatarUrl} : blankAvatar}
+              style={styles.savedAccountAvatar}
+            />
+          </View>
+        ) : (
+          <AppInput
+            placeholder={t('username')}
+            value={username}
+            onChangeText={setUsername}
+            autoCapitalize="none"
+            containerStyle={{ width: '100%', marginBottom: ms(15) }}
+          />
+        )}
 
         <View style={[authStyles.passwordInputContainer, { marginBottom: ms(15) }]}>
           <AppInput
@@ -88,7 +120,7 @@ export default function LoginScreen() {
         </View>
 
         {errorMessage && (
-          <View style={{ width: '100%', marginTop: ms(10), marginBottom: ms(6) }}>
+          <View style={{ width: '100%', marginTop: ms(4), marginBottom: ms(6) }}>
             <Text style={[authStyles.errorText, { color: COLORS.danger }]}>
               {t(errorMessage as any)}
             </Text>
@@ -99,17 +131,68 @@ export default function LoginScreen() {
           <SaveButton
             label={isLoading ? t('loggingIn') : t('login')}
             onPress={handleLogin}
-            disabled={isLoading}
+            disabled={isLoading || isBiometricLoading}
             style={{ flex: 0 }}
           />
         </View>
-        <TouchableOpacity
-          style={authStyles.forgotPassword}
-          onPress={() => navigate('ForgotPassword')}
-          activeOpacity={0.7}
-        >
-          <Text style={authStyles.forgotPasswordTxt}>Forgot your password?</Text>
-        </TouchableOpacity>
+
+        <View style={styles.secondaryActionsRow}>
+          <TouchableOpacity
+            onPress={() => navigate('ForgotPassword')}
+            activeOpacity={0.7}
+            style={styles.secondaryAction}>
+            <Text style={[styles.secondaryActionText, {color: COLORS.mainColor}]}>
+              {t('forgotPassword')}
+            </Text>
+          </TouchableOpacity>
+          {useSavedAccount && savedAccount && (
+            <TouchableOpacity
+              onPress={handleSwitchAccount}
+              activeOpacity={0.7}
+              style={styles.secondaryAction}>
+              <Text style={[styles.secondaryActionText, {color: COLORS.mainColor}]}>
+                {t('switchAccount')}
+              </Text>
+            </TouchableOpacity>
+          )}
+        </View>
+
+        {showBiometricButton && (
+          <TouchableOpacity
+            style={styles.biometricRow}
+            onPress={handleBiometricLogin}
+            disabled={isLoading || isBiometricLoading}
+            activeOpacity={0.8}>
+            <View
+              style={[
+                styles.biometricIconCircle,
+                {
+                  borderColor: COLORS.mainColor,
+                  opacity: isLoading || isBiometricLoading ? 0.5 : 1,
+                },
+              ]}>
+              <BiometricSvgIcon
+                biometryType={biometryType}
+                width={ws(22)}
+                height={hs(22)}
+                color={COLORS.mainColor}
+              />
+            </View>
+            <Text
+              style={[
+                styles.biometricLabel,
+                {
+                  color: COLORS.mainColor,
+                  opacity: isLoading || isBiometricLoading ? 0.5 : 1,
+                },
+              ]}>
+              {isBiometricLoading
+                ? t('loggingIn')
+                : t('loginWithBiometrics').replace('{biometryName}', biometryName)}
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.bottomSection}>
           <View style={styles.languageSelect}>
             <TouchableOpacity
@@ -144,6 +227,67 @@ export default function LoginScreen() {
 }
 
 const styles = StyleSheet.create({
+  savedAccountCard: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: rs(6),
+    paddingVertical: ms(8),
+    paddingHorizontal: ms(10),
+    marginBottom: ms(12),
+  },
+  savedAccountTextWrap: {
+    flex: 1,
+    paddingRight: ms(8),
+  },
+  savedAccountName: {
+    fontSize: fs(13),
+    fontWeight: '600',
+  },
+  savedAccountUsername: {
+    marginTop: ms(2),
+    fontSize: fs(11),
+  },
+  savedAccountAvatar: {
+    width: ws(36),
+    height: ws(36),
+    borderRadius: ws(18),
+    backgroundColor: COLORS.lightGray,
+  },
+  secondaryActionsRow: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: ms(14),
+  },
+  secondaryAction: {
+    paddingVertical: ms(4),
+  },
+  secondaryActionText: {
+    fontSize: fs(14),
+    fontWeight: '600',
+  },
+  biometricRow: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: ms(28),
+    gap: ms(12),
+  },
+  biometricIconCircle: {
+    width: ws(44),
+    height: ws(44),
+    borderRadius: ws(22),
+    borderWidth: 1.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  biometricLabel: {
+    fontSize: fs(14),
+    fontWeight: '600',
+  },
   bottomSection: {
     flexDirection: 'column',
     justifyContent: 'flex-end',
@@ -175,83 +319,5 @@ const styles = StyleSheet.create({
   },
   languageText: {
     fontSize: fs(15),
-  },
-  dropdownOverlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-  },
-  dropdownContainer: {
-    backgroundColor: '#fff',
-    borderRadius: rs(12),
-    borderWidth: 0,
-    paddingVertical: ms(8),
-    paddingHorizontal: ms(8),
-    minWidth: ws(220),
-    maxWidth: ws(320),
-    maxHeight: hs(400),
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: rs(12),
-    shadowOffset: { width: 0, height: hs(6) },
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: ms(12),
-    paddingHorizontal: ms(12),
-    width: '100%',
-  },
-  dropdownItemActive: {
-    backgroundColor: 'rgba(53,99,233,0.08)',
-    borderRadius: rs(8),
-  },
-  dropdownHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: ms(8),
-    paddingVertical: ms(8),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-  },
-  dropdownTitle: {
-    fontSize: fs(16),
-    fontWeight: '700',
-  },
-  dropdownClose: {
-    paddingHorizontal: ms(8),
-    paddingVertical: ms(4),
-  },
-  dropdownCloseText: {
-    fontSize: fs(16),
-  },
-  dropdownList: {
-    paddingVertical: ms(4),
-  },
-  flagIcon: {
-    width: ws(28),
-    height: hs(18),
-    marginRight: ms(10),
-    resizeMode: 'contain',
-  },
-  languageOptionText: {
-    fontSize: fs(16),
-  },
-  languageOptionTextActive: {
-    fontWeight: '700',
-  },
-  checkIcon: {
-    marginLeft: 'auto',
-    fontSize: fs(16),
-    color: COLORS.successColor,
-    paddingHorizontal: ms(4),
-  },
-  checkIconPlaceholder: {
-    marginLeft: 'auto',
-    width: ws(16),
-    height: hs(16),
   },
 });
