@@ -12,7 +12,7 @@ globs:
 
 Stack: React Native CLI + TypeScript, `axios`, `@react-native-async-storage/async-storage`, `formik`/`yup`, `@react-native-community/netinfo`. No React Query/SWR/Redux/Zustand. No repository layer, no DTO mapper layer.
 
-This document is the **only** reference needed for API work. Do not re-derive architecture from scratch — extend the patterns below.
+This document is the **only** reference needed for **how** to write API code in this app. For **what** the backend contract is (path, method, params, body, response), use Postman workspace **VFC OMR** — see `.cursor/rules/postman-vfc-omr.mdc`. Do not re-derive architecture from scratch — extend the patterns below.
 
 ---
 

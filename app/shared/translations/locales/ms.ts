@@ -589,9 +589,9 @@ const ms = {
     visit: 'Lawatan',
     visitDetail: 'Butiran Lawatan',
     visitDetails: 'Butiran Lawatan',
-    addVisits: 'Tambah Lawatan',
+    addVisits: 'Tambah Lawatan & Acara',
     addVisit: 'Tambah Lawatan',
-    visitsAndEventsInformationFor: 'Maklumat Lawatan dan Acara Untuk',
+    visitsAndEventsInformationFor: 'Maklumat Lawatan dan Acara',
     pleaseSelectTheInformation: 'Sila pilih maklumat',
     visitor: 'Pelawat',
     numberOfChurchesVisited: 'Bilangan Gereja Dilawati',
@@ -703,7 +703,20 @@ const ms = {
     churchesPlantedLegend: 'Gereja Ditanam',
     churchesClosedLegend: 'Gereja Ditutup',
     ytdYearToDate: 'YTD Setakat Tahun Ini',
-    pastoralVisits: 'Lawatan Pastoral',
+    pastoralVisits: 'Carta Lawatan Gereja',
+    apiErrorNetwork:
+      'Tidak dapat menyambung ke pelayan. Sila semak sambungan Internet anda dan cuba lagi.',
+    apiErrorTimeout:
+      'Permintaan mengambil masa lebih lama daripada biasa. Sila cuba lagi.',
+    apiErrorUnauthorized: 'Sesi anda telah tamat. Sila log masuk semula.',
+    apiErrorForbidden: 'Anda tidak mempunyai kebenaran untuk melakukan tindakan ini.',
+    apiErrorNotFound: 'Data atau sumber yang diminta tidak dijumpai.',
+    apiErrorValidation: 'Sila semak maklumat yang dimasukkan dan cuba lagi.',
+    apiErrorTooManyRequests:
+      'Anda telah membuat terlalu banyak permintaan. Sila cuba lagi kemudian.',
+    apiErrorServer: 'Sistem sedang menghadapi masalah. Sila cuba lagi kemudian.',
+    apiErrorUnexpected: 'Ralat tidak dijangka telah berlaku. Sila cuba lagi.',
+    tryAgain: 'Cuba lagi',
 } satisfies TranslationDictionary;
 
 export default ms;

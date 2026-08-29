@@ -11,6 +11,10 @@ import AppInput from '../../../shared/components/AppInput';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import {COLORS} from '../../../shared/constants/colors';
 import {createOmrSupportRequest, getOmrSupportIntro} from '../services/omrsupport.service';
+import {
+  getApiErrorMessage,
+  getApiValidationErrors,
+} from '../../../shared/utils/apiErrorHandler';
 
 export const OmrSupportScreen = () => {
   const C = useThemedColors();
@@ -75,26 +79,16 @@ export const OmrSupportScreen = () => {
       setSubject('');
       setMessage('');
     } catch (error: any) {
-      const validationErrors = error?.response?.data?.errors;
-      if (validationErrors && typeof validationErrors === 'object') {
+      const validationErrors = getApiValidationErrors(error);
+      if (validationErrors) {
         setFieldErrors({
-          name:
-            typeof validationErrors?.name === 'string'
-              ? validationErrors.name
-              : undefined,
-          subject:
-            typeof validationErrors?.subject === 'string'
-              ? validationErrors.subject
-              : undefined,
-          message:
-            typeof validationErrors?.message === 'string'
-              ? validationErrors.message
-              : undefined,
+          name: validationErrors.name,
+          subject: validationErrors.subject,
+          message: validationErrors.message,
         });
         return;
       }
-      const apiMessage = error?.response?.data?.message;
-      Alert.alert(t('error') || 'Error', apiMessage || t('omrSupportSendFailed'));
+      Alert.alert(t('error') || 'Error', getApiErrorMessage(error, t) || t('omrSupportSendFailed'));
     } finally {
       setSubmitting(false);
     }

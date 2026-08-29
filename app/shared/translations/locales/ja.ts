@@ -590,9 +590,9 @@ const ja = {
     visit: '訪問',
     visitDetail: '訪問詳細',
     visitDetails: '訪問詳細',
-    addVisits: '訪問を追加',
+    addVisits: '訪問とイベントを追加',
     addVisit: '訪問を追加',
-    visitsAndEventsInformationFor: '訪問とイベント情報：',
+    visitsAndEventsInformationFor: '訪問とイベント情報',
     pleaseSelectTheInformation: '情報を選択してください',
     visitor: '訪問者',
     numberOfChurchesVisited: '訪問した教会数',
@@ -703,7 +703,19 @@ const ja = {
     churchesPlantedLegend: '開拓教会',
     churchesClosedLegend: '閉鎖教会',
     ytdYearToDate: 'YTD（年初来）',
-    pastoralVisits: '牧師訪問',
+    pastoralVisits: '教会訪問チャート',
+    apiErrorNetwork:
+      'サーバーに接続できません。インターネット接続を確認して、もう一度お試しください。',
+    apiErrorTimeout: 'リクエストに通常より時間がかかっています。もう一度お試しください。',
+    apiErrorUnauthorized: 'セッションの有効期限が切れました。再度サインインしてください。',
+    apiErrorForbidden: 'この操作を実行する権限がありません。',
+    apiErrorNotFound: '要求されたデータまたはリソースが見つかりません。',
+    apiErrorValidation: '入力内容を確認して、もう一度お試しください。',
+    apiErrorTooManyRequests:
+      'リクエストが多すぎます。しばらくしてからもう一度お試しください。',
+    apiErrorServer: 'システムに問題が発生しています。しばらくしてからもう一度お試しください。',
+    apiErrorUnexpected: '予期しないエラーが発生しました。もう一度お試しください。',
+    tryAgain: '再試行',
 } satisfies TranslationDictionary;
 
 export default ja;

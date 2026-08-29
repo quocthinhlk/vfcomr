@@ -551,9 +551,9 @@ const fr = {
     visit: 'Visite',
     visitDetail: 'Détail de la Visite',
     visitDetails: 'Détails de la Visite',
-    addVisits: 'Ajouter des Visites',
+    addVisits: 'Ajouter des visites et événements',
     addVisit: 'Ajouter une Visite',
-    visitsAndEventsInformationFor: 'Informations sur les Visites et Événements pour',
+    visitsAndEventsInformationFor: 'Informations sur les visites et événements',
     pleaseSelectTheInformation: 'Veuillez sélectionner les informations',
     visitor: 'Visiteur',
     numberOfChurchesVisited: 'Nombre d’Églises Visitées',
@@ -705,7 +705,22 @@ const fr = {
     churchesPlantedLegend: 'Églises plantées',
     churchesClosedLegend: 'Églises fermées',
     ytdYearToDate: 'YTD (année en cours)',
-    pastoralVisits: 'Visites pastorales',
+    pastoralVisits: 'Graphique des visites d\'église',
+    apiErrorNetwork:
+      'Impossible de se connecter au serveur. Vérifiez votre connexion Internet et réessayez.',
+    apiErrorTimeout:
+      'La requête prend plus de temps que d\'habitude. Veuillez réessayer.',
+    apiErrorUnauthorized: 'Votre session a expiré. Veuillez vous reconnecter.',
+    apiErrorForbidden: 'Vous n\'avez pas l\'autorisation d\'effectuer cette action.',
+    apiErrorNotFound: 'Les données ou la ressource demandées sont introuvables.',
+    apiErrorValidation:
+      'Vérifiez les informations saisies et réessayez.',
+    apiErrorTooManyRequests:
+      'Vous avez effectué trop de requêtes. Veuillez réessayer plus tard.',
+    apiErrorServer:
+      'Le système rencontre un problème. Veuillez réessayer plus tard.',
+    apiErrorUnexpected: 'Une erreur inattendue s\'est produite. Veuillez réessayer.',
+    tryAgain: 'Réessayer',
 } satisfies TranslationDictionary;
 
 export default fr;

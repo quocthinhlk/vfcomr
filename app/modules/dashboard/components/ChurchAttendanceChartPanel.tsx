@@ -1,5 +1,12 @@
 import React, {useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, ScrollView, StyleSheet, View} from 'react-native';
+import {
+  ActivityIndicator,
+  ScrollView,
+  StyleProp,
+  StyleSheet,
+  View,
+  ViewStyle,
+} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import Svg, {Circle, Line, Polyline} from 'react-native-svg';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -44,6 +51,7 @@ type ChartSeriesMeta = {
 type Props = {
   churchId: number;
   refreshKey: number;
+  containerStyle?: StyleProp<ViewStyle>;
   scrollable?: boolean;
   period?: '1y' | '2y' | '3y';
   displayWeeks?: number;
@@ -113,6 +121,7 @@ const buildDots = (
 
 export function ChurchAttendanceChartPanel({
   churchId,
+  containerStyle = {},
   refreshKey,
   scrollable = false,
   period,

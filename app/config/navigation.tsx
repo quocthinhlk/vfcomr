@@ -5,6 +5,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkReloadListener } from '../shared/components/NetworkReloadListener';
 import { isBiometricLoginEnabled } from '../shared/services/biometrics.service';
+import { setUnauthorizedHandler } from './api';
 
 export type RootStackParamList = {
   Login: undefined;
@@ -300,6 +301,13 @@ export default function Navigation() {
   useEffect(() => {
     // Check if user is already logged in
     checkAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setIsAuthenticated(false);
+    });
+    return () => setUnauthorizedHandler(null);
   }, []);
 
   const checkAuthStatus = async () => {

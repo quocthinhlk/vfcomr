@@ -299,7 +299,16 @@ export const UserListScreen: React.FC = () => {
           <Header title={t('usersList')} />
 
           <View style={styles.headerRow}>
-            <AddNewHeaderButton name="AddUser" text={t('addNew')} />
+            <AddNewHeaderButton
+              name="AddUser"
+              text={t('addNew')}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
+            />
           </View>
 
           <SearchInput

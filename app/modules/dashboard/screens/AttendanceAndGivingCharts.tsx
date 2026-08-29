@@ -113,36 +113,49 @@ export default function AttendanceAndGivingChartsScreen() {
               ]}
             />
           </TouchableOpacity>
-          <ChurchAttendanceChartPanel
-            churchId={churchId}
-            refreshKey={refreshKey}
-          />
           {show24Months ? (
             <>
-              <View style={styles.sectionGapSmall} />
-              <ChurchAttendanceChartPanel
-                churchId={churchId}
-                refreshKey={refreshKey}
-                period="2y"
-                displayWeeks={104}
-                titleKey="attendanceLast24Months"
-              />
+              <View style={[styles.chartContainer, {backgroundColor: C.surface}]}>
+                <ChurchAttendanceChartPanel
+                  churchId={churchId}
+                  refreshKey={refreshKey}
+                  period="2y"
+                  displayWeeks={104}
+                  titleKey="attendanceLast24Months"
+                  containerStyle={{backgroundColor: C.surface}}
+                />
+              </View>
+              <View style={styles.sectionGap} />
+              <View style={[styles.chartContainer, {backgroundColor: C.surface}]}>
+                <ChurchGivingChartPanel
+                  churchId={churchId}
+                  refreshKey={refreshKey}
+                  period="2y"
+                  displayWeeks={104}
+                  titleKey="givingLast24Months"
+                  containerStyle={{backgroundColor: C.surface}}
+                />
+              </View>
             </>
-          ) : null}
-          <View style={styles.sectionGap} />
-          <ChurchGivingChartPanel churchId={churchId} refreshKey={refreshKey} />
-          {show24Months ? (
+          ) : (
             <>
-              <View style={styles.sectionGapSmall} />
-              <ChurchGivingChartPanel
-                churchId={churchId}
-                refreshKey={refreshKey}
-                period="2y"
-                displayWeeks={104}
-                titleKey="givingLast24Months"
-              />
+              <View style={[styles.chartContainer, {backgroundColor: C.surface}]}>
+                <ChurchAttendanceChartPanel
+                  churchId={churchId}
+                  refreshKey={refreshKey}
+                  containerStyle={{backgroundColor: C.surface}}
+                />
+              </View>
+              <View style={styles.sectionGap} />
+              <View style={[styles.chartContainer, {backgroundColor: C.surface}]}>
+                <ChurchGivingChartPanel 
+                  churchId={churchId} 
+                  refreshKey={refreshKey}
+                  containerStyle={{backgroundColor: C.surface}} 
+                />
+              </View>
             </>
-          ) : null}
+          )}
         </ScrollView>
       </View>
     </SafeAreaView>
@@ -223,5 +236,10 @@ const styles = StyleSheet.create({
   },
   sectionGapSmall: {
     height: ms(14),
+  },
+  chartContainer: {
+    borderRadius: rs(8),
+    padding: ms(12),
+    marginBottom: ms(12),
   },
 });

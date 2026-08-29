@@ -596,9 +596,9 @@ const en = {
     visit: 'Visit',
     visitDetail: 'Visit Detail',
     visitDetails: 'Visit Details',
-    addVisits: 'Add Visits',
+    addVisits: 'Add Visits & Events',
     addVisit: 'Add Visit',
-    visitsAndEventsInformationFor: 'Visits and Events Information For',
+    visitsAndEventsInformationFor: 'Visits and Events Information',
     pleaseSelectTheInformation: 'Please Select the Information',
     visitor: 'Visitor',
     numberOfChurchesVisited: 'Number of Churches Visited',
@@ -696,7 +696,19 @@ const en = {
     churchesPlantedLegend: 'Churches Planted',
     churchesClosedLegend: 'Churches Closed',
     ytdYearToDate: 'YTD Year To Date',
-    pastoralVisits: 'Pastoral Visits',
+    pastoralVisits: 'Church Visits Chart',
+    apiErrorNetwork:
+      'Unable to connect to the server. Please check your Internet connection and try again.',
+    apiErrorTimeout: 'The request is taking longer than usual. Please try again.',
+    apiErrorUnauthorized: 'Your session has expired. Please sign in again.',
+    apiErrorForbidden: 'You do not have permission to perform this action.',
+    apiErrorNotFound: 'The requested data or resource was not found.',
+    apiErrorValidation: 'Please check the information you entered and try again.',
+    apiErrorTooManyRequests:
+      'You have made too many requests. Please try again later.',
+    apiErrorServer: 'The system is experiencing issues. Please try again later.',
+    apiErrorUnexpected: 'An unexpected error occurred. Please try again.',
+    tryAgain: 'Try again',
 } as const;
 
 export default en;

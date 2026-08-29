@@ -582,9 +582,9 @@ const pt = {
     visit: 'Visita',
     visitDetail: 'Detalhes da Visita',
     visitDetails: 'Detalhes da Visita',
-    addVisits: 'Adicionar Visitas',
+    addVisits: 'Adicionar Visitas e Eventos',
     addVisit: 'Adicionar Visita',
-    visitsAndEventsInformationFor: 'Informações de Visitas e Eventos Para',
+    visitsAndEventsInformationFor: 'Informações de Visitas e Eventos',
     pleaseSelectTheInformation: 'Por favor selecione as informações',
     visitor: 'Visitante',
     numberOfChurchesVisited: 'Número de Igrejas Visitadas',
@@ -701,7 +701,22 @@ const pt = {
     churchesPlantedLegend: 'Igrejas plantadas',
     churchesClosedLegend: 'Igrejas encerradas',
     ytdYearToDate: 'YTD (ano até a data)',
-    pastoralVisits: 'Visitas Pastorais',
+    pastoralVisits: 'Gráfico de Visitas à Igreja',
+    apiErrorNetwork:
+      'Não foi possível conectar ao servidor. Verifique sua conexão com a Internet e tente novamente.',
+    apiErrorTimeout:
+      'A solicitação está demorando mais do que o normal. Tente novamente.',
+    apiErrorUnauthorized: 'Sua sessão expirou. Faça login novamente.',
+    apiErrorForbidden: 'Você não tem permissão para realizar esta ação.',
+    apiErrorNotFound: 'Os dados ou o recurso solicitado não foram encontrados.',
+    apiErrorValidation:
+      'Verifique as informações inseridas e tente novamente.',
+    apiErrorTooManyRequests:
+      'Você fez muitas solicitações. Tente novamente mais tarde.',
+    apiErrorServer:
+      'O sistema está com problemas. Tente novamente mais tarde.',
+    apiErrorUnexpected: 'Ocorreu um erro inesperado. Tente novamente.',
+    tryAgain: 'Tentar novamente',
 } satisfies TranslationDictionary;
 
 export default pt;

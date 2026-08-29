@@ -1,5 +1,5 @@
 import React, {useEffect, useMemo, useState} from 'react';
-import {ActivityIndicator, ScrollView, StyleSheet, View} from 'react-native';
+import {ActivityIndicator, ScrollView, StyleSheet, View, ViewStyle} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import Svg, {Circle, Line, Polyline} from 'react-native-svg';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -33,6 +33,7 @@ const MFP_COLOR = '#d29a3a';
 
 type Props = {
   churchId: number;
+  containerStyle?: ViewStyle;
   refreshKey: number;
   scrollable?: boolean;
   period?: '1y' | '2y' | '3y';
@@ -57,6 +58,7 @@ const getNiceStep = (rawStep: number) => {
 
 export function ChurchGivingChartPanel({
   churchId,
+  containerStyle = {},
   refreshKey,
   scrollable = false,
   period,

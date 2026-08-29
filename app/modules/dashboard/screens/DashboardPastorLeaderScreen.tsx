@@ -26,6 +26,8 @@ import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatList
 import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {getUserById, updateUser} from '../../user/services/user.service';
 import {getChurchDetail, updateChurch} from '../../church/services/church.service';
 import {churchAttributeBadgeStyles} from '../../church/components/ChurchAttributeBadges';
@@ -573,6 +575,8 @@ export default function DashboardPastorLeaderScreen() {
   const { setIsAuthenticated } = useContext(AuthContext);
   const { selectedLanguage, setLanguage } = useLanguage();
   const { t } = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const C = useThemedColors();
   const { theme } = useThemeMode();
   const isDark = theme === 'dark';
@@ -585,6 +589,8 @@ export default function DashboardPastorLeaderScreen() {
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
   const [dashboardData, setDashboardData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   const [profileError, setProfileError] = useState(false);
@@ -753,7 +759,7 @@ export default function DashboardPastorLeaderScreen() {
       closeAvatarPopup();
       showToast(t('profileUpdatedSuccess'));
     } catch (e: any) {
-      Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('couldNotUpdateUser'));
+      Alert.alert(t('error'), getApiErrorMessage(e, t) || t('couldNotUpdateUser'));
     } finally {
       setAvatarUploading(false);
     }
@@ -1127,6 +1133,9 @@ export default function DashboardPastorLeaderScreen() {
               // ignore
             }
           }
+          if (mounted) {
+            setLoadError(null);
+          }
           return;
         }
 
@@ -1237,16 +1246,28 @@ export default function DashboardPastorLeaderScreen() {
 
           console.log('church_region_logo_url:', dashboardData.dashboard_info?.church_region_logo_url);
           setDashboardData(dashboardData);
+          if (mounted) {
+            setLoadError(null);
+          }
+        } else if (mounted) {
+          setUserProfile(null);
+          setDashboardData(null);
+          setLoadError(tRef.current('failedToLoadData'));
         }
       } catch (error) {
         console.error('Error fetching data:', error);
+        if (mounted) {
+          setUserProfile(null);
+          setDashboardData(null);
+          setLoadError(getApiErrorMessage(error, tRef.current));
+        }
       } finally {
         bootstrapDoneRef.current = true;
         if (mounted) setLoading(false);
       }
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [reloadToken]);
 
   // Same screen instance receives a new church_id (e.g. stack reuse) after bootstrap finished.
   useEffect(() => {
@@ -1535,11 +1556,7 @@ export default function DashboardPastorLeaderScreen() {
           null;
       } catch (e: any) {
         console.error('[church photo upload] error:', e?.response?.status, e?.response?.data, e?.message);
-        uploadError =
-          e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e?.message ||
-          'Upload failed';
+        uploadError = getApiErrorMessage(e, t) || 'Upload failed';
         uploadedPhotoPath = null;
       }
 
@@ -1553,7 +1570,7 @@ export default function DashboardPastorLeaderScreen() {
         await refreshChurchPictures();
         showToast(t('profileUpdatedSuccess'));
       } catch (e: any) {
-        Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('failedToLoadData'));
+        Alert.alert(t('error'), getApiErrorMessage(e, t) || t('failedToLoadData'));
       }
     },
     [refreshChurchPictures, showToast, t, userProfile?.organization],
@@ -1759,13 +1776,18 @@ export default function DashboardPastorLeaderScreen() {
     );
   }
 
-  if (!userProfile) {
+  if (!userProfile || loadError) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(16) }}>
-          <ActivityIndicator size="large" color={COLORS.mainColor} />
-          <Text style={{ color: C.textPrimary, fontSize: fs(15) }}>{t('failedToLoadUserData')}</Text>
-        </View>
+        <ApiErrorState
+          message={loadError || t('failedToLoadData')}
+          onRetry={() => {
+            setLoading(true);
+            setLoadError(null);
+            bootstrapDoneRef.current = false;
+            setReloadToken(token => token + 1);
+          }}
+        />
       </SafeAreaView>
     );
   }

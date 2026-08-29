@@ -1,6 +1,7 @@
 import React, {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActionSheetIOS,
+  ActivityIndicator,
   Alert,
   Animated,
   Easing,
@@ -28,6 +29,8 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
@@ -132,11 +135,14 @@ export default function OverseerDashboardScreen() {
   const {setIsAuthenticated} = useContext(AuthContext);
   const {selectedLanguage, setLanguage} = useLanguage();
   const {t} = useTranslation();
+  const tRef = useRef(t);
+  tRef.current = t;
   const C = useThemedColors();
   const [menuVisible, setMenuVisible] = useState(false);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [profile, setProfile] = useState<{
     name: string;
     role: string;
@@ -177,44 +183,48 @@ export default function OverseerDashboardScreen() {
     }).start();
   }, [showAllStats, rotation]);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const [meRes, dashboardRes, indicatorRes] = await withTimeout(Promise.all([
+  const loadDashboard = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const [meRes, dashboardRes, indicatorRes] = await withTimeout(
+        Promise.all([
           api.get('users/me'),
           api.get('dashboard'),
           api.get('dashboard/overseer-indicators'),
-        ]));
-        if (!mounted) return;
+        ]),
+      );
 
-        const me = meRes?.data?.data;
-        const r = resolveRoleId(me);
-        const userId = me?.id;
-        if (r != null) setCurrentUserRoleId(r);
-        if (typeof userId === 'number') setCurrentUserId(userId);
+      const me = meRes?.data?.data;
+      const r = resolveRoleId(me);
+      const userId = me?.id;
+      if (r != null) setCurrentUserRoleId(r);
+      if (typeof userId === 'number') setCurrentUserId(userId);
 
-        const dashboardData: OverseerDashboardData = dashboardRes?.data?.data ?? {};
-        const indicator: OverseerIndicatorData = indicatorRes?.data?.data ?? {};
-        const p = dashboardData?.overseer_profile;
+      const dashboardData: OverseerDashboardData = dashboardRes?.data?.data ?? {};
+      const indicator: OverseerIndicatorData = indicatorRes?.data?.data ?? {};
+      const p = dashboardData?.overseer_profile;
 
-        setProfile({
-          name: p?.name || '',
-          role: p?.role_name || '',
-          title: p?.title || '',
-          image: p?.photo_url || BLANK_AVATAR,
-        });
-        setIndicatorData(indicator);
-      } catch (error) {
-        console.error('Failed to load overseer dashboard:', error);
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
+      setProfile({
+        name: p?.name || '',
+        role: p?.role_name || '',
+        title: p?.title || '',
+        image: p?.photo_url || BLANK_AVATAR,
+      });
+      setIndicatorData(indicator);
+      setLoadError(null);
+    } catch (error) {
+      console.error('Failed to load overseer dashboard:', error);
+      setIndicatorData({});
+      setLoadError(getApiErrorMessage(error, tRef.current));
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    void loadDashboard();
+  }, [loadDashboard]);
 
   const normalizeFileUri = useCallback((p: string) => (p.startsWith('file://') ? p : `file://${p}`), []);
 
@@ -277,11 +287,7 @@ export default function OverseerDashboardScreen() {
           null;
       } catch (e: any) {
         console.error('[overseer avatar upload]', e?.response?.data, e?.message);
-        uploadError =
-          e?.response?.data?.message ||
-          e?.response?.data?.error ||
-          e?.message ||
-          null;
+        uploadError = getApiErrorMessage(e, t);
         uploadedUserPhotoPath = null;
       }
 
@@ -300,7 +306,7 @@ export default function OverseerDashboardScreen() {
       } catch (e: any) {
         Alert.alert(
           t('error'),
-          e?.response?.data?.message || e?.message || t('couldNotUpdateUser') || 'Could not update user',
+          getApiErrorMessage(e, t) || t('couldNotUpdateUser') || 'Could not update user',
         );
       } finally {
         setAvatarUploading(false);
@@ -608,9 +614,20 @@ export default function OverseerDashboardScreen() {
       <SafeAreaView
         style={{flex: 1, backgroundColor: C.background}}
         edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(12)}}>
+          <ActivityIndicator size="large" color={COLORS.mainColor} />
           <Text style={{color: C.textPrimary}}>{t('loading')}...</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView
+        style={{flex: 1, backgroundColor: C.background}}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <ApiErrorState message={loadError} onRetry={() => void loadDashboard()} />
       </SafeAreaView>
     );
   }

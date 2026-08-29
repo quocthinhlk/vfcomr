@@ -28,18 +28,7 @@ import {
   ResourceItem,
   ResourceTypeItem,
 } from '../services/resource.service';
-
-const getErrorMessage = (
-  error: any,
-  fallbackMessage: string,
-): string => {
-  const status = error?.response?.status;
-  const apiMessage = error?.response?.data?.message;
-  if (status && apiMessage) return `(${status}) ${apiMessage}`;
-  if (status) return `Request failed with status ${status}`;
-  if (apiMessage) return String(apiMessage);
-  return error?.message || fallbackMessage;
-};
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 
 export default function SearchResourcesScreen() {
   const navigation = useNavigation<any>();
@@ -91,14 +80,14 @@ export default function SearchResourcesScreen() {
         setResources(resourceRes.value);
       } else {
         setResources([]);
-        errors.push(getErrorMessage(resourceRes.reason, t('unknownError')));
+        errors.push(getApiErrorMessage(resourceRes.reason, t));
       }
 
       if (typeRes.status === 'fulfilled') {
         setTypes(typeRes.value);
       } else {
         setTypes([]);
-        errors.push(getErrorMessage(typeRes.reason, t('unknownError')));
+        errors.push(getApiErrorMessage(typeRes.reason, t));
       }
 
       await loadTopics('');
@@ -106,7 +95,7 @@ export default function SearchResourcesScreen() {
         setScreenError(errors[0]);
       }
     } catch (error) {
-      setScreenError(getErrorMessage(error, t('unknownError')));
+      setScreenError(getApiErrorMessage(error, t));
     } finally {
       setLoadingInit(false);
     }
@@ -213,7 +202,7 @@ export default function SearchResourcesScreen() {
       handleOpenResourceDetail(resourceId);
     } catch (error) {
       setSelectedResourceDetail(null);
-      setScreenError(getErrorMessage(error, t('unknownError')));
+      setScreenError(getApiErrorMessage(error, t));
     } finally {
       setLoadingResourceDetail(false);
     }
@@ -258,7 +247,7 @@ export default function SearchResourcesScreen() {
       setFilteredResults(uniqueResults);
     } catch (error) {
       setFilteredResults([]);
-      setScreenError(getErrorMessage(error, t('unknownError')));
+      setScreenError(getApiErrorMessage(error, t));
     } finally {
       setSubmitting(false);
     }

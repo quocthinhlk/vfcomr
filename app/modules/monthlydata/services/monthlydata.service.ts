@@ -1,4 +1,5 @@
 import api from '../../../config/api';
+import {getApiErrorMessage as resolveApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 
 export interface WorshipSessionAttendance {
   adult_attendance: number | null;
@@ -111,28 +112,9 @@ export const CHURCH_METRIC_SAVE_FIELDS: (keyof ChurchMetrics)[] = [
 ];
 
 function getApiErrorMessage(err: any, fallback: string): string {
-  const data = err?.response?.data;
-  if (!data) {
-    return err?.message || fallback;
-  }
-
-  const detail =
-    data?.errors?.detail ||
-    (typeof data?.errors === 'string' ? data.errors : null);
-  const message = typeof data?.message === 'string' ? data.message.trim() : '';
-
-  if (detail && message) {
-    if (message.endsWith(':') || message.endsWith(': ')) {
-      return `${message} ${detail}`.trim();
-    }
-    return `${message}: ${detail}`;
-  }
-
-  if (detail) {
-    return String(detail);
-  }
-
-  return message || err?.message || fallback;
+  // Prefer centralized safe messages; keep a domain fallback when nothing useful remains.
+  const safe = resolveApiErrorMessage(err);
+  return safe || fallback;
 }
 
 export function buildChurchMetricsPayload(

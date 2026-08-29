@@ -9,6 +9,7 @@ import {
   Modal,
   Animated,
   Easing,
+  ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text, Button} from '@ui-kitten/components';
@@ -37,6 +38,8 @@ import OverseerDashboardScreen from './OverseerDashboardScreen';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -58,6 +61,7 @@ export default function DashboardScreen() {
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const C = useThemedColors();
   const {t} = useTranslation();
 
@@ -108,31 +112,32 @@ export default function DashboardScreen() {
   };
   const [orgModalVisible, setOrgModalVisible] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await api.get('users/me');
-        if (!mounted) {
-          return;
-        }
-        const userData = res?.data?.data;
-        const r = resolveRoleId(userData);
-        const userId = userData?.id;
-        if (r != null) {
-          setCurrentUserRoleId(r);
-        }
-        if (typeof userId === 'number') {
-          setCurrentUserId(userId);
-        }
-      } catch {}
-      if (mounted) {
-        setLoading(false);
+  const loadCurrentUser = async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await api.get('users/me');
+      const userData = res?.data?.data;
+      const r = resolveRoleId(userData);
+      const userId = userData?.id;
+      if (r != null) {
+        setCurrentUserRoleId(r);
       }
-    })();
-    return () => {
-      mounted = false;
-    };
+      if (typeof userId === 'number') {
+        setCurrentUserId(userId);
+      }
+      setLoadError(null);
+    } catch (error) {
+      console.error('Failed to load current user for dashboard:', error);
+      setLoadError(getApiErrorMessage(error, t));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    void loadCurrentUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load profile display fields
@@ -157,16 +162,6 @@ export default function DashboardScreen() {
     };
   }, []);
 
-  // If user is Pastor Leader, show the Pastor Leader Dashboard
-  if (!loading && isPastorLeader(currentUserRoleId)) {
-    return <DashboardPastorLeaderScreen />;
-  }
-
-  // If user is Overseer, show the Overseer Dashboard
-  if (!loading && isOverseer(currentUserRoleId)) {
-    return <OverseerDashboardScreen />;
-  }
-
   const handleLogout = async () => {
     try {
       await logout();
@@ -177,7 +172,6 @@ export default function DashboardScreen() {
       setMenuVisible(false); // Close menu after logout
     }
   };
-
 
   const handleMenuItemPress = (item: any) => {
     if (item.routeName) {
@@ -193,6 +187,16 @@ export default function DashboardScreen() {
     }
     setMenuVisible(false); // Close menu after any item press
   };
+
+  // If user is Pastor Leader, show the Pastor Leader Dashboard
+  if (!loading && !loadError && isPastorLeader(currentUserRoleId)) {
+    return <DashboardPastorLeaderScreen />;
+  }
+
+  // If user is Overseer, show the Overseer Dashboard
+  if (!loading && !loadError && isOverseer(currentUserRoleId)) {
+    return <OverseerDashboardScreen />;
+  }
 
   const handleChangeLanguage = (lang: string) => setLanguage(lang);
 
@@ -231,9 +235,20 @@ export default function DashboardScreen() {
         style={{flex: 1, backgroundColor: C.background}}
         edges={['top', 'bottom', 'left', 'right']}>
         <View
-          style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+          style={{flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(12)}}>
+          <ActivityIndicator size="large" color={COLORS.mainColor} />
           <Text style={{color: C.textPrimary}}>{t('loading')}...</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView
+        style={{flex: 1, backgroundColor: C.background}}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <ApiErrorState message={loadError} onRetry={() => void loadCurrentUser()} />
       </SafeAreaView>
     );
   }

@@ -47,7 +47,6 @@ const localeMap: Record<string, string> = {
 };
 
 type YearOption = {label: string; value: number};
-type CountOption = {label: string; value: number};
 type VisitorOption = {
   label: string;
   value: number;
@@ -87,8 +86,8 @@ export const AddVisitsScreen: React.FC = () => {
   const [visitorRole, setVisitorRole] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
-  const [churchVisitCount, setChurchVisitCount] = useState<number | null>(0);
-  const [eventCount, setEventCount] = useState<number | null>(0);
+  const [churchVisitCount, setChurchVisitCount] = useState('0');
+  const [eventCount, setEventCount] = useState('0');
 
   const monthOptions = useMemo(() => {
     const locale = localeMap[selectedLanguage as string] || 'en-US';
@@ -110,14 +109,7 @@ export const AddVisitsScreen: React.FC = () => {
     });
   }, []);
 
-  const countOptions = useMemo<CountOption[]>(
-    () =>
-      Array.from({length: 10000}, (_, index) => ({
-        label: String(index),
-        value: index,
-      })),
-    [],
-  );
+  const normalizeCountInput = (text: string) => text.replace(/[^0-9]/g, '');
 
   useEffect(() => {
     let mounted = true;
@@ -316,7 +308,7 @@ export const AddVisitsScreen: React.FC = () => {
         style={{flex: 1}}>
         <View style={{flex: 1, backgroundColor: C.background}}>
           <View style={styles.container}>
-            <Header title={t('addVisits') || 'Add Visits'} showMenu={false} />
+            <Header title={t('addVisits') || 'Add Visits & Events'} showMenu={false} />
 
             <ScrollView
               ref={ref => {
@@ -326,9 +318,10 @@ export const AddVisitsScreen: React.FC = () => {
               contentContainerStyle={styles.scrollContent}>
               <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.border}]}>
                 <Text style={[styles.headingTitle, {color: C.textPrimary}]}>
-                  {`${t('visitsAndEventsInformationFor') || 'Visits and Events Information For'} : ${
-                    visitorName || '-'
-                  }`}
+                  {t('visitsAndEventsInformationFor') || 'Visits and Events Information'}
+                </Text>
+                <Text style={[styles.headingVisitorName, {color: C.textPrimary}]}>
+                  {visitorName || '-'}
                 </Text>
                 <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
                   {t('pleaseSelectTheInformation') || 'Please Select the Information'}
@@ -415,19 +408,16 @@ export const AddVisitsScreen: React.FC = () => {
                   <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
                     {t('numberOfChurchesVisited') || 'Number of Churches Visited'}
                   </Text>
-                  <ElementDropdown
-                    data={countOptions}
+                  <AppInput
                     value={churchVisitCount}
-                    onChange={value => {
-                      setChurchVisitCount(value as number);
+                    onChangeText={text => {
+                      setChurchVisitCount(normalizeCountInput(text));
                       clearInvalid('churchVisitCount');
                       clearFieldError('churchVisitCount');
                     }}
                     placeholder="0"
-                    containerStyle={{
-                      backgroundColor: C.inputBg,
-                      borderColor: invalid.churchVisitCount ? C.error || '#ff4444' : C.inputBorder,
-                    }}
+                    keyboardType="number-pad"
+                    error={!!invalid.churchVisitCount}
                   />
                   {renderFieldError('churchVisitCount')}
                 </View>
@@ -438,19 +428,16 @@ export const AddVisitsScreen: React.FC = () => {
                   <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
                     {t('numberOfEventsYouOrganised') || 'Number of Events You Organised'}
                   </Text>
-                  <ElementDropdown
-                    data={countOptions}
+                  <AppInput
                     value={eventCount}
-                    onChange={value => {
-                      setEventCount(value as number);
+                    onChangeText={text => {
+                      setEventCount(normalizeCountInput(text));
                       clearInvalid('eventCount');
                       clearFieldError('eventCount');
                     }}
                     placeholder="0"
-                    containerStyle={{
-                      backgroundColor: C.inputBg,
-                      borderColor: invalid.eventCount ? C.error || '#ff4444' : C.inputBorder,
-                    }}
+                    keyboardType="number-pad"
+                    error={!!invalid.eventCount}
                   />
                   {renderFieldError('eventCount')}
                 </View>
@@ -494,6 +481,12 @@ const styles = StyleSheet.create({
     borderRadius: rs(12),
   },
   headingTitle: {
+    fontSize: fs(16),
+    fontWeight: '700',
+    lineHeight: fs(22),
+    marginBottom: ms(4),
+  },
+  headingVisitorName: {
     fontSize: fs(16),
     fontWeight: '700',
     lineHeight: fs(22),

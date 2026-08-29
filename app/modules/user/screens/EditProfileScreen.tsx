@@ -28,6 +28,7 @@ import {Formik} from 'formik';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
+import {COLORS} from '../../../shared/constants/colors';
 import {fs, ms, rs, hs} from '../../../shared/utils/scale';
 import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import AppInput from '../../../shared/components/AppInput';
@@ -507,6 +508,7 @@ export default function EditProfileScreen() {
 
                 try {
                   const response = await updateUser(userId, payload);
+                  console.log('Update user response:', response);
                   const warning =
                     typeof response?.warning === 'string'
                       ? response.warning.trim()
@@ -516,11 +518,13 @@ export default function EditProfileScreen() {
                     Alert.alert(t('success'), warning, [
                       {text: t('ok') || 'OK', onPress: navigateAfterSave},
                     ]);
-                    return;
+                    return { ...response, warning }; // Include warning in response
                   }
 
-                  Alert.alert(t('success'), t('profileUpdatedSuccess'));
+                  const successMessage = response?.message || t('profileUpdatedSuccess');
+                  Alert.alert(t('success'), successMessage);
                   navigateAfterSave();
+                  return { ...response, warning: '' }; // Include empty warning in response
                 } catch (error: any) {
                   const apiErrors = error?.response?.data?.errors;
                   if (apiErrors && typeof apiErrors === 'object') {
@@ -553,12 +557,14 @@ export default function EditProfileScreen() {
 
                   {/* Change Password Button */}
                   <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
-                    <AddNewHeaderButton
-                      name="ChangePasswordForOtherUser"
-                      params={{id: userId}}
-                      text={t('changePassword')}
-                      prefix=""
-                    />
+                  <AddNewHeaderButton
+                    name="ChangePasswordForOtherUser"
+                    params={{id: userId}}
+                    text={t('changePassword')}
+                    prefix=""
+                    style={{backgroundColor: 'white', borderWidth: 1, borderColor: COLORS.mainColor}}
+                    textStyle={{color: COLORS.mainColor}}
+                  />
                   </View>
 
                   {/* Prefix */}
@@ -616,6 +622,35 @@ export default function EditProfileScreen() {
                     {renderFieldError('title')}
                   </View>
 
+                  {/* OMR Status */}
+                  <View onLayout={e => setFieldPos('role_id', e.nativeEvent.layout.y)}>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                        {t('omrStatus')} <Text style={{color: '#c00000'}}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('omrStatus')} message={t('helpOmrStatus')} size={16} offsetY={-2} />
+                    </View>
+                    <ElementDropdown
+                      key={`role-${roleOptions.length > 0}`}
+                      data={roleDropdownData}
+                      value={values.role_id as any}
+                      onChange={v => {
+                        const roleId = (typeof v === 'number' ? v : Number(v)) || null;
+                        console.log('Selected role_id:', roleId);
+                        setFieldValue('role_id', roleId);
+                        clearInvalid('role_id');
+                        clearFieldError('role_id');
+                      }}
+                      placeholder={t('selectOption')}
+                      containerStyle={{
+                        borderColor: invalid.role_id ? '#db2d2d' : C.inputBorder,
+                        backgroundColor: C.inputBg,
+                      } as any}
+                      error={!!invalid.role_id}
+                    />
+                    {renderFieldError('role_id')}
+                  </View>
+
                   {/* Last Name */}
                   <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
@@ -656,33 +691,6 @@ export default function EditProfileScreen() {
                       error={!!invalid.username}
                     />
                     {renderFieldError('username')}
-                  </View>
-
-                  {/* OMR Status */}
-                  <View onLayout={e => setFieldPos('role_id', e.nativeEvent.layout.y)}>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('omrStatus')} <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon title={t('omrStatus')} message={t('helpOmrStatus')} size={16} offsetY={-2} />
-                    </View>
-                    <ElementDropdown
-                      key={`role-${roleOptions.length > 0}`}
-                      data={roleDropdownData}
-                      value={values.role_id as any}
-                      onChange={v => {
-                        setFieldValue('role_id', (typeof v === 'number' ? v : Number(v)) || null);
-                        clearInvalid('role_id');
-                        clearFieldError('role_id');
-                      }}
-                      placeholder={t('selectOption')}
-                      containerStyle={{
-                        borderColor: invalid.role_id ? '#db2d2d' : C.inputBorder,
-                        backgroundColor: C.inputBg,
-                      } as any}
-                      error={!!invalid.role_id}
-                    />
-                    {renderFieldError('role_id')}
                   </View>
 
                   {/* User Photo */}

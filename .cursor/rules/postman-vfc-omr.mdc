@@ -1,0 +1,26 @@
+---
+description: Bind this repo to Postman workspace VFC OMR. Use that collection as the API source of truth.
+alwaysApply: true
+---
+
+# Postman — VFC OMR
+
+This mobile app (`vfcomr`) is the OMR client. Always use Postman workspace **VFC OMR** for API work. Do not use Team Workspace, Test API, Instar Workspace, or My Workspace unless the user names them.
+
+## IDs
+
+- Workspace: `3d27b894-983d-4791-a6c7-22da43a9c83f` (name: VFC OMR)
+- Collection: `5716057-25d9ac44-0a39-4f26-b2ab-d3fd149147ba` (name: VFC_OMR API Documentation)
+- Environment: `5716057-d4a64a2b-a0c8-4297-8956-fc005dfc39f5` (name: VFC-OMR-API-dev)
+- App Axios `baseURL`: `https://tintran.cloud-ip.cc/api/v1/` — matches env var `url` + `/api/v1/`
+
+## When implementing or changing an API
+
+1. Read the matching request from **VFC_OMR API Documentation** via Postman MCP (`getCollection` / `getCollectionRequest`). Do not guess paths, methods, or payloads.
+2. Implement in the existing service layer (`app/modules/<feature>/services/*.service.ts`) using `api` from `app/config/api.ts`. Follow `.cursor/rules/api-rules.md`.
+3. If Postman and the app disagree, treat Postman as the contract unless the user says the collection is outdated.
+4. Never copy Postman environment tokens (`token`, `token_of_*`) into git, rules, or source. Auth stays in the Axios interceptor.
+
+## Collection folders (map to modules)
+
+Auth, User, Church, Worship Service, Visits, Event, Monthly Data, Dashboard & Graph, FAQ, Resource, Relating, Overseer Goals, Church Planting Projections, Watch list, Notifications, Support, and the admin lookup folders (Countries, Languages, Church Type, etc.).

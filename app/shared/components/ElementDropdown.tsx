@@ -15,7 +15,7 @@ import { useThemedColors } from '../styles/theme';
 import { fs, ws, hs, ms, rs } from '../utils/scale';
 import { FORM_INPUT_HEIGHT } from '../styles/form';
 
-export interface ElementDropdownItem { label: string; value: string | number }
+export interface ElementDropdownItem { label: string; value: string | number; color?: string }
 
 interface ElementDropdownProps {
   data: ElementDropdownItem[];
@@ -128,7 +128,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       selectedText: { fontSize: fs(14), color: C.textPrimary },
       placeholderText: { fontSize: fs(14), color: C.textSecondary, lineHeight: fs(14) },
       itemText: { fontSize: fs(14), color: C.textPrimary, lineHeight: fs(15) },
-      itemContainer: { paddingVertical: ms(1), minHeight: hs(32), justifyContent: 'center', backgroundColor: C.inputBg },
+      itemContainer: { paddingVertical: ms(1), paddingLeft: ms(12), minHeight: hs(32), justifyContent: 'center', backgroundColor: C.inputBg },
     })
   , [C]);
   const renderRightIcon = () => {
@@ -196,14 +196,24 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         }}
         // NOTE: do not forward Dropdown's internal search text events here.
         // We handle search via `renderInputSearch` below to avoid duplicate calls.
-        renderItem={renderItem as any}
+        renderItem={renderItem ? (renderItem as any) : (item: ElementDropdownItem) => {
+          const isSelected = item.value === value;
+          return (
+            <View style={[themed.itemContainer, optionItemStyle, isSelected ? {backgroundColor: C.bgSelectedOption} : null]}>
+              <RNText style={[themed.itemText, item.color ? {color: item.color} : null]} numberOfLines={1}>
+                {item.label}
+              </RNText>
+            </View>
+          );
+        }}
         renderInputSearch={(onSearch) => (
           <TextInput
             ref={searchRef}
             placeholder={placeholder}
-            autoFocus
-            style={themed.searchInput}
-            onChangeText={(t) => {
+          autoFocus={false}
+          style={themed.searchInput}
+          onFocus={() => searchRef.current?.focus()}
+          onChangeText={(t) => {
               onSearch(t);
               if (!disabled) {
                 onSearchText && onSearchText(t);
@@ -217,7 +227,10 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
             : undefined
         }
         renderRightIcon={renderRightIcon}
-        selectedTextStyle={themed.selectedText}
+        selectedTextStyle={[themed.selectedText, (() => {
+          const selectedItem = data.find(item => item.value === value);
+          return selectedItem?.color ? {color: selectedItem.color} : null;
+        })()]}
         placeholderStyle={themed.placeholderText}
         itemTextStyle={themed.itemText}
         itemContainerStyle={[themed.itemContainer, optionItemStyle]}
@@ -237,8 +250,8 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
           Keyboard.dismiss();
           computeBestPosition();
           try {
-            // Delay to allow dropdown to mount input
-            setTimeout(() => searchRef.current?.focus(), Platform.OS === 'android' ? 80 : 0);
+          // Only focus search input if user explicitly interacts with it
+          // Removed auto-focus to prevent keyboard from showing automatically
           } catch {}
         }}
       />

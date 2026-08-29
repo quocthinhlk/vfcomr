@@ -1,6 +1,16 @@
 // app/config/api.ts
-import axios, { AxiosError } from 'axios';
+import axios, {AxiosError} from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {
+  API_ERROR_FALLBACKS,
+  ApiErrorMessageKey,
+  buildSafeResponseData,
+  logApiError,
+  parseApiError,
+  type ParsedApiError,
+} from '../shared/utils/apiErrorHandler';
+import {translations} from '../shared/translations';
+import type {LanguageCode} from '../shared/translations/types';
 
 export const DEFAULT_PAGE_LIMIT = 10;
 const APP_LANGUAGE_STORAGE_KEY = 'appLanguage';
@@ -9,15 +19,60 @@ const DEFAULT_LANGUAGE = 'en';
 // Admin token
 // export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODkzNzQ1MzQsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NDUwfQ.oH5eRvElBNThPtwq8_2nhgtAOWAhgudiK0qzRtsLhzY";
 // Overseer token
-// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3OTEyODEyMDEsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.uQ9qXyfn5NUGHSPY61nTqPjRs2APbRqPkMHF7pn0lDo";
-export const TOKEN_FOR_TEST = '';
+export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3OTEyODEyMDEsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.uQ9qXyfn5NUGHSPY61nTqPjRs2APbRqPkMHF7pn0lDo";
+// export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
   baseURL: 'https://tintran.cloud-ip.cc/api/v1/',
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000,
 });
+
+type UnauthorizedHandler = () => void | Promise<void>;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+let unauthorizedInFlight = false;
+
+/**
+ * Register a callback (usually from Navigation/AuthContext) to clear session on 401.
+ */
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null) {
+  unauthorizedHandler = handler;
+}
+
+const FORCE_STATUS_MESSAGE = new Set([401, 403, 404, 429, 500, 502, 503, 504]);
+
+async function resolveLocalizedApiMessage(
+  parsed: ParsedApiError,
+): Promise<string> {
+  const preferMapped =
+    parsed.isNetworkError ||
+    parsed.isTimeout ||
+    (parsed.status != null && FORCE_STATUS_MESSAGE.has(parsed.status));
+
+  // Keep safe, short validation messages from the API when available.
+  if (
+    !preferMapped &&
+    parsed.safeMessage !== API_ERROR_FALLBACKS[parsed.messageKey]
+  ) {
+    return parsed.safeMessage;
+  }
+
+  try {
+    const language =
+      ((await AsyncStorage.getItem(APP_LANGUAGE_STORAGE_KEY))?.trim() as LanguageCode) ||
+      DEFAULT_LANGUAGE;
+    const dict = translations[language] || translations.en;
+    return (
+      dict[parsed.messageKey as keyof typeof dict] ||
+      translations.en[parsed.messageKey] ||
+      API_ERROR_FALLBACKS[parsed.messageKey as ApiErrorMessageKey]
+    );
+  } catch {
+    return API_ERROR_FALLBACKS[parsed.messageKey];
+  }
+}
 
 api.interceptors.request.use(async config => {
   try {
@@ -50,9 +105,13 @@ api.interceptors.request.use(async config => {
   return config;
 });
 
-function normalizeAxiosError(error: AxiosError): Error {
-  const normalized = new Error(error.message);
-  normalized.name = error.name;
+function normalizeAxiosError(
+  error: AxiosError,
+  safeMessage: string,
+  extras: Record<string, unknown>,
+): Error {
+  const normalized = new Error(safeMessage);
+  normalized.name = error.name || 'ApiError';
   Object.assign(normalized, {
     code: error.code,
     config: error.config,
@@ -60,17 +119,74 @@ function normalizeAxiosError(error: AxiosError): Error {
     response: error.response,
     status: error.response?.status,
     isAxiosError: true,
+    isApiError: true,
+    ...extras,
   });
   return normalized;
 }
 
+async function triggerUnauthorizedLogout(): Promise<void> {
+  if (unauthorizedInFlight) {
+    return;
+  }
+  unauthorizedInFlight = true;
+  try {
+    if (!TOKEN_FOR_TEST) {
+      await AsyncStorage.removeItem('token');
+    }
+    if (unauthorizedHandler) {
+      await unauthorizedHandler();
+    }
+  } catch (e) {
+    console.warn('[API] Unauthorized handler failed', e);
+  } finally {
+    // Allow a later 401 (e.g. after re-login) to trigger again.
+    setTimeout(() => {
+      unauthorizedInFlight = false;
+    }, 1500);
+  }
+}
+
 api.interceptors.response.use(
   response => response,
-  (error: unknown) => {
-    if (axios.isAxiosError(error)) {
-      return Promise.reject(normalizeAxiosError(error));
+  async (error: unknown) => {
+    if (!axios.isAxiosError(error)) {
+      logApiError(error);
+      return Promise.reject(error);
     }
-    return Promise.reject(error);
+
+    // Log full technical details for developers first (before sanitizing).
+    logApiError(error);
+
+    const parsed = parseApiError(error);
+    const localizedMessage = await resolveLocalizedApiMessage(parsed);
+    const localizedParsed: ParsedApiError = {
+      ...parsed,
+      safeMessage: localizedMessage,
+    };
+
+    // Replace unsafe response bodies (HTML/proxy dumps) with a safe envelope.
+    // Legacy screens reading `error.response.data.message` then get friendly text.
+    if (error.response) {
+      error.response.data = buildSafeResponseData(
+        error.response.data,
+        localizedParsed,
+      );
+    }
+
+    if (parsed.shouldLogout) {
+      void triggerUnauthorizedLogout();
+    }
+
+    return Promise.reject(
+      normalizeAxiosError(error, localizedMessage, {
+        messageKey: parsed.messageKey,
+        validationErrors: parsed.validationErrors,
+        kind: parsed.kind,
+        isNetworkError: parsed.isNetworkError,
+        isTimeout: parsed.isTimeout,
+      }),
+    );
   },
 );
 

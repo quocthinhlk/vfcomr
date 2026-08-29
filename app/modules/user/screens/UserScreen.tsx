@@ -30,6 +30,8 @@ import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import IosActionSheet from '../../../shared/components/IosActionSheet';
 import ImagePicker from 'react-native-image-crop-picker';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 const blankAvatar = require('../../../assets/images/blank-avatar.png');
 const editIcon = require('../../../assets/icons/edit.png');
@@ -151,10 +153,10 @@ export const UserScreen = () => {
         setUser(userData);
       } catch (e: any) {
         setUser(null);
-        if (e?.message === REQUEST_TIMEOUT_ERROR) {
-          setError(tRef.current('requestTimedOut'));
+        if (e?.message === REQUEST_TIMEOUT_ERROR || e?.isTimeout) {
+          setError(tRef.current('apiErrorTimeout'));
         } else {
-          setError(e?.message || tRef.current('failedToLoadUserData'));
+          setError(getApiErrorMessage(e, tRef.current));
         }
       } finally {
         if (shouldShowLoading) {
@@ -336,7 +338,7 @@ export const UserScreen = () => {
       } catch (error: any) {
         Alert.alert(
           t('error'),
-          error?.response?.data?.message || error?.message || t('couldNotUpdateUser'),
+          getApiErrorMessage(error, t) || t('couldNotUpdateUser'),
         );
       }
     },
@@ -469,11 +471,10 @@ export const UserScreen = () => {
         edges={['top', 'bottom', 'left', 'right']}>
         <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
           <Header title={t('pastorLeaderDetails')} />
-          <View style={styles.fullScreenLoading}>
-            <View style={[styles.errorBox, {backgroundColor: C.surface, borderWidth: 1, borderColor: C.error || '#ff4444'}]}>
-              <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{error}</Text>
-            </View>
-          </View>
+          <ApiErrorState
+            message={error}
+            onRetry={() => void fetchUserDetails({showLoading: true})}
+          />
         </Layout>
       </SafeAreaView>
     );

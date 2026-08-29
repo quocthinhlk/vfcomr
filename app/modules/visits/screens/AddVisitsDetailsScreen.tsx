@@ -165,6 +165,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
       eventTypes.map(item => ({
         label: item.name,
         value: item.id,
+        color: item.color,
       })),
     [eventTypes],
   );
@@ -573,9 +574,10 @@ export const AddVisitsDetailsScreen: React.FC = () => {
                   style={[styles.summaryCard, {backgroundColor: C.surface, borderColor: C.border}]}
                   onLayout={e => setFieldPos('form', e.nativeEvent.layout.y)}>
                   <Text style={[styles.summaryTitle, {color: C.textPrimary}]}>
-                    {`${t('visitsAndEventsInformationFor') || 'Visits and Events Information For'} : ${
-                      visitorName || '-'
-                    }`}
+                    {t('visitsAndEventsInformationFor') || 'Visits and Events Information'}
+                  </Text>
+                  <Text style={[styles.summaryTitle, {color: C.textPrimary}]}>
+                    {visitorName || '-'}
                   </Text>
                   <Text style={[styles.summaryText, {color: C.textPrimary}]}>
                     {`${t('month') || 'Month'}: ${monthLabel}    ${t('year') || 'Year'}: ${

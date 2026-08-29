@@ -17,6 +17,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
+import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
 import {addWeeks, startOfISOWeek} from 'date-fns';
 import {getVisitById, listVisits, VisitItem} from '../services/visit.service';
@@ -45,8 +46,8 @@ export const EditVisitScreen: React.FC = () => {
   const [visitorRole, setVisitorRole] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<number | null>(new Date().getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
-  const [churchVisitCount, setChurchVisitCount] = useState<number | null>(0);
-  const [eventCount, setEventCount] = useState<number | null>(0);
+  const [churchVisitCount, setChurchVisitCount] = useState('0');
+  const [eventCount, setEventCount] = useState('0');
   const [prefillVisit, setPrefillVisit] = useState<VisitItem | null>(null);
 
   const MONTHS = useMemo(() => Array.from({length: 12}, (_, i) => ({value: i + 1})), []);
@@ -92,14 +93,7 @@ export const EditVisitScreen: React.FC = () => {
     });
   }, []);
 
-  const countOptions = useMemo(
-    () =>
-      Array.from({length: 10000}, (_, index) => ({
-        label: String(index),
-        value: index,
-      })),
-    [],
-  );
+  const normalizeCountInput = (text: string) => text.replace(/[^0-9]/g, '');
 
   const inferMonthFromIsoWeek = (year: number, weekNumber: number) => {
     const jan4 = new Date(year, 0, 4);
@@ -138,7 +132,7 @@ export const EditVisitScreen: React.FC = () => {
         });
       }),
     );
-    setChurchVisitCount(churchIds.size);
+    setChurchVisitCount(String(churchIds.size));
   };
 
   useEffect(() => {
@@ -200,7 +194,7 @@ export const EditVisitScreen: React.FC = () => {
           const inferredMonth = inferMonthFromIsoWeek(visitData.year, visitData.week_number);
           setSelectedMonth(inferredMonth);
           await loadExistingVisitChurchCount(defaultUserId!, visitData.year, inferredMonth);
-          setEventCount(0);
+          setEventCount('0');
         }
       } catch (e) {
         console.error('Failed to load edit visit setup:', e);
@@ -433,19 +427,16 @@ export const EditVisitScreen: React.FC = () => {
                   <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
                     {t('numberOfChurchesVisited') || 'Number of Churches Visited'}
                   </Text>
-                  <ElementDropdown
-                    data={countOptions}
+                  <AppInput
                     value={churchVisitCount}
-                    onChange={value => {
-                      setChurchVisitCount(value as number);
+                    onChangeText={text => {
+                      setChurchVisitCount(normalizeCountInput(text));
                       clearInvalid('churchVisitCount');
                       clearFieldError('churchVisitCount');
                     }}
                     placeholder="0"
-                    containerStyle={{
-                      backgroundColor: C.inputBg,
-                      borderColor: invalid.churchVisitCount ? C.error || '#ff4444' : C.inputBorder,
-                    }}
+                    keyboardType="number-pad"
+                    error={!!invalid.churchVisitCount}
                   />
                   {renderFieldError('churchVisitCount')}
                 </View>
@@ -456,19 +447,16 @@ export const EditVisitScreen: React.FC = () => {
                   <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
                     {t('numberOfEventsYouOrganised') || 'Number of Events You Organised'}
                   </Text>
-                  <ElementDropdown
-                    data={countOptions}
+                  <AppInput
                     value={eventCount}
-                    onChange={value => {
-                      setEventCount(value as number);
+                    onChangeText={text => {
+                      setEventCount(normalizeCountInput(text));
                       clearInvalid('eventCount');
                       clearFieldError('eventCount');
                     }}
                     placeholder="0"
-                    containerStyle={{
-                      backgroundColor: C.inputBg,
-                      borderColor: invalid.eventCount ? C.error || '#ff4444' : C.inputBorder,
-                    }}
+                    keyboardType="number-pad"
+                    error={!!invalid.eventCount}
                   />
                   {renderFieldError('eventCount')}
                 </View>

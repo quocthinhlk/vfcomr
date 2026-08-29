@@ -24,6 +24,7 @@ import { LANGUAGES } from '../../../config/languages';
 import { useLanguage } from '../../../shared/context/LanguageContext';
 import LanguageSelectModal from '../../../shared/components/LanguageSelectModal';
 import { fs, ws, hs, ms, rs } from '../../../shared/utils/scale';
+import { getApiErrorMessage } from '../../../shared/utils/apiErrorHandler';
 
 export default function ForgotPasswordScreen() {
   const [email, setEmail] = useState('');
@@ -50,8 +51,7 @@ export default function ForgotPasswordScreen() {
       Alert.alert(t('success'), t('resetLinkSent'));
       goBack();
     } catch (error: any) {
-      const serverMessage = error?.response?.data?.message;
-      Alert.alert(t('error'), serverMessage || t('resetLinkFailed'));
+      Alert.alert(t('error'), getApiErrorMessage(error, t, 'apiErrorUnexpected') || t('resetLinkFailed'));
     } finally {
       setIsLoading(false);
     }

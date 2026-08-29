@@ -642,9 +642,9 @@ const es = {
   visit: 'Visita',
   visitDetail: 'Detalle de visita',
   visitDetails: 'Detalles de visita',
-  addVisits: 'Agregar visitas',
+  addVisits: 'Agregar visitas y eventos',
   addVisit: 'Agregar visita',
-  visitsAndEventsInformationFor: 'Información de visitas y eventos para',
+  visitsAndEventsInformationFor: 'Información de visitas y eventos',
   pleaseSelectTheInformation: 'Selecciona la información',
   visitor: 'Visitante',
   numberOfChurchesVisited: 'Número de iglesias visitadas',
@@ -752,7 +752,22 @@ const es = {
   churchesPlantedLegend: 'Iglesias plantadas',
   churchesClosedLegend: 'Iglesias cerradas',
   ytdYearToDate: 'YTD (año hasta la fecha)',
-  pastoralVisits: 'Visitas pastorales',
+  pastoralVisits: 'Gráfico de visitas a la iglesia',
+  apiErrorNetwork:
+    'No se puede conectar al servidor. Comprueba tu conexión a Internet e inténtalo de nuevo.',
+  apiErrorTimeout:
+    'La solicitud está tardando más de lo habitual. Inténtalo de nuevo.',
+  apiErrorUnauthorized: 'Tu sesión ha caducado. Inicia sesión de nuevo.',
+  apiErrorForbidden: 'No tienes permiso para realizar esta acción.',
+  apiErrorNotFound: 'No se encontraron los datos o el recurso solicitado.',
+  apiErrorValidation:
+    'Revisa la información introducida e inténtalo de nuevo.',
+  apiErrorTooManyRequests:
+    'Has realizado demasiadas solicitudes. Inténtalo más tarde.',
+  apiErrorServer:
+    'El sistema está experimentando problemas. Inténtalo más tarde.',
+  apiErrorUnexpected: 'Se produjo un error inesperado. Inténtalo de nuevo.',
+  tryAgain: 'Intentar de nuevo',
 } as const;
 
 export default es;

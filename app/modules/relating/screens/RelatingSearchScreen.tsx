@@ -6,6 +6,7 @@ import {
   Platform,
   ScrollView,
   StyleSheet,
+  TouchableOpacity,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -13,7 +14,6 @@ import {Text} from '@ui-kitten/components';
 import {useNavigation} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {SaveButton} from '../../../shared/components/ActionButtons';
-import AppButton from '../../../shared/components/AppButton';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
@@ -31,35 +31,17 @@ import {
   RelatingCountryItem,
   searchRelatingCountries,
 } from '../services/relating.service';
+import {
+  getApiErrorMessage,
+  getApiValidationErrors,
+} from '../../../shared/utils/apiErrorHandler';
 
-const getErrorMessage = (
-  error: any,
-  fallbackMessage: string,
-  statusFailedMessage: string,
-): string => {
-  const status = error?.response?.status;
-  const apiMessage = error?.response?.data?.message;
-  if (status && apiMessage) return `(${status}) ${apiMessage}`;
-  if (status) return `${statusFailedMessage} ${status}`;
-  if (apiMessage) return String(apiMessage);
-  return error?.message || fallbackMessage;
-};
-
-const getValidationErrors = (
-  error: any,
-): Record<string, string> | null => {
-  const errors = error?.response?.data?.errors;
-  if (!errors || typeof errors !== 'object' || Array.isArray(errors)) {
-    return null;
-  }
-  const normalized: Record<string, string> = {};
-  Object.keys(errors).forEach(key => {
-    const value = errors[key];
-    if (typeof value === 'string' && value.trim()) {
-      normalized[key] = value.trim();
-    }
-  });
-  return Object.keys(normalized).length ? normalized : null;
+/** True only when the API explicitly asks the client to show Edit Profile. */
+const shouldShowEditEmailButton = (error: any): boolean => {
+  const errors = getApiValidationErrors(error);
+  const flag =
+    errors?.showEditEmailButton ?? error?.response?.data?.errors?.showEditEmailButton;
+  return flag === true || flag === 'true' || flag === 1 || flag === '1';
 };
 
 export default function RelatingSearchScreen() {
@@ -132,8 +114,9 @@ export default function RelatingSearchScreen() {
     (async () => {
       try {
         const res = await api.get('users/me');
-        const userId = res?.data?.data?.id;
-        if (mounted && typeof userId === 'number') {
+        const rawId = res?.data?.data?.id;
+        const userId = typeof rawId === 'number' ? rawId : Number(rawId);
+        if (mounted && Number.isFinite(userId) && userId > 0) {
           setCurrentUserId(userId);
         }
       } catch {
@@ -264,7 +247,7 @@ export default function RelatingSearchScreen() {
       });
       setResult(data);
     } catch (error) {
-      Alert.alert(t('error'), getErrorMessage(error, t('unknownError'), t('requestFailedWithStatus')));
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
     } finally {
       setSearching(false);
     }
@@ -316,10 +299,10 @@ export default function RelatingSearchScreen() {
         },
       ]);
     } catch (error) {
-      const validationErrors = getValidationErrors(error);
+      const validationErrors = getApiValidationErrors(error);
       if (validationErrors) {
-        const hasEmailError = !!validationErrors.email;
-        setShowEditProfileForEmailError(hasEmailError);
+        const showEdit = shouldShowEditEmailButton(error);
+        setShowEditProfileForEmailError(showEdit);
         setFieldErrors(prev => ({
           ...prev,
           name: validationErrors.name || prev.name,
@@ -328,9 +311,24 @@ export default function RelatingSearchScreen() {
           message: validationErrors.message || prev.message,
         }));
         setSubmitError('');
+        // Ensure we have a user id ready for Edit Profile navigation.
+        if (showEdit && currentUserId == null) {
+          void (async () => {
+            try {
+              const res = await api.get('users/me');
+              const rawId = res?.data?.data?.id;
+              const userId = typeof rawId === 'number' ? rawId : Number(rawId);
+              if (Number.isFinite(userId) && userId > 0) {
+                setCurrentUserId(userId);
+              }
+            } catch {
+              // ignore
+            }
+          })();
+        }
         return;
       }
-      Alert.alert(t('error'), getErrorMessage(error, t('unknownError'), t('requestFailedWithStatus')));
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
     } finally {
       setSendingRequest(false);
     }
@@ -500,21 +498,41 @@ export default function RelatingSearchScreen() {
                   containerStyle={styles.input}
                 />
                 {fieldErrors.email ? (
-                  <>
+                  <View style={styles.emailErrorBlock}>
                     <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>
                       {fieldErrors.email}
                     </Text>
-                    {showEditProfileForEmailError && currentUserId ? (
-                      <AppButton
-                        variant="gray"
-                        style={styles.editProfileButton}
-                        onPress={() =>
-                          navigation.navigate('EditProfile', {id: currentUserId})
-                        }>
-                        {t('editProfile')}
-                      </AppButton>
+                    {showEditProfileForEmailError ? (
+                      <TouchableOpacity
+                        onPress={async () => {
+                          let userId = currentUserId;
+                          if (userId == null) {
+                            try {
+                              const res = await api.get('users/me');
+                              const rawId = res?.data?.data?.id;
+                              const parsed =
+                                typeof rawId === 'number' ? rawId : Number(rawId);
+                              if (Number.isFinite(parsed) && parsed > 0) {
+                                userId = parsed;
+                                setCurrentUserId(parsed);
+                              }
+                            } catch {
+                              // ignore
+                            }
+                          }
+                          if (userId == null) {
+                            Alert.alert(t('error'), t('unknownError'));
+                            return;
+                          }
+                          navigation.navigate('EditProfile', {id: userId});
+                        }}
+                        activeOpacity={0.7}
+                        hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                        style={styles.editProfileLinkWrap}>
+                        <Text style={styles.editProfileLink}>{t('editProfile')}</Text>
+                      </TouchableOpacity>
                     ) : null}
-                  </>
+                  </View>
                 ) : null}
               </View>
 
@@ -637,8 +655,18 @@ const styles = StyleSheet.create({
     marginTop: ms(6),
     fontSize: fs(12),
   },
-  editProfileButton: {
-    marginTop: ms(10),
+  emailErrorBlock: {
+    marginTop: ms(6),
+  },
+  editProfileLinkWrap: {
+    alignSelf: 'flex-end',
+    marginTop: ms(4),
+  },
+  editProfileLink: {
+    fontSize: fs(12),
+    fontWeight: '600',
+    color: COLORS.mainColor,
+    textAlign: 'right',
   },
   searchButtonWrap: {
     marginTop: ms(2),

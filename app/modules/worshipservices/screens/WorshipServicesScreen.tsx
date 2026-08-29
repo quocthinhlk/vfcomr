@@ -25,6 +25,7 @@ import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
 import {COLORS} from '../../../shared/constants/colors';
+import {MSC_FAQ_ID} from '../../../shared/constants/faq';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 const editIcon = require('../../../assets/icons/edit.png');
@@ -202,7 +203,7 @@ export const WorshipServicesScreen: React.FC = () => {
             {borderColor: COLORS.mainColor, backgroundColor: C.surface},
           ]}
           activeOpacity={0.7}
-          onPress={() => navigation.navigate('SearchFAQ')}>
+          onPress={() => navigation.navigate('FAQDetail', {faqId: MSC_FAQ_ID})}>
           <Text
             style={[styles.infoNoteBtnText, {color: C.textPrimary}]}
             allowFontScaling={false}>
