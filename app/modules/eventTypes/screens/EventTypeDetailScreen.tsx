@@ -5,11 +5,10 @@ import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
-import {getEventTypeById} from '../services/eventType.service';
+import {getEventTypeById, EventTypeItem, resolveEventMeetingType} from '../services/eventType.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs, hs} from '../../../shared/utils/scale';
-import {EventTypeItem} from '../services/eventType.service';
 
 export const EventTypeDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -109,7 +108,9 @@ export const EventTypeDetailScreen: React.FC = () => {
                       {t('meetingType') || 'Meeting Type'}
                     </Text>
                     <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {eventType.meeting_type}
+                      {resolveEventMeetingType(eventType.meeting_type) === 'meeting_with'
+                        ? t('eventMeetingWith') || 'Meeting With'
+                        : t('eventAttendance') || 'Attendance'}
                     </Text>
                   </View>
                 </View>

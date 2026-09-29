@@ -3,7 +3,7 @@ import {ActivityIndicator, Image, ScrollView, StyleSheet, View} from 'react-nati
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import Svg, {G, Line, Rect, Text as SvgText} from 'react-native-svg';
-import {useFocusEffect, useRoute} from '@react-navigation/native';
+import {useFocusEffect} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -12,11 +12,25 @@ import type {TranslationKey} from '../../../shared/translations';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {
+  getOverseerChartHeaderInfo,
   getOverseerIndicators,
   OverseerChurchPlantedYear,
 } from '../services/overseerIndicators.service';
-import {useDashboardChartChurchId} from '../hooks/useDashboardChartChurchId';
-import {useChartChurchName} from '../hooks/useChartChurchName';
+import {OverseerChartTitleBlock} from '../components/OverseerChartTitleBlock';
+import {ChartSaveButton} from '../components/ChartSaveButton';
+import {
+  CHART_EXPORT_LEGEND_H,
+  CHART_EXPORT_PAD,
+  CHART_EXPORT_TITLE_H,
+  ChartExportTitleTexts,
+  chartExportOffscreenStyle,
+} from '../components/ChartExportTitleTexts';
+import {
+  formatOverseerReportDate,
+  formatReportingPeriod,
+  pickGraphHeaderValue,
+} from '../utils/overseerChartHeader';
+import {useChartJpegExport} from '../utils/useChartJpegExport';
 
 /** Normalised row for divergent chart (planted up, closed down). */
 type PlantedClosedYearRow = {
@@ -93,29 +107,44 @@ function normaliseYearRows(list: OverseerChurchPlantedYear[]): PlantedClosedYear
 export default function OverseerChurchesPlantedLast10YearsScreen() {
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
-  const route = useRoute<any>();
-  const routeChurchId =
-    typeof route?.params?.churchId === 'number' ? route.params.churchId : undefined;
-  const {churchId, refreshKey} = useDashboardChartChurchId(routeChurchId);
-  const churchName = useChartChurchName(churchId, refreshKey);
   const [loading, setLoading] = useState(true);
-  const [graphTitle, setGraphTitle] = useState('');
   const [years, setYears] = useState<PlantedClosedYearRow[]>([]);
+  const [pastorName, setPastorName] = useState('');
+  const [regionNation, setRegionNation] = useState('');
+  const [reportDate, setReportDate] = useState('');
+  const [reportingPeriod, setReportingPeriod] = useState('');
 
   const load = useCallback(async () => {
     try {
       setLoading(true);
       const data = await getOverseerIndicators();
       const graph = data?.church_planted_graph;
-      setGraphTitle(graph?.graph_title?.trim() || '');
       const list = graph?.data;
       const raw = Array.isArray(list) ? [...list] : [];
       raw.sort((a, b) => a.year - b.year);
-      setYears(normaliseYearRows(raw));
+      const normalised = normaliseYearRows(raw);
+      setYears(normalised);
+      setPastorName(pickGraphHeaderValue(graph, ['pastor_name', 'for_pastor']));
+      setRegionNation(
+        pickGraphHeaderValue(graph, ['region_nation', 'region', 'nation']),
+      );
+      setReportDate(pickGraphHeaderValue(graph, ['report_date']));
+      setReportingPeriod(
+        pickGraphHeaderValue(graph, ['reporting_period', 'period']) ||
+          formatReportingPeriod(normalised.map(row => row.year)),
+      );
     } catch {
       setYears([]);
     } finally {
       setLoading(false);
+    }
+
+    try {
+      const header = await getOverseerChartHeaderInfo();
+      setPastorName(prev => prev || header.pastorName);
+      setRegionNation(prev => prev || header.regionNation);
+    } catch {
+      // Chart can render without header metadata.
     }
   }, []);
 
@@ -151,8 +180,8 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
       }));
 
     const gridYs = new Map<number, number>();
-    yPlantedTickYs.forEach(({value, y}) => gridYs.set(Math.round(y * 10) / 10, y));
-    yClosedTickYs.forEach(({value, y}) => gridYs.set(Math.round(y * 10) / 10, y));
+    yPlantedTickYs.forEach(({y}) => gridYs.set(Math.round(y * 10) / 10, y));
+    yClosedTickYs.forEach(({y}) => gridYs.set(Math.round(y * 10) / 10, y));
     gridYs.set(Math.round(baselineY * 10) / 10, baselineY);
 
     const bars = years.map((row, i) => {
@@ -200,11 +229,10 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
     return s && s !== key ? s : fallback;
   };
 
-  const defaultTitle = trOr(
-    'churchesPlantedClosedLast10Years',
-    'Churches Planted & Closed Over the Last 10 Years',
+  const displayTitle = trOr(
+    'churchesPlantedLast10Years',
+    'Churches Planted last 10 years',
   );
-  const displayTitle = graphTitle || defaultTitle;
   const plantedAxisLabel = trOr(
     'numberOfChurchesPlantedAxis',
     'Number of Churches Planted',
@@ -221,102 +249,28 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
   const lowerAxisCenterY =
     (chartLayout.baselineY + chartLayout.plotBottomY) / 2;
 
-  return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header
-          title={
-            t('churchesPlantedLast10Years')?.trim() ||
-            'Churches Planted Last 10 Years'
-          }
-        />
+  const resolvedReportDate =
+    reportDate ||
+    formatOverseerReportDate(new Date(), selectedLanguage || 'en');
+  const exportWidth = CHART_EXPORT_PAD * 2 + chartLayout.chartWidth;
+  const exportHeight =
+    CHART_EXPORT_PAD * 2 +
+    CHART_EXPORT_TITLE_H +
+    CHART_EXPORT_LEGEND_H +
+    SVG_HEIGHT;
+  const exportPlotOffsetY =
+    CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H + CHART_EXPORT_LEGEND_H;
 
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={COLORS.mainColor} />
-          </View>
-        ) : years.length === 0 ? (
-          <View style={styles.loadingWrap}>
-            <Text style={[styles.infoText, {color: C.textSecondary}]}>
-              {t('noDataFound')}
-            </Text>
-          </View>
-        ) : (
-          <View style={styles.content}>
-            <View
-              style={[
-                styles.landscapeTip,
-                {
-                  backgroundColor: C.surface,
-                  borderColor: C.inputBorder,
-                },
-              ]}>
-              <View style={styles.landscapeTipRow}>
-                <Image
-                  source={TIP_ICON}
-                  style={[styles.landscapeTipIcon, {tintColor: C.textSecondary}]}
-                />
-                <Text style={[styles.landscapeTipText, {color: C.textSecondary}]}>
-                  {t('chartsLandscapeTip')}
-                </Text>
-              </View>
-            </View>
-            {churchName ? (
-              <Text style={[styles.churchName, {color: C.textPrimary}]}>
-                {churchName}
-              </Text>
-            ) : null}
-            <ScrollView
-              style={styles.scroll}
-              contentContainerStyle={styles.scrollContent}
-              horizontal={years.length > 6}
-              showsHorizontalScrollIndicator>
-              <View
-                style={[
-                  styles.card,
-                  {backgroundColor: C.surface, borderColor: C.inputBorder},
-                ]}>
-              <Text
-                style={[styles.chartTitle, {color: C.textPrimary}]}
-                numberOfLines={3}>
-                {displayTitle}
-              </Text>
+  const {exportSvgRef, saving, showExportSvg, captureExport, handleSaveJpeg} =
+    useChartJpegExport({
+      filePrefix: 'churches-planted-chart',
+      width: exportWidth,
+      height: exportHeight,
+      canSave: years.length > 0,
+    });
 
-              <View style={styles.legendRow}>
-                <View style={styles.legendItem}>
-                  <View
-                    style={[styles.legendSwatch, {backgroundColor: PLANTED_COLOR}]}
-                  />
-                  <Text style={[styles.legendText, {color: C.textSecondary}]}>
-                    {legendPlanted}
-                  </Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View
-                    style={[styles.legendSwatch, {backgroundColor: CLOSED_COLOR}]}
-                  />
-                  <Text style={[styles.legendText, {color: C.textSecondary}]}>
-                    {legendClosed}
-                  </Text>
-                </View>
-                <View style={styles.legendItem}>
-                  <View
-                    style={[
-                      styles.legendSwatch,
-                      styles.legendSwatchYtd,
-                      {backgroundColor: PLANTED_COLOR},
-                    ]}
-                  />
-                  <Text style={[styles.legendText, {color: C.textSecondary}]}>
-                    {legendYtd}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={{width: chartLayout.chartWidth}}>
-                <Svg width={chartLayout.chartWidth} height={SVG_HEIGHT}>
+  const renderPlantedPlot = () => (
+    <>
                   {/* Upper Y ticks (planted) */}
                   {chartLayout.yPlantedTickYs.map(({value, y}) => (
                     <SvgText
@@ -502,10 +456,189 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
                       </G>
                     );
                   })}
-                </Svg>
+    </>
+  );
+
+  return (
+
+    <SafeAreaView
+      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+      edges={['top', 'bottom', 'left', 'right']}>
+      <View style={[styles.container, {backgroundColor: C.background}]}>
+        <Header title={displayTitle} />
+
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={COLORS.mainColor} />
+          </View>
+        ) : (
+          <View style={styles.content}>
+            <View
+              style={[
+                styles.landscapeTip,
+                {
+                  backgroundColor: C.surface,
+                  borderColor: C.inputBorder,
+                },
+              ]}>
+              <View style={styles.landscapeTipRow}>
+                <Image
+                  source={TIP_ICON}
+                  style={[styles.landscapeTipIcon, {tintColor: C.textSecondary}]}
+                />
+                <Text style={[styles.landscapeTipText, {color: C.textSecondary}]}>
+                  {t('chartsLandscapeTip')}
+                </Text>
               </View>
             </View>
-          </ScrollView>
+            <View
+              style={[
+                styles.card,
+                {backgroundColor: C.surface, borderColor: C.inputBorder},
+              ]}>
+              <OverseerChartTitleBlock
+                title={displayTitle}
+                pastorName={pastorName}
+                regionNation={regionNation}
+                reportDate={resolvedReportDate}
+                reportingPeriod={reportingPeriod}
+                style={styles.titleInCard}
+                action={
+                  <ChartSaveButton saving={saving} onPress={handleSaveJpeg} />
+                }
+              />
+              <View
+                style={[styles.headerDivider, {backgroundColor: C.inputBorder}]}
+              />
+              {years.length === 0 ? (
+                <View style={styles.emptyWrap}>
+                  <Text style={[styles.infoText, {color: C.textSecondary}]}>
+                    {t('noDataFound')}
+                  </Text>
+                </View>
+              ) : (
+                <>
+            <View style={styles.legendRow}>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendSwatch, {backgroundColor: PLANTED_COLOR}]}
+                />
+                <Text style={[styles.legendText, {color: C.textSecondary}]}>
+                  {legendPlanted}
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View
+                  style={[styles.legendSwatch, {backgroundColor: CLOSED_COLOR}]}
+                />
+                <Text style={[styles.legendText, {color: C.textSecondary}]}>
+                  {legendClosed}
+                </Text>
+              </View>
+              <View style={styles.legendItem}>
+                <View
+                  style={[
+                    styles.legendSwatch,
+                    styles.legendSwatchYtd,
+                    {backgroundColor: PLANTED_COLOR},
+                  ]}
+                />
+                <Text style={[styles.legendText, {color: C.textSecondary}]}>
+                  {legendYtd}
+                </Text>
+              </View>
+            </View>
+            <ScrollView
+              style={styles.scroll}
+              contentContainerStyle={styles.scrollContent}
+              horizontal={years.length > 6}
+              showsHorizontalScrollIndicator>
+              <View style={{width: chartLayout.chartWidth}}>
+                <Svg width={chartLayout.chartWidth} height={SVG_HEIGHT}>
+                  {renderPlantedPlot()}
+                </Svg>
+              </View>
+            </ScrollView>
+                </>
+              )}
+            </View>
+            {showExportSvg ? (
+              <View
+                collapsable={false}
+                onLayout={captureExport}
+                pointerEvents="none"
+                style={[
+                  chartExportOffscreenStyle,
+                  {width: exportWidth, height: exportHeight},
+                ]}>
+                <Svg ref={exportSvgRef} width={exportWidth} height={exportHeight}>
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={exportWidth}
+                    height={exportHeight}
+                    fill={C.surface}
+                  />
+                  <ChartExportTitleTexts
+                    title={displayTitle}
+                    pastorName={pastorName}
+                    regionNation={regionNation}
+                    reportDate={resolvedReportDate}
+                    reportingPeriod={reportingPeriod}
+                    fill={C.textPrimary}
+                  />
+                  <Rect
+                    x={CHART_EXPORT_PAD}
+                    y={CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H + 6}
+                    width={10}
+                    height={10}
+                    fill={PLANTED_COLOR}
+                  />
+                  <SvgText
+                    x={CHART_EXPORT_PAD + 16}
+                    y={CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H + 15}
+                    fill={C.textSecondary}
+                    fontSize={fs(11)}
+                    fontWeight="500">
+                    {legendPlanted}
+                  </SvgText>
+                  <Rect
+                    x={CHART_EXPORT_PAD + 160}
+                    y={CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H + 6}
+                    width={10}
+                    height={10}
+                    fill={CLOSED_COLOR}
+                  />
+                  <SvgText
+                    x={CHART_EXPORT_PAD + 176}
+                    y={CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H + 15}
+                    fill={C.textSecondary}
+                    fontSize={fs(11)}
+                    fontWeight="500">
+                    {legendClosed}
+                  </SvgText>
+                  <Rect
+                    x={CHART_EXPORT_PAD + 310}
+                    y={CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H + 6}
+                    width={10}
+                    height={10}
+                    fill={PLANTED_COLOR}
+                    opacity={0.45}
+                  />
+                  <SvgText
+                    x={CHART_EXPORT_PAD + 326}
+                    y={CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H + 15}
+                    fill={C.textSecondary}
+                    fontSize={fs(11)}
+                    fontWeight="500">
+                    {legendYtd}
+                  </SvgText>
+                  <G transform={`translate(${CHART_EXPORT_PAD}, ${exportPlotOffsetY})`}>
+                    {renderPlantedPlot()}
+                  </G>
+                </Svg>
+              </View>
+            ) : null}
           </View>
         )}
       </View>
@@ -555,6 +688,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(12),
     paddingVertical: ms(12),
     minWidth: '100%',
+  },
+  titleInCard: {
+    marginBottom: 0,
+  },
+  headerDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginBottom: ms(10),
+  },
+  emptyWrap: {
+    minHeight: ms(80),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   chartTitle: {
     fontSize: fs(14),

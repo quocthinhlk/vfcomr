@@ -1,208 +1,672 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
-  Linking,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   TouchableOpacity,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useRoute} from '@react-navigation/native';
+import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {Text} from '@ui-kitten/components';
+import * as RNFS from 'react-native-fs';
+import FileViewer from 'react-native-file-viewer';
+import {
+  errorCodes,
+  isErrorWithCode,
+  pick,
+  types as documentTypes,
+} from '@react-native-documents/picker';
 import {Header} from '../../../shared/components/Header';
+import AppInput from '../../../shared/components/AppInput';
+import ElementDropdown from '../../../shared/components/ElementDropdown';
+import {
+  CancelButton,
+  SaveButton,
+} from '../../../shared/components/ActionButtons';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {EditSvgIcon, DeleteSvgIcon} from '../../../shared/components/icons';
 import {globalStyles} from '../../../shared/styles/global';
+import {formStyles} from '../../../shared/styles/form';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
+import {COLORS} from '../../../shared/constants/colors';
+import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import {
-  getResourceCategories,
-  getResourceDetail,
-  getResourceFileFormats,
-  getResourceTypes,
+  isSuperAdmin,
+  resolveRoleIdFromUser,
+} from '../../../shared/utils/permissions';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import api from '../../../config/api';
+import type {TranslationKey} from '../../../shared/translations/types';
+import {
+  deleteResource,
+  deleteResourceFile,
+  getResourceById,
+  listResourceFileFormats,
+  reorderResourceChildren,
+  reorderResourceFiles,
+  resolveResourceMediaUrl,
+  ResourceDetailItem,
+  ResourceFileFormatItem,
   ResourceFileItem,
-  ResourceItem,
+  ResourceListItem,
+  updateResourceFile,
+  uploadResourceFile,
 } from '../services/resource.service';
-import {getLanguageById} from '../../language/services/language.service';
 
-const RESOURCE_HOST = 'http://34.126.158.119';
-
-const formatReferenceDate = (dateString?: string) => {
-  if (!dateString) {
+function stripHtml(value?: string | null): string {
+  if (!value) {
     return '';
   }
+  return value
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&rsquo;/g, "'")
+    .replace(/&ldquo;/g, '"')
+    .replace(/&rdquo;/g, '"')
+    .trim();
+}
 
-  const date = new Date(dateString);
-  if (Number.isNaN(date.getTime())) {
-    return '';
-  }
-
-  return date.toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
-};
-
-const resolveFileUrl = (file: ResourceFileItem) => {
-  const rawUrl = file.url?.trim() || file.path?.trim() || '';
-  if (!rawUrl) {
-    return '';
-  }
-  if (/^https?:\/\//i.test(rawUrl)) {
-    return rawUrl;
-  }
-  return `${RESOURCE_HOST}/${rawUrl.replace(/^\/+/, '')}`;
-};
-
-const getFileExtension = (filename?: string) => {
+function getFileExtension(filename?: string) {
   if (!filename || !filename.includes('.')) {
     return 'FILE';
   }
   return filename.split('.').pop()?.toUpperCase() || 'FILE';
+}
+
+const LANGUAGE_NAME_KEYS: Record<string, TranslationKey> = {
+  en: 'langEnglish',
+  es: 'langSpanish',
+  fr: 'langFrench',
+  pt: 'langPortuguese',
+  zh: 'langChinese',
+  ms: 'langMalay',
+  ja: 'langJapanese',
+  vi: 'langVietnamese',
 };
 
+export const RESOURCE_LANGUAGE_CODES = [
+  'en',
+  'es',
+  'fr',
+  'pt',
+  'zh',
+  'ms',
+  'ja',
+  'vi',
+] as const;
+
+export function resourceLanguageLabel(
+  code: string | null | undefined,
+  t: (key: TranslationKey) => string,
+): string {
+  const normalized = (code ?? '').trim().toLowerCase();
+  if (!normalized) {
+    return '';
+  }
+  const key = LANGUAGE_NAME_KEYS[normalized];
+  return key ? t(key) : code!.toUpperCase();
+}
+
+type FileModalMode = 'upload' | 'edit';
+
 export default function ResourceDetailScreen() {
+  const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const resourceId: number | undefined = route.params?.resourceId;
   const {t} = useTranslation();
   const C = useThemedColors();
 
-  const [resource, setResource] = useState<ResourceItem | null>(null);
+  const [resource, setResource] = useState<ResourceDetailItem | null>(null);
+  const [formats, setFormats] = useState<ResourceFileFormatItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [typeName, setTypeName] = useState('');
-  const [topicName, setTopicName] = useState('');
-  const [languageName, setLanguageName] = useState('');
-  const [formatNameById, setFormatNameById] = useState<Map<number, string>>(new Map());
+  const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [userRoleId, setUserRoleId] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [openingFileId, setOpeningFileId] = useState<number | null>(null);
+
+  const [fileModalVisible, setFileModalVisible] = useState(false);
+  const [fileModalMode, setFileModalMode] = useState<FileModalMode>('upload');
+  const [editingFile, setEditingFile] = useState<ResourceFileItem | null>(null);
+  const [fileName, setFileName] = useState('');
+  const [partNo, setPartNo] = useState('1');
+  const [fileLang, setFileLang] = useState('en');
+  const [formatId, setFormatId] = useState<number | null>(null);
+  const [isAiTranslated, setIsAiTranslated] = useState(false);
+  const [pickedFile, setPickedFile] = useState<{
+    uri: string;
+    type?: string;
+    name?: string;
+  } | null>(null);
+
+  const canManage = isSuperAdmin(userRoleId);
 
   useEffect(() => {
     let mounted = true;
-
-    const load = async () => {
-      if (!resourceId) {
-        if (mounted) {
-          setLoading(false);
-        }
-        return;
-      }
-
+    (async () => {
       try {
-        setLoading(true);
-        const detail = await getResourceDetail(resourceId);
-        if (!mounted) {
-          return;
-        }
-
-        setResource(detail);
-
-        if (!detail) {
-          return;
-        }
-
-        const [typesRes, topicsRes, formatsRes, languageRes] = await Promise.allSettled([
-          getResourceTypes(),
-          getResourceCategories({page: 1, limit: 200, name: ''}),
-          getResourceFileFormats(),
-          detail.language_id ? getLanguageById(detail.language_id) : Promise.resolve(null),
-        ]);
-
-        if (!mounted) {
-          return;
-        }
-
-        if (typesRes.status === 'fulfilled' && detail.type_id) {
-          const matchedType = typesRes.value.find(item => item.id === detail.type_id);
-          setTypeName(matchedType?.name || '');
-        }
-
-        if (topicsRes.status === 'fulfilled' && detail.topic_id) {
-          const matchedTopic = topicsRes.value.find(item => item.id === detail.topic_id);
-          setTopicName(matchedTopic?.name || '');
-        }
-
-        if (
-          languageRes.status === 'fulfilled' &&
-          languageRes.value &&
-          (languageRes.value as any).data?.name
-        ) {
-          setLanguageName((languageRes.value as any).data.name);
-        }
-
-        if (formatsRes.status === 'fulfilled') {
-          setFormatNameById(
-            new Map(formatsRes.value.map(item => [item.id, item.name] as const)),
-          );
-        }
-      } catch {
+        const res = await api.get('/users/me');
         if (mounted) {
-          setResource(null);
+          setUserRoleId(resolveRoleIdFromUser(res?.data?.data));
         }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+      } catch (error) {
+        console.error(error);
       }
-    };
-
-    load();
-
+    })();
     return () => {
       mounted = false;
     };
-  }, [resourceId]);
+  }, []);
 
-  const metaItems = useMemo(
-    () =>
-      [
-        typeName ? `${t('type') || 'Type'}: ${typeName}` : '',
-        topicName ? `${t('topic') || 'Topic'}: ${topicName}` : '',
-        languageName ? `${t('language') || 'Language'}: ${languageName}` : '',
-        resource?.reference_date
-          ? `${t('date') || 'Date'}: ${formatReferenceDate(resource.reference_date)}`
-          : '',
-      ].filter(Boolean),
-    [languageName, resource?.reference_date, t, topicName, typeName],
-  );
-
-  const handleOpenUrl = (url: string) => {
-    if (!url) {
+  const load = useCallback(async () => {
+    if (!resourceId) {
+      setResource(null);
+      setLoading(false);
       return;
     }
-    Linking.openURL(url).catch(() => {});
+    try {
+      setLoadError(null);
+      setLoading(true);
+      const [detailRes, formatRes] = await Promise.all([
+        getResourceById(resourceId),
+        listResourceFileFormats().catch(() => ({data: [] as ResourceFileFormatItem[]})),
+      ]);
+      setResource(detailRes.data ?? null);
+      setFormats(formatRes.data ?? []);
+    } catch (error) {
+      console.error(error);
+      setResource(null);
+      setLoadError(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [resourceId]);
+  useFocusEffect(
+    useCallback(() => {
+      // Always refresh when the screen comes into focus so edits are reflected.
+      load();
+    }, [load]),
+  );
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await load();
+    setRefreshing(false);
   };
 
-  const renderFileCard = (file: ResourceFileItem) => {
-    const fileUrl = resolveFileUrl(file);
-    const fileTag = formatNameById.get(file.format_id || 0) || getFileExtension(file.filename);
+  const formatNameById = useMemo(
+    () => new Map(formats.map(item => [item.id, item.name] as const)),
+    [formats],
+  );
+
+  const files = useMemo(() => {
+    const list = [...(resource?.files ?? [])];
+    return list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id);
+  }, [resource?.files]);
+
+  const children = useMemo(() => {
+    const list = [...(resource?.children ?? [])];
+    return list.sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0) || a.id - b.id);
+  }, [resource?.children]);
+
+  const graphicUrl = resolveResourceMediaUrl(resource?.graphic_path);
+  const description = stripHtml(resource?.short_description);
+
+  const handleOpenFile = async (file: ResourceFileItem, url: string) => {
+    if (!url || openingFileId != null) {
+      return;
+    }
+    const safeName = (file.filename || `resource-${file.id}`)
+      .replace(/[^\w.\-]+/g, '_')
+      .replace(/^_+|_+$/g, '');
+    const localPath = `${RNFS.CachesDirectoryPath}/resource-${file.id}-${safeName}`;
+
+    try {
+      setOpeningFileId(file.id);
+      const exists = await RNFS.exists(localPath);
+      if (!exists) {
+        const result = await RNFS.downloadFile({
+          fromUrl: url,
+          toFile: localPath,
+        }).promise;
+        if (result.statusCode < 200 || result.statusCode >= 300) {
+          throw new Error(`Download failed (${result.statusCode})`);
+        }
+      }
+      await FileViewer.open(localPath, {
+        displayName: file.filename,
+        showOpenWithDialog: false,
+        showAppsSuggestions: false,
+      });
+    } catch (error) {
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
+    } finally {
+      setOpeningFileId(null);
+    }
+  };
+
+  const confirmDeleteResource = () => {
+    if (!resourceId) {
+      return;
+    }
+    Alert.alert(t('delete'), t('resourceConfirmDelete'), [
+      {text: t('cancel'), style: 'cancel'},
+      {
+        text: t('delete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setBusy(true);
+            await deleteResource(resourceId);
+            Alert.alert(t('success'), t('resourceDeleted'));
+            navigation.navigate('Resources', {reload: true});
+          } catch (error) {
+            Alert.alert(t('error'), getApiErrorMessage(error, t));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const moveFile = async (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= files.length || !resourceId) {
+      return;
+    }
+    const previousFiles = [...files];
+    const next = [...files];
+    const [removed] = next.splice(index, 1);
+    next.splice(target, 0, removed);
+    const reorderedFiles = next.map((file, orderIndex) => ({
+      ...file,
+      sort_order: orderIndex + 1,
+    }));
+    // Update locally so the ScrollView remains mounted and keeps its position.
+    setResource(current =>
+      current ? {...current, files: reorderedFiles} : current,
+    );
+    try {
+      setBusy(true);
+      await reorderResourceFiles(
+        resourceId,
+        reorderedFiles.map((file, orderIndex) => ({
+          file_id: file.id,
+          sort_order: orderIndex + 1,
+        })),
+      );
+    } catch (error) {
+      setResource(current =>
+        current ? {...current, files: previousFiles} : current,
+      );
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const moveChild = async (index: number, direction: -1 | 1) => {
+    const target = index + direction;
+    if (target < 0 || target >= children.length || !resourceId) {
+      return;
+    }
+    const previousChildren = [...children];
+    const next = [...children];
+    const [removed] = next.splice(index, 1);
+    next.splice(target, 0, removed);
+    const reorderedChildren = next.map((child, orderIndex) => ({
+      ...child,
+      sort_order: orderIndex + 1,
+    }));
+    setResource(current =>
+      current ? {...current, children: reorderedChildren} : current,
+    );
+    try {
+      setBusy(true);
+      await reorderResourceChildren(
+        resourceId,
+        reorderedChildren.map((child, orderIndex) => ({
+          resource_id: child.id,
+          sort_order: orderIndex + 1,
+        })),
+      );
+    } catch (error) {
+      setResource(current =>
+        current ? {...current, children: previousChildren} : current,
+      );
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const openUploadModal = () => {
+    setFileModalMode('upload');
+    setEditingFile(null);
+    setFileName('');
+    setPartNo('1');
+    setFileLang(resource?.available_languages?.[0] || 'en');
+    setFormatId(formats[0]?.id ?? null);
+    setIsAiTranslated(false);
+    setPickedFile(null);
+    setFileModalVisible(true);
+  };
+
+  const openEditFileModal = (file: ResourceFileItem) => {
+    setFileModalMode('edit');
+    setEditingFile(file);
+    setFileName(file.filename);
+    setPartNo(String(file.part_no ?? 1));
+    setFileLang(file.lang || 'en');
+    setFormatId(file.format_id);
+    setIsAiTranslated(Boolean(file.is_ai_translated));
+    setPickedFile(null);
+    setFileModalVisible(true);
+  };
+
+  const pickUploadFile = async () => {
+    try {
+      const [file] = await pick({
+        type: [documentTypes.allFiles],
+        allowMultiSelection: false,
+        mode: 'import',
+      });
+      setPickedFile({
+        uri: file.uri,
+        type: file.type || 'application/octet-stream',
+        name: file.name || file.uri.split('/').pop() || 'resource-file',
+      });
+    } catch (error) {
+      if (
+        isErrorWithCode(error) &&
+        error.code === errorCodes.OPERATION_CANCELED
+      ) {
+        return;
+      }
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
+    }
+  };
+
+  const submitFileModal = async () => {
+    const parsedPart = Number(partNo);
+    const partValue = Number.isFinite(parsedPart) && parsedPart > 0 ? parsedPart : 1;
+
+    try {
+      setBusy(true);
+      if (fileModalMode === 'upload') {
+        if (!resourceId || !formatId || !pickedFile) {
+          Alert.alert(t('error'), t('fillRequiredFields'));
+          return;
+        }
+        await uploadResourceFile({
+          uri: pickedFile.uri,
+          type: pickedFile.type,
+          name: pickedFile.name,
+          resourceId,
+          formatId,
+          partNo: partValue,
+          lang: fileLang || 'en',
+          isAiTranslated,
+        });
+        Alert.alert(t('success'), t('resourceFileUploaded'));
+      } else if (editingFile) {
+        if (!fileName.trim()) {
+          Alert.alert(t('error'), t('fillRequiredFields'));
+          return;
+        }
+        await updateResourceFile(editingFile.id, {
+          filename: fileName.trim(),
+          part_no: partValue,
+          lang: fileLang || 'en',
+          is_ai_translated: isAiTranslated,
+        });
+        Alert.alert(t('success'), t('resourceFileUpdated'));
+      }
+      setFileModalVisible(false);
+      await load();
+    } catch (error) {
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmDeleteFile = (file: ResourceFileItem) => {
+    Alert.alert(t('delete'), t('resourceConfirmDelete'), [
+      {text: t('cancel'), style: 'cancel'},
+      {
+        text: t('delete'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setBusy(true);
+            await deleteResourceFile(file.id);
+            Alert.alert(t('success'), t('resourceFileDeleted'));
+            await load();
+          } catch (error) {
+            Alert.alert(t('error'), getApiErrorMessage(error, t));
+          } finally {
+            setBusy(false);
+          }
+        },
+      },
+    ]);
+  };
+
+  const renderFileRow = (file: ResourceFileItem, index: number) => {
+    const fileUrl = file.url || resolveResourceMediaUrl(file.path);
+    const fileTag =
+      formatNameById.get(file.format_id || 0) || getFileExtension(file.filename);
     const isOpenable = Boolean(fileUrl);
 
     return (
-      <TouchableOpacity
+      <View
         key={file.id}
         style={[
-          styles.fileCard,
-          {
-            backgroundColor: C.background,
-            borderColor: C.inputBorder,
-            opacity: isOpenable ? 1 : 0.8,
-          },
-        ]}
-        activeOpacity={isOpenable ? 0.75 : 1}
-        disabled={!isOpenable}
-        onPress={() => handleOpenUrl(fileUrl)}>
-        <View style={[styles.fileBadge, {backgroundColor: C.bgSelectedOption}]}>
-          <Text style={[styles.fileBadgeText, {color: '#2f6fcd'}]}>{fileTag}</Text>
-        </View>
-        <Text style={[styles.fileName, {color: C.textPrimary}]} numberOfLines={2}>
-          {file.filename}
-        </Text>
-        <Text style={[styles.fileActionText, {color: isOpenable ? '#2f6fcd' : C.textSecondary}]}>
-          {isOpenable ? t('open') : t('noDataFound')}
-        </Text>
-      </TouchableOpacity>
+          styles.itemCard,
+          {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+        ]}>
+        <TouchableOpacity
+          style={styles.listRowMain}
+          activeOpacity={isOpenable ? 0.75 : 1}
+          disabled={!isOpenable || openingFileId != null}
+          onPress={() => handleOpenFile(file, fileUrl)}>
+          <View style={[styles.fileBadge, {backgroundColor: C.bgSelectedOption}]}>
+            <Text style={[styles.fileBadgeText, {color: COLORS.mainColor}]} numberOfLines={1}>
+              {fileTag}
+            </Text>
+          </View>
+          <View style={styles.listRowBody}>
+            <Text style={[styles.fileName, {color: C.textPrimary}]} numberOfLines={2}>
+              {file.filename}
+            </Text>
+            <Text style={[styles.fileMeta, {color: C.textSecondary}]}>
+              {resourceLanguageLabel(file.lang, t)} · {t('resourcePartNumber')} {file.part_no}
+            </Text>
+          </View>
+          <Text
+            style={[
+              styles.openHint,
+              {color: isOpenable ? COLORS.mainColor : C.textSecondary},
+            ]}>
+            {openingFileId === file.id
+              ? `${t('loading')}...`
+              : isOpenable
+                ? `${t('open')}  ›`
+                : ''}
+          </Text>
+        </TouchableOpacity>
+        {canManage ? (
+          <View style={[styles.itemActions, {borderTopColor: C.inputBorder}]}>
+            <View style={styles.reorderActions}>
+              <TouchableOpacity
+                style={styles.reorderButton}
+                onPress={() => moveFile(index, -1)}
+                disabled={busy || index === 0}>
+                <Text
+                  style={[
+                    styles.reorderGlyph,
+                    {color: index === 0 ? C.textSecondary : COLORS.mainColor},
+                  ]}>
+                  ↑
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.reorderButton}
+                onPress={() => moveFile(index, 1)}
+                disabled={busy || index === files.length - 1}>
+                <Text
+                  style={[
+                    styles.reorderGlyph,
+                    {
+                      color:
+                        index === files.length - 1
+                          ? C.textSecondary
+                          : COLORS.mainColor,
+                    },
+                  ]}>
+                  ↓
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View style={styles.editActions}>
+              <TouchableOpacity
+                style={styles.simpleIconButton}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel={t('edit')}
+                onPress={() => openEditFileModal(file)}>
+                <EditSvgIcon
+                  width={fs(17)}
+                  height={fs(17)}
+                  color={COLORS.mainColor}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.simpleIconButton}
+                activeOpacity={0.6}
+                accessibilityRole="button"
+                accessibilityLabel={t('delete')}
+                onPress={() => confirmDeleteFile(file)}>
+                <DeleteSvgIcon
+                  width={fs(17)}
+                  height={fs(17)}
+                  color={COLORS.dangerColor}
+                />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ) : null}
+      </View>
     );
   };
+
+  const renderChildRow = (child: ResourceListItem, index: number) => (
+    <View
+      key={child.id}
+      style={[
+        styles.itemCard,
+        {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+      ]}>
+      <TouchableOpacity
+        style={styles.listRowMain}
+        activeOpacity={0.75}
+        onPress={() =>
+          navigation.push('ResourceDetail', {resourceId: child.id})
+        }>
+        <View style={styles.listRowBody}>
+          <Text style={[styles.childName, {color: C.textPrimary}]} numberOfLines={2}>
+            {child.name}
+          </Text>
+        </View>
+        <Text style={[styles.chevron, {color: C.textSecondary}]}>›</Text>
+      </TouchableOpacity>
+      {canManage ? (
+        <View style={[styles.itemActions, {borderTopColor: C.inputBorder}]}>
+          <View style={styles.reorderActions}>
+            <TouchableOpacity
+              style={styles.reorderButton}
+              onPress={() => moveChild(index, -1)}
+              disabled={busy || index === 0}>
+              <Text
+                style={[
+                  styles.reorderGlyph,
+                  {color: index === 0 ? C.textSecondary : COLORS.mainColor},
+                ]}>
+                ↑
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.reorderButton}
+              onPress={() => moveChild(index, 1)}
+              disabled={busy || index === children.length - 1}>
+              <Text
+                style={[
+                  styles.reorderGlyph,
+                  {
+                    color:
+                      index === children.length - 1
+                        ? C.textSecondary
+                        : COLORS.mainColor,
+                  },
+                ]}>
+                ↓
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : null}
+    </View>
+  );
+
+  if (loading && !refreshing) {
+    return (
+      <SafeAreaView
+        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.headerWrap}>
+          <Header title={t('resourceDetailTitle')} showMenu={false} />
+        </View>
+        <View style={styles.centerWrap}>
+          <ActivityIndicator color={COLORS.mainColor} />
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!resource) {
+    return (
+      <SafeAreaView
+        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <View style={styles.headerWrap}>
+          <Header title={t('resourceDetailTitle')} showMenu={false} />
+        </View>
+        {loadError ? (
+          <ApiErrorState error={loadError} onRetry={load} />
+        ) : (
+          <View style={styles.centerWrap}>
+            <Text style={[styles.loadingText, {color: C.textSecondary}]}>
+              {t('noDataFound')}
+            </Text>
+          </View>
+        )}
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -210,193 +674,264 @@ export default function ResourceDetailScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.screen, {backgroundColor: C.background}]}>
         <Header title={t('resourceDetailTitle')} showMenu={false} />
-
-        {loading ? (
-          <View style={styles.centerWrap}>
-            <ActivityIndicator size="small" color="#2f6fcd" />
-            <Text style={[styles.loadingText, {color: C.textSecondary}]}>
-              {t('loading')}...
-            </Text>
-          </View>
-        ) : !resource ? (
-          <View style={styles.centerWrap}>
-            <Text style={[styles.loadingText, {color: C.textSecondary}]}>
-              {t('noDataFound')}
-            </Text>
-          </View>
-        ) : (
-          <ScrollView
-
-            contentContainerStyle={styles.scrollContent}>
-            <View
-              style={[
-                styles.heroCard,
-                {
-                  backgroundColor: C.surface,
-                  borderColor: C.inputBorder,
-                  shadowColor: '#000',
-                },
-              ]}>
-              {resource.graphic_url ? (
-                <Image
-                  source={{uri: resource.graphic_url}}
-                  style={styles.heroImage}
-                  resizeMode="cover"
-                />
-              ) : (
-                <View
-                  style={[
-                    styles.heroImagePlaceholder,
-                    {backgroundColor: C.inputBg, borderColor: C.inputBorder},
-                  ]}>
-                  <Text style={[styles.placeholderText, {color: C.textSecondary}]}>
-                    {t('resourceNoImageAvailable')}
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }>
+          <View
+            style={[
+              styles.heroCard,
+              {backgroundColor: C.surface, borderColor: C.surfaceBorder},
+            ]}>
+            {graphicUrl ? (
+              <Image
+                source={{uri: graphicUrl}}
+                style={styles.heroImage}
+                resizeMode="cover"
+              />
+            ) : null}
+            <View style={styles.heroBody}>
+              <View style={styles.summaryRow}>
+                <View style={styles.summaryText}>
+                  <Text style={[styles.resourceTitle, {color: C.textPrimary}]}>
+                    {resource.name}
                   </Text>
-                </View>
-              )}
-
-              <View style={styles.heroContent}>
-                <Text style={[styles.resourceTitle, {color: C.textPrimary}]}>
-                  {resource.name}
-                </Text>
-                {resource.author_name ? (
-                  <Text style={[styles.authorLine, {color: C.textSecondary}]}>
-                    {t('author')}: {resource.author_name}
-                  </Text>
-                ) : null}
-
-                {resource.short_description ? (
-                  <Text style={[styles.shortDescription, {color: '#2f6fcd'}]}>
-                    {resource.short_description}
-                  </Text>
-                ) : null}
-
-                <Text style={[styles.descriptionText, {color: C.textPrimary}]}>
-                  {resource.description || t('noDataFound')}
-                </Text>
-
-                {metaItems.length > 0 ? (
-                  <View style={styles.metaWrap}>
-                    {metaItems.map(item => (
-                      <View
-                        key={item}
-                        style={[styles.metaChip, {backgroundColor: C.bgSelectedOption}]}>
-                        <Text style={[styles.metaChipText, {color: C.textPrimary}]}>
-                          {item}
-                        </Text>
-                      </View>
-                    ))}
-                  </View>
-                ) : null}
-              </View>
-            </View>
-
-            {resource.resource_files && resource.resource_files.length > 0 ? (
-              <View
-                style={[
-                  styles.sectionCard,
-                  {
-                    backgroundColor: C.surface,
-                    borderColor: C.inputBorder,
-                    shadowColor: '#000',
-                  },
-                ]}>
-                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                  {t('attachments')}
-                </Text>
-                <View style={styles.filesWrap}>
-                  {resource.resource_files.map(renderFileCard)}
+                  {resource.available_languages?.length ? (
+                    <View style={styles.metaWrap}>
+                      {resource.available_languages.map(code => (
+                        <View
+                          key={code}
+                          style={[
+                            styles.metaChip,
+                            {backgroundColor: C.bgSelectedOption},
+                          ]}>
+                          <Text
+                            style={[
+                              styles.metaChipText,
+                              {color: C.textSecondary},
+                            ]}>
+                            {resourceLanguageLabel(code, t)}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  ) : null}
                 </View>
               </View>
-            ) : null}
 
-            {resource.more_information ? (
-              <View
-                style={[
-                  styles.sectionCard,
-                  {
-                    backgroundColor: C.surface,
-                    borderColor: C.inputBorder,
-                    shadowColor: '#000',
-                  },
-                ]}>
-                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                  {t('description')}
+              {description ? (
+                <Text style={[styles.descriptionText, {color: C.textSecondary}]}>
+                  {description}
                 </Text>
-                <Text style={[styles.descriptionText, {color: C.textPrimary}]}>
-                  {resource.more_information}
-                </Text>
-              </View>
-            ) : null}
+              ) : null}
 
-            {resource.author_name || resource.author_pic ? (
-              <View
-                style={[
-                  styles.authorCard,
-                  {
-                    backgroundColor: C.surface,
-                    borderColor: C.inputBorder,
-                    shadowColor: '#000',
-                  },
-                ]}>
-                {resource.author_pic ? (
-                  <Image
-                    source={{uri: resource.author_pic}}
-                    style={styles.authorImage}
-                    resizeMode="cover"
-                  />
-                ) : (
-                  <View
-                    style={[
-                      styles.authorImagePlaceholder,
-                      {backgroundColor: C.inputBg, borderColor: C.inputBorder},
-                    ]}>
-                    <Text style={[styles.placeholderText, {color: C.textSecondary}]}>
-                      {t('author')}
-                    </Text>
-                  </View>
-                )}
-
-                <View style={styles.authorContent}>
-                  <Text style={[styles.authorLabel, {color: '#2f6fcd'}]}>
-                    {t('author')}
-                  </Text>
-                  <Text style={[styles.authorName, {color: C.textPrimary}]}>
-                    {resource.author_name || '-'}
-                  </Text>
-                </View>
-              </View>
-            ) : null}
-
-            {resource.resource_weblinks && resource.resource_weblinks.length > 0 ? (
-              <View
-                style={[
-                  styles.sectionCard,
-                  {
-                    backgroundColor: C.surface,
-                    borderColor: C.inputBorder,
-                    shadowColor: '#000',
-                  },
-                ]}>
-                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                  {t('links')}
-                </Text>
-                {resource.resource_weblinks.map(link => (
+              {canManage ? (
+                <View style={styles.primaryActions}>
                   <TouchableOpacity
-                    key={link.id}
-                    style={[styles.linkRow, {borderColor: C.inputBorder}]}
                     activeOpacity={0.75}
-                    onPress={() => handleOpenUrl(link.url || '')}>
-                    <Text style={[styles.linkText, {color: '#2f6fcd'}]}>
-                      {link.title || link.url || '-'}
-                    </Text>
+                    style={styles.heroIconButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('edit')}
+                    onPress={() =>
+                      navigation.navigate('EditResource', {
+                        resourceId: resource.id,
+                      })
+                    }>
+                    <EditSvgIcon
+                      width={fs(19)}
+                      height={fs(19)}
+                      color={COLORS.mainColor}
+                    />
                   </TouchableOpacity>
-                ))}
-              </View>
-            ) : null}
-          </ScrollView>
-        )}
+                  <TouchableOpacity
+                    activeOpacity={0.75}
+                    style={styles.heroIconButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('delete')}
+                    onPress={confirmDeleteResource}
+                    disabled={busy}>
+                    <DeleteSvgIcon
+                      width={fs(19)}
+                      height={fs(19)}
+                      color={COLORS.dangerColor}
+                    />
+                  </TouchableOpacity>
+                </View>
+              ) : null}
+            </View>
+          </View>
+
+          <View
+            style={[
+              styles.sectionCard,
+              {backgroundColor: C.surface, borderColor: C.surfaceBorder},
+            ]}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                {t('resourceFiles')}
+              </Text>
+              {canManage ? (
+                <TouchableOpacity
+                  style={styles.sectionAction}
+                  onPress={openUploadModal}
+                  disabled={busy}>
+                  <Text style={styles.sectionActionText}>
+                    +{' '}
+                    {t('resourceUploadFile')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {files.length === 0 ? (
+              <Text style={[styles.emptyText, {color: C.textSecondary}]}>
+                {t('resourceNoFiles')}
+              </Text>
+            ) : (
+              files.map(renderFileRow)
+            )}
+          </View>
+
+          <View
+            style={[
+              styles.sectionCard,
+              {backgroundColor: C.surface, borderColor: C.surfaceBorder},
+            ]}>
+            <View style={styles.sectionHeader}>
+              <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                {t('resourceChildren')}
+              </Text>
+              {canManage ? (
+                <TouchableOpacity
+                  style={styles.sectionAction}
+                  onPress={() =>
+                    navigation.navigate('AddNewResource', {
+                      parentId: resource.id,
+                    })
+                  }>
+                  <Text style={styles.sectionActionText}>
+                    + {t('addNew')}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+            {children.length === 0 ? (
+              <Text style={[styles.emptyText, {color: C.textSecondary}]}>
+                {t('resourceNoChildren')}
+              </Text>
+            ) : (
+              children.map(renderChildRow)
+            )}
+          </View>
+        </ScrollView>
       </View>
+
+      <Modal
+        visible={fileModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setFileModalVisible(false)}>
+        <KeyboardAvoidingView
+          style={styles.modalKeyboardAvoider}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+          <View style={styles.modalBackdrop}>
+            <ScrollView
+              style={[styles.modalCard, {backgroundColor: C.surface}]}
+              contentContainerStyle={styles.modalCardContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+              bounces={false}>
+            <Text style={[styles.modalTitle, {color: C.textPrimary}]}>
+              {fileModalMode === 'upload'
+                ? t('resourceUploadFile')
+                : t('resourceEditFile')}
+            </Text>
+            {fileModalMode === 'edit' ? (
+              <>
+                <Text style={[formStyles.label, {color: C.textPrimary}]}>
+                  {t('resourceFileName')}
+                </Text>
+                <AppInput value={fileName} onChangeText={setFileName} />
+              </>
+            ) : (
+              <>
+                <Text style={[formStyles.label, {color: C.textPrimary}]}>
+                  {t('resourceFormat')}
+                </Text>
+                <ElementDropdown
+                  data={formats.map(item => ({
+                    label: item.name,
+                    value: item.id,
+                  }))}
+                  value={formatId}
+                  onChange={value =>
+                    setFormatId(typeof value === 'number' ? value : Number(value))
+                  }
+                  placeholder={t('resourceSelectFormat')}
+                  search={false}
+                />
+                <TouchableOpacity
+                  onPress={pickUploadFile}
+                  activeOpacity={0.7}
+                  style={[styles.pickFileButton, {borderColor: COLORS.mainColor}]}>
+                  <Text
+                    style={[
+                      styles.pickFileButtonText,
+                      {color: COLORS.mainColor},
+                    ]}
+                    numberOfLines={1}>
+                    {pickedFile?.name || t('resourcePickFile')}
+                  </Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <Text style={[formStyles.label, styles.fieldGap, {color: C.textPrimary}]}>
+              {t('resourcePartNumber')}
+            </Text>
+            <AppInput
+              value={partNo}
+              onChangeText={setPartNo}
+              keyboardType="number-pad"
+            />
+            <Text style={[formStyles.label, styles.fieldGap, {color: C.textPrimary}]}>
+              {t('resourceFileLanguage')}
+            </Text>
+            <ElementDropdown
+              data={RESOURCE_LANGUAGE_CODES.map(code => ({
+                label: resourceLanguageLabel(code, t),
+                value: code,
+              }))}
+              value={fileLang || 'en'}
+              onChange={value => setFileLang(String(value))}
+              placeholder={t('resourceFileLanguage')}
+              search={false}
+            />
+            <View style={styles.switchRow}>
+              <Text style={[formStyles.label, {color: C.textPrimary, marginBottom: 0}]}>
+                {t('resourceAiTranslated')}
+              </Text>
+              <Switch
+                value={isAiTranslated}
+                onValueChange={setIsAiTranslated}
+              />
+            </View>
+            <View style={styles.modalActions}>
+              <CancelButton
+                label={t('cancel')}
+                onPress={() => setFileModalVisible(false)}
+                style={styles.adminButton}
+              />
+              <SaveButton
+                label={busy ? t('saving') : t('save')}
+                onPress={submitFileModal}
+                disabled={busy}
+                style={styles.adminButton}
+              />
+            </View>
+            </ScrollView>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -404,7 +939,10 @@ export default function ResourceDetailScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    paddingHorizontal: ms(12),
+    paddingHorizontal: ms(16),
+  },
+  headerWrap: {
+    paddingHorizontal: ms(16),
   },
   centerWrap: {
     flex: 1,
@@ -416,167 +954,236 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
   },
   scrollContent: {
-    paddingTop: ms(8),
-    paddingBottom: ms(24),
-    gap: ms(12),
+    paddingTop: ms(12),
+    paddingBottom: ms(28),
+    gap: ms(16),
   },
   heroCard: {
     borderWidth: 1,
-    borderRadius: rs(14),
+    borderRadius: rs(12),
     overflow: 'hidden',
-    shadowOpacity: 0.08,
-    shadowRadius: rs(8),
-    shadowOffset: {width: 0, height: hs(3)},
+    shadowColor: '#000',
+    shadowOpacity: 0.05,
+    shadowRadius: rs(6),
+    shadowOffset: {width: 0, height: 2},
     elevation: 2,
   },
   heroImage: {
     width: '100%',
-    height: ws(190),
+    height: ws(170),
   },
-  heroImagePlaceholder: {
-    width: '100%',
-    height: ws(190),
-    borderBottomWidth: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
+  heroBody: {
+    padding: ms(16),
   },
-  placeholderText: {
-    fontSize: fs(12),
-    fontWeight: '500',
+  summaryRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
   },
-  heroContent: {
-    padding: ms(14),
+  summaryText: {
+    flex: 1,
+    minWidth: 0,
   },
   resourceTitle: {
-    fontSize: fs(20),
+    fontSize: fs(19),
     fontWeight: '700',
-    lineHeight: fs(28),
-    marginBottom: ms(6),
-  },
-  authorLine: {
-    fontSize: fs(13),
-    marginBottom: ms(8),
-  },
-  shortDescription: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    lineHeight: fs(20),
-    marginBottom: ms(10),
+    lineHeight: fs(25),
   },
   descriptionText: {
     fontSize: fs(14),
-    lineHeight: fs(22),
+    lineHeight: fs(21),
+    marginTop: ms(12),
   },
   metaWrap: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: ms(8),
-    marginTop: ms(14),
+    gap: ms(6),
+    marginTop: ms(6),
   },
   metaChip: {
-    borderRadius: rs(999),
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(6),
+    borderRadius: rs(12),
+    paddingHorizontal: ms(9),
+    paddingVertical: ms(3),
   },
   metaChipText: {
-    fontSize: fs(12),
-    fontWeight: '500',
+    fontSize: fs(11),
+    fontWeight: '600',
+  },
+  primaryActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: ms(6),
+    marginTop: ms(16),
+  },
+  heroIconButton: {
+    width: ws(34),
+    height: ws(34),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionCard: {
     borderWidth: 1,
-    borderRadius: rs(14),
+    borderRadius: rs(12),
+    overflow: 'hidden',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     padding: ms(14),
-    shadowOpacity: 0.08,
-    shadowRadius: rs(8),
-    shadowOffset: {width: 0, height: hs(3)},
-    elevation: 2,
   },
   sectionTitle: {
     fontSize: fs(16),
     fontWeight: '700',
-    marginBottom: ms(12),
   },
-  filesWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    gap: ms(10),
-  },
-  fileCard: {
-    width: '48%',
+  sectionAction: {
     borderWidth: 1,
-    borderRadius: rs(12),
+    borderColor: COLORS.mainColor,
+    borderRadius: rs(6),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(6),
+  },
+  sectionActionText: {
+    color: COLORS.mainColor,
+    fontSize: fs(12),
+    fontWeight: '600',
+  },
+  itemCard: {
+    borderWidth: 0,
+    borderTopWidth: 1,
+    borderRadius: 0,
+    marginBottom: 0,
+  },
+  listRowMain: {
+    flexDirection: 'row',
+    alignItems: 'center',
     padding: ms(12),
-    minHeight: ws(130),
+  },
+  listRowBody: {
+    flex: 1,
+    minWidth: 0,
   },
   fileBadge: {
-    alignSelf: 'flex-start',
-    borderRadius: rs(8),
+    borderRadius: rs(6),
     paddingHorizontal: ms(8),
-    paddingVertical: ms(6),
-    marginBottom: ms(10),
+    paddingVertical: ms(5),
+    marginRight: ms(10),
+    maxWidth: ws(82),
   },
   fileBadgeText: {
-    fontSize: fs(12),
+    fontSize: fs(10),
     fontWeight: '700',
   },
   fileName: {
     fontSize: fs(13),
-    lineHeight: fs(18),
     fontWeight: '600',
-    marginBottom: ms(10),
+    lineHeight: fs(18),
   },
-  fileActionText: {
-    marginTop: 'auto',
+  fileMeta: {
+    fontSize: fs(11),
+    marginTop: ms(2),
+  },
+  openHint: {
     fontSize: fs(12),
     fontWeight: '600',
+    marginLeft: ms(8),
   },
-  authorCard: {
-    borderWidth: 1,
-    borderRadius: rs(14),
-    padding: ms(14),
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowOpacity: 0.08,
-    shadowRadius: rs(8),
-    shadowOffset: {width: 0, height: hs(3)},
-    elevation: 2,
+  chevron: {
+    fontSize: fs(22),
+    lineHeight: fs(22),
+    marginLeft: ms(8),
   },
-  authorImage: {
-    width: ws(92),
-    height: ws(92),
-    borderRadius: rs(12),
-    marginRight: ms(14),
-  },
-  authorImagePlaceholder: {
-    width: ws(92),
-    height: ws(92),
-    borderRadius: rs(12),
-    borderWidth: 1,
-    marginRight: ms(14),
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: ms(6),
-  },
-  authorContent: {
-    flex: 1,
-  },
-  authorLabel: {
-    fontSize: fs(13),
-    fontWeight: '700',
-    marginBottom: ms(6),
-  },
-  authorName: {
-    fontSize: fs(18),
-    fontWeight: '600',
-    lineHeight: fs(24),
-  },
-  linkRow: {
-    borderTopWidth: 1,
-    paddingVertical: ms(12),
-  },
-  linkText: {
+  childName: {
     fontSize: fs(14),
     fontWeight: '600',
+  },
+  itemActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(4),
+  },
+  reorderActions: {
+    flexDirection: 'row',
+    gap: ms(6),
+  },
+  editActions: {
+    flexDirection: 'row',
+    gap: ms(4),
+  },
+  simpleIconButton: {
+    width: ws(30),
+    height: ws(30),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reorderButton: {
+    width: ws(30),
+    height: ws(30),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  reorderGlyph: {
+    fontSize: fs(17),
+    fontWeight: '700',
+  },
+  emptyText: {
+    fontSize: fs(13),
+    paddingVertical: ms(16),
+    textAlign: 'center',
+  },
+  modalKeyboardAvoider: {
+    flex: 1,
+  },
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.4)',
+    justifyContent: 'flex-end',
+  },
+  modalCard: {
+    maxHeight: '92%',
+    borderTopLeftRadius: rs(16),
+    borderTopRightRadius: rs(16),
+  },
+  modalCardContent: {
+    padding: ms(16),
+    paddingBottom: ms(28),
+  },
+  modalTitle: {
+    fontSize: fs(16),
+    fontWeight: '700',
+    marginBottom: ms(12),
+  },
+  fieldGap: {
+    marginTop: ms(10),
+  },
+  pickFileButton: {
+    marginTop: ms(10),
+    borderWidth: 1,
+    borderRadius: rs(6),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(8),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pickFileButtonText: {
+    fontSize: fs(13),
+    fontWeight: '600',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: ms(12),
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: ms(12),
+    marginTop: ms(16),
+  },
+  adminButton: {
+    flex: 1,
   },
 });

@@ -5,7 +5,6 @@ import {
   Linking,
   ScrollView,
   StyleSheet,
-  Text as RNText,
   TouchableOpacity,
   View,
 } from 'react-native';
@@ -20,7 +19,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import AppButton from '../../../shared/components/AppButton';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 
 const blankChurch = require('../../../assets/images/church.png');
@@ -40,7 +39,7 @@ export default function ChurchDetailScreen() {
   const [imageModalVisible, setImageModalVisible] = useState<boolean>(false);
   const [imageError, setImageError] = useState<boolean>(false);
 
-  const fetchChurch = async () => {
+  const fetchChurch = React.useCallback(async () => {
     if (!churchId) {
       setLoading(false);
       return;
@@ -53,7 +52,7 @@ export default function ChurchDetailScreen() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [churchId]);
 
   useEffect(() => {
     let mounted = true;
@@ -66,14 +65,14 @@ export default function ChurchDetailScreen() {
     return () => {
       mounted = false;
     };
-  }, [churchId]);
+  }, [fetchChurch]);
 
   useFocusEffect(
     React.useCallback(() => {
       // Refresh details whenever screen gains focus (after enable/disable flow)
       fetchChurch();
       return () => {};
-    }, [churchId]),
+    }, [fetchChurch]),
   );
 
   useEffect(() => {
@@ -140,6 +139,16 @@ export default function ChurchDetailScreen() {
     {label: 'tt', url: normalizeUrl(data?.tiktok)},
   ].filter(item => !!item.url);
 
+  const hasCoordinates =
+    data?.latitude != null && data?.longitude != null;
+  const hasLocation = hasCoordinates || !!omrMapUrl;
+  const locationLabel = hasCoordinates
+    ? `${Number(data.latitude).toFixed(4)}, ${Number(data.longitude).toFixed(4)}`
+    : omrMapUrl || '-';
+  const mapsLink = hasCoordinates
+    ? `https://maps.google.com/?q=${data.latitude},${data.longitude}`
+    : omrMapUrl || '';
+
   const openLink = (url?: string) => {
     if (!url) return;
     Linking.openURL(url).catch(() => {});
@@ -179,6 +188,31 @@ export default function ChurchDetailScreen() {
         <ScrollView
 
           contentContainerStyle={{paddingBottom: ms(24)}}>
+          {!loading && data && !hasLocation && (
+            <View style={styles.locationCard}>
+              <View style={styles.locationContent}>
+                <Text style={styles.locationTitle}>
+                  {t('omrMapLocationMissing') ||
+                    'This church does not have a map location yet.'}
+                </Text>
+              </View>
+              {isSuperAdminUser ? (
+                <TouchableOpacity
+                  style={styles.locationAction}
+                  onPress={() =>
+                    navigation.navigate('EditChurchLocation' as any, {
+                      id: churchId,
+                      latitude: data?.latitude,
+                      longitude: data?.longitude,
+                    })
+                  }>
+                  <Text style={styles.locationActionText}>
+                    {t('addLocation') || 'Add'}
+                  </Text>
+                </TouchableOpacity>
+              ) : null}
+            </View>
+          )}
           {loading ? (
             <View style={styles.loadingWrap}>
               <ActivityIndicator size="large" color={COLORS.mainColor} />
@@ -203,17 +237,17 @@ export default function ChurchDetailScreen() {
                     resizeMode="cover"
                     onError={() => setImageError(true)}
                   />
-                  <TouchableOpacity
-                    style={[
-                      styles.iconBtn,
-                      styles.zoomBtn,
-                      {backgroundColor: C.surface},
-                      !canOpenFullImage && styles.disabledBtn,
-                    ]}
-                    onPress={() => setImageModalVisible(true)}
-                    disabled={!canOpenFullImage}>
-                    <Image source={zoomOutIcon} style={styles.zoomIcon} resizeMode="contain" />
-                  </TouchableOpacity>
+                  {canOpenFullImage ? (
+                    <TouchableOpacity
+                      style={[
+                        styles.iconBtn,
+                        styles.zoomBtn,
+                        {backgroundColor: C.surface},
+                      ]}
+                      onPress={() => setImageModalVisible(true)}>
+                      <Image source={zoomOutIcon} style={styles.zoomIcon} resizeMode="contain" />
+                    </TouchableOpacity>
+                  ) : null}
                 </View>
                 <View style={styles.summaryText}>
                   <Text style={[styles.summaryName, {color: COLORS.mainColor}]}>
@@ -353,22 +387,44 @@ export default function ChurchDetailScreen() {
                 {renderRow(t('currency'), data.currency_name || '-', {
                   valueStyle: styles.normalValue,
                 })}
-                {renderRow('OMR Map\nLocation', omrMapUrl || '-', {
-                  noDivider: true,
-                  link: omrMapUrl || '',
-                  valueStyle: styles.normalValue,
-                })}
+                <View style={[styles.row, styles.noDivider, {borderBottomColor: C.border}]}>
+                  <Text style={[styles.rowLabel, {color: C.textPrimary}]}>
+                    OMR Map{'\n'}Location
+                  </Text>
+                  <View style={styles.locationRowRight}>
+                    <Text
+                      style={[
+                        styles.rowValue,
+                        styles.normalValue,
+                        mapsLink ? [styles.rowLink, {color: COLORS.mainColor}] : null,
+                      ]}
+                      onPress={mapsLink ? () => openLink(mapsLink) : undefined}>
+                      {locationLabel}
+                    </Text>
+                    {isSuperAdminUser && hasLocation ? (
+                      <TouchableOpacity
+                        style={styles.locationEditChip}
+                        onPress={() =>
+                          navigation.navigate('EditChurchLocation' as any, {
+                            id: churchId,
+                            latitude: data?.latitude,
+                            longitude: data?.longitude,
+                          })
+                        }>
+                        <Text style={styles.locationEditChipText}>
+                          {t('edit') || 'Edit'}
+                        </Text>
+                      </TouchableOpacity>
+                    ) : null}
+                  </View>
+                </View>
               </View>
 
               {isSuperAdminUser ? (
-                <View style={{paddingHorizontal: 0}}>
+                <View style={styles.fullWidthActionWrap}>
                   {data.disabled ? (
                     <AppButton
-                      style={{
-                        marginTop: ms(8),
-                        backgroundColor: COLORS.successColor,
-                        borderColor: COLORS.successColor,
-                      }}
+                      style={styles.enableChurchButton}
                       onPress={() =>
                         navigation.navigate('EnableChurch' as any, {
                           id: churchId,
@@ -378,11 +434,7 @@ export default function ChurchDetailScreen() {
                     </AppButton>
                   ) : (
                     <AppButton
-                      style={{
-                        marginTop: ms(8),
-                        backgroundColor: COLORS.dangerColor,
-                        borderColor: COLORS.dangerColor,
-                      }}
+                      style={styles.disableChurchButton}
                       onPress={() =>
                         navigation.navigate('DisableChurch' as any, {
                           id: churchId,
@@ -549,6 +601,72 @@ const styles = StyleSheet.create({
   socialLabel: {
     fontSize: fs(12),
     fontWeight: '700',
+  },
+  fullWidthActionWrap: {
+    paddingTop: ms(12),
+    paddingBottom: ms(4),
+  },
+  disableChurchButton: {
+    width: '100%',
+    backgroundColor: COLORS.dangerColor,
+    borderColor: COLORS.dangerColor,
+  },
+  enableChurchButton: {
+    width: '100%',
+    backgroundColor: COLORS.successColor,
+    borderColor: COLORS.successColor,
+  },
+  locationCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: ms(12),
+    marginTop: ms(8),
+    marginBottom: ms(8),
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(6),
+    borderRadius: rs(10),
+    backgroundColor: '#FFF4CC',
+  },
+  locationContent: {
+    flex: 1,
+    marginRight: ms(8),
+  },
+  locationTitle: {
+    fontSize: fs(13),
+    fontWeight: '600',
+    lineHeight: fs(16),
+    color: '#8A4B16',
+  },
+  locationDescription: {
+    fontSize: fs(12),
+    lineHeight: fs(14),
+    marginTop: ms(1),
+  },
+  locationAction: {
+    paddingHorizontal: ms(4),
+    paddingVertical: ms(4),
+  },
+  locationActionText: {
+    color: COLORS.mainColor,
+    fontSize: fs(12),
+    fontWeight: '700',
+  },
+  locationRowRight: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    gap: ms(8),
+  },
+  locationEditChip: {
+    paddingHorizontal: ms(4),
+    paddingVertical: ms(2),
+    borderRadius: rs(8),
+  },
+  locationEditChipText: {
+    fontSize: fs(11),
+    fontWeight: '600',
+    color: COLORS.mainColor,
   },
   attributeWrap: {
     flex: 1,

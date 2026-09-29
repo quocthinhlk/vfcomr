@@ -6,6 +6,7 @@ export type SelectedChartPoint = {
   value: number;
   cx: number;
   cy: number;
+  label?: string;
 };
 
 export type ChartDot = {
@@ -14,6 +15,7 @@ export type ChartDot = {
   cy: number;
   index: number;
   value: number;
+  label?: string;
 };
 
 export const toggleChartPointSelection = (

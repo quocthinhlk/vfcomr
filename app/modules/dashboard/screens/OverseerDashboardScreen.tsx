@@ -588,7 +588,7 @@ export default function OverseerDashboardScreen() {
     },
     {
       icon: require('../../../../app/assets/images/icon/visit.png'),
-      label: t('pastoralVisits') || 'Pastoral Visits',
+      label: t('pastoralVisits') || 'Church Visits Chart',
       routeName: 'PastoralVisitsChart',
     },
     {

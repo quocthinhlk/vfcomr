@@ -17,9 +17,9 @@ const APP_LANGUAGE_STORAGE_KEY = 'appLanguage';
 const DEFAULT_LANGUAGE = 'en';
 
 // Admin token
-// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3ODkzNzQ1MzQsInJvbGUiOiJTdXBlciBBZG1pbiIsInJvbGVJRCI6MSwidXNlcklEIjo0NDUwfQ.oH5eRvElBNThPtwq8_2nhgtAOWAhgudiK0qzRtsLhzY";
+export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI2NTYsInJvbGUiOiJBZG1pbiIsInJvbGVJRCI6MiwidXNlcklEIjo0ODI1fQ.11_t1FZFBdad3vcBG8_eq5c4LSSkHubeWxMjfx6OA9s";
 // Overseer token
-export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3OTEyODEyMDEsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.uQ9qXyfn5NUGHSPY61nTqPjRs2APbRqPkMHF7pn0lDo";
+// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI3MTUsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.JSdjDkonHna9DZVwORfbsLIz70oHRsbehAVR5We3TYY";
 // export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({

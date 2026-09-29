@@ -19,6 +19,12 @@ interface ImagePickerConfig {
    * Target height for cropping. Defaults to 300.
    */
   height?: number;
+  /**
+   * Allow any aspect ratio when cropping. When true, width/height
+   * constraints are not passed to the picker, so the user can choose
+   * any crop shape. Defaults to false (fixed ratio from width/height).
+   */
+  freeAspect?: boolean;
 }
 
 export function useImagePicker(config?: ImagePickerConfig) {
@@ -30,6 +36,7 @@ export function useImagePicker(config?: ImagePickerConfig) {
     try {
       const targetWidth = config?.width ?? 300;
       const targetHeight = config?.height ?? 300;
+      const useFixedDimensions = !config?.freeAspect;
 
       const ok = await ensureAndroidPermission(source, t('cancel') || 'Cancel');
       if (!ok) {
@@ -42,9 +49,11 @@ export function useImagePicker(config?: ImagePickerConfig) {
           : ImagePicker.openPicker;
 
       const image = await open({
-        width: targetWidth,
-        height: targetHeight,
+        ...(useFixedDimensions
+          ? {width: targetWidth, height: targetHeight}
+          : {}),
         cropping: true,
+        ...(config?.freeAspect ? {freeStyleCropEnabled: true} : {}),
         cropperCircleOverlay: false,
         compressImageMaxWidth: 1024,
         compressImageMaxHeight: 1024,

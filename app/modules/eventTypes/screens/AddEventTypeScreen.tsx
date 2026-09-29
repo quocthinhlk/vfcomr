@@ -6,7 +6,7 @@ import {useNavigation} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
-import {createEventType} from '../services/eventType.service';
+import {createEventType, EventMeetingType} from '../services/eventType.service';
 import {
   SaveButton,
   CancelButton,
@@ -24,7 +24,7 @@ export const AddEventTypeScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [color, setColor] = useState('');
   const [cellColor, setCellColor] = useState('');
-  const [meetingType, setMeetingType] = useState<'Pastors List' | 'Attendance' | null>(null);
+  const [meetingType, setMeetingType] = useState<EventMeetingType | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const {t} = useTranslation();
@@ -34,8 +34,8 @@ export const AddEventTypeScreen: React.FC = () => {
     setInvalid(prev => ({...prev, [key]: false}));
 
   const meetingTypeOptions = [
-    {label: 'Pastors List', value: 'Pastors List' as const},
-    {label: 'Attendance', value: 'Attendance' as const},
+    {label: t('eventAttendance') || 'Attendance', value: 'attendance' as const},
+    {label: t('eventMeetingWith') || 'Meeting With', value: 'meeting_with' as const},
   ];
 
   const onSave = async () => {
@@ -57,7 +57,7 @@ export const AddEventTypeScreen: React.FC = () => {
         name: name.trim(),
         color: color.trim(),
         cell_color: cellColor.trim(),
-        meeting_type: meetingType as 'Pastors List' | 'Attendance',
+        meeting_type: meetingType as EventMeetingType,
       });
       Alert.alert(t('success') || 'Success', `${t('add') || 'Add'} ${t('eventType') || 'Event Type'} ${t('success') || 'success'}`);
       navigation.navigate('EventTypes', {reload: true});
@@ -144,7 +144,7 @@ export const AddEventTypeScreen: React.FC = () => {
                     data={meetingTypeOptions}
                     value={meetingType as any}
                     onChange={v => {
-                      setMeetingType(v as 'Pastors List' | 'Attendance');
+                      setMeetingType(v as EventMeetingType);
                       clearInvalid('meetingType');
                     }}
                     placeholder={t('selectOption') || 'Select Meeting Type'}

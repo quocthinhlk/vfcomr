@@ -1,11 +1,28 @@
 import api from '../../../config/api';
 
+export type EventMeetingType = 'attendance' | 'meeting_with';
+
 export interface EventTypeItem {
   id: number;
   name: string;
   color: string;
   cell_color: string;
-  meeting_type: 'Pastors List' | 'Attendance' | 'Both';
+  meeting_type: EventMeetingType;
+}
+
+export function resolveEventMeetingType(
+  meetingType?: string | null,
+): EventMeetingType | null {
+  if (meetingType === 'attendance' || meetingType === 'meeting_with') {
+    return meetingType;
+  }
+  if (meetingType === 'Pastors List') {
+    return 'meeting_with';
+  }
+  if (meetingType === 'Attendance' || meetingType === 'Both') {
+    return 'attendance';
+  }
+  return null;
 }
 
 export interface ListEventTypesResponse {
@@ -24,14 +41,14 @@ export interface CreateEventTypePayload {
   name: string;
   color: string;
   cell_color: string;
-  meeting_type: 'Pastors List' | 'Attendance';
+  meeting_type: EventMeetingType;
 }
 
 export interface UpdateEventTypePayload {
   name: string;
   color: string;
   cell_color: string;
-  meeting_type: 'Pastors List' | 'Attendance' | 'Both';
+  meeting_type: EventMeetingType;
 }
 
 export async function listEventTypes() {

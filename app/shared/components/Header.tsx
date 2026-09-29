@@ -5,7 +5,7 @@ import {MenuPopup} from './MenuPopup';
 import {CommonMenuItem} from '../interfaces/MenuItem';
 import {logout} from '../../modules/auth/services/auth.service';
 import {AuthContext} from '../../config/navigation';
-import {dashboardMenuItems, getTranslatedMenuItems} from '../config/dashboard.constants';
+import {getTranslatedMenuItems} from '../config/dashboard.constants';
 import {useLanguage} from '../context/LanguageContext';
 import api from '../../config/api';
 import {
@@ -14,10 +14,8 @@ import {
   ParamListBase,
   useRoute,
 } from '@react-navigation/native';
-import { useThemedColors } from '../styles/theme';
-import { fs, ws, hs, ms, rs } from '../utils/scale';
-
- 
+import {useThemedColors} from '../styles/theme';
+import {fs, ws, hs, ms} from '../utils/scale';
 
 type HeaderProps = {
   title?: string;
@@ -140,6 +138,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     elevation: 0,
     borderBottomWidth: 0,
+    paddingHorizontal: ms(12),
   },
   backText: {
     fontSize: fs(44),
@@ -150,12 +149,11 @@ const styles = StyleSheet.create({
     width: ws(25),
     height: hs(35),
     resizeMode: 'contain',
-    marginLeft: 0,
     textAlign: 'right',
   },
   backWrap: {
-    marginLeft: 0,
-    paddingLeft: 0,
+    paddingVertical: hs(6),
+    paddingRight: ms(8),
     alignItems: 'flex-start',
     justifyContent: 'center',
   },

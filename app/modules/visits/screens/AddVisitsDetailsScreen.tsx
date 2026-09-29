@@ -28,7 +28,11 @@ import ElementDropdown, {
 } from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
-import {listEventTypes, EventTypeItem} from '../../eventTypes/services/eventType.service';
+import {
+  listEventTypes,
+  EventTypeItem,
+  resolveEventMeetingType,
+} from '../../eventTypes/services/eventType.service';
 import {useLanguage} from '../../../shared/context/LanguageContext';
 import {
   addWeeks,
@@ -65,6 +69,7 @@ interface EventEntry {
   event_type_id: number | null;
   name: string;
   attendance: string;
+  meeting_with: number | null;
   daysByWeek: Record<number, string>;
 }
 
@@ -144,6 +149,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [countryOptions, setCountryOptions] = useState<CountryOption[]>([]);
+  const [userOptions, setUserOptions] = useState<ElementDropdownItem[]>([]);
   const [eventTypes, setEventTypes] = useState<EventTypeItem[]>([]);
   const [weekColumns, setWeekColumns] = useState<WeekColumn[]>([]);
   const [visitEntries, setVisitEntries] = useState<VisitEntry[]>([]);
@@ -179,9 +185,10 @@ export const AddVisitsDetailsScreen: React.FC = () => {
           return;
         }
 
-        const [countriesRes, eventTypesRes] = await Promise.all([
+        const [countriesRes, eventTypesRes, usersRes] = await Promise.all([
           api.get('countries', {params: {page: 1, limit: 1000, sort_by: 'name', sort_desc: false}}),
           listEventTypes(),
+          api.get('users', {params: {page: 1, limit: 1000, sort_by: 'name', sort_desc: false}}),
         ]);
 
         if (!mounted) {
@@ -192,7 +199,12 @@ export const AddVisitsDetailsScreen: React.FC = () => {
           label: item.name,
           value: item.id,
         }));
+        const users = ((usersRes?.data?.data?.items ?? []) as any[]).map(item => ({
+          label: item.name || `${item.first_name || ''} ${item.last_name || ''}`.trim() || String(item.id),
+          value: item.id,
+        }));
         setCountryOptions(countries);
+        setUserOptions(users);
         setEventTypes(eventTypesRes?.data ?? []);
 
         const columns = createWeekColumns(selectedYear, selectedMonth);
@@ -215,6 +227,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
             event_type_id: null,
             name: '',
             attendance: '',
+            meeting_with: null,
             daysByWeek: {...emptyWeekState},
           })),
         );
@@ -458,11 +471,11 @@ export const AddVisitsDetailsScreen: React.FC = () => {
       }
 
       const eventType = getSelectedEventType(entry.event_type_id);
-      const requiresAttendance = eventType?.meeting_type !== 'Pastors List';
+      const meetingType = resolveEventMeetingType(eventType?.meeting_type);
       const attendanceNumber = Number(entry.attendance || '0');
 
       if (
-        requiresAttendance &&
+        meetingType === 'attendance' &&
         (!entry.attendance.trim() || !Number.isFinite(attendanceNumber) || attendanceNumber <= 0)
       ) {
         setFieldError(
@@ -470,6 +483,15 @@ export const AddVisitsDetailsScreen: React.FC = () => {
           t('pleaseEnterAttendance') || 'Please enter attendance.',
         );
         requestAnimationFrame(() => scrollToField(`event.${index}.attendance`));
+        return;
+      }
+
+      if (meetingType === 'meeting_with' && !entry.meeting_with) {
+        setFieldError(
+          `event.${index}.meeting_with`,
+          t('pleaseSelectMeetingWith') || 'Please select who you met with.',
+        );
+        requestAnimationFrame(() => scrollToField(`event.${index}.meeting_with`));
         return;
       }
 
@@ -498,7 +520,10 @@ export const AddVisitsDetailsScreen: React.FC = () => {
           year: selectedYear,
           week_number: item.weekNumber,
           number_of_days: item.numberOfDays,
-          ...(requiresAttendance ? {attendance: attendanceNumber} : {}),
+          ...(meetingType === 'attendance' ? {attendance: attendanceNumber} : {}),
+          ...(meetingType === 'meeting_with' && entry.meeting_with
+            ? {meeting_with: entry.meeting_with}
+            : {}),
         });
       });
     }
@@ -744,12 +769,18 @@ export const AddVisitsDetailsScreen: React.FC = () => {
                       <ElementDropdown
                         data={eventTypeOptions}
                         value={entry.event_type_id}
-                        onChange={value =>
+                        onChange={value => {
+                          clearInvalid(`event.${index}.attendance`);
+                          clearInvalid(`event.${index}.meeting_with`);
+                          clearFieldError(`event.${index}.attendance`);
+                          clearFieldError(`event.${index}.meeting_with`);
                           updateEventEntry(index, current => ({
                             ...current,
                             event_type_id: value as number,
-                          }))
-                        }
+                            attendance: '',
+                            meeting_with: null,
+                          }));
+                        }}
                         placeholder={t('eventType') || 'Event Type'}
                         containerStyle={{
                           backgroundColor: C.inputBg,
@@ -760,6 +791,65 @@ export const AddVisitsDetailsScreen: React.FC = () => {
                       />
                       {renderFieldError(`event.${index}.event_type_id`)}
                     </View>
+
+                    {resolveEventMeetingType(
+                      getSelectedEventType(entry.event_type_id)?.meeting_type,
+                    ) === 'attendance' && (
+                      <View
+                        style={styles.field}
+                        onLayout={e =>
+                          setFieldPos(`event.${index}.attendance`, e.nativeEvent.layout.y)
+                        }>
+                        <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                          {t('eventAttendance') || 'Attendance'}
+                        </Text>
+                        <AppInput
+                          value={entry.attendance}
+                          error={!!invalid[`event.${index}.attendance`]}
+                          onChangeText={text =>
+                            updateEventEntry(index, current => ({
+                              ...current,
+                              attendance: normalizePositiveIntegerInput(text),
+                            }))
+                          }
+                          keyboardType="numeric"
+                          placeholder="0"
+                        />
+                        {renderFieldError(`event.${index}.attendance`)}
+                      </View>
+                    )}
+
+                    {resolveEventMeetingType(
+                      getSelectedEventType(entry.event_type_id)?.meeting_type,
+                    ) === 'meeting_with' && (
+                      <View
+                        style={styles.field}
+                        onLayout={e =>
+                          setFieldPos(`event.${index}.meeting_with`, e.nativeEvent.layout.y)
+                        }>
+                        <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
+                          {t('eventMeetingWith') || 'Meeting With'}
+                        </Text>
+                        <ElementDropdown
+                          data={userOptions}
+                          value={entry.meeting_with}
+                          onChange={value =>
+                            updateEventEntry(index, current => ({
+                              ...current,
+                              meeting_with: value as number,
+                            }))
+                          }
+                          placeholder={t('selectMeetingWith') || 'Select person'}
+                          containerStyle={{
+                            backgroundColor: C.inputBg,
+                            borderColor: invalid[`event.${index}.meeting_with`]
+                              ? C.error || '#ff4444'
+                              : C.inputBorder,
+                          }}
+                        />
+                        {renderFieldError(`event.${index}.meeting_with`)}
+                      </View>
+                    )}
 
                     <View
                       style={styles.field}
@@ -779,27 +869,6 @@ export const AddVisitsDetailsScreen: React.FC = () => {
                         placeholder={t('name') || 'Name'}
                       />
                       {renderFieldError(`event.${index}.name`)}
-                    </View>
-
-                    <View
-                      style={styles.field}
-                      onLayout={e => setFieldPos(`event.${index}.attendance`, e.nativeEvent.layout.y)}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('approxAttendanceAtEvent') || 'Approx. Attendance at Event'}
-                      </Text>
-                      <AppInput
-                        value={entry.attendance}
-                        error={!!invalid[`event.${index}.attendance`]}
-                        onChangeText={text =>
-                          updateEventEntry(index, current => ({
-                            ...current,
-                            attendance: normalizePositiveIntegerInput(text),
-                          }))
-                        }
-                        keyboardType="numeric"
-                        placeholder="0"
-                      />
-                      {renderFieldError(`event.${index}.attendance`)}
                     </View>
                     <View onLayout={e => setFieldPos(`event.${index}.weeks`, e.nativeEvent.layout.y)}>
                       {renderFieldError(`event.${index}.weeks`)}

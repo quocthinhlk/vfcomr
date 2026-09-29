@@ -3,7 +3,7 @@ import {ActivityIndicator, Image, ScrollView, StyleSheet, View} from 'react-nati
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import Svg, {G, Line, Rect, Text as SvgText} from 'react-native-svg';
-import {useFocusEffect, useRoute} from '@react-navigation/native';
+import {useFocusEffect} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -11,11 +11,26 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {
+  getOverseerChartHeaderInfo,
   getOverseerIndicators,
   PastoralVisitWeekPoint,
 } from '../services/overseerIndicators.service';
-import {useDashboardChartChurchId} from '../hooks/useDashboardChartChurchId';
-import {useChartChurchName} from '../hooks/useChartChurchName';
+import {OverseerChartTitleBlock} from '../components/OverseerChartTitleBlock';
+import {ChartSaveButton} from '../components/ChartSaveButton';
+import {
+  CHART_EXPORT_PAD,
+  CHART_EXPORT_TITLE_H,
+  ChartExportTitleTexts,
+  chartExportOffscreenStyle,
+} from '../components/ChartExportTitleTexts';
+import {
+  formatCompactChartDate,
+  formatOverseerReportDate,
+  formatReportingPeriod,
+  pickGraphHeaderValue,
+  yearFromIsoDate,
+} from '../utils/overseerChartHeader';
+import {useChartJpegExport} from '../utils/useChartJpegExport';
 
 type Row = {dates: string; visitDays: number; sortKey: number; churches: string[]};
 
@@ -28,9 +43,9 @@ const SVG_TOTAL_HEIGHT = CHART_HEIGHT + X_LABEL_AREA;
 const PADDING_LEFT = 42;
 const PADDING_RIGHT = 14;
 const PADDING_Y = 16;
-const BAR_SLOT = 13;
-const BAR_WIDTH = 9;
-const X_LABEL_EVERY = 6;
+const BAR_SLOT = 24;
+const BAR_WIDTH = 16;
+const X_LABEL_EVERY = 4;
 const Y_AXIS_WIDTH = 34;
 
 const getNiceStep = (rawStep: number) => {
@@ -132,14 +147,13 @@ function normaliseRows(list: PastoralVisitWeekPoint[]): Row[] {
 export default function PastoralVisitsChartScreen() {
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
-  const route = useRoute<any>();
-  const routeChurchId =
-    typeof route?.params?.churchId === 'number' ? route.params.churchId : undefined;
-  const {churchId, refreshKey} = useDashboardChartChurchId(routeChurchId);
-  const churchName = useChartChurchName(churchId, refreshKey);
   const [loading, setLoading] = useState(true);
   const [rows, setRows] = useState<Row[]>([]);
   const [selectedBarIndex, setSelectedBarIndex] = useState<number | null>(null);
+  const [pastorName, setPastorName] = useState('');
+  const [regionNation, setRegionNation] = useState('');
+  const [reportDate, setReportDate] = useState('');
+  const [reportingPeriod, setReportingPeriod] = useState('');
 
   const load = useCallback(async () => {
     try {
@@ -148,11 +162,29 @@ export default function PastoralVisitsChartScreen() {
       const graph = data?.pastoral_visits_graph;
       const list = graph?.data;
       const raw = Array.isArray(list) ? [...list] : [];
-      setRows(normaliseRows(raw));
+      const normalised = normaliseRows(raw);
+      setRows(normalised);
+      setPastorName(pickGraphHeaderValue(graph, ['pastor_name', 'for_pastor']));
+      setRegionNation(
+        pickGraphHeaderValue(graph, ['region_nation', 'region', 'nation']),
+      );
+      setReportDate(pickGraphHeaderValue(graph, ['report_date']));
+      setReportingPeriod(
+        pickGraphHeaderValue(graph, ['reporting_period', 'period']) ||
+          formatReportingPeriod(normalised.map(row => yearFromIsoDate(row.dates))),
+      );
     } catch {
       setRows([]);
     } finally {
       setLoading(false);
+    }
+
+    try {
+      const header = await getOverseerChartHeaderInfo();
+      setPastorName(prev => prev || header.pastorName);
+      setRegionNation(prev => prev || header.regionNation);
+    } catch {
+      // Chart can render without header metadata.
     }
   }, []);
 
@@ -223,9 +255,11 @@ export default function PastoralVisitsChartScreen() {
     if (!selectedRow) {
       return '';
     }
-    const weekLabel = formatShortDate(selectedRow.dates, selectedLanguage || 'en');
-    const churchLabel = selectedRow.churches.join(', ');
-    return `${t('week')}: ${weekLabel}, ${t('church')}: ${churchLabel}, ${t('chartTooltipDays')}: ${selectedRow.visitDays}`;
+    const churchLabel = selectedRow.churches.join(', ') || '-';
+    return `${t('chartTooltipDate') || 'Date'}: ${formatCompactChartDate(
+      selectedRow.dates,
+      selectedLanguage || 'en',
+    )}  ${t('church')}: ${churchLabel}   ${t('chartTooltipDays')}: ${selectedRow.visitDays}`;
   }, [selectedRow, selectedLanguage, t]);
 
   const detailBannerPosition = useMemo(() => {
@@ -254,22 +288,147 @@ export default function PastoralVisitsChartScreen() {
     setSelectedBarIndex(prev => (prev === index ? null : index));
   };
 
+  const displayTitle = t('pastoralVisits') || 'Church Visits Chart';
+  const resolvedReportDate =
+    reportDate ||
+    formatOverseerReportDate(new Date(), selectedLanguage || 'en');
+  const exportWidth =
+    CHART_EXPORT_PAD * 2 + Y_AXIS_WIDTH + chartLayout.chartWidth;
+  const exportHeight =
+    CHART_EXPORT_PAD * 2 + CHART_EXPORT_TITLE_H + SVG_TOTAL_HEIGHT;
+  const exportPlotOffsetY = CHART_EXPORT_PAD + CHART_EXPORT_TITLE_H;
+
+  const {exportSvgRef, saving, showExportSvg, captureExport, handleSaveJpeg} =
+    useChartJpegExport({
+      filePrefix: 'church-visits-chart',
+      width: exportWidth,
+      height: exportHeight,
+      canSave: rows.length > 0,
+    });
+
+  const renderPlot = (interactive: boolean) => (
+    <>
+      {rows.map((_, i) => {
+        const x = PADDING_LEFT + i * BAR_SLOT + BAR_SLOT / 2;
+        return (
+          <Line
+            key={`v-${i}`}
+            x1={x}
+            y1={PADDING_Y}
+            x2={x}
+            y2={chartLayout.plotBottomY}
+            stroke={C.inputBorder}
+            strokeWidth={0.5}
+            opacity={0.2}
+          />
+        );
+      })}
+      {chartLayout.yTicks.map(tick => (
+        <Line
+          key={`h-${tick.value}`}
+          x1={PADDING_LEFT}
+          y1={tick.y}
+          x2={chartLayout.chartWidth - PADDING_RIGHT}
+          y2={tick.y}
+          stroke={C.inputBorder}
+          strokeWidth={0.8}
+          opacity={0.55}
+        />
+      ))}
+      <Line
+        x1={PADDING_LEFT}
+        y1={chartLayout.plotBottomY}
+        x2={chartLayout.chartWidth - PADDING_RIGHT}
+        y2={chartLayout.plotBottomY}
+        stroke={C.inputBorder}
+        strokeWidth={1.5}
+      />
+      <Line
+        x1={PADDING_LEFT}
+        y1={PADDING_Y}
+        x2={PADDING_LEFT}
+        y2={chartLayout.plotBottomY}
+        stroke={C.inputBorder}
+        strokeWidth={1.5}
+      />
+      {chartLayout.bars.map(b =>
+        b.h > 0.5 ? (
+          <Rect
+            key={b.key}
+            x={b.cx}
+            y={b.yTop}
+            width={BAR_WIDTH}
+            height={b.h}
+            fill={COLORS.mainColor}
+            rx={rs(2)}
+            ry={rs(2)}
+            opacity={selectedBarIndex === b.index ? 1 : 0.92}
+            stroke={selectedBarIndex === b.index ? '#ffffff' : undefined}
+            strokeWidth={selectedBarIndex === b.index ? 1 : 0}
+          />
+        ) : null,
+      )}
+      {interactive
+        ? chartLayout.bars.map(b => (
+            <Rect
+              key={`hit-${b.key}`}
+              x={PADDING_LEFT + b.index * BAR_SLOT}
+              y={PADDING_Y}
+              width={BAR_SLOT}
+              height={chartLayout.plotBottomY - PADDING_Y}
+              fill="transparent"
+              onPress={() => handleBarPress(b.index)}
+            />
+          ))
+        : null}
+      {chartLayout.bars.map(b =>
+        b.h > ms(14) && b.v > 0 ? (
+          <SvgText
+            key={`t-${b.key}`}
+            x={b.cx + BAR_WIDTH / 2}
+            y={b.yTop + ms(2)}
+            fill="#fff"
+            fontSize={fs(8)}
+            fontWeight="700"
+            textAnchor="middle"
+            alignmentBaseline="hanging">
+            {String(b.v)}
+          </SvgText>
+        ) : null,
+      )}
+      {chartLayout.xLabels.map(({i, label}) => {
+        const tx = PADDING_LEFT + i * BAR_SLOT + BAR_SLOT / 2;
+        const labelBaseY = chartLayout.plotBottomY + X_LABEL_START_BELOW_AXIS;
+        return (
+          <G
+            key={`xl-${i}`}
+            transform={`translate(${tx}, ${labelBaseY}) rotate(-45)`}>
+            <SvgText
+              x={0}
+              y={0}
+              fill={C.textPrimary}
+              fontSize={fs(9)}
+              fontWeight="500"
+              textAnchor="end"
+              alignmentBaseline="middle">
+              {label}
+            </SvgText>
+          </G>
+        );
+      })}
+    </>
+  );
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header title={t('pastoralVisits')} />
+        <Header title={displayTitle} />
 
         {loading ? (
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={COLORS.mainColor} />
-          </View>
-        ) : rows.length === 0 ? (
-          <View style={styles.loadingWrap}>
-            <Text style={[styles.infoText, {color: C.textSecondary}]}>
-              {t('noDataFound')}
-            </Text>
           </View>
         ) : (
           <View style={styles.content}>
@@ -291,21 +450,37 @@ export default function PastoralVisitsChartScreen() {
                 </Text>
               </View>
             </View>
-            {churchName ? (
-              <Text style={[styles.churchName, {color: C.textPrimary}]}>
-                {churchName}
-              </Text>
-            ) : null}
+            <View
+              style={[
+                styles.card,
+                {backgroundColor: C.surface, borderColor: C.inputBorder},
+              ]}>
+              <OverseerChartTitleBlock
+                title={displayTitle}
+                pastorName={pastorName}
+                regionNation={regionNation}
+                reportDate={resolvedReportDate}
+                reportingPeriod={reportingPeriod}
+                style={styles.titleInCard}
+                action={
+                  <ChartSaveButton saving={saving} onPress={handleSaveJpeg} />
+                }
+              />
+              <View
+                style={[styles.headerDivider, {backgroundColor: C.inputBorder}]}
+              />
+            {rows.length === 0 ? (
+              <View style={styles.emptyWrap}>
+                <Text style={[styles.infoText, {color: C.textSecondary}]}>
+                  {t('noDataFound')}
+                </Text>
+              </View>
+            ) : (
             <ScrollView
               style={styles.scroll}
               contentContainerStyle={styles.scrollContent}
               horizontal={rows.length > 8}
               showsHorizontalScrollIndicator>
-              <View
-                style={[
-                  styles.card,
-                  {backgroundColor: C.surface, borderColor: C.inputBorder},
-                ]}>
                 <View style={styles.chartRow}>
                 <View style={[styles.yAxisWrap, {height: SVG_TOTAL_HEIGHT}]}>
                   {chartLayout.yTicks.map(tick => (
@@ -325,119 +500,7 @@ export default function PastoralVisitsChartScreen() {
                     {width: chartLayout.chartWidth},
                   ]}>
                   <Svg width={chartLayout.chartWidth} height={SVG_TOTAL_HEIGHT}>
-                    {rows.map((_, i) => {
-                      const x = PADDING_LEFT + i * BAR_SLOT + BAR_SLOT / 2;
-                      return (
-                        <Line
-                          key={`v-${i}`}
-                          x1={x}
-                          y1={PADDING_Y}
-                          x2={x}
-                          y2={chartLayout.plotBottomY}
-                          stroke={C.inputBorder}
-                          strokeWidth={0.5}
-                          opacity={0.2}
-                        />
-                      );
-                    })}
-                    {chartLayout.yTicks.map(tick => (
-                      <Line
-                        key={`h-${tick.value}`}
-                        x1={PADDING_LEFT}
-                        y1={tick.y}
-                        x2={chartLayout.chartWidth - PADDING_RIGHT}
-                        y2={tick.y}
-                        stroke={C.inputBorder}
-                        strokeWidth={0.8}
-                        opacity={0.55}
-                      />
-                    ))}
-                    <Line
-                      x1={PADDING_LEFT}
-                      y1={chartLayout.plotBottomY}
-                      x2={chartLayout.chartWidth - PADDING_RIGHT}
-                      y2={chartLayout.plotBottomY}
-                      stroke={C.inputBorder}
-                      strokeWidth={1.5}
-                    />
-                    <Line
-                      x1={PADDING_LEFT}
-                      y1={PADDING_Y}
-                      x2={PADDING_LEFT}
-                      y2={chartLayout.plotBottomY}
-                      stroke={C.inputBorder}
-                      strokeWidth={1.5}
-                    />
-
-                    {chartLayout.bars.map(b =>
-                      b.h > 0.5 ? (
-                        <Rect
-                          key={b.key}
-                          x={b.cx}
-                          y={b.yTop}
-                          width={BAR_WIDTH}
-                          height={b.h}
-                          fill={COLORS.mainColor}
-                          rx={rs(2)}
-                          ry={rs(2)}
-                          opacity={selectedBarIndex === b.index ? 1 : 0.92}
-                          stroke={
-                            selectedBarIndex === b.index ? '#ffffff' : undefined
-                          }
-                          strokeWidth={selectedBarIndex === b.index ? 1 : 0}
-                        />
-                      ) : null,
-                    )}
-
-                    {chartLayout.bars.map(b => (
-                      <Rect
-                        key={`hit-${b.key}`}
-                        x={PADDING_LEFT + b.index * BAR_SLOT}
-                        y={PADDING_Y}
-                        width={BAR_SLOT}
-                        height={chartLayout.plotBottomY - PADDING_Y}
-                        fill="transparent"
-                        onPress={() => handleBarPress(b.index)}
-                      />
-                    ))}
-
-                    {chartLayout.bars.map(b =>
-                      b.h > ms(14) && b.v > 0 ? (
-                        <SvgText
-                          key={`t-${b.key}`}
-                          x={b.cx + BAR_WIDTH / 2}
-                          y={b.yTop + ms(2)}
-                          fill="#fff"
-                          fontSize={fs(8)}
-                          fontWeight="700"
-                          textAnchor="middle"
-                          alignmentBaseline="hanging">
-                          {String(b.v)}
-                        </SvgText>
-                      ) : null,
-                    )}
-
-                    {chartLayout.xLabels.map(({i, label}) => {
-                      const tx = PADDING_LEFT + i * BAR_SLOT + BAR_SLOT / 2;
-                      const labelBaseY =
-                        chartLayout.plotBottomY + X_LABEL_START_BELOW_AXIS;
-                      return (
-                        <G
-                          key={`xl-${i}`}
-                          transform={`translate(${tx}, ${labelBaseY}) rotate(-45)`}>
-                          <SvgText
-                            x={0}
-                            y={0}
-                            fill={C.textPrimary}
-                            fontSize={fs(9)}
-                            fontWeight="500"
-                            textAnchor="end"
-                            alignmentBaseline="middle">
-                            {label}
-                          </SvgText>
-                        </G>
-                      );
-                    })}
+                    {renderPlot(true)}
                   </Svg>
                   {selectedRow && detailBannerPosition ? (
                     <View
@@ -457,8 +520,53 @@ export default function PastoralVisitsChartScreen() {
                   ) : null}
                 </View>
               </View>
+            </ScrollView>
+            )}
             </View>
-          </ScrollView>
+            {showExportSvg ? (
+              <View
+                collapsable={false}
+                onLayout={captureExport}
+                pointerEvents="none"
+                style={[
+                  chartExportOffscreenStyle,
+                  {width: exportWidth, height: exportHeight},
+                ]}>
+                <Svg ref={exportSvgRef} width={exportWidth} height={exportHeight}>
+                  <Rect
+                    x={0}
+                    y={0}
+                    width={exportWidth}
+                    height={exportHeight}
+                    fill={C.surface}
+                  />
+                  <ChartExportTitleTexts
+                    title={displayTitle}
+                    pastorName={pastorName}
+                    regionNation={regionNation}
+                    reportDate={resolvedReportDate}
+                    reportingPeriod={reportingPeriod}
+                    fill={C.textPrimary}
+                  />
+                  {chartLayout.yTicks.map(tick => (
+                    <SvgText
+                      key={`export-y-${tick.value}`}
+                      x={CHART_EXPORT_PAD + Y_AXIS_WIDTH - 4}
+                      y={exportPlotOffsetY + tick.y + 3}
+                      fill={C.textSecondary}
+                      fontSize={fs(9)}
+                      fontWeight="500"
+                      textAnchor="end">
+                      {formatAxisValue(tick.value)}
+                    </SvgText>
+                  ))}
+                  <G
+                    transform={`translate(${CHART_EXPORT_PAD + Y_AXIS_WIDTH}, ${exportPlotOffsetY})`}>
+                    {renderPlot(false)}
+                  </G>
+                </Svg>
+              </View>
+            ) : null}
           </View>
         )}
       </View>
@@ -508,6 +616,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(12),
     paddingVertical: ms(12),
     minWidth: '100%',
+  },
+  titleInCard: {
+    marginBottom: 0,
+  },
+  headerDivider: {
+    height: StyleSheet.hairlineWidth,
+    marginBottom: ms(10),
+  },
+  emptyWrap: {
+    minHeight: ms(80),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   churchName: {
     fontSize: fs(13),

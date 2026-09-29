@@ -73,6 +73,23 @@ export async function enableChurch(id: number) {
   }
 }
 
+export async function updateChurchLocation(
+  id: number,
+  latitude: number,
+  longitude: number,
+) {
+  try {
+    const response = await api.patch(`/churches/${id}`, {
+      latitude,
+      longitude,
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error updating church location:', error);
+    throw error;
+  }
+}
+
 export async function getChurchDetail(id: number): Promise<any> {
   try {
     const response = await api.get(`churches/${id}`);

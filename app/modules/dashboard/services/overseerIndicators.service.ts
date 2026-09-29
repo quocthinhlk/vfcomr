@@ -7,8 +7,19 @@ export type OverseerAttendancePoint = {
   attendance: number;
 };
 
-export type OverseerAttendanceGraph = {
+export type OverseerGraphHeaderFields = {
   graph_title?: string;
+  pastor_name?: string;
+  for_pastor?: string;
+  region?: string;
+  nation?: string;
+  region_nation?: string;
+  report_date?: string;
+  reporting_period?: string;
+  period?: string;
+};
+
+export type OverseerAttendanceGraph = OverseerGraphHeaderFields & {
   data?: OverseerAttendancePoint[];
 };
 
@@ -28,8 +39,7 @@ export type OverseerChurchPlantedYear = {
   year_to_date?: boolean;
 };
 
-export type OverseerChurchPlantedGraph = {
-  graph_title?: string;
+export type OverseerChurchPlantedGraph = OverseerGraphHeaderFields & {
   data?: OverseerChurchPlantedYear[];
 };
 
@@ -43,12 +53,11 @@ export type PastoralVisitWeekPoint = {
   dates?: string;
   visit_days?: number | null;
   churches?: Array<string | PastoralVisitChurchRef>;
-  church_names?: string[];
+  church_names?: string | string[];
   visited_churches?: Array<string | PastoralVisitChurchRef>;
 };
 
-export type PastoralVisitsGraph = {
-  graph_title?: string;
+export type PastoralVisitsGraph = OverseerGraphHeaderFields & {
   data?: PastoralVisitWeekPoint[];
 };
 
@@ -59,6 +68,37 @@ export type OverseerIndicatorsPayload = {
   pastoral_visits_graph?: PastoralVisitsGraph;
   [key: string]: unknown;
 };
+
+export type OverseerChartHeaderInfo = {
+  pastorName: string;
+  regionNation: string;
+};
+
+const firstNamed = (items: unknown): string => {
+  if (!Array.isArray(items)) {
+    return '';
+  }
+  return items
+    .map((item: any) => String(item?.name ?? '').trim())
+    .filter(Boolean)
+    .join(', ');
+};
+
+export async function getOverseerChartHeaderInfo(): Promise<OverseerChartHeaderInfo> {
+  const [dashRes, meRes] = await Promise.all([api.get('dashboard'), api.get('users/me')]);
+  const dash = dashRes?.data?.data ?? {};
+  const me = meRes?.data?.data ?? {};
+  const profile = dash?.overseer_profile ?? {};
+  const allowed = dash?.overseer_permissions?.allowedIds ?? {};
+  const prefix = String(me?.prefix ?? '').trim();
+  const name = String(profile?.name || me?.name || '').trim();
+  const pastorName = [prefix, name].filter(Boolean).join(' ');
+  const regionNation =
+    firstNamed(allowed.geographicalRegionIds) ||
+    firstNamed(allowed.churchRegionIds) ||
+    String(profile?.title || me?.country_name || '').trim();
+  return {pastorName, regionNation};
+}
 
 export async function getOverseerIndicators(): Promise<OverseerIndicatorsPayload | undefined> {
   const res = await api.get('dashboard/overseer-indicators');

@@ -6,7 +6,7 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
-import {updateEventType, getEventTypeById} from '../services/eventType.service';
+import {updateEventType, getEventTypeById, EventMeetingType, resolveEventMeetingType} from '../services/eventType.service';
 import {
   SaveButton,
   CancelButton,
@@ -26,7 +26,7 @@ export const EditEventTypeScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [color, setColor] = useState('#808080');
   const [cellColor, setCellColor] = useState('#D9D9D9');
-  const [meetingType, setMeetingType] = useState<'Pastors List' | 'Attendance' | 'Both' | null>(null);
+  const [meetingType, setMeetingType] = useState<EventMeetingType | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
@@ -37,9 +37,8 @@ export const EditEventTypeScreen: React.FC = () => {
     setInvalid(prev => ({...prev, [key]: false}));
 
   const meetingTypeOptions = [
-    {label: 'Pastors List', value: 'Pastors List' as const},
-    {label: 'Attendance', value: 'Attendance' as const},
-    {label: 'Both', value: 'Both' as const},
+    {label: t('eventAttendance') || 'Attendance', value: 'attendance' as const},
+    {label: t('eventMeetingWith') || 'Meeting With', value: 'meeting_with' as const},
   ];
 
   useEffect(() => {
@@ -55,7 +54,7 @@ export const EditEventTypeScreen: React.FC = () => {
             setName(eventType.name || '');
             setColor(eventType.color || '#808080');
             setCellColor(eventType.cell_color || '#D9D9D9');
-            setMeetingType(eventType.meeting_type || null);
+            setMeetingType(resolveEventMeetingType(eventType.meeting_type));
           }
         })
         .catch(() => {})
@@ -93,7 +92,7 @@ export const EditEventTypeScreen: React.FC = () => {
         name: name.trim(),
         color: color.trim(),
         cell_color: cellColor.trim(),
-        meeting_type: meetingType as 'Pastors List' | 'Attendance' | 'Both',
+        meeting_type: meetingType as EventMeetingType,
       });
       Alert.alert(t('success') || 'Success', `${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'} ${t('success') || 'success'}`);
       navigation.navigate('EventTypes', {reload: true});
@@ -200,7 +199,7 @@ export const EditEventTypeScreen: React.FC = () => {
                     data={meetingTypeOptions}
                     value={meetingType as any}
                     onChange={v => {
-                      setMeetingType(v as 'Pastors List' | 'Attendance' | 'Both');
+                      setMeetingType(v as EventMeetingType);
                       clearInvalid('meetingType');
                     }}
                     placeholder={t('selectOption') || 'Select Meeting Type'}

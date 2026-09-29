@@ -2,7 +2,7 @@ import React, { useCallback, useMemo, useState, useContext, useEffect, useRef } 
 import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import {useNavigation, useRoute, useIsFocused} from '@react-navigation/native';
 import { logout } from '../../auth/services/auth.service';
 import { AuthContext } from '../../../config/navigation';
 import { MenuPopup } from '../../../shared/components/MenuPopup';
@@ -648,6 +648,8 @@ export default function DashboardPastorLeaderScreen() {
   const organizationRowWidthRef = useRef(0);
   /** Last line of the org text: width + y-offset, used to place the chevron right after the text end. */
   const [orgLastLineInfo, setOrgLastLineInfo] = useState<{width: number; y: number} | null>(null);
+  const [hasMapLocation, setHasMapLocation] = useState<boolean | null>(null);
+  const isFocused = useIsFocused();
 
   /** After initial bootstrap, `church_id` in route params is handled by the param effect (same screen, new selection). */
   const bootstrapDoneRef = useRef(false);
@@ -1497,7 +1499,6 @@ export default function DashboardPastorLeaderScreen() {
     }
     return DEFAULT_CHURCH_PICTURE_URI ? [DEFAULT_CHURCH_PICTURE_URI] : [];
   }, [displayChurchPictures]);
-
   const getCurrentChurchId = async (): Promise<number | null> => {
     try {
       const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
@@ -1510,6 +1511,48 @@ export default function DashboardPastorLeaderScreen() {
     }
     return parseRouteChurchId(dashboardData?.dashboard_info?.church_id);
   };
+
+  useEffect(() => {
+    if (!isFocused) {
+      return;
+    }
+    let cancelled = false;
+    const checkLocation = async () => {
+      try {
+        const isOverseerOrPastorLeader =
+          isOverseer(currentUserRoleId ?? undefined) ||
+          isPastorLeader(currentUserRoleId ?? undefined);
+        if (!isOverseerOrPastorLeader) {
+          setHasMapLocation(null);
+          return;
+        }
+        const churchId = await getCurrentChurchId();
+        if (!churchId) {
+          setHasMapLocation(null);
+          return;
+        }
+        const detail = await getChurchDetail(churchId);
+        if (cancelled) {
+          return;
+        }
+        const lat = detail?.latitude;
+        const lng = detail?.longitude;
+        const hasCoords =
+          lat != null &&
+          lng != null &&
+          !(Number(lat) === 0 && Number(lng) === 0);
+        setHasMapLocation(hasCoords);
+      } catch {
+        if (!cancelled) {
+          setHasMapLocation(null);
+        }
+      }
+    };
+    void checkLocation();
+    return () => {
+      cancelled = true;
+    };
+  }, [isFocused, currentUserRoleId, dashboardData?.dashboard_info?.church_id, reloadToken, getCurrentChurchId]);
 
   const refreshChurchPictures = useCallback(async () => {
     try {
@@ -1840,6 +1883,30 @@ export default function DashboardPastorLeaderScreen() {
         renderItem={() => null}
         ListHeaderComponent={
           <>
+        {(isOverseer(currentUserRoleId ?? undefined) || isPastorLeader(currentUserRoleId ?? undefined)) &&
+          hasMapLocation === false && (
+            <View style={styles.locationWarningBanner}>
+              <Text style={styles.locationWarningText} numberOfLines={2}>
+                {t('omrMapLocationMissing') ||
+                  'This church does not have a map location yet.'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  const churchId = parseRouteChurchId(
+                    dashboardData?.dashboard_info?.church_id,
+                  );
+                  if (churchId != null) {
+                    navigation.navigate('EditChurchLocation' as any, {
+                      id: churchId,
+                    });
+                  }
+                }}>
+                <Text style={styles.locationWarningAction}>
+                  {t('addLocation') || 'Add location'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
         {/* Profile Section */}
         <View style={styles.profileSection}>
           {/* Row 1: Organization + dropdown */}
@@ -2521,6 +2588,30 @@ const styles = StyleSheet.create({
     fontSize: fs(12),
     color: COLORS.mainColor,
     fontWeight: '700',
+  },
+  locationWarningBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(8),
+    marginHorizontal: ms(12),
+    marginTop: ms(6),
+    marginBottom: ms(4),
+    borderRadius: rs(8),
+    backgroundColor: '#FFF4CC',
+  },
+  locationWarningText: {
+    flex: 1,
+    fontSize: fs(12),
+    fontWeight: '600',
+    color: '#8A4B16',
+    marginRight: ms(8),
+  },
+  locationWarningAction: {
+    fontSize: fs(12),
+    fontWeight: '700',
+    color: COLORS.mainColor,
   },
   statsContainer: {
     flexDirection: 'row',

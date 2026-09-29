@@ -11,7 +11,7 @@ import {Text} from '@ui-kitten/components';
 import {Header} from '../../../shared/components/Header';
 import {COLORS} from '../../../shared/constants/colors';
 import {globalStyles} from '../../../shared/styles/global';
-import {listEventTypes, EventTypeItem} from '../services/eventType.service';
+import {listEventTypes, EventTypeItem, resolveEventMeetingType} from '../services/eventType.service';
 import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -31,6 +31,16 @@ export const EventTypesScreen: React.FC = () => {
   const {theme} = useThemeMode();
   const L = getListStyles(C, theme);
   const {t} = useTranslation();
+  const meetingTypeLabel = (value?: string | null) => {
+    const resolved = resolveEventMeetingType(value);
+    if (resolved === 'meeting_with') {
+      return t('eventMeetingWith') || 'Meeting With';
+    }
+    if (resolved === 'attendance') {
+      return t('eventAttendance') || 'Attendance';
+    }
+    return value || '-';
+  };
   const [items, setItems] = useState<EventTypeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -111,7 +121,7 @@ export const EventTypesScreen: React.FC = () => {
             <View style={styles.metaRow}>
               <View style={[styles.colorBox, {backgroundColor: item.cell_color}]} />
               <Text style={[styles.metaText, {color: C.textSecondary}]}>
-                {item.meeting_type}
+                {meetingTypeLabel(item.meeting_type)}
               </Text>
             </View>
           </View>

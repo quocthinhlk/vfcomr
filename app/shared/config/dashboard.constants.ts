@@ -57,6 +57,13 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
     ],
   },
   {
+    label: t('watchLists'),
+    children: [
+      {label: t('viewMyWatchlists'), routeName: 'WatchList'},
+      {label: t('addNewWatchlist'), routeName: 'WatchListForm'},
+    ],
+  },
+  {
     label: t('pastorsLeadersListMenu'),
     children: [
       {label: t('all'), routeName: 'UserList'},
@@ -113,12 +120,20 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
 const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
   {label: t('myDashboard'), routeName: 'Dashboard'},
   {
+    label: t('watchLists'),
+    children: [
+      {label: t('viewMyWatchlists'), routeName: 'WatchList'},
+      {label: t('addNewWatchlist'), routeName: 'WatchListForm'},
+    ],
+  },
+  {
     label: t('users'),
     children: [
       {label: t('all'), routeName: 'UserList'},
       {label: t('overseers'), routeName: 'Overseers'},
       {label: t('addNewPastor'), routeName: 'AddUser'},
       {label: t('addNewChurchAndPastor'), routeName: 'NewPastorAndChurch'},
+      {label: t('roleChangeRequests') || 'Role Change Requests', routeName: 'RoleChangeRequests'},
     ],
   },
   {
@@ -187,7 +202,6 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
     children: [
       {label: t('search'), routeName: 'Resources'},
       {label: t('addNewResource'), routeName: 'AddNewResource'},
-      {label: t('editAddTopicList'), routeName: 'EditAddTopicList'},
     ],
   },
   {
@@ -224,6 +238,13 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
 
 const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
   {label: t('myDashboard'), routeName: 'Dashboard'},
+  {
+    label: t('watchLists'),
+    children: [
+      {label: t('viewMyWatchlists'), routeName: 'WatchList'},
+      {label: t('addNewWatchlist'), routeName: 'WatchListForm'},
+    ],
+  },
   {
     label: t('users'),
     children: [

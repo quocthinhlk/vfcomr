@@ -21,6 +21,7 @@ export type RootStackParamList = {
   DisableChurches: undefined;
   EnableChurch: { id: number } | undefined;
   EditChurch: { id: number; returnTo?: 'DashboardPastorLeader' } | undefined;
+  EditChurchLocation: { id: number; latitude?: number; longitude?: number } | undefined;
   ChurchDetail: { id: number } | undefined;
   Overseer: undefined;
   EditProfile: undefined;
@@ -30,6 +31,8 @@ export type RootStackParamList = {
   UserRoles: undefined;
   Churches: { refresh?: boolean; openChurchInPastorDashboard?: boolean } | undefined;
   WatchList: undefined;
+  WatchListDetail: { watchListId: number };
+  WatchListForm: { watchListId?: number } | undefined;
   OverseerGoals: undefined;
   AddOverseerGoals: undefined;
   OverseerGoalDetail: { goalPeriodId: number } | undefined;
@@ -59,10 +62,10 @@ export type RootStackParamList = {
   AddLanguage: undefined;
   EditLanguage: { languageId: number } | undefined;
   DeleteLanguage: { languageId: number } | undefined;
-  Resources: undefined;
-  ResourceDetail: { resourceId: number } | undefined;
-  AddNewResource: undefined;
-  EditAddTopicList: undefined;
+  Resources: { reload?: boolean } | undefined;
+  ResourceDetail: { resourceId: number; reload?: boolean } | undefined;
+  AddNewResource: { parentId?: number } | undefined;
+  EditResource: { resourceId: number };
   RelatingSearch: undefined;
   RelatingDetails: undefined;
   RelatingMultiUserRestrictions: undefined;
@@ -155,6 +158,8 @@ export type RootStackParamList = {
     month: number;
     weekNumbers: number[];
   } | undefined;
+  RoleChangeRequests: undefined;
+  RoleChangeRequestDetail: { id: number } | undefined;
 };
 
 import LoginScreen from '../modules/auth/screens/LoginScreen';
@@ -170,6 +175,7 @@ import ListDisableChurchScreen from '../modules/church/screens/ListDisableChurch
 import EnableChurchScreen from '../modules/church/screens/EnableChurchScreen';
 import EditChurchScreen from '../modules/church/screens/EditChurchScreen';
 import ChurchDetailScreen from '../modules/church/screens/ChurchDetailScreen';
+import EditChurchLocationScreen from '../modules/church/screens/EditChurchLocationScreen';
 import OverseerScreen from '../modules/overseer/screens/OverseerScreen';
 import EditProfileScreen from '../modules/user/screens/EditProfileScreen';
 import EnterVisitsScreen from '../modules/report/screens/EnterVisitsScreen';
@@ -189,6 +195,8 @@ import OverseerChurchesPlantedLast10YearsScreen from '../modules/dashboard/scree
 import ChurchGivingChartScreen from '../modules/dashboard/screens/ChurchGivingChartScreen';
 import AttendanceAndGivingChartsScreen from '../modules/dashboard/screens/AttendanceAndGivingCharts';
 import { WatchListScreen } from '../modules/dashboard/screens/WatchListScreen';
+import WatchListDetailScreen from '../modules/dashboard/screens/WatchListDetailScreen';
+import WatchListFormScreen from '../modules/dashboard/screens/WatchListFormScreen';
 import { OverseerGoalsScreen } from '../modules/overseer/screens/OverseerGoalsScreen';
 import AddOverseerGoalsScreen from '../modules/overseer/screens/AddOverseerGoalsScreen';
 import DeleteOverseerGoalPeriodScreen from '../modules/overseer/screens/DeleteOverseerGoalPeriodScreen';
@@ -221,7 +229,6 @@ import DeleteLanguageScreen from '../modules/language/screens/DeleteLanguageScre
 import SearchResourcesScreen from '../modules/resources/screens/SearchResourcesScreen';
 import ResourceDetailScreen from '../modules/resources/screens/ResourceDetailScreen';
 import AddNewResourceScreen from '../modules/resources/screens/AddNewResourceScreen';
-import EditAddTopicListScreen from '../modules/resources/screens/EditAddTopicListScreen';
 import RelatingSearchScreen from '../modules/relating/screens/RelatingSearchScreen';
 import RelatingDetailsScreen from '../modules/relating/screens/RelatingDetailsScreen';
 import RelatingMultiUserRestrictionsScreen from '../modules/relating/screens/RelatingMultiUserRestrictionsScreen';
@@ -273,6 +280,8 @@ import DeleteVisitScreen from '../modules/visits/screens/DeleteVisitScreen';
 import EditVisitDetailsScreen from '../modules/visits/screens/EditVisitDetailsScreen';
 import MonthlyDataSelectScreen from '../modules/monthlydata/screens/MonthlyDataSelectScreen';
 import MonthlyDataEntryScreen from '../modules/monthlydata/screens/MonthlyDataEntryScreen';
+import { RoleChangeRequestsScreen } from '../modules/user/screens/RoleChangeRequestsScreen';
+import { RoleChangeRequestDetailScreen } from '../modules/user/screens/RoleChangeRequestDetailScreen';
 
 const OverseerGoalDetailScreen =
   require('../modules/overseer/screens/OverseerGoalDetailScreen').default;
@@ -363,6 +372,7 @@ export default function Navigation() {
               <Stack.Screen name="AddCloneChurch" component={AddCloneChurchScreen} />
               <Stack.Screen name="CloneChurch" component={CloneChurchScreen} />
               <Stack.Screen name="EditChurch" component={EditChurchScreen} />
+              <Stack.Screen name="EditChurchLocation" component={EditChurchLocationScreen} />
               <Stack.Screen name="ChurchDetail" component={ChurchDetailScreen} />
               <Stack.Screen name="DisableChurch" component={DisableChurchScreen} />
               <Stack.Screen name="DisableChurches" component={ListDisableChurchScreen} />
@@ -384,6 +394,8 @@ export default function Navigation() {
               <Stack.Screen name="Overseers" component={ListOverseerScreen} />
               <Stack.Screen name="Churches" component={ChurchesListScreen} />
               <Stack.Screen name="WatchList" component={WatchListScreen} />
+              <Stack.Screen name="WatchListDetail" component={WatchListDetailScreen} />
+              <Stack.Screen name="WatchListForm" component={WatchListFormScreen} />
               <Stack.Screen name="OverseerGoals" component={OverseerGoalsScreen} />
               <Stack.Screen name="AddOverseerGoals" component={AddOverseerGoalsScreen} />
               <Stack.Screen name="OverseerGoalDetail" component={OverseerGoalDetailScreen} />
@@ -430,7 +442,7 @@ export default function Navigation() {
               <Stack.Screen name="Resources" component={SearchResourcesScreen} />
               <Stack.Screen name="ResourceDetail" component={ResourceDetailScreen} />
               <Stack.Screen name="AddNewResource" component={AddNewResourceScreen} />
-              <Stack.Screen name="EditAddTopicList" component={EditAddTopicListScreen} />
+              <Stack.Screen name="EditResource" component={AddNewResourceScreen} />
               <Stack.Screen name="RelatingSearch" component={RelatingSearchScreen} />
               <Stack.Screen name="RelatingDetails" component={RelatingDetailsScreen} />
               <Stack.Screen
@@ -497,6 +509,8 @@ export default function Navigation() {
               <Stack.Screen name="EditStepsChart" component={EditStepsChartScreen} />
               <Stack.Screen name="MonthlyDataSelect" component={MonthlyDataSelectScreen} />
               <Stack.Screen name="MonthlyDataEntry" component={MonthlyDataEntryScreen} />
+              <Stack.Screen name="RoleChangeRequests" component={RoleChangeRequestsScreen} />
+              <Stack.Screen name="RoleChangeRequestDetail" component={RoleChangeRequestDetailScreen} />
             </>
           )}
         </Stack.Navigator>
