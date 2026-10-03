@@ -68,7 +68,7 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [projectionId]);
+  }, [projectionId, route.params?.refetchKey]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';

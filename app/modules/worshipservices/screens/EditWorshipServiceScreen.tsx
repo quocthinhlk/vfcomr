@@ -11,6 +11,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -126,7 +127,7 @@ export const EditWorshipServiceScreen: React.FC = () => {
         t('success') || 'Success',
         `${t('edit') || 'Edit'} ${t('worshipService') || 'Worship Service'} ${t('success') || 'success'}`,
       );
-      navigation.navigate('WorshipServices', {reload: true});
+      returnAfterEdit(navigation);
     } catch (e: any) {
       Alert.alert(
         t('error') || 'Error',

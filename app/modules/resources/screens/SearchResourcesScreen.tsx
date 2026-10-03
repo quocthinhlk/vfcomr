@@ -152,9 +152,10 @@ export default function SearchResourcesScreen() {
 
   const actionItems: ActionItem[] = selectedItem
     ? [
-        {label: t('edit'), onPress: () => handleEdit(selectedItem)},
+        {label: t('edit'), icon: 'edit', onPress: () => handleEdit(selectedItem)},
         {
           label: t('delete'),
+          icon: 'delete',
           type: 'danger',
           onPress: () => handleDelete(selectedItem),
         },

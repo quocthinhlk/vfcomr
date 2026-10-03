@@ -211,6 +211,12 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
             <AddNewHeaderButton
               name="AddChurchPlantingProjection"
               text={t('addNew') || 'Add New'}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
             />
           </View>
 
@@ -251,6 +257,7 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
               const list: ActionItem[] = [];
               list.push({
                 label: t('view') || 'View',
+                icon: 'view',
                 onPress: () => {
                   if (selectedProjection) {
                     navigation.navigate('ChurchPlantingProjectionDetail', {
@@ -263,6 +270,7 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
               });
               list.push({
                 label: t('edit') || 'Edit',
+                icon: 'edit',
                 onPress: () => {
                   if (selectedProjection) {
                     navigation.navigate('EditChurchPlantingProjection', {
@@ -275,6 +283,7 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
               });
               list.push({
                 label: t('delete') || 'Delete',
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedProjection) {

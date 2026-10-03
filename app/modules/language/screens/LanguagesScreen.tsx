@@ -208,7 +208,16 @@ export const LanguagesScreen: React.FC = () => {
           <Header title={t('languages')} />
 
           <View style={styles.headerRow}>
-            <AddNewHeaderButton name="AddLanguage" text={t('addNew')} />
+            <AddNewHeaderButton
+              name="AddLanguage"
+              text={t('addNew')}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
+            />
           </View>
 
           <SearchInput
@@ -259,6 +268,7 @@ export const LanguagesScreen: React.FC = () => {
               const list: ActionItem[] = [];
               list.push({
                 label: t('edit'),
+                icon: 'edit',
                 onPress: () => {
                   if (selectedLanguage) {
                     navigation.navigate('EditLanguage', {
@@ -271,6 +281,7 @@ export const LanguagesScreen: React.FC = () => {
               });
               list.push({
                 label: t('delete'),
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedLanguage) {

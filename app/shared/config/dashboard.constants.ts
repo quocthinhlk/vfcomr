@@ -39,6 +39,37 @@ const iconEdit = require('../../assets/images/edit.png');
 
 type TFunc = (key: TranslationKey) => string;
 
+const getReportMenuItem = (t: TFunc): CommonMenuItem => ({
+  label: t('generateReports'),
+  children: [
+    {label: t('reportGroupChurch'), routeName: 'GenerateReports', params: {group: 'church'}},
+    {
+      label: t('reportGroupChurchGraph'),
+      routeName: 'GenerateReports',
+      params: {group: 'church_reports_graph_reports'},
+    },
+    {label: t('reportGroupVisit'), routeName: 'GenerateReports', params: {group: 'visit_report'}},
+    {
+      label: t('reportGroupStatus'),
+      routeName: 'GenerateReports',
+      params: {group: 'church_report_status'},
+    },
+    {
+      label: t('reportGroupMultiChurch'),
+      routeName: 'GenerateReports',
+      params: {group: 'multi_church'},
+    },
+    {label: t('reportGroupUserData'), routeName: 'GenerateReports', params: {group: 'user_data'}},
+    {label: t('reportGroupUserGraph'), routeName: 'GenerateReports', params: {group: 'user_graph'}},
+    {label: t('reportGroupEvent'), routeName: 'GenerateReports', params: {group: 'event'}},
+    {
+      label: t('reportGroupDirectory'),
+      routeName: 'GenerateReports',
+      params: {group: 'my_directory'},
+    },
+  ],
+});
+
 const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
   {
     label: t('myChurchProfile'),
@@ -82,10 +113,7 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('disabledChurches'), routeName: 'DisableChurches'},
     ],
   },
-  {
-    label: t('generateReports'),
-    routeName: 'GenerateReports',
-  },
+  getReportMenuItem(t),
   {
     label: t('relating'),
     children: [
@@ -150,12 +178,12 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
   {
     label: t('overseerGoals'),
     children: [
-      {label: t('addNew'), routeName: 'AddOverseerGoals'},
       {label: t('list'), routeName: 'OverseerGoals'},
+      {label: t('addNew'), routeName: 'AddOverseerGoals'},
       // {label: t('editDefaults'), routeName: 'EditOverseerGoalDefaults'},
     ],
   },
-  {label: t('generateReports'), routeName: 'GenerateReports'},
+  getReportMenuItem(t),
   {
     label: t('churchNetworks'),
     children: [
@@ -216,16 +244,16 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
   {
     label: t('faq'),
     children: [
-      {label: t('createFaq'), routeName: 'AddFAQ'},
-      {label: t('searchFaq'), routeName: 'SearchFAQ'},
       {label: t('listFaq'), routeName: 'FAQs'},
+      {label: t('searchFaq'), routeName: 'SearchFAQ'},
+      {label: t('createFaq'), routeName: 'AddFAQ'},
     ],
   },
   {
     label: t('eventType'),
     children: [
-      {label: t('addNew') || 'Add New', routeName: 'AddEventType'},
       {label: t('list') || 'List', routeName: 'EventTypes'},
+      {label: t('addNew') || 'Add New', routeName: 'AddEventType'},
     ],
   },
   {
@@ -265,10 +293,7 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('disabledChurches'), routeName: 'DisableChurches'},
     ],
   },
-  {
-    label: t('generateReports'),
-    routeName: 'GenerateReports',
-  },
+  getReportMenuItem(t),
   // {
   //   label: t('visits'),
   //   children: [

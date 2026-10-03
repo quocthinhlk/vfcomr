@@ -44,6 +44,8 @@ import {
   resolveRoleIdFromUser,
 } from '../../../shared/utils/permissions';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import {returnToList} from '../../../shared/utils/returnToList';
+import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import api from '../../../config/api';
 import type {TranslationKey} from '../../../shared/translations/types';
 import {
@@ -271,7 +273,7 @@ export default function ResourceDetailScreen() {
             setBusy(true);
             await deleteResource(resourceId);
             Alert.alert(t('success'), t('resourceDeleted'));
-            navigation.navigate('Resources', {reload: true});
+            returnToList(navigation);
           } catch (error) {
             Alert.alert(t('error'), getApiErrorMessage(error, t));
           } finally {
@@ -802,17 +804,18 @@ export default function ResourceDetailScreen() {
                 {t('resourceChildren')}
               </Text>
               {canManage ? (
-                <TouchableOpacity
-                  style={styles.sectionAction}
-                  onPress={() =>
-                    navigation.navigate('AddNewResource', {
-                      parentId: resource.id,
-                    })
-                  }>
-                  <Text style={styles.sectionActionText}>
-                    + {t('addNew')}
-                  </Text>
-                </TouchableOpacity>
+                <AddNewHeaderButton
+                  name="AddNewResource"
+                  params={{parentId: resource.id}}
+                  text={t('addNew')}
+                  style={{
+                    backgroundColor: C.surface,
+                    borderWidth: 1,
+                    borderColor: COLORS.mainColor,
+                    marginTop: 0,
+                  }}
+                  textStyle={{color: COLORS.mainColor}}
+                />
               ) : null}
             </View>
             {children.length === 0 ? (

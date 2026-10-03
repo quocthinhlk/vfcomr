@@ -25,6 +25,7 @@ import api from '../../../config/api';
 import {getChurchDetail, updateChurch} from '../services/church.service';
 import {createCity} from '../services/city.service';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Alert} from 'react-native';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -42,9 +43,6 @@ export default function EditChurchScreen() {
   const C = useThemedColors();
   const route = useRoute<any>();
   const editId: number | null = route?.params?.id ?? null;
-  const returnToAfterSave = route?.params?.returnTo as
-    | 'DashboardPastorLeader'
-    | undefined;
 
   const {
     motherChurchOptions,
@@ -672,14 +670,7 @@ export default function EditChurchScreen() {
 
                   await updateChurch(editId, payload as any);
                   Alert.alert('Success', 'Church updated successfully!');
-                  if (returnToAfterSave === 'DashboardPastorLeader') {
-                    navigation.navigate('DashboardPastorLeader');
-                  } else {
-                    navigation.navigate('ChurchDetail', {
-                      id: editId,
-                      refetchKey: Date.now(),
-                    });
-                  }
+                  returnAfterEdit(navigation);
                 } catch (e: any) {
                   const apiErrors = e?.response?.data?.errors;
                   if (apiErrors && typeof apiErrors === 'object') {

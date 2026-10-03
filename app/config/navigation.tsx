@@ -43,7 +43,7 @@ export type RootStackParamList = {
   DeleteOverseerGoalPeriod: { goalPeriodId: number } | undefined;
   EditOverseerGoalDefaults: { goalPeriodId: number } | undefined;
   EditOverseerGoals: { goalPeriodId: number } | undefined;
-  GenerateReports: undefined;
+  GenerateReports: { group?: string } | undefined;
   ChurchesPlantedLast10Years: undefined;
   OverseerChurchAttendanceChart: undefined;
   PastoralVisitsChart: undefined;
@@ -52,6 +52,7 @@ export type RootStackParamList = {
   AddChurchNetwork: undefined;
   EditChurchNetwork: { churchNetworkId: number } | undefined;
   DeleteChurchNetwork: { churchNetworkId: number } | undefined;
+  ChurchNetworkDetail: { churchNetworkId: number } | undefined;
   ChurchTypes: undefined;
   AddChurchType: undefined;
   EditChurchType: { churchTypeId: number } | undefined;
@@ -98,7 +99,7 @@ export type RootStackParamList = {
   OmrSupport: undefined;
   AboutOmr: undefined;
   UserList: undefined;
-  DeleteUser: { userId: number } | undefined;
+  DeleteUser: { userId: number; userName?: string } | undefined;
   EditCountry: { countryId: number } | undefined;
   DeleteCountry: { countryId: number } | undefined;
   AddCountry: undefined;
@@ -212,6 +213,7 @@ import AddChurchNetworkScreen from '../modules/churchnetwork/screens/AddChurchNe
 import EditChurchNetworkScreen from '../modules/churchnetwork/screens/EditChurchNetworkScreen';
 import DeleteChurchNetworkScreen from '../modules/churchnetwork/screens/DeleteChurchNetworkScreen';
 import ChurchNetworksScreen from '../modules/churchnetwork/screens/ChurchNetworksScreen';
+import ChurchNetworkDetailScreen from '../modules/churchnetwork/screens/ChurchNetworkDetailScreen';
 import ChurchRegionsScreen from '../modules/churchregion/screens/ChurchRegionsScreen';
 import AddChurchRegionScreen from '../modules/churchregion/screens/AddChurchRegionScreen';
 import EditChurchRegionScreen from '../modules/churchregion/screens/EditChurchRegionScreen';
@@ -446,6 +448,7 @@ export default function Navigation() {
               <Stack.Screen name="AddChurchNetwork" component={AddChurchNetworkScreen} />
               <Stack.Screen name="EditChurchNetwork" component={EditChurchNetworkScreen} />
               <Stack.Screen name="DeleteChurchNetwork" component={DeleteChurchNetworkScreen} />
+              <Stack.Screen name="ChurchNetworkDetail" component={ChurchNetworkDetailScreen} />
               <Stack.Screen name="ChurchTypes" component={ChurchTypesScreen} />
               <Stack.Screen name="AddChurchType" component={AddChurchTypeScreen} />
               <Stack.Screen name="EditChurchType" component={EditChurchTypeScreen} />

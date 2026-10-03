@@ -633,7 +633,10 @@ export const UserScreen = () => {
               <DeleteButton
                 label={t('deleteUser')}
                 onPress={() =>
-                  navigation.navigate('DeleteUser', {userId})
+                  navigation.navigate('DeleteUser', {
+                    userId,
+                    userName: user?.name?.trim() || undefined,
+                  })
                 }
                 fullWidth
               />

@@ -64,7 +64,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   const handleMenuItemPress = (item: CommonMenuItem) => {
     if (item.routeName) {
-      navigation.navigate(item.routeName as string);
+      navigation.navigate(item.routeName as string, item.params);
     } else if (item.label === 'Logout') {
       handleLogout();
     } else if (item.onPress) {

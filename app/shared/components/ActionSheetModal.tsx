@@ -1,24 +1,24 @@
-import React, {useEffect, useRef} from 'react';
-import {
-  Modal,
-  View,
-  TouchableWithoutFeedback,
-  StyleSheet,
-  Animated,
-  Easing,
-  TouchableOpacity,
-  PanResponder,
-  PanResponderGestureState,
-} from 'react-native';
+import React from 'react';
+import {Pressable, StyleSheet, View} from 'react-native';
+import Modal from 'react-native-modal';
 import {Text} from '@ui-kitten/components';
-import {useThemedColors} from '../styles/theme';
-import {fs, ms, rs, hs} from '../utils/scale';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
+import Svg, {Circle, Path} from 'react-native-svg';
+import {useThemedColors, ThemeMode} from '../styles/theme';
+import {useThemeMode} from '../context/ThemeContext';
+import {useTranslation} from '../hooks/useTranslation';
+import {COLORS} from '../constants/colors';
+import {fs, ms, rs, ws} from '../utils/scale';
+
+export type ActionIcon = 'view' | 'edit' | 'delete';
 
 export type ActionItem = {
   label: string;
   onPress: () => void;
   type?: 'default' | 'danger';
   disabled?: boolean;
+  /** Optional leading icon; also sets the button colour (view = blue, edit = green, delete = red). */
+  icon?: ActionIcon;
 };
 
 type Props = {
@@ -28,6 +28,87 @@ type Props = {
   onRequestClose: () => void;
 };
 
+/* ------------------------------------------------------------------ */
+/* Tokens                                                              */
+/* ------------------------------------------------------------------ */
+
+const getTokens = (theme: ThemeMode) =>
+  theme === 'light'
+    ? {
+        sheetBg: '#FFFFFF',
+        pressedBg: '#F2F4F7',
+        blueText: COLORS.mainColor,
+        blueTint: 'rgba(36,120,206,0.10)',
+        greenText: '#15803D',
+        greenTint: '#DCFCE7',
+        redText: COLORS.dangerColor,
+        redTint: '#FDECEE',
+        backdrop: 0.35,
+      }
+    : {
+        sheetBg: '#151517',
+        pressedBg: '#1C1C1E',
+        blueText: '#6AA9EA',
+        blueTint: 'rgba(106,169,234,0.16)',
+        greenText: '#4ADE80',
+        greenTint: 'rgba(74,222,128,0.14)',
+        redText: '#FF6B78',
+        redTint: 'rgba(255,107,120,0.14)',
+        backdrop: 0.6,
+      };
+
+/* ------------------------------------------------------------------ */
+/* Icons                                                               */
+/* ------------------------------------------------------------------ */
+
+const ICON_SIZE = ws(18);
+
+const EyeIcon: React.FC<{color: string}> = ({color}) => (
+  <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinejoin="round"
+    />
+    <Circle cx={12} cy={12} r={3} stroke={color} strokeWidth={2} />
+  </Svg>
+);
+
+const PencilIcon: React.FC<{color: string}> = ({color}) => (
+  <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16v4z"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const TrashIcon: React.FC<{color: string}> = ({color}) => (
+  <Svg width={ICON_SIZE} height={ICON_SIZE} viewBox="0 0 24 24" fill="none">
+    <Path
+      d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3"
+      stroke={color}
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    />
+  </Svg>
+);
+
+const ICONS: Record<ActionIcon, React.FC<{color: string}>> = {
+  view: EyeIcon,
+  edit: PencilIcon,
+  delete: TrashIcon,
+};
+
+/* ------------------------------------------------------------------ */
+/* Component                                                           */
+/* ------------------------------------------------------------------ */
+
 export default function ActionSheetModal({
   visible,
   title,
@@ -35,202 +116,163 @@ export default function ActionSheetModal({
   onRequestClose,
 }: Props) {
   const C = useThemedColors();
-  const sheetTranslateY = useRef(new Animated.Value(hs(80))).current;
-  const backdropOpacity = useRef(new Animated.Value(0)).current;
-  const dragY = useRef(new Animated.Value(0)).current;
+  const {theme} = useThemeMode();
+  const T = getTokens(theme);
+  const {t} = useTranslation();
+  const insets = useSafeAreaInsets();
 
-  const panResponder = useRef(
-    PanResponder.create({
-      onMoveShouldSetPanResponder: (_e: any, g: PanResponderGestureState) =>
-        Math.abs(g.dy) > 2,
-      onPanResponderGrant: () => {
-        dragY.setOffset(0);
-      },
-      onPanResponderMove: (_e: any, g: PanResponderGestureState) => {
-        let dy = g.dy;
-        const limit = -hs(20);
-        if (dy < limit) {
-          dy = limit;
-        }
-        dragY.setValue(dy);
-      },
-      onPanResponderRelease: (_e: any, g: PanResponderGestureState) => {
-        const threshold = hs(120);
-        if (g.dy > threshold) {
-          // close sheet
-          dragY.flattenOffset();
-          Animated.timing(dragY, {
-            toValue: hs(300),
-            duration: 200,
-            useNativeDriver: true,
-          }).start(() => {
-            dragY.setValue(0);
-            onRequestClose();
-          });
-        } else {
-          // snap back
-          Animated.spring(dragY, {
-            toValue: 0,
-            useNativeDriver: true,
-            friction: 8,
-            tension: 70,
-          }).start();
-        }
-      },
-      onPanResponderTerminate: () => {
-        Animated.spring(dragY, {
-          toValue: 0,
-          useNativeDriver: true,
-          friction: 8,
-          tension: 70,
-        }).start();
-      },
-      onPanResponderTerminationRequest: () => true,
-    })
-  ).current;
-
-  useEffect(() => {
-    if (visible) {
-      sheetTranslateY.setValue(hs(120));
-      backdropOpacity.setValue(0);
-      dragY.setValue(0);
-      Animated.parallel([
-        Animated.spring(sheetTranslateY, {
-          toValue: 0,
-          useNativeDriver: true,
-          friction: 8,
-          tension: 70,
-        }),
-        Animated.timing(backdropOpacity, {
-          toValue: 1,
-          duration: 220,
-          easing: Easing.out(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]).start();
-    } else {
-      // instant close behavior is handled by parent via visible=false and animationType="none"
-      sheetTranslateY.setValue(hs(120));
-      backdropOpacity.setValue(0);
-      dragY.setValue(0);
+  const colorsFor = (a: ActionItem) => {
+    if (a.type === 'danger' || a.icon === 'delete') {
+      return {text: T.redText, tint: T.redTint};
     }
-  }, [visible]);
+    if (a.icon === 'edit') {
+      return {text: T.greenText, tint: T.greenTint};
+    }
+    return {text: T.blueText, tint: T.blueTint};
+  };
 
   return (
     <Modal
-      transparent
-      visible={visible}
-      animationType="none"
-      presentationStyle="overFullScreen"
+      isVisible={visible}
+      onBackdropPress={onRequestClose}
+      onBackButtonPress={onRequestClose}
+      onSwipeComplete={onRequestClose}
+      swipeDirection="down"
+      backdropOpacity={T.backdrop}
+      useNativeDriverForBackdrop
+      hideModalContentWhileAnimating
       statusBarTranslucent
-      hardwareAccelerated
-      onRequestClose={onRequestClose}>
-      <View style={styles.modalContainer}>
-        <TouchableWithoutFeedback onPress={onRequestClose}>
-          <Animated.View
-            style={[
-              styles.backdrop,
-              {backgroundColor: C.overlay, opacity: backdropOpacity},
-            ]}
-          />
-        </TouchableWithoutFeedback>
-        <Animated.View
-          style={[
-            styles.sheet,
-            {backgroundColor: C.surface, borderColor: C.border},
-            {transform: [{translateY: Animated.add(sheetTranslateY, dragY)}]},
-          ]}>
-          {/* <View {...panResponder.panHandlers} style={styles.dragArea}> */}
-            {/* <View style={styles.sheetHandle} /> */}
-          {/* </View> */}
+      style={styles.modal}>
+      <View
+        style={[
+          styles.container,
+          {paddingBottom: Math.max(insets.bottom, ms(12))},
+        ]}>
+        <View style={[styles.sheet, {backgroundColor: T.sheetBg}]}>
+          <View style={[styles.handle, {backgroundColor: C.border}]} />
+
           {!!title && (
             <Text
               style={[styles.title, {color: C.textPrimary}]}
-              numberOfLines={1}>
+              numberOfLines={2}
+              accessibilityRole="header">
               {title}
             </Text>
           )}
-          {actions.map((a, idx) => (
-            <TouchableOpacity
-              key={`${a.label}-${idx}`}
-              style={[
-                styles.item,
-                {borderTopColor: C.border},
-                a.disabled && {opacity: 0.5},
-              ]}
-              onPress={() => {
-                if (!a.disabled) {
-                  a.onPress();
-                }
-              }}
-              disabled={!!a.disabled}
-            >
-              <Text
-                style={[
-                  styles.itemText,
-                  {color: a.type === 'danger' ? '#db2d2d' : C.textPrimary},
-                ]}>
-                {a.label}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </Animated.View>
+
+          <View style={[styles.buttons, !title && styles.buttonsNoTitle]}>
+            {actions.map((a, idx) => {
+              const {text, tint} = colorsFor(a);
+              const Icon = a.icon ? ICONS[a.icon] : null;
+              return (
+                <Pressable
+                  key={`${a.label}-${idx}`}
+                  onPress={() => {
+                    if (!a.disabled) {
+                      a.onPress();
+                    }
+                  }}
+                  disabled={!!a.disabled}
+                  accessibilityRole="button"
+                  accessibilityLabel={a.label}
+                  accessibilityState={{disabled: !!a.disabled}}
+                  style={({pressed}) => [
+                    styles.button,
+                    {borderColor: text, backgroundColor: tint},
+                    pressed && styles.buttonPressed,
+                    a.disabled && styles.buttonDisabled,
+                  ]}>
+                  {Icon && <Icon color={text} />}
+                  <Text style={[styles.buttonLabel, {color: text}]}>
+                    {a.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+        </View>
+
+        <Pressable
+          onPress={onRequestClose}
+          accessibilityRole="button"
+          style={({pressed}) => [
+            styles.cancel,
+            {backgroundColor: pressed ? T.pressedBg : T.sheetBg},
+          ]}>
+          <Text style={[styles.cancelText, {color: C.textPrimary}]}>
+            {t('cancel')}
+          </Text>
+        </Pressable>
       </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  modalContainer: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+  modal: {
     justifyContent: 'flex-end',
+    margin: 0,
   },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    right: 0,
-    bottom: 0,
-    left: 0,
+  container: {
+    paddingHorizontal: ms(10),
+    gap: ms(8),
   },
   sheet: {
-    borderTopLeftRadius: rs(12),
-    borderTopRightRadius: rs(12),
-    borderWidth: 1,
-    paddingBottom: ms(10),
-    paddingTop: ms(6),
-    marginHorizontal: ms(8),
-    shadowColor: '#000',
-    shadowOpacity: 0.15,
-    shadowRadius: rs(12),
-    shadowOffset: {width: 0, height: -hs(2)},
-    elevation: 8,
+    borderRadius: rs(20),
+    paddingBottom: ms(6),
+    overflow: 'hidden',
   },
-  // dragArea: {
-  //   paddingVertical: 8,
-  // },
-  // sheetHandle: {
-  //   alignSelf: 'center', width: 60, height: 4, borderRadius: 2, backgroundColor: '#999', opacity: 0.5, marginBottom: 8,
-  // },
+  handle: {
+    alignSelf: 'center',
+    width: ws(36),
+    height: 4,
+    borderRadius: 2,
+    marginTop: ms(8),
+  },
   title: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     fontWeight: '700',
+    lineHeight: fs(22),
+    textAlign: 'center',
+    paddingHorizontal: ms(20),
+    paddingTop: ms(12),
+    paddingBottom: ms(16),
+  },
+  buttons: {
     paddingHorizontal: ms(16),
-    paddingTop: ms(6),
     paddingBottom: ms(10),
+    gap: ms(10),
   },
-  item: {
-    paddingHorizontal: ms(16),
-    paddingVertical: ms(14),
-    borderTopWidth: StyleSheet.hairlineWidth,
+  buttonsNoTitle: {
+    paddingTop: ms(16),
   },
-  itemText: {
-    fontSize: fs(14),
+  button: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: ms(8),
+    minHeight: 48,
+    borderWidth: 1,
+    borderRadius: rs(12),
+  },
+  buttonPressed: {
+    opacity: 0.7,
+  },
+  buttonDisabled: {
+    opacity: 0.45,
+  },
+  buttonLabel: {
+    fontSize: fs(15),
     fontWeight: '600',
   },
+  cancel: {
+    minHeight: 52,
+    borderRadius: rs(16),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  cancelText: {
+    fontSize: fs(15),
+    fontWeight: '700',
+  },
 });
-
-

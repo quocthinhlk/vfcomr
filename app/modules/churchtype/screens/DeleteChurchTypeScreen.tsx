@@ -17,6 +17,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteChurchTypeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -51,7 +52,7 @@ export const DeleteChurchTypeScreen: React.FC = () => {
       setSubmitting(true);
       await deleteChurchType(churchTypeId);
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('churchType')} ${t('success')}`);
-      navigation.navigate('ChurchTypes', { reload: true });
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to delete church type');
     } finally {

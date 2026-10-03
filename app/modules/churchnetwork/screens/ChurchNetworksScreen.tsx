@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   FlatList,
@@ -17,29 +17,32 @@ import {
   listChurchNetworks,
   ChurchNetworkItem,
 } from '../services/churchnetwork.service';
-// import { DeleteSvgIcon } from '../../../shared/components/icons';
-import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
-// import { Pagination } from '../../../shared/components/Pagination';
+import {useNavigation, useFocusEffect} from '@react-navigation/native';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
+import {fs, ws, ms} from '../../../shared/utils/scale';
+import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+import SearchInput from '../../../shared/components/SearchInput';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {
+  CenteredLoader,
+  ChurchNetworkCard,
+  NetworkIcon,
+  getNetworkTokens,
+} from '../components/ChurchNetworkUI';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
-import {EditSvgIcon} from '../../../shared/components/icons';
-import SearchInput from '../../../shared/components/SearchInput';
-import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 
 export const ChurchNetworksScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const route = useRoute<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
   const {theme} = useThemeMode();
   const L = getListStyles(C, theme);
+  const T = getNetworkTokens(theme);
   const [items, setItems] = useState<ChurchNetworkItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -49,13 +52,11 @@ export const ChurchNetworksScreen: React.FC = () => {
   const [query, setQuery] = useState('');
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedNetwork, setSelectedNetwork] = useState<ChurchNetworkItem | null>(null);
+  const pageRef = useRef(1);
 
   const fetchData = useCallback(
     async (targetPage: number, reset = false) => {
       try {
-        if (loading) {
-          return;
-        }
         setLoading(true);
         const res = await listChurchNetworks({limit: 50});
         const full = res?.data?.items ?? [];
@@ -76,6 +77,7 @@ export const ChurchNetworksScreen: React.FC = () => {
 
         setTotalPages(totalPages);
         setTotal(total);
+        pageRef.current = validPage;
         setPage(validPage);
         setItems(pageSlice);
       } catch (e) {
@@ -84,24 +86,18 @@ export const ChurchNetworksScreen: React.FC = () => {
         setLoading(false);
       }
     },
-    [loading, query],
+    [query],
   );
 
   useEffect(() => {
     setItems([]);
     fetchData(1, true);
-  }, [query]);
+  }, [query, fetchData]);
 
   useFocusEffect(
     useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        // Clear the reload flag
-        navigation.setParams({reload: undefined});
-        setItems([]);
-        fetchData(1, true);
-      }
-    }, [route.params?.reload]),
+      fetchData(pageRef.current, true);
+    }, [fetchData]),
   );
 
   const onRefresh = async () => {
@@ -119,49 +115,28 @@ export const ChurchNetworksScreen: React.FC = () => {
     fetchData(targetPage, true);
   };
 
-  const handleEdit = (item: ChurchNetworkItem) => {
-    navigation.navigate('EditChurchNetwork', {churchNetworkId: item.id});
-  };
+  const handleView = useCallback(
+    (item: ChurchNetworkItem) => {
+      navigation.navigate('ChurchNetworkDetail', {churchNetworkId: item.id});
+    },
+    [navigation],
+  );
 
-  // Delete action removed per request
-  const handleDelete = (item: ChurchNetworkItem) => {
-    navigation.navigate('DeleteChurchNetwork', {churchNetworkId: item.id});
-  };
+  const openActions = useCallback((item: ChurchNetworkItem) => {
+    setSelectedNetwork(item);
+    setActionsVisible(true);
+  }, []);
+
+  const closeActions = useCallback(() => {
+    setActionsVisible(false);
+  }, []);
 
   const renderItem = ({item}: {item: ChurchNetworkItem}) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
-      onPress={() => handleEdit(item)}
-      onLongPress={() => {
-        setSelectedNetwork(item);
-        setActionsVisible(true);
-      }}
-      delayLongPress={300}
-    >
-      <View style={L.itemCard as any}>
-        <View style={L.itemRow as any}>
-          <View style={styles.itemCol}>
-            <Text style={[styles.name, {color: C.textPrimary}]}>
-              {item.name}
-            </Text>
-            <Text style={[styles.meta, {color: C.textSecondary}]}>
-              {item.pastor_credential_locked
-                ? t('credentialLocked')
-                : t('credentialUnlocked')}
-            </Text>
-          </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={ws(15)} height={hs(15)} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+    <ChurchNetworkCard
+      item={item}
+      onPress={handleView}
+      onMorePress={openActions}
+    />
   );
 
   const keyExtractor = (item: ChurchNetworkItem) => String(item.id);
@@ -212,6 +187,8 @@ export const ChurchNetworksScreen: React.FC = () => {
     );
   };
 
+  const isInitialLoading = loading && items.length === 0 && !refreshing;
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -221,7 +198,21 @@ export const ChurchNetworksScreen: React.FC = () => {
           <Header title={t('churchNetworks')} />
 
           <View style={styles.headerRow}>
-            <AddNewHeaderButton name="AddChurchNetwork" text={t('addNew')} />
+            <Text
+              style={[styles.countText, {color: C.textSecondary}]}
+              accessibilityLiveRegion="polite">
+              {`${total} ${t('churchNetworks').toLowerCase()}`}
+            </Text>
+            <AddNewHeaderButton
+              name="AddChurchNetwork"
+              text={t('addNew')}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
+            />
           </View>
 
           <SearchInput
@@ -242,60 +233,66 @@ export const ChurchNetworksScreen: React.FC = () => {
                 renderItem={renderItem}
                 nestedScrollEnabled={Platform.OS === 'android'}
                 style={{flex: 1}}
+                contentContainerStyle={styles.listContent}
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
                 ListEmptyComponent={
-                  !loading ? (
-                    <Text style={[styles.empty, {color: C.textSecondary}]}>
-                      {t('noChurchesFound')}
-                    </Text>
+                  isInitialLoading ? (
+                    <CenteredLoader />
+                  ) : !loading ? (
+                    <View style={styles.empty}>
+                      <View style={[styles.emptyIcon, {backgroundColor: T.brandTint}]}>
+                        <NetworkIcon color={T.brandText} />
+                      </View>
+                      <Text style={[styles.emptyTitle, {color: C.textPrimary}]}>
+                        {t('noChurchNetworksFound')}
+                      </Text>
+                      {!query && (
+                        <Text style={[styles.emptyHint, {color: C.textSecondary}]}>
+                          {t('noChurchNetworksHint')}
+                        </Text>
+                      )}
+                    </View>
                   ) : null
                 }
               />
             </PaginatedListPager>
           </View>
-          <Text style={[styles.subTitle, {color: C.textSecondary}]}>
-            {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
-          </Text>
 
-          <View style={styles.pagination}>{renderPagination()}</View>
+          {totalPages > 1 && (
+            <View style={styles.pagination}>
+              <Text style={[styles.pageInfo, {color: C.textSecondary}]}>
+                {`${t('page')} ${page}/${totalPages}`}
+              </Text>
+              {renderPagination()}
+            </View>
+          )}
 
           <ActionSheetModal
             visible={actionsVisible}
-            title={selectedNetwork?.name || t('churchNetworks')}
-            onRequestClose={() => {
-              setActionsVisible(false);
-              setSelectedNetwork(null);
-            }}
+            title={selectedNetwork?.name}
+            onRequestClose={closeActions}
             actions={((): ActionItem[] => {
-              const items: ActionItem[] = [];
-              items.push({
-                label: t('edit'),
-                onPress: () => {
-                  if (selectedNetwork) {
-                    navigation.navigate('EditChurchNetwork', {
-                      churchNetworkId: selectedNetwork.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedNetwork(null);
+              const go = (route: string) => () => {
+                if (selectedNetwork) {
+                  navigation.navigate(route, {
+                    churchNetworkId: selectedNetwork.id,
+                  });
+                }
+                closeActions();
+              };
+              // Delete opens a confirmation screen, never deletes directly.
+              return [
+                {label: t('view'), icon: 'view', onPress: go('ChurchNetworkDetail')},
+                {label: t('edit'), icon: 'edit', onPress: go('EditChurchNetwork')},
+                {
+                  label: t('delete'),
+                  icon: 'delete',
+                  type: 'danger',
+                  onPress: go('DeleteChurchNetwork'),
                 },
-              });
-              items.push({
-                label: t('delete'),
-                type: 'danger',
-                onPress: () => {
-                  if (selectedNetwork) {
-                    navigation.navigate('DeleteChurchNetwork', {
-                      churchNetworkId: selectedNetwork.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedNetwork(null);
-                },
-              });
-              return items;
+              ];
             })()}
           />
         </View>
@@ -312,89 +309,52 @@ const styles = StyleSheet.create({
   },
   headerRow: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     alignItems: 'center',
   },
-  title: {
-    fontSize: fs(16),
-    fontWeight: '600',
-  },
-  subTitle: {
+  countText: {
     marginTop: ms(6),
-    marginBottom: ms(10),
-    fontSize: fs(12),
+    fontSize: fs(13),
+    fontWeight: '500',
   },
-  search: {
-    height: hs(40),
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: rs(6),
-    paddingHorizontal: ms(12),
-    color: '#000',
-    marginBottom: ms(10),
-    marginTop: ms(6),
-  },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: ms(10),
-    borderBottomWidth: 1,
-    borderBottomColor: '#eee',
-  },
-  itemCol: {
-    flex: 1,
-    paddingRight: ms(8),
-  },
-  itemColRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: ms(8),
-    width: ws(72),
-  },
-  name: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    marginBottom: ms(2),
-  },
-  meta: {
-    color: '#666',
-    fontSize: fs(12),
+  listContent: {
+    paddingTop: ms(4),
+    paddingBottom: ms(16),
+    flexGrow: 1,
   },
   empty: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    color: '#888',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: ms(6),
-  },
-  actionBtn: {
-    width: ws(25),
-    height: ws(25),
-    borderRadius: rs(4),
-    justifyContent: 'center',
     alignItems: 'center',
+    paddingTop: ms(48),
+    paddingHorizontal: ms(24),
   },
-  editBtn: {
-    backgroundColor: COLORS.successColor,
+  emptyIcon: {
+    width: ws(64),
+    height: ws(64),
+    borderRadius: ws(32),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: ms(14),
+  },
+  emptyTitle: {
+    fontSize: fs(15),
+    fontWeight: '600',
+    textAlign: 'center',
+  },
+  emptyHint: {
+    marginTop: ms(6),
+    fontSize: fs(13),
+    textAlign: 'center',
+    lineHeight: fs(19),
   },
   pagination: {
-    paddingVertical: ms(12),
-    alignItems: 'flex-end',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: ms(10),
   },
-  
-  addButton: {
-    backgroundColor: COLORS.mainColor,
-    paddingVertical: ms(8),
-    paddingHorizontal: ms(12),
-    borderRadius: rs(6),
-  },
-  addButtonText: {
-    color: '#fff',
+  pageInfo: {
     fontSize: fs(12),
-    fontWeight: '600',
   },
 });
 
-export default ChurchNetworksScreen; 
+export default ChurchNetworksScreen;

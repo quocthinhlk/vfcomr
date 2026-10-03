@@ -15,6 +15,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteCountryScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -49,7 +50,7 @@ export const DeleteCountryScreen: React.FC = () => {
       setSubmitting(true);
       await deleteCountry(countryId);
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('country')} ${t('success')}`);
-      navigation.navigate('Countries', { reload: true });
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to delete country');
     } finally {

@@ -17,6 +17,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, ms, rs} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 import ChurchMultiSelectModal from '../components/ChurchMultiSelectModal';
 import {
   addChurchesToWatchList,
@@ -159,7 +160,7 @@ export const WatchListDetailScreen: React.FC = () => {
             setMutating(true);
             try {
               await deleteWatchList(item.id);
-              navigation.goBack();
+              returnToList(navigation);
             } catch (error) {
               Alert.alert(
                 t('error'),

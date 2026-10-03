@@ -12,6 +12,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -173,7 +174,7 @@ export const EditStepsChartScreen: React.FC = () => {
         t('success') || 'Success',
         `${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'} ${t('success') || 'success'}`,
       );
-      navigation.goBack();
+      returnAfterEdit(navigation);
     } catch (e: any) {
       Alert.alert(t('error') || 'Error', e?.message || t('failedToUpdateStepsChart') || 'Failed to update Steps Chart');
     } finally {

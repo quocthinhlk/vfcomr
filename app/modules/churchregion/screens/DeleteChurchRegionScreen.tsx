@@ -17,6 +17,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteChurchRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -52,7 +53,7 @@ export const DeleteChurchRegionScreen: React.FC = () => {
       setSubmitting(true);
       await deleteChurchRegion(churchRegionId);
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('churchApostolicRegions')} ${t('success')}`);
-      navigation.navigate('ChurchRegions', { reload: true });
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to delete church region');
     } finally {

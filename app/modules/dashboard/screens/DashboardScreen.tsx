@@ -181,7 +181,7 @@ export default function DashboardScreen() {
           navigation.navigate('EditProfile', {id: currentUserId});
         }
       } else {
-        navigation.navigate(item.routeName);
+        navigation.navigate(item.routeName, item.params);
       }
     } else if (item.label === 'Logout') {
       handleLogout();

@@ -3,6 +3,7 @@ import {View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, Sta
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -95,7 +96,7 @@ export const EditEventTypeScreen: React.FC = () => {
         meeting_type: meetingType as EventMeetingType,
       });
       Alert.alert(t('success') || 'Success', `${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'} ${t('success') || 'success'}`);
-      navigation.navigate('EventTypes', {reload: true});
+      returnAfterEdit(navigation);
     } catch (e: any) {
       Alert.alert(t('error') || 'Error', e?.message || 'Failed to update Event Type');
     } finally {

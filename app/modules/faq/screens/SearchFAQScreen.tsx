@@ -301,6 +301,7 @@ export const SearchFAQScreen: React.FC = () => {
               const list: ActionItem[] = [];
               list.push({
                 label: t('view') || 'View',
+                icon: 'view',
                 onPress: () => {
                   if (selectedFAQ) {
                     navigation.navigate('FAQDetail', {faqId: selectedFAQ.id});
@@ -313,6 +314,7 @@ export const SearchFAQScreen: React.FC = () => {
               if (isSuperAdmin(userRoleId)) {
                 list.push({
                   label: t('edit') || 'Edit',
+                  icon: 'edit',
                   onPress: () => {
                     if (selectedFAQ) {
                       navigation.navigate('EditFAQ', {faqId: selectedFAQ.id});
@@ -323,6 +325,7 @@ export const SearchFAQScreen: React.FC = () => {
                 });
                 list.push({
                   label: t('delete') || 'Delete',
+                  icon: 'delete',
                   type: 'danger',
                   onPress: () => {
                     if (selectedFAQ) {

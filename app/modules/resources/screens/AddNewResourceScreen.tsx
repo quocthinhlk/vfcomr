@@ -13,6 +13,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
@@ -256,9 +257,7 @@ export default function AddNewResourceScreen() {
       if (isEdit && resourceId) {
         await updateResource(resourceId, payload);
         Alert.alert(t('success'), t('resourceUpdated'));
-        // Go back to the previous screen (either ResourceDetail or list),
-        // which will reload its data on focus.
-        navigation.goBack();
+        returnAfterEdit(navigation);
       } else {
         const created = await createResource(payload);
         const newId = created?.data?.resource_id;

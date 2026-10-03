@@ -3,6 +3,7 @@ import {View, StyleSheet, Alert, TouchableOpacity, Image} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -135,7 +136,7 @@ export const EditChurchRegionScreen: React.FC = () => {
       
       await updateChurchRegion(churchRegionId, updateData);
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('edit')} ${t('success')}`);
-      navigation.navigate('ChurchRegions', { reload: true });
+      returnAfterEdit(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to update church region');
     } finally {

@@ -18,6 +18,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {updateChurchLocation} from '../services/church.service';
 import {requestLocationPermission} from '../../../shared/services/permissions.service';
 
@@ -73,7 +74,7 @@ export const EditChurchLocationScreen: React.FC = () => {
       Alert.alert(t('success'), t('locationSaved') || 'Location saved.', [
         {
           text: t('ok'),
-          onPress: () => navigation.goBack(),
+          onPress: () => returnAfterEdit(navigation),
         },
       ]);
     } catch (error: any) {

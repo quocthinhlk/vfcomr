@@ -16,6 +16,7 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteEventTypeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -49,7 +50,7 @@ export const DeleteEventTypeScreen: React.FC = () => {
       setSubmitting(true);
       await deleteEventType(eventTypeId);
       Alert.alert(t('success') || 'Success', `${t('delete') || 'Delete'} ${t('eventType') || 'Event Type'} ${t('success') || 'success'}`);
-      navigation.navigate('EventTypes', {reload: true});
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to delete Event Type');
     } finally {

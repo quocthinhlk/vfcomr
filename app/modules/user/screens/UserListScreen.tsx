@@ -105,16 +105,12 @@ export const UserListScreen: React.FC = () => {
   }, [query]);
 
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      const shouldRefresh = !!route?.params?.refresh;
-      if (shouldRefresh) {
-        setItems([]);
-        fetchData(1, true);
-        try { navigation.setParams({ refresh: false }); } catch {}
-      }
-    });
-    return unsubscribe;
-  }, [navigation, fetchData, route?.params?.refresh]);
+    if (route?.params?.refresh || route?.params?.reload) {
+      setItems([]);
+      fetchData(1, true);
+      navigation.setParams({refresh: false, reload: undefined});
+    }
+  }, [route?.params?.refresh, route?.params?.reload]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -360,6 +356,7 @@ export const UserListScreen: React.FC = () => {
               const list: ActionItem[] = [];
               list.push({
                 label: t('userDetail'),
+                icon: 'view',
                 onPress: () => {
                   if (selectedUser) {
                     navigation.navigate('User', {userId: selectedUser.id});
@@ -369,6 +366,7 @@ export const UserListScreen: React.FC = () => {
               });
               list.push({
                 label: t('editUser'),
+                icon: 'edit',
                 onPress: () => {
                   if (selectedUser) {
                     navigation.navigate('EditProfile', {id: selectedUser.id});
@@ -390,11 +388,13 @@ export const UserListScreen: React.FC = () => {
               if (isSuperAdmin(roleId)) {
                 list.push({
                   label: t('deleteUser'),
+                  icon: 'delete',
                   type: 'danger',
                   onPress: () => {
                     if (selectedUser) {
                       navigation.navigate('DeleteUser', {
                         userId: selectedUser.id,
+                        userName: selectedUser.name || undefined,
                       });
                     }
                     closeActions();

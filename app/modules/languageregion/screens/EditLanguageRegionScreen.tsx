@@ -3,6 +3,7 @@ import {View, StyleSheet, Alert, Switch} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -94,7 +95,7 @@ export const EditLanguageRegionScreen: React.FC = () => {
       setSubmitting(true);
       await updateLanguageRegion(languageRegionId, { name: name.trim(), parent_id: parentId ?? null, disabled });
       Alert.alert(t('success') || 'Success', `${t('edit')} ${t('languageRegion')} ${t('success')}`);
-      navigation.navigate('LanguageRegions', { reload: true });
+      returnAfterEdit(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to update language region');
     } finally {

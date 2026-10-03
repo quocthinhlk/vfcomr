@@ -30,6 +30,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, ms, rs, hs} from '../../../shared/utils/scale';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
@@ -489,21 +490,7 @@ export default function EditProfileScreen() {
                 }
 
                 const navigateAfterSave = () => {
-                  const routes = navigation.getState()?.routes ?? [];
-                  const cameFromUser = routes
-                    .slice(0, -1)
-                    .some((routeEntry: {name?: string}) => routeEntry.name === 'User');
-
-                  if (cameFromUser && typeof navigation.popTo === 'function') {
-                    navigation.popTo('User', {
-                      userId,
-                      refetchKey: Date.now(),
-                    });
-                  } else if (navigation.canGoBack()) {
-                    navigation.goBack();
-                  } else {
-                    navigation.navigate('User', {userId});
-                  }
+                  returnAfterEdit(navigation);
                 };
 
                 try {

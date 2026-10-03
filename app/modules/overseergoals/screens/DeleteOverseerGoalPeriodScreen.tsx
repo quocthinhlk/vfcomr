@@ -16,6 +16,7 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteOverseerGoalPeriodScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -64,7 +65,7 @@ export const DeleteOverseerGoalPeriodScreen: React.FC = () => {
       setSubmitting(true);
       await deleteOverseerGoalPeriod(goalPeriodId);
       Alert.alert(t('success'), t('goalPeriodDeletedSuccess'));
-      navigation.navigate('OverseerGoals', {reload: true});
+      returnToList(navigation);
     } catch (e: any) {
       Alert.alert(t('error'), e?.message || t('failedToDeleteGoalPeriod'));
     } finally {

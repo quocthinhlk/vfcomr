@@ -189,7 +189,7 @@ export default function ChurchDetailScreen() {
         <ScrollView
 
           contentContainerStyle={{paddingBottom: ms(24)}}>
-          {!loading && data && !hasLocation && (
+          {!loading && data && !hasLocation && !data.disabled && (
             <View style={styles.locationCard}>
               <View style={styles.locationContent}>
                 <Text style={styles.locationTitle}>

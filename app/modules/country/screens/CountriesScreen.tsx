@@ -173,7 +173,16 @@ export const CountriesScreen: React.FC = () => {
             <Text style={[styles.title, {color: C.textPrimary}]}>
               {t('countries')}
             </Text>
-            <AddNewHeaderButton name="AddCountry" text={t('addNew')} />
+            <AddNewHeaderButton
+              name="AddCountry"
+              text={t('addNew')}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
+            />
           </View>
 
           <SearchInput
@@ -252,6 +261,7 @@ export const CountriesScreen: React.FC = () => {
               const acts: ActionItem[] = [];
               acts.push({
                 label: t('edit'),
+                icon: 'edit',
                 onPress: () => {
                   if (selectedCountry) {
                     navigation.navigate('EditCountry', {
@@ -264,6 +274,7 @@ export const CountriesScreen: React.FC = () => {
               });
               acts.push({
                 label: t('delete'),
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedCountry) {

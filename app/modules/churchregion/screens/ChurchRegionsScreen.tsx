@@ -205,7 +205,16 @@ export const ChurchRegionsScreen: React.FC = () => {
           <Header title={t('churchApostolicRegions')} />
 
           <View style={styles.headerRow}>
-            <AddNewHeaderButton name="AddChurchRegion" text={t('addNew')} />
+            <AddNewHeaderButton
+              name="AddChurchRegion"
+              text={t('addNew')}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
+            />
           </View>
 
           <SearchInput
@@ -256,6 +265,7 @@ export const ChurchRegionsScreen: React.FC = () => {
               const acts: ActionItem[] = [];
               acts.push({
                 label: t('edit'),
+                icon: 'edit',
                 onPress: () => {
                   if (selectedRegion) {
                     navigation.navigate('EditChurchRegion', {
@@ -268,6 +278,7 @@ export const ChurchRegionsScreen: React.FC = () => {
               });
               acts.push({
                 label: t('delete'),
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedRegion) {

@@ -17,6 +17,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {returnToList} from '../../../shared/utils/returnToList';
 import api from '../../../config/api';
 
 export const DeleteFAQScreen: React.FC = () => {
@@ -78,7 +79,7 @@ export const DeleteFAQScreen: React.FC = () => {
       setSubmitting(true);
       await deleteFAQ(faqId);
       Alert.alert(t('success') || 'Success', `${t('delete') || 'Delete'} ${t('faq') || 'FAQ'} ${t('success') || 'success'}`);
-      navigation.navigate('FAQs', {reload: true});
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to delete FAQ');
     } finally {

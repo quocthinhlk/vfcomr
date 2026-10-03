@@ -16,6 +16,7 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteWorshipServiceScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -49,7 +50,7 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
       setSubmitting(true);
       await deleteWorshipService(worshipServiceId);
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('worshipService') || 'Worship Service'} ${t('success')}`);
-      navigation.navigate('WorshipServices', {reload: true});
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to delete worship service');
     } finally {

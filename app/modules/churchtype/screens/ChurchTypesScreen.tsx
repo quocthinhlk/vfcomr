@@ -211,7 +211,16 @@ export const ChurchTypesScreen: React.FC = () => {
         <Header title={t('churchTypes')} />
 
         <View style={styles.headerRow}>
-          <AddNewHeaderButton name="AddChurchType" text={t('addNew')} />
+          <AddNewHeaderButton
+            name="AddChurchType"
+            text={t('addNew')}
+            style={{
+              backgroundColor: C.surface,
+              borderWidth: 1,
+              borderColor: COLORS.mainColor,
+            }}
+            textStyle={{color: COLORS.mainColor}}
+          />
         </View>
 
         <SearchInput
@@ -262,6 +271,7 @@ export const ChurchTypesScreen: React.FC = () => {
             const list: ActionItem[] = [];
             list.push({
               label: (t as any)('edit') || 'Edit',
+              icon: 'edit',
               onPress: () => {
                 if (selectedType) {
                   navigation.navigate('EditChurchType', {
@@ -274,6 +284,7 @@ export const ChurchTypesScreen: React.FC = () => {
             });
             list.push({
               label: (t as any)('delete') || 'Delete',
+              icon: 'delete',
               type: 'danger',
               onPress: () => {
                 if (selectedType) {

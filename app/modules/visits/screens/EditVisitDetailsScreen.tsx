@@ -10,6 +10,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnToList} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {
@@ -602,7 +603,7 @@ export const EditVisitDetailsScreen: React.FC = () => {
         await createEventsBulk(eventPayloads);
       }
 
-      navigation.navigate('Visits', {reload: true});
+      returnToList(navigation);
     } catch (e: any) {
       const handled = applyApiValidationErrors(e);
       if (!handled) {

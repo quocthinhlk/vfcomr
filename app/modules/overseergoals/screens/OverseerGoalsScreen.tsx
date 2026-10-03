@@ -9,7 +9,7 @@ import {
   Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {Text} from '@ui-kitten/components';
 import {Header} from '../../../shared/components/Header';
 import {COLORS} from '../../../shared/constants/colors';
@@ -30,6 +30,7 @@ import {fs, ms} from '../../../shared/utils/scale';
 
 export const OverseerGoalsScreen = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const C = useThemedColors();
   const {theme} = useThemeMode();
   const L = getListStyles(C, theme);
@@ -80,6 +81,13 @@ export const OverseerGoalsScreen = () => {
   useEffect(() => {
     fetchData(1);
   }, [fetchData]);
+
+  useEffect(() => {
+    if (route?.params?.reload || route?.params?.refresh) {
+      fetchData(1);
+      navigation.setParams({reload: undefined, refresh: undefined});
+    }
+  }, [route?.params?.reload, route?.params?.refresh]);
 
   const onRefresh = async () => {
     setRefreshing(true);

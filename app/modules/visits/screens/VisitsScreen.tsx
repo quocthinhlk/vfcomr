@@ -19,6 +19,7 @@ import {
 } from '../services/visit.service';
 import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
 import {useThemedColors} from '../../../shared/styles/theme';
+import {COLORS} from '../../../shared/constants/colors';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -264,6 +265,12 @@ export const VisitsScreen: React.FC = () => {
             <AddNewHeaderButton
               name="AddVisits"
               text={t('addNew') || 'Add New'}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
             />
           </View>
 
@@ -357,6 +364,7 @@ export const VisitsScreen: React.FC = () => {
               const list: ActionItem[] = [];
               list.push({
                 label: t('view') || 'View',
+                icon: 'view',
                 onPress: () => {
                   if (selectedVisit) {
                     navigation.navigate('VisitDetail', {
@@ -369,6 +377,7 @@ export const VisitsScreen: React.FC = () => {
               });
               list.push({
                 label: t('edit') || 'Edit',
+                icon: 'edit',
                 onPress: () => {
                   if (selectedVisit) {
                     navigation.navigate('EditVisit', {

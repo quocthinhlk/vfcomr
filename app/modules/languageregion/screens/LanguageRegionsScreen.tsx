@@ -215,7 +215,16 @@ export const LanguageRegionsScreen: React.FC = () => {
           <Header title={t('languageRegions')} />
 
           <View style={styles.headerRow}>
-            <AddNewHeaderButton name="AddLanguageRegion" text={t('addNew')} />
+            <AddNewHeaderButton
+              name="AddLanguageRegion"
+              text={t('addNew')}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
+            />
           </View>
 
           <SearchInput
@@ -266,6 +275,7 @@ export const LanguageRegionsScreen: React.FC = () => {
               const acts: ActionItem[] = [];
               acts.push({
                 label: t('edit'),
+                icon: 'edit',
                 onPress: () => {
                   if (selectedRegion) {
                     navigation.navigate('EditLanguageRegion', {
@@ -278,6 +288,7 @@ export const LanguageRegionsScreen: React.FC = () => {
               });
               acts.push({
                 label: t('delete'),
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedRegion) {

@@ -11,7 +11,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {BackButton} from '../../../shared/components/BackButton';
 import {COLORS} from '../../../shared/constants/colors';
@@ -43,6 +43,7 @@ type OverseerItem = {
 
 export const ListOverseerScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const C = useThemedColors();
   const {theme} = useThemeMode();
   const listStyles = getListStyles(C, theme);
@@ -90,6 +91,14 @@ export const ListOverseerScreen: React.FC = () => {
     setItems([]);
     fetchData(1, true);
   }, [query]);
+
+  useEffect(() => {
+    if (route?.params?.refresh || route?.params?.reload) {
+      setItems([]);
+      fetchData(1, true);
+      navigation.setParams({refresh: false, reload: undefined});
+    }
+  }, [route?.params?.refresh, route?.params?.reload]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -278,6 +287,7 @@ export const ListOverseerScreen: React.FC = () => {
             actions={[
               {
                 label: t('userDetail'),
+                icon: 'view',
                 onPress: () => {
                   if (selectedUser) {
                     navigation.navigate('User', {userId: selectedUser.id});
@@ -288,6 +298,7 @@ export const ListOverseerScreen: React.FC = () => {
               },
               {
                 label: t('editUser'),
+                icon: 'edit',
                 onPress: () => {
                   if (selectedUser) {
                     navigation.navigate('EditProfile', {id: selectedUser.id});
@@ -298,11 +309,13 @@ export const ListOverseerScreen: React.FC = () => {
               },
               {
                 label: t('deleteUser'),
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedUser) {
                     navigation.navigate('DeleteUser', {
                       userId: selectedUser.id,
+                      userName: selectedUser.name || undefined,
                     });
                   }
                   setActionsVisible(false);

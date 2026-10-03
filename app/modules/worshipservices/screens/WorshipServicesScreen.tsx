@@ -278,6 +278,7 @@ export const WorshipServicesScreen: React.FC = () => {
               const list: ActionItem[] = [];
               list.push({
                 label: t('view') || 'View',
+                icon: 'view',
                 onPress: () => {
                   if (selectedService) {
                     navigation.navigate('WorshipServiceDetail', {
@@ -290,6 +291,7 @@ export const WorshipServicesScreen: React.FC = () => {
               });
               list.push({
                 label: t('edit') || 'Edit',
+                icon: 'edit',
                 onPress: () => {
                   if (selectedService) {
                     navigation.navigate('EditWorshipService', {
@@ -302,6 +304,7 @@ export const WorshipServicesScreen: React.FC = () => {
               });
               list.push({
                 label: t('delete') || 'Delete',
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedService) {

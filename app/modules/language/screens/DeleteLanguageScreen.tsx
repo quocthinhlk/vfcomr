@@ -17,6 +17,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteLanguageScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -51,7 +52,7 @@ export const DeleteLanguageScreen: React.FC = () => {
       setSubmitting(true);
       await deleteLanguage(languageId);
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('language')} ${t('success')}`);
-      navigation.navigate('Languages', { reload: true });
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to delete language');
     } finally {

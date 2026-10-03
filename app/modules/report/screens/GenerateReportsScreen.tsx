@@ -16,6 +16,7 @@ import {Text} from '@ui-kitten/components';
 import axios from 'axios';
 import FileViewer from 'react-native-file-viewer';
 import Svg, {Path, Rect, Text as SvgText} from 'react-native-svg';
+import {useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {globalStyles} from '../../../shared/styles/global';
@@ -82,6 +83,9 @@ function asRegionList(payload: any): any[] {
 }
 
 export const GenerateReportsScreen = () => {
+  const route = useRoute<any>();
+  const selectedGroup =
+    typeof route.params?.group === 'string' ? route.params.group : 'church';
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
   const tRef = useRef(t);
@@ -89,7 +93,7 @@ export const GenerateReportsScreen = () => {
   const [catalog, setCatalog] = useState<ReportCatalog | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [group, setGroup] = useState('church');
+  const [group, setGroup] = useState(selectedGroup);
   const [reportType, setReportType] = useState('');
   const [church, setChurch] = useState<NamedId | null>(null);
   const [user, setUser] = useState<NamedId | null>(null);
@@ -134,11 +138,6 @@ export const GenerateReportsScreen = () => {
     try {
       const next = await getReportCatalog();
       setCatalog(next);
-      const first = next.groups[0];
-      if (first) {
-        setGroup(first.key);
-        setReportType(first.types[0] || '');
-      }
     } catch (error) {
       Alert.alert(tRef.current('error'), getApiErrorMessage(error, tRef.current));
     } finally {
@@ -149,6 +148,30 @@ export const GenerateReportsScreen = () => {
   useEffect(() => {
     void loadCatalog();
   }, [loadCatalog]);
+
+  useEffect(() => {
+    setGroup(selectedGroup);
+    setReportType('');
+    setErrors({});
+    setReportFiles([]);
+  }, [selectedGroup]);
+
+  useEffect(() => {
+    if (!catalog) {
+      return;
+    }
+    const match =
+      catalog.groups.find(item => item.key === group) ?? catalog.groups[0];
+    if (!match) {
+      return;
+    }
+    if (match.key !== group) {
+      setGroup(match.key);
+    }
+    setReportType(current =>
+      match.types.includes(current) ? current : match.types[0] || '',
+    );
+  }, [catalog, group]);
 
   useEffect(() => {
     let mounted = true;
@@ -372,7 +395,7 @@ export const GenerateReportsScreen = () => {
         keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
         style={{flex: 1}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
-          <Header title={t('generateReports')} />
+          <Header title={groupLabel(group)} />
           {loadingCatalog ? (
             <ActivityIndicator color={COLORS.mainColor} style={styles.loader} />
           ) : (
@@ -385,25 +408,6 @@ export const GenerateReportsScreen = () => {
                   {catalog.subHeading}
                 </Text>
               ) : null}
-              {dropdown(
-                t('reportCategory'),
-                (catalog?.groups ?? []).map(item => ({
-                  label: groupLabel(item.key),
-                  value: item.key,
-                })),
-                group,
-                value => {
-                  if (value == null || value === '') {
-                    return;
-                  }
-                  const nextGroup = String(value);
-                  const nextTypes =
-                    catalog?.groups.find(item => item.key === nextGroup)?.types ?? [];
-                  setGroup(nextGroup);
-                  setReportType(nextTypes[0] || '');
-                  clearError('type');
-                },
-              )}
               {needs.reportType
                 ? dropdown(
                     needs.directory ? t('sortBy') : t('reportType'),

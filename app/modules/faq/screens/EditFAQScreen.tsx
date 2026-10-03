@@ -3,6 +3,7 @@ import {View, StyleSheet, Alert, ScrollView, TouchableOpacity, KeyboardAvoidingV
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -224,7 +225,7 @@ export const EditFAQScreen: React.FC = () => {
         tags: validTags,
       });
       Alert.alert(t('success') || 'Success', `${t('edit') || 'Edit'} ${t('faq') || 'FAQ'} ${t('success') || 'success'}`);
-      navigation.navigate('FAQs', {reload: true});
+      returnAfterEdit(navigation);
     } catch (e: any) {
       Alert.alert(t('error') || 'Error', e?.message || 'Failed to update FAQ');
     } finally {

@@ -150,7 +150,16 @@ export const EventTypesScreen: React.FC = () => {
           <Header title={t('eventType') || 'Event Types'} />
 
           <View style={styles.headerRow}>
-            <AddNewHeaderButton name="AddEventType" text={t('addNew') || 'Add New'} />
+            <AddNewHeaderButton
+              name="AddEventType"
+              text={t('addNew') || 'Add New'}
+              style={{
+                backgroundColor: C.surface,
+                borderWidth: 1,
+                borderColor: COLORS.mainColor,
+              }}
+              textStyle={{color: COLORS.mainColor}}
+            />
           </View>
 
           <FlatList
@@ -180,6 +189,7 @@ export const EventTypesScreen: React.FC = () => {
               const list: ActionItem[] = [];
               list.push({
                 label: t('view') || 'View',
+                icon: 'view',
                 onPress: () => {
                   if (selectedEventType) {
                     navigation.navigate('EventTypeDetail', {eventTypeId: selectedEventType.id});
@@ -190,6 +200,7 @@ export const EventTypesScreen: React.FC = () => {
               });
               list.push({
                 label: t('edit') || 'Edit',
+                icon: 'edit',
                 onPress: () => {
                   if (selectedEventType) {
                     navigation.navigate('EditEventType', {eventTypeId: selectedEventType.id});
@@ -200,6 +211,7 @@ export const EventTypesScreen: React.FC = () => {
               });
               list.push({
                 label: t('delete') || 'Delete',
+                icon: 'delete',
                 type: 'danger',
                 onPress: () => {
                   if (selectedEventType) {

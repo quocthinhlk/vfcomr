@@ -16,6 +16,7 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteVisitScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -63,7 +64,7 @@ export const DeleteVisitScreen: React.FC = () => {
         t('success') || 'Success',
         `${t('delete') || 'Delete'} ${t('visit') || 'Visit'} ${t('success') || 'success'}`,
       );
-      navigation.navigate('Visits', {reload: true});
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', t('failedToDeleteVisit') || 'Failed to delete Visit');
     } finally {

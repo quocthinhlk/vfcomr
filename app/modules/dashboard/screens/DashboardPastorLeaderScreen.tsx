@@ -650,6 +650,7 @@ export default function DashboardPastorLeaderScreen() {
   /** Last line of the org text: width + y-offset, used to place the chevron right after the text end. */
   const [orgLastLineInfo, setOrgLastLineInfo] = useState<{width: number; y: number} | null>(null);
   const [hasMapLocation, setHasMapLocation] = useState<boolean | null>(null);
+  const [mapChurchDisabled, setMapChurchDisabled] = useState(false);
   const isFocused = useIsFocused();
   const [unreadNotifications] = useState<number>(0);
 
@@ -1402,7 +1403,7 @@ export default function DashboardPastorLeaderScreen() {
         } catch (error) {
           console.error('Error setting default church ID:', error);
         } finally {
-          navigation.navigate(item.routeName);
+          navigation.navigate(item.routeName, item.params);
         }
       } else if (item.routeName === 'ChurchAttendanceChart') {
         try {
@@ -1444,7 +1445,7 @@ export default function DashboardPastorLeaderScreen() {
           navigation.navigate('AttendanceAndGivingCharts');
         }
       } else {
-        navigation.navigate(item.routeName);
+        navigation.navigate(item.routeName, item.params);
       }
     } else if (item.label === 'Logout') {
       handleLogout();
@@ -1526,11 +1527,13 @@ export default function DashboardPastorLeaderScreen() {
           isPastorLeader(currentUserRoleId ?? undefined);
         if (!isOverseerOrPastorLeader) {
           setHasMapLocation(null);
+          setMapChurchDisabled(false);
           return;
         }
         const churchId = await getCurrentChurchId();
         if (!churchId) {
           setHasMapLocation(null);
+          setMapChurchDisabled(false);
           return;
         }
         const detail = await getChurchDetail(churchId);
@@ -1543,10 +1546,12 @@ export default function DashboardPastorLeaderScreen() {
           lat != null &&
           lng != null &&
           !(Number(lat) === 0 && Number(lng) === 0);
+        setMapChurchDisabled(!!detail?.disabled);
         setHasMapLocation(hasCoords);
       } catch {
         if (!cancelled) {
           setHasMapLocation(null);
+          setMapChurchDisabled(false);
         }
       }
     };
@@ -1901,7 +1906,8 @@ export default function DashboardPastorLeaderScreen() {
         ListHeaderComponent={
           <>
         {(isOverseer(currentUserRoleId ?? undefined) || isPastorLeader(currentUserRoleId ?? undefined)) &&
-          hasMapLocation === false && (
+          hasMapLocation === false &&
+          !mapChurchDisabled && (
             <View style={styles.locationWarningBanner}>
               <Text style={styles.locationWarningText} numberOfLines={2}>
                 {t('omrMapLocationMissing') ||

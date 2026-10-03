@@ -3,6 +3,7 @@ import {View, StyleSheet, Alert} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -58,7 +59,7 @@ export const EditChurchTypeScreen: React.FC = () => {
       setSubmitting(true);
       await updateChurchType(churchTypeId, { name: name.trim() });
       Alert.alert(t('success') || 'Success', `${t('edit')} ${t('churchType')} ${t('success')}`);
-      navigation.navigate('ChurchTypes', { reload: true });
+      returnAfterEdit(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to update church type');
     } finally {

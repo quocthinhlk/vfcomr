@@ -26,6 +26,7 @@ import {
   updateOverseerGoalPeriodParameters,
 } from '../services/overseerGoals.service';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 
 const EditOverseerGoalDefaultsScreen = () => {
   const navigation = useNavigation<any>();
@@ -147,7 +148,7 @@ const EditOverseerGoalDefaultsScreen = () => {
         end_year: endYearNumber,
       });
       Alert.alert(t('success'), t('goalParametersUpdatedSuccess'));
-      navigation.replace('OverseerGoalDetail', {goalPeriodId});
+      returnAfterEdit(navigation);
     } catch (error: any) {
       Alert.alert(t('error'), error?.message || t('failedToUpdateGoalParameters'));
     } finally {

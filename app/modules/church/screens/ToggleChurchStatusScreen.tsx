@@ -13,6 +13,7 @@ import {
 import {useThemedColors} from '../../../shared/styles/theme';
 import AppButton from '../../../shared/components/AppButton';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export default function ToggleChurchStatusScreen() {
   const navigation = useNavigation<any>();
@@ -45,7 +46,7 @@ export default function ToggleChurchStatusScreen() {
         await enableChurch(churchId);
         Alert.alert('Success', 'Church enabled successfully');
       }
-      navigation.navigate('Churches');
+      returnToList(navigation);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || e?.message || 'Failed to toggle status');
     } finally {

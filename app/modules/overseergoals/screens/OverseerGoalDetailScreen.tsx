@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -8,7 +8,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
-import {useNavigation, useRoute} from '@react-navigation/native';
+import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import Svg, {Path} from 'react-native-svg';
 import {Header} from '../../../shared/components/Header';
 import {DeleteButton} from '../../../shared/components/ActionButtons';
@@ -113,40 +113,48 @@ const OverseerGoalDetailScreen = () => {
   const {t} = useTranslation();
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<GoalPeriodDetailData | null>(null);
+  const hasDetail = useRef(false);
 
-  useEffect(() => {
-    let mounted = true;
+  useFocusEffect(
+    useCallback(() => {
+      let mounted = true;
 
-    const loadDetail = async () => {
-      if (!goalPeriodId) {
-        setLoading(false);
-        return;
-      }
-
-      try {
-        setLoading(true);
-        const response = await getOverseerGoalPeriodDetail(goalPeriodId);
-        if (mounted) {
-          setDetail(response?.data ?? null);
-        }
-      } catch (error) {
-        console.error('Failed to load goal period detail:', error);
-        if (mounted) {
-          setDetail(null);
-        }
-      } finally {
-        if (mounted) {
+      const loadDetail = async () => {
+        if (!goalPeriodId) {
           setLoading(false);
+          return;
         }
-      }
-    };
 
-    loadDetail();
+        if (!hasDetail.current) {
+          setLoading(true);
+        }
 
-    return () => {
-      mounted = false;
-    };
-  }, [goalPeriodId]);
+        try {
+          const response = await getOverseerGoalPeriodDetail(goalPeriodId);
+          if (mounted) {
+            const nextDetail = response?.data ?? null;
+            hasDetail.current = nextDetail != null;
+            setDetail(nextDetail);
+          }
+        } catch (error) {
+          console.error('Failed to load goal period detail:', error);
+          if (mounted && !hasDetail.current) {
+            setDetail(null);
+          }
+        } finally {
+          if (mounted) {
+            setLoading(false);
+          }
+        }
+      };
+
+      loadDetail();
+
+      return () => {
+        mounted = false;
+      };
+    }, [goalPeriodId]),
+  );
 
   const sectionSummaries = useMemo(() => {
     if (!detail) {
@@ -231,9 +239,6 @@ const OverseerGoalDetailScreen = () => {
                       {`${detail.goal_period.start_year} – ${detail.goal_period.end_year}`}
                     </Text>
                   </View>
-                  <Text style={[styles.idText, {color: C.textSecondary}]}>
-                    #{detail.goal_period.id}
-                  </Text>
                 </View>
                 <View style={styles.actions}>
                   <IconAction
@@ -420,7 +425,6 @@ const styles = StyleSheet.create({
     paddingVertical: ms(4),
   },
   periodChipText: {fontSize: fs(12), fontWeight: '700'},
-  idText: {fontSize: fs(12), fontWeight: '600'},
   actions: {flexDirection: 'row', alignItems: 'center', gap: ms(8)},
   iconAction: {
     width: ms(36),

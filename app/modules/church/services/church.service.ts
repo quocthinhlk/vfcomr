@@ -55,7 +55,9 @@ export async function updateChurch(id: number, payload: any) {
 
 export async function disableChurch(id: number) {
   try {
-    const response = await api.patch(`/churches/${id}/disable`);
+    // The endpoint rejects a request with no body ("Invalid request body"),
+    // but accepts an empty JSON object.
+    const response = await api.patch(`/churches/${id}/disable`, {});
     return response.data;
   } catch (error) {
     console.error('Error disabling church:', error);

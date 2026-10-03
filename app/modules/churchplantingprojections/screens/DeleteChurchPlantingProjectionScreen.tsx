@@ -16,6 +16,7 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 export const DeleteChurchPlantingProjectionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -52,7 +53,7 @@ export const DeleteChurchPlantingProjectionScreen: React.FC = () => {
         t('success') || 'Success',
         `${t('delete') || 'Delete'} ${t('churchPlantingProjection') || 'Church Planting Projection'} ${t('success') || 'success'}`,
       );
-      navigation.navigate('ChurchPlantingProjections', {reload: true});
+      returnToList(navigation);
     } catch (e) {
       Alert.alert(
         t('error') || 'Error',

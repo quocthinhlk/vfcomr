@@ -16,7 +16,14 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {fs, ms} from '../../../shared/utils/scale';
+import {fs, ms, ws} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import {
+  AlertIcon,
+  getNetworkTokens,
+  networkStyles,
+} from '../components/ChurchNetworkUI';
 
 export const DeleteChurchNetworkScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -24,9 +31,11 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
   const churchNetworkId: number | undefined = route.params?.churchNetworkId;
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const {t} = useTranslation();
   const C = useThemedColors();
   const {theme} = useThemeMode();
+  const T = getNetworkTokens(theme);
 
   useEffect(() => {
     let mounted = true;
@@ -49,36 +58,65 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
     if (!churchNetworkId) return;
     try {
       setSubmitting(true);
+      setErrorMessage('');
       await deleteChurchNetwork(churchNetworkId);
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('churchNetwork')} ${t('success')}`);
-      navigation.navigate('ChurchNetworks', { reload: true });
-    } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete church network');
+      returnToList(navigation);
+    } catch (e: any) {
+      const detail = e?.response?.data?.errors?.detail;
+      setErrorMessage(
+        (typeof detail === 'string' && detail.trim()) || getApiErrorMessage(e, t),
+      );
     } finally {
       setSubmitting(false);
     }
   };
 
+  const [before, after] = t('deleteChurchNetworkMessage').split('{name}');
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Header title={`${t('delete')} ${t('churchNetwork')}`} />
-          <Text style={[styles.desc, {color: C.textSecondary}]}>
-            {`${t('delete')} ${t('churchNetwork')} "${name}"?`}
+      <View style={[networkStyles.screen, {backgroundColor: C.background}]}>
+        <Header title={`${t('delete')} ${t('churchNetwork')}`} showMenu={false} />
+
+        <View style={styles.content}>
+          <View style={[styles.iconWrap, {backgroundColor: T.dangerTint}]}>
+            <AlertIcon color={T.dangerText} />
+          </View>
+          <Text
+            style={[styles.title, {color: C.textPrimary}]}
+            accessibilityRole="header">
+            {t('deleteChurchNetworkTitle')}
           </Text>
-          <View style={styles.row}>
+          <Text style={[styles.message, {color: C.textSecondary}]}>
+            {before}
+            <Text style={[styles.name, {color: C.textPrimary}]}>
+              {name || '…'}
+            </Text>
+            {after}
+          </Text>
+
+          {errorMessage ? (
+            <View style={[styles.errorBox, {backgroundColor: T.dangerTint}]}>
+              <Text style={[styles.errorText, {color: T.dangerText}]}>
+                {errorMessage}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Cancel first (safe default), Delete on the trailing side. */}
+          <View style={styles.buttons}>
             <CancelButton
               label={t('cancel')}
               onPress={() => navigation.goBack()}
               disabled={submitting}
             />
             <DeleteButton
-              label={t('delete')}
+              label={submitting ? t('deleting') : t('delete')}
               onPress={onConfirm}
-              disabled={submitting}
+              disabled={submitting || !churchNetworkId}
             />
           </View>
         </View>
@@ -88,24 +126,50 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
+  content: {
+    marginTop: ms(24),
+    alignItems: 'center',
+  },
+  iconWrap: {
+    width: ws(56),
+    height: ws(56),
+    borderRadius: ws(28),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: ms(14),
   },
   title: {
-    marginTop: ms(16),
-    marginBottom: ms(8),
+    fontSize: fs(17),
+    fontWeight: '700',
+    textAlign: 'center',
   },
-  desc: {
-    color: '#555',
+  message: {
+    marginTop: ms(8),
     fontSize: fs(14),
+    lineHeight: fs(21),
+    textAlign: 'center',
   },
-  row: {
+  name: {
+    fontWeight: '700',
+  },
+  errorBox: {
+    marginTop: ms(16),
+    alignSelf: 'stretch',
+    borderRadius: ms(8),
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(10),
+  },
+  errorText: {
+    fontSize: fs(13),
+    lineHeight: fs(18),
+    textAlign: 'center',
+  },
+  buttons: {
     flexDirection: 'row',
-    marginTop: ms(24),
     gap: ms(12),
+    marginTop: ms(24),
+    alignSelf: 'stretch',
   },
 });
 
-export default DeleteChurchNetworkScreen; 
+export default DeleteChurchNetworkScreen;

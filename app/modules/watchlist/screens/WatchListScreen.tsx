@@ -336,7 +336,7 @@ export const WatchListScreen: React.FC = () => {
         <View style={styles.addRow}>
           <AddNewHeaderButton
             name="WatchListForm"
-            text={t('createWatchList')}
+            text={t('addNew')}
             style={{
               backgroundColor: C.surface,
               borderWidth: 1,

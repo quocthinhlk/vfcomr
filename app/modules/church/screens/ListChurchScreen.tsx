@@ -231,16 +231,13 @@ export const ChurchesListScreen: React.FC = () => {
     if (page - 1 >= 1) {fetchPage(page - 1);}
   }, [page, totalPages, fetchPage]);
 
-  // Refresh on screen focus (e.g. after add/edit)
+  // Reload after a church is disabled or enabled and the flow returns here.
   useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (route?.params?.refresh) {
-        resetAndLoad();
-        try {navigation.setParams({refresh: false});} catch {}
-      }
-    });
-    return unsubscribe;
-  }, [navigation, resetAndLoad, route?.params?.refresh]);
+    if (route?.params?.refresh || route?.params?.reload) {
+      resetAndLoad();
+      navigation.setParams({refresh: false, reload: undefined});
+    }
+  }, [route?.params?.refresh, route?.params?.reload]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -587,8 +584,8 @@ export const ChurchesListScreen: React.FC = () => {
             onRequestClose={() => {setActionsVisible(false); setSelectedChurch(null);}}
             actions={((): ActionItem[] => {
               const list: ActionItem[] = [];
-              list.push({label: t('churchDetail'), onPress: () => {if (selectedChurch) {navigation.navigate('ChurchDetail', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
-              list.push({label: t('editChurch'), onPress: () => {if (selectedChurch) {navigation.navigate('EditChurch', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
+              list.push({label: t('churchDetail'), icon: 'view', onPress: () => {if (selectedChurch) {navigation.navigate('ChurchDetail', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
+              list.push({label: t('editChurch'), icon: 'edit', onPress: () => {if (selectedChurch) {navigation.navigate('EditChurch', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
               if (isSuperAdmin(roleId)) {
                 list.push({label: t('disableChurch') || 'Disable Church', type: 'danger', onPress: () => {if (selectedChurch) {navigation.navigate('DisableChurch', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
               }

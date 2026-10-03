@@ -13,6 +13,7 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
+import {returnToList} from '../../../shared/utils/returnToList';
 
 const DisableChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -50,7 +51,7 @@ const DisableChurchScreen: React.FC = () => {
       setSubmitting(true);
       await disableChurch(churchId);
       Alert.alert(t('success'), t('churchDisabledSuccess'));
-      navigation.goBack();
+      returnToList(navigation);
     } catch (e: any) {
       Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('failedToDisableChurch'));
     } finally {

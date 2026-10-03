@@ -429,7 +429,7 @@ export default function OverseerDashboardScreen() {
       } else if (item.routeName === 'Churches') {
         navigation.navigate('Churches', {openChurchInPastorDashboard: true});
       } else {
-        navigation.navigate(item.routeName);
+        navigation.navigate(item.routeName, item.params);
       }
     } else if (item.label === 'Logout') {
       handleLogout();

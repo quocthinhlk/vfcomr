@@ -7,6 +7,7 @@ import {
   CancelButton,
 } from '../../../shared/components/ActionButtons';
 import {useNavigation, useRoute} from '@react-navigation/native';
+import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -56,7 +57,7 @@ export const EditCountryScreen: React.FC = () => {
       setSubmitting(true);
       await updateCountry(countryId, { name: name.trim() });
       Alert.alert(t('success') || 'Success', `${t('edit')} ${t('country')} ${t('success')}`);
-      navigation.navigate('Countries', { reload: true });
+      returnAfterEdit(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', 'Failed to update country');
     } finally {
