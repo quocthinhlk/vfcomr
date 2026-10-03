@@ -136,6 +136,7 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('roleChangeRequests') || 'Role Change Requests', routeName: 'RoleChangeRequests'},
     ],
   },
+  {label: t('switchUser'), routeName: 'SwitchUser'},
   {
     label: t('churches'),
     children: [

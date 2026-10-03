@@ -15,7 +15,7 @@ import {
   useRoute,
 } from '@react-navigation/native';
 import {useThemedColors} from '../styles/theme';
-import {fs, ws, hs, ms} from '../utils/scale';
+import {fs, ws, hs} from '../utils/scale';
 
 type HeaderProps = {
   title?: string;
@@ -138,7 +138,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     elevation: 0,
     borderBottomWidth: 0,
-    paddingHorizontal: ms(12),
   },
   backText: {
     fontSize: fs(44),
@@ -146,14 +145,13 @@ const styles = StyleSheet.create({
     color: '#111',
   },
   backIcon: {
-    width: ws(25),
-    height: hs(35),
+    width: ws(22),
+    height: ws(22),
     resizeMode: 'contain',
-    textAlign: 'right',
   },
   backWrap: {
-    paddingVertical: hs(6),
-    paddingRight: ms(8),
+    width: ws(35),
+    height: ws(35),
     alignItems: 'flex-start',
     justifyContent: 'center',
   },

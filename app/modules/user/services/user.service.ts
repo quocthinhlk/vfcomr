@@ -153,11 +153,6 @@ export interface ListUsersResponse {
 }
 
 export async function listUsers(params: ListUsersParams = {}) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-
   const page = params.page ?? 1;
   const limit = params.limit ?? DEFAULT_PAGE_LIMIT;
   const search = params.search ?? '';
@@ -165,9 +160,6 @@ export async function listUsers(params: ListUsersParams = {}) {
   try {
     const response = await api.get<ListUsersResponse>(`/users`, {
       params: { page, limit, search },
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
     });
     return response.data;
   } catch (error) {

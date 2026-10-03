@@ -44,6 +44,7 @@ export const WatchListFormScreen: React.FC = () => {
   const [pickerVisible, setPickerVisible] = useState(false);
   const [loading, setLoading] = useState(Boolean(watchListId));
   const [saving, setSaving] = useState(false);
+  const [nameError, setNameError] = useState(false);
 
   useEffect(() => {
     if (!watchListId) {
@@ -92,7 +93,7 @@ export const WatchListFormScreen: React.FC = () => {
 
   const save = async () => {
     if (!name.trim()) {
-      Alert.alert(t('error'), t('watchListNameRequired'));
+      setNameError(true);
       return;
     }
     setSaving(true);
@@ -122,9 +123,11 @@ export const WatchListFormScreen: React.FC = () => {
   if (loading) {
     return (
       <SafeAreaView style={[styles.safeArea, {backgroundColor: C.background}]}>
-        <Header title={t('editWatchList')} />
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={COLORS.mainColor} />
+        <View style={[styles.container, {backgroundColor: C.background}]}>
+          <Header title={t('editWatchList')} />
+          <View style={styles.center}>
+            <ActivityIndicator size="large" color={COLORS.mainColor} />
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -146,18 +149,27 @@ export const WatchListFormScreen: React.FC = () => {
           </Text>
           <TextInput
             value={name}
-            onChangeText={setName}
+            onChangeText={value => {
+              setName(value);
+              if (value.trim()) {
+                setNameError(false);
+              }
+            }}
             placeholder={t('watchListName')}
             placeholderTextColor={C.textSecondary}
             style={[
               styles.input,
+              nameError && styles.inputError,
               {
                 color: C.inputText,
                 backgroundColor: C.inputBg,
-                borderColor: C.inputBorder,
+                borderColor: nameError ? COLORS.danger : C.inputBorder,
               },
             ]}
           />
+          {nameError ? (
+            <Text style={styles.errorText}>{t('required')}</Text>
+          ) : null}
 
           <Text style={[styles.label, {color: C.textPrimary}]}>
             {t('sortBy')}
@@ -267,8 +279,8 @@ export const WatchListFormScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   safeArea: {flex: 1},
-  container: {flex: 1},
-  content: {padding: ms(16), paddingBottom: ms(36)},
+  container: {flex: 1, paddingHorizontal: ms(16)},
+  content: {paddingTop: ms(16), paddingBottom: ms(36)},
   center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   label: {fontSize: fs(12), fontWeight: '700', marginBottom: ms(6)},
   input: {
@@ -278,6 +290,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(10),
     fontSize: fs(12),
     marginBottom: ms(16),
+  },
+  inputError: {
+    marginBottom: ms(4),
+  },
+  errorText: {
+    color: COLORS.danger,
+    fontSize: fs(12),
+    marginBottom: ms(12),
   },
   options: {flexDirection: 'row', gap: ms(7), marginBottom: ms(16)},
   option: {

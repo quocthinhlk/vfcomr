@@ -8,7 +8,10 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {
+  initialWindowMetrics,
+  useSafeAreaInsets,
+} from 'react-native-safe-area-context';
 import {getChurchesList, ChurchListItem} from '../../church/services/church.service';
 import SearchInput from '../../../shared/components/SearchInput';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -31,6 +34,12 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
 }) => {
   const C = useThemedColors();
   const {t} = useTranslation();
+  const insets = useSafeAreaInsets();
+  const topInset = Math.max(insets.top, initialWindowMetrics?.insets.top ?? 0);
+  const bottomInset = Math.max(
+    insets.bottom,
+    initialWindowMetrics?.insets.bottom ?? 0,
+  );
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<ChurchListItem[]>([]);
   const [draft, setDraft] = useState<Record<number, string>>({});
@@ -84,7 +93,15 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.safeArea, {backgroundColor: C.background}]}>
+      <View
+        style={[
+          styles.safeArea,
+          {
+            backgroundColor: C.background,
+            paddingTop: topInset,
+            paddingBottom: bottomInset,
+          },
+        ]}>
         <View style={[styles.header, {borderBottomColor: C.border}]}>
           <TouchableOpacity onPress={onClose} style={styles.headerButton}>
             <Text style={[styles.headerButtonText, {color: C.textSecondary}]}>
@@ -157,7 +174,7 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
             }}
           />
         </View>
-      </SafeAreaView>
+      </View>
     </Modal>
   );
 };

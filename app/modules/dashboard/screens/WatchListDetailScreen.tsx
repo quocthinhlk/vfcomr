@@ -129,6 +129,19 @@ export const WatchListDetailScreen: React.FC = () => {
     );
   };
 
+  const sortLabel = (value?: string) => {
+    if (value === 'country_id') {
+      return t('sortByCountry');
+    }
+    if (value === 'id') {
+      return t('sortByChurchId');
+    }
+    if (value === 'name') {
+      return t('sortByName');
+    }
+    return '';
+  };
+
   const confirmDelete = () => {
     if (!item) {
       return;
@@ -176,36 +189,41 @@ export const WatchListDetailScreen: React.FC = () => {
                 styles.summary,
                 {backgroundColor: C.surface, borderColor: C.border},
               ]}>
-              <Text style={[styles.name, {color: C.textPrimary}]}>
+              <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={1}>
                 {item.name}
               </Text>
-              <Text style={[styles.meta, {color: C.textSecondary}]}>
-                {t('sortBy')}: {item.sort_by}
-              </Text>
-              <Text style={[styles.meta, {color: C.textSecondary}]}>
-                {t('selectedChurches')}: {item.churches.length}
+              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+                {sortLabel(item.sort_by)
+                  ? `${sortLabel(item.sort_by)} · ${item.churches.length} ${t('churches')}`
+                  : `${item.churches.length} ${t('churches')}`}
               </Text>
               <View style={styles.actions}>
                 <TouchableOpacity
-                  style={[styles.button, {backgroundColor: COLORS.mainColor}]}
                   onPress={() =>
                     navigation.navigate('WatchListForm', {
                       watchListId: item.id,
                     })
-                  }>
-                  <Text style={styles.buttonText}>{t('edit')}</Text>
+                  }
+                  hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
+                  <Text style={[styles.actionText, {color: COLORS.mainColor}]}>
+                    {t('edit')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.button, {backgroundColor: COLORS.successColor}]}
                   onPress={() => setPickerVisible(true)}
-                  disabled={mutating}>
-                  <Text style={styles.buttonText}>{t('addChurches')}</Text>
+                  disabled={mutating}
+                  hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
+                  <Text style={[styles.actionText, {color: COLORS.mainColor}]}>
+                    {t('addChurches')}
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.button, {backgroundColor: COLORS.dangerColor}]}
                   onPress={confirmDelete}
-                  disabled={mutating}>
-                  <Text style={styles.buttonText}>{t('delete')}</Text>
+                  disabled={mutating}
+                  hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
+                  <Text style={[styles.actionText, {color: COLORS.dangerColor}]}>
+                    {t('delete')}
+                  </Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -264,20 +282,20 @@ const styles = StyleSheet.create({
   summary: {
     borderWidth: 1,
     borderRadius: rs(10),
-    padding: ms(14),
-    marginTop: ms(10),
-    marginBottom: ms(16),
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(10),
+    marginTop: ms(8),
+    marginBottom: ms(12),
   },
-  name: {fontSize: fs(16), fontWeight: '700', marginBottom: ms(8)},
-  meta: {fontSize: fs(11), marginBottom: ms(4)},
-  actions: {flexDirection: 'row', gap: ms(7), marginTop: ms(10)},
-  button: {
-    flex: 1,
-    borderRadius: rs(4),
-    paddingVertical: ms(8),
+  name: {fontSize: fs(15), fontWeight: '700'},
+  meta: {fontSize: fs(12), marginTop: ms(2)},
+  actions: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: ms(16),
+    marginTop: ms(8),
   },
-  buttonText: {color: COLORS.white, fontSize: fs(10), fontWeight: '700'},
+  actionText: {fontSize: fs(13), fontWeight: '600'},
   sectionTitle: {fontSize: fs(13), fontWeight: '700', marginBottom: ms(9)},
   churchRow: {
     minHeight: ms(48),

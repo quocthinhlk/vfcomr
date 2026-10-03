@@ -327,7 +327,18 @@ async function tryGetFcmToken(): Promise<string | null> {
     if (Platform.OS === 'ios') {
       await messaging().registerDeviceForRemoteMessages();
     }
-    return await messaging().getToken();
+    const token: string = await messaging().getToken();
+    try {
+      const {registerDeviceToken} = require('./notifications.service') as typeof import('./notifications.service');
+      if (token) {
+        void registerDeviceToken(token);
+      }
+    } catch (e) {
+      if (__DEV__) {
+        console.warn('[permissions.service] Failed to register device token:', e);
+      }
+    }
+    return token;
   } catch (e) {
     console.warn('[permissions.service] FCM getToken skipped:', e);
     return null;

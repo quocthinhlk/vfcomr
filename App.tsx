@@ -18,6 +18,7 @@ import { enableScreens } from 'react-native-screens';
 import { LogBox } from 'react-native';
 import './app/shared/config/ui';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import NotificationListener from './app/shared/components/NotificationListener';
 
 /* ================================
    1. TẮT FONT SCALING TOÀN APP
@@ -69,6 +70,7 @@ function AppInner() {
         <SafeAreaProvider>
           <LanguageProvider>
             <MonthlyDataProvider>
+              <NotificationListener />
               <Navigation />
             </MonthlyDataProvider>
           </LanguageProvider>

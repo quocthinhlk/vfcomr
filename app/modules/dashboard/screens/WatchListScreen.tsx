@@ -19,7 +19,10 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
 import {COLORS} from '../../../shared/constants/colors';
-import {fs, ms, rs, ws} from '../../../shared/utils/scale';
+import {fs, ms} from '../../../shared/utils/scale';
+import ActionSheetModal, {
+  ActionItem,
+} from '../../../shared/components/ActionSheetModal';
 import {
   deleteWatchList,
   listWatchLists,
@@ -37,6 +40,7 @@ export const WatchListScreen: React.FC = () => {
   const [items, setItems] = useState<WatchListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedItem, setSelectedItem] = useState<WatchListItem | null>(null);
 
   const load = useCallback(async (showLoader = true) => {
     if (showLoader) {
@@ -97,7 +101,16 @@ export const WatchListScreen: React.FC = () => {
       <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('watchLists')} />
         <View style={styles.addRow}>
-          <AddNewHeaderButton name="WatchListForm" text={t('createWatchList')} />
+          <AddNewHeaderButton
+            name="WatchListForm"
+            text={t('createWatchList')}
+            style={{
+              backgroundColor: C.surface,
+              borderWidth: 1,
+              borderColor: COLORS.mainColor,
+            }}
+            textStyle={{color: COLORS.mainColor}}
+          />
         </View>
 
         {loading && items.length === 0 ? (
@@ -129,42 +142,49 @@ export const WatchListScreen: React.FC = () => {
                 activeOpacity={0.8}
                 onPress={() =>
                   navigation.navigate('WatchListDetail', {watchListId: item.id})
-                }>
+                }
+                onLongPress={() => setSelectedItem(item)}
+                delayLongPress={300}>
                 <View style={L.itemCard as any}>
-                  <View style={styles.itemRow}>
-                    <View style={styles.itemContent}>
-                      <Text style={[styles.name, {color: C.textPrimary}]}>
-                        {item.name}
-                      </Text>
-                      <Text style={[styles.meta, {color: C.textSecondary}]}>
-                        {t('churches')}: {item.churches?.length ?? 0}
-                      </Text>
-                    </View>
-                    <View style={styles.actions}>
-                      <TouchableOpacity
-                        onPress={() =>
-                          navigation.navigate('WatchListForm', {
-                            watchListId: item.id,
-                          })
-                        }
-                        style={[styles.action, {backgroundColor: COLORS.mainColor}]}>
-                        <Text style={styles.actionText}>{t('edit')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        onPress={() => confirmDelete(item)}
-                        style={[
-                          styles.action,
-                          {backgroundColor: COLORS.dangerColor},
-                        ]}>
-                        <Text style={styles.actionText}>{t('delete')}</Text>
-                      </TouchableOpacity>
-                    </View>
-                  </View>
+                  <Text style={[styles.name, {color: C.textPrimary}]}>
+                    {item.name}
+                  </Text>
+                  <Text style={[styles.meta, {color: C.textSecondary}]}>
+                    {t('churches')}: {item.churches?.length ?? 0}
+                  </Text>
                 </View>
               </TouchableOpacity>
             )}
           />
         )}
+        <ActionSheetModal
+          visible={selectedItem != null}
+          title={selectedItem?.name || t('watchLists')}
+          onRequestClose={() => setSelectedItem(null)}
+          actions={((): ActionItem[] => {
+            if (!selectedItem) {
+              return [];
+            }
+            const item = selectedItem;
+            return [
+              {
+                label: t('edit'),
+                onPress: () => {
+                  setSelectedItem(null);
+                  navigation.navigate('WatchListForm', {watchListId: item.id});
+                },
+              },
+              {
+                label: t('delete'),
+                type: 'danger',
+                onPress: () => {
+                  setSelectedItem(null);
+                  confirmDelete(item);
+                },
+              },
+            ];
+          })()}
+        />
       </View>
     </SafeAreaView>
   );
@@ -180,17 +200,6 @@ const styles = StyleSheet.create({
   center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   emptyList: {flexGrow: 1, justifyContent: 'center'},
   empty: {textAlign: 'center', fontSize: fs(12)},
-  itemRow: {flexDirection: 'row', alignItems: 'center'},
-  itemContent: {flex: 1, paddingRight: ms(8)},
   name: {fontSize: fs(14), fontWeight: '700', marginBottom: ms(5)},
   meta: {fontSize: fs(11)},
-  actions: {flexDirection: 'row', gap: ms(6)},
-  action: {
-    minWidth: ws(48),
-    paddingHorizontal: ms(7),
-    paddingVertical: ms(7),
-    borderRadius: rs(4),
-    alignItems: 'center',
-  },
-  actionText: {color: COLORS.white, fontSize: fs(10), fontWeight: '600'},
 });

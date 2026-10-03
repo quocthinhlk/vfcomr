@@ -1,9 +1,11 @@
 // app/config/navigation.tsx
 import React, { useState, useEffect } from 'react';
+import { DeviceEventEmitter, View } from 'react-native';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkReloadListener } from '../shared/components/NetworkReloadListener';
+import { SwitchSessionBar } from '../shared/components/SwitchSessionBar';
 import { isBiometricLoginEnabled } from '../shared/services/biometrics.service';
 import { setUnauthorizedHandler } from './api';
 
@@ -27,6 +29,7 @@ export type RootStackParamList = {
   EditProfile: undefined;
   EnterVisits: undefined;
   NewPastorAndChurch: undefined;
+  Notifications: undefined;
   User: { userId?: number } | undefined;
   UserRoles: undefined;
   Churches: { refresh?: boolean; openChurchInPastorDashboard?: boolean } | undefined;
@@ -253,6 +256,7 @@ import BibleVerseScreen from '../modules/setting/screens/BibleVerseScreen';
 import RationalisingScreen from '../modules/setting/screens/RationalisingScreen';
 import { ProfileScreen } from '../modules/user/screens/ProfileScreen';
 import { SwitchUserScreen } from '../modules/user/screens/SwitchUserScreen';
+import NotificationsScreen from '../modules/notifications/screens/NotificationsScreen';
 import { SupportScreen } from '../modules/dashboard/screens/SupportScreen';
 import { OmrSupportScreen } from '../modules/omrsupport/screens/OmrSupportScreen';
 import { AboutOmrScreen } from '../modules/aboutomr/screens/AboutOmrScreen';
@@ -319,6 +323,18 @@ export default function Navigation() {
     return () => setUnauthorizedHandler(null);
   }, []);
 
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('switchSessionReset', () => {
+      if (navigationRef.isReady()) {
+        navigationRef.reset({
+          index: 0,
+          routes: [{name: 'Dashboard'}],
+        });
+      }
+    });
+    return () => subscription.remove();
+  }, []);
+
   const checkAuthStatus = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
@@ -355,6 +371,8 @@ export default function Navigation() {
     <AuthContext.Provider value={{ isAuthenticated, setIsAuthenticated }}>
       <NavigationContainer ref={navigationRef}>
         <NetworkReloadListener />
+        <View style={{ flex: 1 }}>
+        {isAuthenticated ? <SwitchSessionBar /> : null}
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
             <>
@@ -388,6 +406,7 @@ export default function Navigation() {
               <Stack.Screen name="AddVisitsDetails" component={AddVisitsDetailsScreen} />
               <Stack.Screen name="DeleteVisit" component={DeleteVisitScreen} />
               <Stack.Screen name="NewPastorAndChurch" component={NewPastorAndChurchScreen} />
+              <Stack.Screen name="Notifications" component={NotificationsScreen} />
               {/* New screens */}
               <Stack.Screen name="User" component={UserScreen} />
               <Stack.Screen name="UserRoles" component={UserRolesScreen} />
@@ -514,6 +533,7 @@ export default function Navigation() {
             </>
           )}
         </Stack.Navigator>
+        </View>
       </NavigationContainer>
     </AuthContext.Provider>
   );

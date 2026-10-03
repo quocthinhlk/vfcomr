@@ -40,6 +40,7 @@ import {COLORS} from '../../../shared/constants/colors';
 import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {BellSvgIcon} from '../../../shared/components/icons';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -325,7 +326,15 @@ export default function DashboardScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        <View style={{marginBottom: ms(18)}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: ms(18)}}>
+          <TouchableOpacity
+            style={localStyles.notificationIconWrap}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Notifications' as any)}>
+            <View style={localStyles.notificationIcon}>
+              <BellSvgIcon width={24} height={24} color={COLORS.mainColor} />
+            </View>
+          </TouchableOpacity>
           <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
           <MenuPopup
             visible={menuVisible}
@@ -579,6 +588,15 @@ const localStyles = StyleSheet.create({
     width: ws(15),
     height: ws(15),
     transform: [{ rotate: '-90deg' }],
+  },
+  notificationIconWrap: {
+    paddingHorizontal: ms(6),
+    paddingVertical: ms(4),
+    marginRight: ms(4),
+  },
+  notificationIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   modalItemText: {
     fontSize: fs(14),

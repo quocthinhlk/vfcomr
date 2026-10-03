@@ -36,6 +36,7 @@ import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
 import {updateUser} from '../../user/services/user.service';
+import {BellSvgIcon} from '../../../shared/components/icons';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -680,7 +681,15 @@ export default function OverseerDashboardScreen() {
             </Text>
           </TouchableOpacity>
         </View>
-        <View style={{marginBottom: ms(18)}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: ms(18)}}>
+          <TouchableOpacity
+            style={styles.notificationIconWrap}
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('Notifications' as any)}>
+            <View style={styles.notificationIcon}>
+              <BellSvgIcon width={24} height={24} color={COLORS.mainColor} />
+            </View>
+          </TouchableOpacity>
           <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
           <MenuPopup
             visible={menuVisible}
@@ -874,5 +883,14 @@ const styles = StyleSheet.create({
     width: ws(15),
     height: ws(15),
     transform: [{rotate: '-90deg'}],
+  },
+  notificationIconWrap: {
+    paddingHorizontal: ms(6),
+    paddingVertical: ms(4),
+    marginRight: ms(4),
+  },
+  notificationIcon: {
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

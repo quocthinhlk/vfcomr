@@ -17,10 +17,10 @@ const APP_LANGUAGE_STORAGE_KEY = 'appLanguage';
 const DEFAULT_LANGUAGE = 'en';
 
 // Admin token
-export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI2NTYsInJvbGUiOiJBZG1pbiIsInJvbGVJRCI6MiwidXNlcklEIjo0ODI1fQ.11_t1FZFBdad3vcBG8_eq5c4LSSkHubeWxMjfx6OA9s";
+// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI2NTYsInJvbGUiOiJBZG1pbiIsInJvbGVJRCI6MiwidXNlcklEIjo0ODI1fQ.11_t1FZFBdad3vcBG8_eq5c4LSSkHubeWxMjfx6OA9s";
 // Overseer token
 // export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI3MTUsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.JSdjDkonHna9DZVwORfbsLIz70oHRsbehAVR5We3TYY";
-// export const TOKEN_FOR_TEST = '';
+export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
   baseURL: 'https://tintran.cloud-ip.cc/api/v1/',
@@ -76,7 +76,11 @@ async function resolveLocalizedApiMessage(
 
 api.interceptors.request.use(async config => {
   try {
-    const token = TOKEN_FOR_TEST || (await AsyncStorage.getItem('token')) || '';
+    const switched = await AsyncStorage.getItem('switchedUser');
+    const stored = (await AsyncStorage.getItem('token')) || '';
+    // While impersonating, the stored session token must win over the dev admin token.
+    const token =
+      switched === '1' && stored ? stored : TOKEN_FOR_TEST || stored || '';
     const language =
       (await AsyncStorage.getItem(APP_LANGUAGE_STORAGE_KEY))?.trim() || DEFAULT_LANGUAGE;
 
@@ -147,12 +151,37 @@ async function triggerUnauthorizedLogout(): Promise<void> {
   }
 }
 
+function coerceArrayBufferJson(data: unknown): unknown {
+  try {
+    let bytes: Uint8Array | null = null;
+    if (data instanceof ArrayBuffer) {
+      bytes = new Uint8Array(data);
+    } else if (ArrayBuffer.isView(data)) {
+      bytes = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
+    }
+    if (!bytes || bytes.length === 0) {
+      return data;
+    }
+    const text = new TextDecoder().decode(bytes).trim();
+    if (!text.startsWith('{') && !text.startsWith('[')) {
+      return data;
+    }
+    return JSON.parse(text);
+  } catch {
+    return data;
+  }
+}
+
 api.interceptors.response.use(
   response => response,
   async (error: unknown) => {
     if (!axios.isAxiosError(error)) {
       logApiError(error);
       return Promise.reject(error);
+    }
+
+    if (error.config?.responseType === 'arraybuffer' && error.response?.data) {
+      error.response.data = coerceArrayBufferJson(error.response.data);
     }
 
     // Log full technical details for developers first (before sanitizing).
