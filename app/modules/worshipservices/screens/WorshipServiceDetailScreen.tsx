@@ -182,7 +182,7 @@ export const WorshipServiceDetailScreen: React.FC = () => {
                 <DeleteButton
                   label={t('delete') || 'Delete'}
                   onPress={handleDelete}
-                  style={styles.deleteButton}
+                  fullWidth
                 />
               </View>
             </ScrollView>
@@ -283,10 +283,6 @@ const styles = StyleSheet.create({
   deleteSection: {
     marginTop: ms(10),
     alignSelf: 'stretch',
-  },
-  deleteButton: {
-    flex: 0,
-    width: '100%',
   },
 });
 

@@ -2,10 +2,18 @@ import UIKit
 import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
+import FirebaseCore
 
 @main
 class AppDelegate: RCTAppDelegate {
   override func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey : Any]? = nil) -> Bool {
+    // FCM: configure only when GoogleService-Info.plist is bundled, so builds
+    // without Firebase config still launch (push stays disabled).
+    if FirebaseApp.app() == nil,
+       Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
+      FirebaseApp.configure()
+    }
+
     self.moduleName = "vfcomr"
     self.dependencyProvider = RCTAppDependencyProvider()
 

@@ -19,6 +19,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import AppButton from '../../../shared/components/AppButton';
+import {DeleteButton} from '../../../shared/components/ActionButtons';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 
@@ -433,15 +434,15 @@ export default function ChurchDetailScreen() {
                       {t('enableChurch')}
                     </AppButton>
                   ) : (
-                    <AppButton
-                      style={styles.disableChurchButton}
+                    <DeleteButton
+                      label={t('disableThisChurch')}
                       onPress={() =>
                         navigation.navigate('DisableChurch' as any, {
                           id: churchId,
                         })
-                      }>
-                      {t('disableThisChurch')}
-                    </AppButton>
+                      }
+                      fullWidth
+                    />
                   )}
                 </View>
               ) : null}
@@ -605,11 +606,6 @@ const styles = StyleSheet.create({
   fullWidthActionWrap: {
     paddingTop: ms(12),
     paddingBottom: ms(4),
-  },
-  disableChurchButton: {
-    width: '100%',
-    backgroundColor: COLORS.dangerColor,
-    borderColor: COLORS.dangerColor,
   },
   enableChurchButton: {
     width: '100%',

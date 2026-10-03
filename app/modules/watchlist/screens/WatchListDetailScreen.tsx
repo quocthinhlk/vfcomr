@@ -11,6 +11,7 @@ import {
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
+import {DeleteButton} from '../../../shared/components/ActionButtons';
 import {globalStyles} from '../../../shared/styles/global';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -217,14 +218,6 @@ export const WatchListDetailScreen: React.FC = () => {
                     {t('addChurches')}
                   </Text>
                 </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={confirmDelete}
-                  disabled={mutating}
-                  hitSlop={{top: 8, bottom: 8, left: 4, right: 4}}>
-                  <Text style={[styles.actionText, {color: COLORS.dangerColor}]}>
-                    {t('delete')}
-                  </Text>
-                </TouchableOpacity>
               </View>
             </View>
 
@@ -234,6 +227,16 @@ export const WatchListDetailScreen: React.FC = () => {
             <FlatList
               data={item.churches}
               keyExtractor={church => String(church.church_id)}
+              contentContainerStyle={styles.listContent}
+              ListFooterComponent={
+                <DeleteButton
+                  label={t('delete')}
+                  onPress={confirmDelete}
+                  disabled={mutating}
+                  fullWidth
+                  style={styles.deleteButton}
+                />
+              }
               ListEmptyComponent={
                 <Text style={[styles.empty, {color: C.textSecondary}]}>
                   {t('noChurchesFound')}
@@ -309,6 +312,8 @@ const styles = StyleSheet.create({
   churchName: {flex: 1, fontSize: fs(12), paddingRight: ms(8)},
   removeText: {color: COLORS.dangerColor, fontSize: fs(11), fontWeight: '700'},
   empty: {textAlign: 'center', marginTop: ms(30)},
+  listContent: {paddingBottom: ms(28)},
+  deleteButton: {marginTop: ms(12)},
   overlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(0,0,0,0.35)',

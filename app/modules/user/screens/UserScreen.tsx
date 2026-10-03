@@ -17,7 +17,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+import {DeleteButton} from '../../../shared/components/ActionButtons';
 import {getUserById, updateUser, UserDetailData} from '../services/user.service';
 import api from '../../../config/api';
 import {COLORS} from '../../../shared/constants/colors';
@@ -630,16 +630,12 @@ export const UserScreen = () => {
 
           {isSuperAdmin(roleId) && !isOwnProfile ? (
             <View style={{marginTop: ms(12)}}>
-              <AddNewHeaderButton
-                name="DeleteUser"
-                params={{userId}}
-                text={t('deleteUser')}
-                prefix=""
-                style={{
-                  backgroundColor: COLORS.dangerColor,
-                  marginTop: 0,
-                }}
-                textStyle={{fontSize: fs(12)}}
+              <DeleteButton
+                label={t('deleteUser')}
+                onPress={() =>
+                  navigation.navigate('DeleteUser', {userId})
+                }
+                fullWidth
               />
             </View>
           ) : null}

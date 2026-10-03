@@ -1,10 +1,20 @@
 import api from '../../../config/api';
+import {getChurchDetail} from '../../church/services/church.service';
 
 export type WatchListSortBy = 'country_id' | 'id' | 'name';
 
 export interface WatchListChurch {
   church_id: number;
   church_name: string;
+}
+
+export interface WatchListChurchRow extends WatchListChurch {
+  country_name: string;
+  city_name: string;
+  pastor_name: string;
+  is_mother_church: boolean;
+  is_msc: boolean;
+  enable_cpm: boolean;
 }
 
 export interface WatchListItem {
@@ -83,6 +93,50 @@ export async function addChurchesToWatchList(
     {church_ids: churchIds},
   );
   return response.data;
+}
+
+const CHURCH_DETAIL_BATCH = 6;
+
+function churchRowFromDetail(
+  church: WatchListChurch,
+  data: any,
+): WatchListChurchRow {
+  return {
+    church_id: church.church_id,
+    church_name: data?.name || church.church_name,
+    country_name: data?.country_name || '',
+    city_name: data?.city_name || data?.city || '',
+    pastor_name: data?.pastor_name || '',
+    is_mother_church: !!data?.is_mother_church,
+    is_msc: !!data?.is_msc,
+    enable_cpm: !!data?.enable_cpm,
+  };
+}
+
+/** Watch list churches only include id and name. Fill in the columns the web table shows. */
+export async function enrichWatchListChurches(
+  churches: WatchListChurch[],
+): Promise<WatchListChurchRow[]> {
+  const ids = [...new Set(churches.map(church => church.church_id))];
+  const details = new Map<number, any>();
+
+  for (let index = 0; index < ids.length; index += CHURCH_DETAIL_BATCH) {
+    const batch = ids.slice(index, index + CHURCH_DETAIL_BATCH);
+    const results = await Promise.all(
+      batch.map(async id => {
+        try {
+          return [id, await getChurchDetail(id)] as const;
+        } catch {
+          return [id, null] as const;
+        }
+      }),
+    );
+    results.forEach(([id, data]) => details.set(id, data));
+  }
+
+  return churches.map(church =>
+    churchRowFromDetail(church, details.get(church.church_id)),
+  );
 }
 
 export async function removeChurchFromWatchList(

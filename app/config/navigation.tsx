@@ -6,6 +6,7 @@ import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkReloadListener } from '../shared/components/NetworkReloadListener';
 import { SwitchSessionBar } from '../shared/components/SwitchSessionBar';
+import NotificationListener from '../shared/components/NotificationListener';
 import { isBiometricLoginEnabled } from '../shared/services/biometrics.service';
 import { setUnauthorizedHandler } from './api';
 
@@ -197,13 +198,13 @@ import PastoralVisitsChartScreen from '../modules/dashboard/screens/PastoralVisi
 import OverseerChurchesPlantedLast10YearsScreen from '../modules/dashboard/screens/OverseerChurchesPlantedLast10YearsScreen';
 import ChurchGivingChartScreen from '../modules/dashboard/screens/ChurchGivingChartScreen';
 import AttendanceAndGivingChartsScreen from '../modules/dashboard/screens/AttendanceAndGivingCharts';
-import { WatchListScreen } from '../modules/dashboard/screens/WatchListScreen';
-import WatchListDetailScreen from '../modules/dashboard/screens/WatchListDetailScreen';
-import WatchListFormScreen from '../modules/dashboard/screens/WatchListFormScreen';
-import { OverseerGoalsScreen } from '../modules/overseer/screens/OverseerGoalsScreen';
-import AddOverseerGoalsScreen from '../modules/overseer/screens/AddOverseerGoalsScreen';
-import DeleteOverseerGoalPeriodScreen from '../modules/overseer/screens/DeleteOverseerGoalPeriodScreen';
-import EditOverseerGoalDefaultsScreen from '../modules/overseer/screens/EditOverseerGoalDefaultsScreen';
+import { WatchListScreen } from '../modules/watchlist/screens/WatchListScreen';
+import WatchListDetailScreen from '../modules/watchlist/screens/WatchListDetailScreen';
+import WatchListFormScreen from '../modules/watchlist/screens/WatchListFormScreen';
+import { OverseerGoalsScreen } from '../modules/overseergoals/screens/OverseerGoalsScreen';
+import AddOverseerGoalsScreen from '../modules/overseergoals/screens/AddOverseerGoalsScreen';
+import DeleteOverseerGoalPeriodScreen from '../modules/overseergoals/screens/DeleteOverseerGoalPeriodScreen';
+import EditOverseerGoalDefaultsScreen from '../modules/overseergoals/screens/EditOverseerGoalDefaultsScreen';
 import { GenerateReportsScreen } from '../modules/report/screens/GenerateReportsScreen';
 import { ChurchesPlantedLast10YearsScreen } from '../modules/dashboard/screens/ChurchesPlantedLast10YearsScreen';
  
@@ -288,9 +289,9 @@ import { RoleChangeRequestsScreen } from '../modules/user/screens/RoleChangeRequ
 import { RoleChangeRequestDetailScreen } from '../modules/user/screens/RoleChangeRequestDetailScreen';
 
 const OverseerGoalDetailScreen =
-  require('../modules/overseer/screens/OverseerGoalDetailScreen').default;
+  require('../modules/overseergoals/screens/OverseerGoalDetailScreen').default;
 const EditOverseerGoalsScreen =
-  require('../modules/overseer/screens/EditOverseerGoalsScreen').default;
+  require('../modules/overseergoals/screens/EditOverseerGoalsScreen').default;
 const EditVisitScreen =
   require('../modules/visits/screens/EditVisitScreen').default;
 
@@ -373,6 +374,7 @@ export default function Navigation() {
         <NetworkReloadListener />
         <View style={{ flex: 1 }}>
         {isAuthenticated ? <SwitchSessionBar /> : null}
+        {isAuthenticated ? <NotificationListener /> : null}
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (
             <>

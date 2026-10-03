@@ -16,6 +16,8 @@ interface ActionButtonProps {
   label?: string;
   onPress: () => void;
   disabled?: boolean;
+  /** Stretch to the container width instead of sharing a row (flex: 1). */
+  fullWidth?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
@@ -29,6 +31,7 @@ const BaseActionButton: React.FC<BaseButtonProps> = ({
   label,
   onPress,
   disabled,
+  fullWidth,
   style,
   backgroundColor,
   borderColor,
@@ -38,6 +41,7 @@ const BaseActionButton: React.FC<BaseButtonProps> = ({
     <TouchableOpacity
       style={[
         styles.btn,
+        fullWidth && styles.fullWidth,
         {
           backgroundColor,
           borderColor,
@@ -93,12 +97,14 @@ export const DeleteButton: React.FC<ActionButtonProps> = ({
   label = 'Delete',
   onPress,
   disabled,
+  fullWidth,
   style,
 }) => (
   <BaseActionButton
     label={label}
     onPress={onPress}
     disabled={disabled}
+    fullWidth={fullWidth}
     style={style}
     backgroundColor={COLORS.dangerColor}
     borderColor={COLORS.dangerColor}
@@ -115,6 +121,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: ms(10),
+  },
+  fullWidth: {
+    flex: 0,
+    width: '100%',
+    alignSelf: 'stretch',
   },
   btnText: {
     fontSize: fs(12),

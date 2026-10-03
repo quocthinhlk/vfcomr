@@ -26,7 +26,7 @@ import {
   listOverseerGoalPeriods,
   OverseerGoalPeriodItem,
 } from '../services/overseerGoals.service';
-import {fs, ms, rs, ws} from '../../../shared/utils/scale';
+import {fs, ms} from '../../../shared/utils/scale';
 
 export const OverseerGoalsScreen = () => {
   const navigation = useNavigation<any>();
@@ -153,12 +153,12 @@ export const OverseerGoalsScreen = () => {
   const renderItem = ({item}: {item: OverseerGoalPeriodItem}) => {
     const nationName = getSafeText(item.nation_name) || '-';
     const churchName = getSafeText(item.local_church_name) || '-';
-    const assignedTo = getSafeText(item.user_name) || '-';
+    const overseerName = getSafeText(item.user_name) || '-';
     const periodText = `${item.start_year ?? '-'} - ${item.end_year ?? '-'}`;
 
     return (
       <TouchableOpacity
-        activeOpacity={0.85}
+        activeOpacity={0.75}
         onPress={() =>
           navigation.navigate('OverseerGoalDetail', {goalPeriodId: item.id})
         }
@@ -171,62 +171,15 @@ export const OverseerGoalsScreen = () => {
             shadowOpacity: theme === 'dark' ? 0 : 0.06,
           },
         ]}>
-        <View
-        style={[
-          styles.cardBody,
-        ]}>
-        <View style={styles.cardHeader}>
-          <Text
-            style={[styles.nationName, {color: C.textPrimary}]}
-            numberOfLines={1}>
-            {nationName}
-          </Text>
-          <View
-            style={[
-              styles.periodBadge,
-              {
-                borderColor: C.inputBorder,
-                backgroundColor: C.background,
-              },
-            ]}>
-            <Text style={[styles.periodBadgeText, {color: C.textSecondary}]}>
-              {periodText}
-            </Text>
-          </View>
-
-        </View>
-
-        <View
-          style={[
-            styles.infoList,
-            {borderTopColor: C.inputBorder},
-          ]}>
-          <View style={styles.infoLine}>
-            <Text style={[styles.infoLabelInline, {color: C.textSecondary}]}>
-              {t('church')}:
-            </Text>
-            <Text style={[styles.infoValueInline, {color: C.textPrimary}]}>
-              {churchName}
-            </Text>
-          </View>
-
-          <View style={styles.infoLine}>
-            <Text style={[styles.infoLabelInline, {color: C.textSecondary}]}>
-              {t('assignedTo')}:
-            </Text>
-            <Text
-              style={[styles.infoValueInline, {color: C.textPrimary}]}
-              numberOfLines={1}>
-              {assignedTo}
-            </Text>
-          </View>
-        </View>
-
+        <Text style={styles.overseerName} numberOfLines={2}>
+          {overseerName}
+        </Text>
+        <Text style={[styles.churchName, {color: C.textPrimary}]}>{churchName}</Text>
         <View style={styles.metaRow}>
-          <Text style={[styles.metaText, {color: C.textSecondary}]}>
-            {`#${item.id}`}
+          <Text style={[styles.metaText, {color: C.textSecondary}]} numberOfLines={2}>
+            {nationName} · {periodText}
           </Text>
-        </View>
+          <Text style={[styles.metaId, {color: C.textSecondary}]}>#{item.id}</Text>
         </View>
       </TouchableOpacity>
     );
@@ -241,20 +194,25 @@ export const OverseerGoalsScreen = () => {
       <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('overseerGoals')} />
 
+        <View style={styles.headerRow}>
+          <AddNewHeaderButton
+            name="AddOverseerGoals"
+            text={t('addNew')}
+            style={{
+              backgroundColor: C.surface,
+              borderWidth: 1,
+              borderColor: COLORS.mainColor,
+            }}
+            textStyle={{color: COLORS.mainColor}}
+          />
+        </View>
+
         <SearchInput
           value={query}
           onChangeText={setQuery}
           placeholder={t('search')}
           onSubmitEditing={() => goToPage(1)}
         />
-
-        <View style={styles.addButtonRow}>
-          <AddNewHeaderButton
-            name="AddOverseerGoals"
-            text={t('addNew')}
-            style={styles.addButton}
-          />
-        </View>
 
         <View style={{flex: 1, minHeight: 0}}>
           <PaginatedListPager
@@ -321,6 +279,11 @@ const styles = StyleSheet.create({
   listContent: {
     paddingBottom: ms(4),
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
   itemCard: {
     padding: ms(10),
     marginBottom: ms(8),
@@ -329,66 +292,33 @@ const styles = StyleSheet.create({
     shadowOffset: {width: 0, height: 1},
     elevation: 1,
   },
-  cardBody: {
-    flex: 1,
-  },
-  addButtonRow: {
-    alignItems: 'flex-end',
-    marginBottom: ms(8),
-  },
-  addButton: {
-    marginTop: 0,
-    minWidth: ws(88),
-  },
-  cardHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  nationName: {
-    fontSize: fs(15),
+  overseerName: {
+    color: COLORS.mainColor,
+    fontSize: fs(14),
     fontWeight: '700',
-    flex: 1,
-    marginRight: ms(8),
+    lineHeight: fs(18),
   },
-  periodBadge: {
-    borderWidth: 1,
-    borderRadius: ms(999),
-    paddingHorizontal: ms(8),
-    paddingVertical: ms(3),
-  },
-  periodBadgeText: {
-    fontSize: fs(10.5),
-    fontWeight: '700',
-  },
-  infoList: {
-    marginTop: ms(8),
-    paddingTop: ms(6),
-    borderTopWidth: StyleSheet.hairlineWidth,
-  },
-  infoLine: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: ms(3),
-  },
-  infoLabelInline: {
-    fontSize: fs(11),
-    fontWeight: '700',
-    marginRight: ms(6),
-  },
-  infoValueInline: {
-    flex: 1,
-    fontSize: fs(12.5),
+  churchName: {
+    fontSize: fs(13),
     fontWeight: '600',
+    lineHeight: fs(18),
+    marginTop: ms(4),
   },
   metaRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    marginTop: ms(6),
+    alignItems: 'flex-start',
+    gap: ms(8),
+    marginTop: ms(4),
   },
   metaText: {
-    fontSize: fs(10.5),
+    flex: 1,
+    fontSize: fs(12),
+    lineHeight: fs(16),
+  },
+  metaId: {
+    fontSize: fs(11),
+    fontWeight: '600',
+    lineHeight: fs(16),
   },
   subTitle: {
     marginTop: ms(4),

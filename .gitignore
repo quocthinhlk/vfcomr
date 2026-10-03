@@ -73,3 +73,7 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# Firebase native config (per-environment; provide locally / via CI)
+ios/vfcomr/GoogleService-Info.plist
+android/app/google-services.json

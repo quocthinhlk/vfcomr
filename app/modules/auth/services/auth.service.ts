@@ -1,6 +1,7 @@
 import {DeviceEventEmitter} from 'react-native';
 import api, {TOKEN_FOR_TEST} from '../../../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {deleteDeviceToken} from '../../../shared/services/notifications.service';
 
 export const SWITCH_SESSION_EVENT = 'switchSessionChanged';
 const ORIGINAL_TOKEN_KEY = 'originalAdminToken';
@@ -25,6 +26,8 @@ export async function login(payload: LoginPayload) {
 }
 
 export async function logout() {
+  // Stop pushes for this account on this device (non-blocking if offline).
+  void deleteDeviceToken();
   // Remove token and selected church_id in AsyncStorage
   await AsyncStorage.removeItem('token');
   await AsyncStorage.removeItem('selectedChurchId');
