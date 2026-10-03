@@ -1,6 +1,5 @@
 import React, {useEffect, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -9,30 +8,27 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
 import api from '../../../config/api';
-import {globalStyles} from '../../../shared/styles/global';
-import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {formStyles} from '../../../shared/styles/form';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import {CancelButton, SaveButton} from '../../../shared/components/ActionButtons';
+import {
+  FormActions,
+  FormField,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {
   getOverseerGoalPeriodDetail,
   updateOverseerGoalPeriodParameters,
 } from '../services/overseerGoals.service';
-import {fs, ms} from '../../../shared/utils/scale';
+import {ms} from '../../../shared/utils/scale';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 
 const EditOverseerGoalDefaultsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const goalPeriodId: number | undefined = route?.params?.goalPeriodId;
-  const C = useThemedColors();
   const {t} = useTranslation();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -157,145 +153,97 @@ const EditOverseerGoalDefaultsScreen = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header title={t('editParameters')} showMenu={false} />
+    <ScreenContainer title={t('editParameters')} loading={loading}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={
+          Platform.OS === 'ios'
+            ? ms(64)
+            : (StatusBar.currentHeight || 0) + ms(50)
+        }
+        style={{flex: 1}}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+          <FormField label={t('assignedTo')}>
+            <AppInput value={assignedTo} editable={false} />
+          </FormField>
 
-        {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator size="small" color={C.textPrimary} />
+          <FormField label={t('church')} required>
+            <ElementDropdown
+              data={churchOptions}
+              value={localChurchId}
+              onChange={value => {
+                setLocalChurchId(value as number);
+                clearInvalid('localChurchId');
+              }}
+              placeholder={t('selectChurch')}
+              error={!!invalid.localChurchId}
+              onSearchText={text => loadChurches(text)}
+            />
+          </FormField>
+
+          <FormField label={t('nation')} required>
+            <ElementDropdown
+              data={nationOptions}
+              value={nationId}
+              onChange={value => {
+                setNationId(value as number);
+                clearInvalid('nationId');
+              }}
+              placeholder={t('selectNation')}
+              error={!!invalid.nationId}
+              onSearchText={text => loadNations(text)}
+            />
+          </FormField>
+
+          <View style={styles.row}>
+            <View style={styles.halfField}>
+              <FormField label={t('startYear')} required>
+                <AppInput
+                  value={startYear}
+                  onChangeText={text => {
+                    setStartYear(normalizePositiveNumberInput(text));
+                    clearInvalid('startYear');
+                  }}
+                  placeholder={t('startYear')}
+                  keyboardType="numeric"
+                  error={!!invalid.startYear}
+                />
+              </FormField>
+            </View>
+
+            <View style={styles.halfField}>
+              <FormField label={t('endYear')} required>
+                <AppInput
+                  value={endYear}
+                  onChangeText={text => {
+                    setEndYear(normalizePositiveNumberInput(text));
+                    clearInvalid('endYear');
+                  }}
+                  placeholder={t('endYear')}
+                  keyboardType="numeric"
+                  error={!!invalid.endYear}
+                />
+              </FormField>
+            </View>
           </View>
-        ) : (
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-            keyboardVerticalOffset={
-              Platform.OS === 'ios'
-                ? ms(64)
-                : (StatusBar.currentHeight || 0) + ms(50)
-            }
-            style={{flex: 1}}>
-            <ScrollView
 
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled">
-              <View style={styles.form}>
-                <View style={styles.field}>
-                  <Text style={[formStyles.label, {color: C.textSecondary}]}>
-                    {t('assignedTo')}
-                  </Text>
-                  <AppInput value={assignedTo} editable={false} />
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={[formStyles.label, {color: C.textSecondary}]}>
-                    {t('church')} <Text style={styles.required}>*</Text>
-                  </Text>
-                  <ElementDropdown
-                    data={churchOptions}
-                    value={localChurchId}
-                    onChange={value => {
-                      setLocalChurchId(value as number);
-                      clearInvalid('localChurchId');
-                    }}
-                    placeholder={t('selectChurch')}
-                    error={!!invalid.localChurchId}
-                    onSearchText={text => loadChurches(text)}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text style={[formStyles.label, {color: C.textSecondary}]}>
-                    {t('nation')} <Text style={styles.required}>*</Text>
-                  </Text>
-                  <ElementDropdown
-                    data={nationOptions}
-                    value={nationId}
-                    onChange={value => {
-                      setNationId(value as number);
-                      clearInvalid('nationId');
-                    }}
-                    placeholder={t('selectNation')}
-                    error={!!invalid.nationId}
-                    onSearchText={text => loadNations(text)}
-                  />
-                </View>
-
-                <View style={styles.row}>
-                  <View style={[styles.field, styles.halfField]}>
-                    <Text style={[formStyles.label, {color: C.textSecondary}]}>
-                      {t('startYear')} <Text style={styles.required}>*</Text>
-                    </Text>
-                    <AppInput
-                      value={startYear}
-                      onChangeText={text => {
-                        setStartYear(normalizePositiveNumberInput(text));
-                        clearInvalid('startYear');
-                      }}
-                      placeholder={t('startYear')}
-                      keyboardType="numeric"
-                      error={!!invalid.startYear}
-                    />
-                  </View>
-
-                  <View style={[styles.field, styles.halfField]}>
-                    <Text style={[formStyles.label, {color: C.textSecondary}]}>
-                      {t('endYear')} <Text style={styles.required}>*</Text>
-                    </Text>
-                    <AppInput
-                      value={endYear}
-                      onChangeText={text => {
-                        setEndYear(normalizePositiveNumberInput(text));
-                        clearInvalid('endYear');
-                      }}
-                      placeholder={t('endYear')}
-                      keyboardType="numeric"
-                      error={!!invalid.endYear}
-                    />
-                  </View>
-                </View>
-
-                <View style={formStyles.buttonRow}>
-                  <CancelButton
-                    label={t('cancel')}
-                    onPress={() => navigation.goBack()}
-                    disabled={submitting}
-                  />
-                  <SaveButton
-                    label={submitting ? t('saving') : t('save')}
-                    onPress={onSave}
-                    disabled={submitting}
-                  />
-                </View>
-              </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        )}
-      </View>
-    </SafeAreaView>
+          <FormActions
+            onCancel={() => navigation.goBack()}
+            onSave={onSave}
+            submitting={submitting}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: ms(16),
-  },
-  loadingWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scrollContent: {
-    paddingBottom: ms(24),
-  },
-  form: {
-    marginTop: ms(8),
-    gap: ms(14),
-  },
-  field: {
-    marginBottom: ms(2),
+    paddingTop: ms(12),
+    paddingBottom: ms(32),
   },
   row: {
     flexDirection: 'row',
@@ -303,9 +251,6 @@ const styles = StyleSheet.create({
   },
   halfField: {
     flex: 1,
-  },
-  required: {
-    color: '#c00000',
   },
 });
 

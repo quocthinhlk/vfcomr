@@ -1,10 +1,7 @@
 import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, ScrollView, TouchableOpacity} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {View, StyleSheet} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {
   getChurchPlantingProjectionById,
   getStepsChartByProjectionId,
@@ -15,6 +12,13 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs, ws, hs} from '../../../shared/utils/scale';
 import {SaveButton} from '../../../shared/components/ActionButtons';
+import {
+  DetailActions,
+  DetailCard,
+  DetailRow,
+  ListEmptyState,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import api from '../../../config/api';
 
 export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
@@ -172,198 +176,100 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Header
-            title={t('churchPlantingProjectionDetail') || 'Church Planting Projection Detail'}
-            showMenu={false}
-          />
-          
-          {churchName ? (
-            <View style={styles.churchNameContainer}>
-              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {t('churchPlantingProjectionDetail') || 'Church Planting Projection Detail'} {t('for') || 'for'} {churchName}
-              </Text>
-            </View>
-          ) : null}
-          
-          {loading ? (
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('loading') || 'Loading'}...
-            </Text>
-          ) : !projection ? (
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('noDataFound') || 'No data found'}
-            </Text>
-          ) : (
-            <ScrollView
+    <ScreenContainer
+      title={t('churchPlantingProjectionDetail') || 'Church Planting Projection Detail'}
+      loading={loading}
+      scroll>
+      {churchName ? (
+        <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
+          {t('churchPlantingProjectionDetail') || 'Church Planting Projection Detail'} {t('for') || 'for'} {churchName}
+        </Text>
+      ) : null}
 
-              contentContainerStyle={styles.scrollContent}>
-              <View style={styles.content}>
-                {/* Projection Details */}
-                <View style={[styles.detailCard, {backgroundColor: C.surface, borderColor: C.border, shadowColor: '#000'}]}>
-                  <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                    {t('projectionDetails') || 'Projection Details'}
-                  </Text>
+      {!projection ? (
+        <ListEmptyState />
+      ) : (
+        <View style={styles.content}>
+          {/* Projection Details */}
+          <View>
+            <DetailCard title={t('projectionDetails') || 'Projection Details'}>
+              <DetailRow
+                label={t('proposedChurchName') || 'Proposed Church Name'}
+                value={projection.proposed_church_name}
+              />
+              <DetailRow label={t('town') || 'Town'} value={projection.town} />
+              <DetailRow
+                label={t('proposedLeaderName') || 'Proposed Leader Name'}
+                value={projection.proposed_leader_name}
+              />
+              <DetailRow
+                label={t('population') || 'Population'}
+                value={projection.population ? projection.population.toLocaleString() : '-'}
+              />
+              <DetailRow
+                label={t('startDatePreparation') || 'Start Date Preparation'}
+                value={formatDate(projection.start_date_preparation)}
+              />
+              <DetailRow
+                label={t('startDatePioneering') || 'Start Date Pioneering'}
+                value={formatDate(projection.start_date_pioneering)}
+              />
+              <DetailRow
+                label={t('distanceToTown') || 'Distance to Town'}
+                value={`${projection.distance_to_town} ${projection.distance_to_town_unit}`}
+              />
+              <DetailRow
+                label={t('stepsCompleted') || 'Steps Completed'}
+                value={`${projection.steps_completed.filter(Boolean).length} / ${projection.steps_completed.length}`}
+              />
+            </DetailCard>
+            <DetailActions
+              itemName={projection.proposed_church_name}
+              onEdit={() =>
+                navigation.navigate('EditChurchPlantingProjection', {
+                  projectionId: projection.id,
+                })
+              }
+              onDelete={() =>
+                navigation.navigate('DeleteChurchPlantingProjection', {
+                  projectionId: projection.id,
+                })
+              }
+            />
+          </View>
 
-                  <View style={[styles.detailRow, styles.detailRowWithBorder, {borderBottomColor: C.border}]}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('proposedChurchName') || 'Proposed Church Name'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {projection.proposed_church_name}
-                    </Text>
-                  </View>
+          {/* Steps Chart */}
+          {renderStepsTable()}
 
-                  <View style={[styles.detailRow, styles.detailRowWithBorder, {borderBottomColor: C.border}]}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('town') || 'Town'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>{projection.town}</Text>
-                  </View>
-
-                  <View style={[styles.detailRow, styles.detailRowWithBorder, {borderBottomColor: C.border}]}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('proposedLeaderName') || 'Proposed Leader Name'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {projection.proposed_leader_name}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.detailRow, styles.detailRowWithBorder, {borderBottomColor: C.border}]}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('population') || 'Population'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {projection.population ? projection.population.toLocaleString() : '-'}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.detailRow, styles.detailRowWithBorder, {borderBottomColor: C.border}]}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('startDatePreparation') || 'Start Date Preparation'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {formatDate(projection.start_date_preparation)}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.detailRow, styles.detailRowWithBorder, {borderBottomColor: C.border}]}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('startDatePioneering') || 'Start Date Pioneering'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {formatDate(projection.start_date_pioneering)}
-                    </Text>
-                  </View>
-
-                  <View style={[styles.detailRow, styles.detailRowWithBorder, {borderBottomColor: C.border}]}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('distanceToTown') || 'Distance to Town'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {projection.distance_to_town} {projection.distance_to_town_unit}
-                    </Text>
-                  </View>
-
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('stepsCompleted') || 'Steps Completed'}:
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {projection.steps_completed.filter(Boolean).length} /{' '}
-                      {projection.steps_completed.length}
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Steps Chart */}
-                {renderStepsTable()}
-
-                {/* Edit Steps Button */}
-                <View style={styles.buttonContainer}>
-                  <SaveButton
-                    label={t('editSteps') || 'Edit Steps'}
-                    onPress={() => {
-                      navigation.navigate('EditStepsChart', {projectionId: projection.id});
-                    }}
-                    style={styles.editButton}
-                  />
-                </View>
-              </View>
-            </ScrollView>
-          )}
+          {/* Edit Steps Button */}
+          <View style={styles.buttonContainer}>
+            <SaveButton
+              label={t('editSteps') || 'Edit Steps'}
+              onPress={() => {
+                navigation.navigate('EditStepsChart', {projectionId: projection.id});
+              }}
+              style={styles.editButton}
+            />
+          </View>
         </View>
-      </View>
-    </SafeAreaView>
+      )}
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  churchNameContainer: {
-    marginTop: ms(8),
-    marginBottom: ms(12),
-  },
   churchNameText: {
+    marginBottom: ms(12),
     fontSize: fs(14),
     fontWeight: '500',
   },
-  scrollContent: {
-    paddingBottom: ms(24),
-  },
   content: {
-    marginTop: ms(8),
     gap: ms(16),
-  },
-  detailCard: {
-    padding: ms(16),
-    borderRadius: rs(12),
-    borderWidth: 1,
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.1,
-    shadowRadius: rs(8),
-    elevation: 3,
   },
   sectionTitle: {
     fontSize: fs(15),
     fontWeight: '700',
     marginBottom: ms(16),
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: ms(12),
-    paddingBottom: ms(12),
-  },
-  detailRowWithBorder: {
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  label: {
-    fontSize: fs(12),
-    fontWeight: '500',
-    opacity: 0.8,
-    flex: 1,
-  },
-  value: {
-    fontSize: fs(12),
-    fontWeight: '600',
-    flex: 1,
-    textAlign: 'right',
-  },
-  loading: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    fontSize: fs(14),
   },
   stepsContainer: {
     marginTop: ms(8),

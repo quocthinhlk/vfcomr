@@ -1,17 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {
-  View,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
-import {Header} from '../../../shared/components/Header';
-import {COLORS} from '../../../shared/constants/colors';
-import {globalStyles} from '../../../shared/styles/global';
+import {View, FlatList, RefreshControl, Platform} from 'react-native';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {
   listLanguageRegions,
@@ -19,25 +7,26 @@ import {
 } from '../services/languageregion.service';
 import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
-import {EditSvgIcon} from '../../../shared/components/icons';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {
+  CenteredLoader,
+  EntityListCard,
+  ListEmptyState,
+  ListPageBar,
+  ListToolbar,
+  ScreenContainer,
+  StatusBadge,
+  listContentStyle,
+} from '../../../shared/components/crud';
 
 export const LanguageRegionsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
-  const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const L = getListStyles(C, theme);
   const [items, setItems] = useState<LanguageRegionItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -121,254 +110,110 @@ export const LanguageRegionsScreen: React.FC = () => {
     navigation.navigate('EditLanguageRegion', {languageRegionId: item.id});
   };
 
-  const handleDelete = (item: LanguageRegionItem) => {
-    navigation.navigate('DeleteLanguageRegion', {languageRegionId: item.id});
+  const openActions = (item: LanguageRegionItem) => {
+    setSelectedRegion(item);
+    setActionsVisible(true);
+  };
+
+  const closeActions = () => {
+    setActionsVisible(false);
+    setSelectedRegion(null);
   };
 
   const renderItem = ({item}: {item: LanguageRegionItem}) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <EntityListCard
+      title={item.name}
       onPress={() => handleEdit(item)}
-      onLongPress={() => {
-        setSelectedRegion(item);
-        setActionsVisible(true);
-      }}
-      delayLongPress={300}>
-      <View style={L.itemCard as any}>
-        <View style={L.itemRow as any}>
-          <View style={styles.itemCol}>
-            <Text style={[styles.name, {color: C.textPrimary}]}>
-              {item.name}
-            </Text>
-            <Text style={[styles.meta, {color: C.textSecondary}]}>
-              {item.disabled ? t('disabled') : t('active')}
-            </Text>
-          </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={ws(15)} height={hs(15)} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+      onMorePress={() => openActions(item)}>
+      {item.disabled ? (
+        <StatusBadge label={t('disabled')} tone="neutral" />
+      ) : (
+        <StatusBadge label={t('active')} tone="success" />
+      )}
+    </EntityListCard>
   );
 
   const keyExtractor = (item: LanguageRegionItem) => String(item.id);
 
-  const renderPagination = () => {
-    const itemsToRender: Array<{
-      label: string;
-      page: number;
-      active?: boolean;
-      disabled?: boolean;
-    }> = [];
-    itemsToRender.push({label: '<<', page: 1, disabled: page === 1});
-    for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) itemsToRender.push({label: String(p), page: p});
-    }
-    itemsToRender.push({label: String(page), page, active: true});
-    for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) itemsToRender.push({label: String(p), page: p});
-    }
-    itemsToRender.push({
-      label: '>>',
-      page: totalPages,
-      disabled: page === totalPages,
-    });
-    return (
-      <View style={L.pageNumbersContainer as any}>
-        {itemsToRender.map(p => (
-          <TouchableOpacity
-            key={`${p.label}-${p.page}`}
-            style={[
-              L.pageNumber as any,
-              p.active && (L.pageNumberActive as any),
-              (p.disabled || loading) && (L.pageNumberDisabled as any),
-            ]}
-            onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}
-          >
-            <Text
-              style={[
-                L.pageNumberText as any,
-                p.active && (L.pageNumberTextActive as any),
-              ]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
+  const isInitialLoading = loading && items.length === 0 && !refreshing;
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={[styles.container, {backgroundColor: C.background}]}>
-          <Header title={t('languageRegions')} />
+    <ScreenContainer title={t('languageRegions')} showMenu>
+      <ListToolbar
+        countText={`${total} ${t('languageRegions').toLowerCase()}`}
+        addRoute="AddLanguageRegion"
+      />
 
-          <View style={styles.headerRow}>
-            <AddNewHeaderButton
-              name="AddLanguageRegion"
-              text={t('addNew')}
-              style={{
-                backgroundColor: C.surface,
-                borderWidth: 1,
-                borderColor: COLORS.mainColor,
-              }}
-              textStyle={{color: COLORS.mainColor}}
-            />
-          </View>
+      <SearchInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder={t('search')}
+        onSubmitEditing={() => goToPage(1)}
+      />
 
-          <SearchInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t('search')}
-            onSubmitEditing={() => goToPage(1)}
+      <View style={{flex: 1, minHeight: 0}}>
+        <PaginatedListPager
+          page={page}
+          totalPages={totalPages}
+          onPageChange={goToPage}>
+          <FlatList
+            data={items}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            nestedScrollEnabled={Platform.OS === 'android'}
+            style={{flex: 1}}
+            contentContainerStyle={listContentStyle}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListEmptyComponent={
+              isInitialLoading ? (
+                <CenteredLoader />
+              ) : !loading ? (
+                <ListEmptyState
+                  title={t('noDataFound')}
+                  hint={query ? undefined : t('emptyListHint')}
+                />
+              ) : null
+            }
           />
-
-          <View style={{flex: 1, minHeight: 0}}>
-            <PaginatedListPager
-              page={page}
-              totalPages={totalPages}
-              onPageChange={goToPage}>
-              <FlatList
-                data={items}
-                keyExtractor={keyExtractor}
-                renderItem={renderItem}
-                nestedScrollEnabled={Platform.OS === 'android'}
-                style={{flex: 1}}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-                ListEmptyComponent={
-                  !loading ? (
-                    <Text style={[styles.empty, {color: C.textSecondary}]}>
-                      No data found
-                    </Text>
-                  ) : null
-                }
-              />
-            </PaginatedListPager>
-          </View>
-          <Text style={[styles.subTitle, {color: C.textSecondary}]}>
-            {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
-          </Text>
-
-          <View style={styles.pagination}>{renderPagination()}</View>
-
-          <ActionSheetModal
-            visible={actionsVisible}
-            title={selectedRegion?.name || t('languageRegions')}
-            onRequestClose={() => {
-              setActionsVisible(false);
-              setSelectedRegion(null);
-            }}
-            actions={((): ActionItem[] => {
-              const acts: ActionItem[] = [];
-              acts.push({
-                label: t('edit'),
-                icon: 'edit',
-                onPress: () => {
-                  if (selectedRegion) {
-                    navigation.navigate('EditLanguageRegion', {
-                      languageRegionId: selectedRegion.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedRegion(null);
-                },
-              });
-              acts.push({
-                label: t('delete'),
-                icon: 'delete',
-                type: 'danger',
-                onPress: () => {
-                  if (selectedRegion) {
-                    navigation.navigate('DeleteLanguageRegion', {
-                      languageRegionId: selectedRegion.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedRegion(null);
-                },
-              });
-              return acts;
-            })()}
-          />
-        </View>
+        </PaginatedListPager>
       </View>
-    </SafeAreaView>
+
+      <ListPageBar
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPageChange={goToPage}
+      />
+
+      <ActionSheetModal
+        visible={actionsVisible}
+        title={selectedRegion?.name || t('languageRegions')}
+        onRequestClose={closeActions}
+        actions={((): ActionItem[] => {
+          const go = (target: string) => () => {
+            if (selectedRegion) {
+              navigation.navigate(target, {
+                languageRegionId: selectedRegion.id,
+              });
+            }
+            closeActions();
+          };
+          // Delete opens a confirmation screen, never deletes directly.
+          return [
+            {label: t('edit'), icon: 'edit', onPress: go('EditLanguageRegion')},
+            {
+              label: t('delete'),
+              icon: 'delete',
+              type: 'danger',
+              onPress: go('DeleteLanguageRegion'),
+            },
+          ];
+        })()}
+      />
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: fs(16),
-    fontWeight: '600',
-  },
-  subTitle: {
-    marginTop: ms(6),
-    marginBottom: ms(10),
-    fontSize: fs(12),
-  },
-  itemCol: {
-    flex: 1,
-    paddingRight: ms(8),
-  },
-  itemColRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: ms(8),
-    width: ws(72),
-  },
-  name: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    marginBottom: ms(2),
-  },
-  meta: {
-    fontSize: fs(12),
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: ms(40),
-  },
-  pagination: {
-    paddingVertical: ms(12),
-    alignItems: 'flex-end',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: ms(6),
-  },
-  actionBtn: {
-    width: ws(25),
-    height: ws(25),
-    borderRadius: rs(4),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editBtn: {
-    backgroundColor: COLORS.successColor,
-  },
-});
 
 export default LanguageRegionsScreen;

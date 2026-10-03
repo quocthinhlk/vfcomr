@@ -1,21 +1,14 @@
 import React, {useEffect, useState} from 'react';
-import {View, Alert, ScrollView} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {
   getChurchNetworkById,
   updateChurchNetwork,
 } from '../services/churchnetwork.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemedColors} from '../../../shared/styles/theme';
-import {
-  CenteredLoader,
-  ChurchNetworkForm,
-  networkStyles,
-} from '../components/ChurchNetworkUI';
+import {ScreenContainer} from '../../../shared/components/crud';
+import {ChurchNetworkForm} from '../components/ChurchNetworkUI';
 
 export const EditChurchNetworkScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -27,7 +20,6 @@ export const EditChurchNetworkScreen: React.FC = () => {
   const [loading, setLoading] = useState(!!churchNetworkId);
   const [nameError, setNameError] = useState('');
   const {t} = useTranslation();
-  const C = useThemedColors();
 
   useEffect(() => {
     let mounted = true;
@@ -78,31 +70,18 @@ export const EditChurchNetworkScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[networkStyles.screen, {backgroundColor: C.background}]}>
-        <Header title={`${t('edit')} ${t('churchNetwork')}`} showMenu={false} />
-        {loading ? (
-          <CenteredLoader />
-        ) : (
-          <ScrollView
-            contentContainerStyle={networkStyles.scrollContent}
-            keyboardShouldPersistTaps="handled">
-            <ChurchNetworkForm
-              name={name}
-              onNameChange={onNameChange}
-              locked={pastorLocked}
-              onLockedChange={setPastorLocked}
-              nameError={nameError}
-              submitting={submitting}
-              onSave={onSave}
-              onCancel={() => navigation.goBack()}
-            />
-          </ScrollView>
-        )}
-      </View>
-    </SafeAreaView>
+    <ScreenContainer title={`${t('edit')} ${t('churchNetwork')}`} scroll loading={loading}>
+      <ChurchNetworkForm
+        name={name}
+        onNameChange={onNameChange}
+        locked={pastorLocked}
+        onLockedChange={setPastorLocked}
+        nameError={nameError}
+        submitting={submitting}
+        onSave={onSave}
+        onCancel={() => navigation.goBack()}
+      />
+    </ScreenContainer>
   );
 };
 

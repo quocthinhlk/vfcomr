@@ -1,24 +1,19 @@
 import React, {useState, useEffect} from 'react';
-import {View, StyleSheet, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
+import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
-import {formStyles} from '../../../shared/styles/form';
 import {updateEventType, getEventTypeById, EventMeetingType, resolveEventMeetingType} from '../services/eventType.service';
-import {
-  SaveButton,
-  CancelButton,
-} from '../../../shared/components/ActionButtons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms, rs, hs, ws} from '../../../shared/utils/scale';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import ColorPicker from '../../../shared/components/ColorPicker';
 import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
+import {
+  FormActions,
+  FormField,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 
 export const EditEventTypeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -104,159 +99,82 @@ export const EditEventTypeScreen: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{flex: 1, backgroundColor: C.background}}>
-          <View style={styles.container}>
-            <Header
-              title={`${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'}`}
-              showMenu={false}
-            />
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('loading') || 'Loading'}...
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Header
-            title={`${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'}`}
-            showMenu={false}
-          />
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-            keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : ((StatusBar.currentHeight || 0) + hs(50))}
-            style={{flex: 1}}>
-            <ScrollView
-
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled">
-              <View style={styles.form}>
-                <View style={styles.field}>
-                  <Text
-                    style={[formStyles.label, {color: C.textSecondary, marginBottom: ms(4)}]}>
-                    {t('eventTypeName') || 'Event Type Name'} <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <AppInput
-                    value={name}
-                    onChangeText={(text) => {
-                      setName(text);
-                      clearInvalid('name');
-                    }}
-                    placeholder={t('eventTypeName') || 'Event Type Name'}
-                    error={!!invalid.name}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[formStyles.label, {color: C.textSecondary, marginBottom: ms(4)}]}>
-                    {t('textColour') || 'Text Colour'} <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <ColorPicker
-                    value={color}
-                    onChange={(val) => {
-                      setColor(val);
-                      clearInvalid('color');
-                    }}
-                    height={FORM_INPUT_HEIGHT}
-                    error={!!invalid.color}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[formStyles.label, {color: C.textSecondary, marginBottom: ms(4)}]}>
-                    {t('reportCellColour') || 'Report Cell Colour'} <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <ColorPicker
-                    value={cellColor}
-                    onChange={(val) => {
-                      setCellColor(val);
-                      clearInvalid('cellColor');
-                    }}
-                    height={FORM_INPUT_HEIGHT}
-                    error={!!invalid.cellColor}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[formStyles.label, {color: C.textSecondary, marginBottom: ms(4)}]}>
-                    {t('meetingType') || 'Meeting Type'} <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <ElementDropdown
-                    data={meetingTypeOptions}
-                    value={meetingType as any}
-                    onChange={v => {
-                      setMeetingType(v as EventMeetingType);
-                      clearInvalid('meetingType');
-                    }}
-                    placeholder={t('selectOption') || 'Select Meeting Type'}
-                    error={!!invalid.meetingType}
-                    containerStyle={
-                      {
-                        backgroundColor: C.inputBg,
-                        borderColor: invalid.meetingType ? '#db2d2d' : C.inputBorder,
-                      } as any
-                    }
-                  />
-                </View>
-
-                <View style={formStyles.buttonRow}>
-                  <CancelButton
-                    label={t('cancel') || 'Cancel'}
-                    onPress={() => navigation.goBack()}
-                    disabled={submitting}
-                  />
-                  <SaveButton
-                    label={t('save') || 'Save'}
-                    onPress={onSave}
-                    disabled={submitting}
-                  />
-                </View>
-              </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </View>
-    </SafeAreaView>
+    <ScreenContainer
+      title={`${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'}`}
+      scroll
+      loading={loading}>
+      <FormField
+        label={t('eventTypeName') || 'Event Type Name'}
+        required
+        error={invalid.name ? t('required') : undefined}>
+        <AppInput
+          value={name}
+          onChangeText={(text) => {
+            setName(text);
+            clearInvalid('name');
+          }}
+          placeholder={t('eventTypeName') || 'Event Type Name'}
+          error={!!invalid.name}
+          editable={!submitting}
+        />
+      </FormField>
+      <FormField
+        label={t('textColour') || 'Text Colour'}
+        required
+        error={invalid.color ? t('required') : undefined}>
+        <ColorPicker
+          value={color}
+          onChange={(val) => {
+            setColor(val);
+            clearInvalid('color');
+          }}
+          height={FORM_INPUT_HEIGHT}
+          error={!!invalid.color}
+        />
+      </FormField>
+      <FormField
+        label={t('reportCellColour') || 'Report Cell Colour'}
+        required
+        error={invalid.cellColor ? t('required') : undefined}>
+        <ColorPicker
+          value={cellColor}
+          onChange={(val) => {
+            setCellColor(val);
+            clearInvalid('cellColor');
+          }}
+          height={FORM_INPUT_HEIGHT}
+          error={!!invalid.cellColor}
+        />
+      </FormField>
+      <FormField
+        label={t('meetingType') || 'Meeting Type'}
+        required
+        error={invalid.meetingType ? t('required') : undefined}>
+        <ElementDropdown
+          data={meetingTypeOptions}
+          value={meetingType as any}
+          onChange={v => {
+            setMeetingType(v as EventMeetingType);
+            clearInvalid('meetingType');
+          }}
+          placeholder={t('selectOption') || 'Select Meeting Type'}
+          error={!!invalid.meetingType}
+          containerStyle={
+            {
+              backgroundColor: C.inputBg,
+              borderColor: invalid.meetingType ? '#db2d2d' : C.inputBorder,
+            } as any
+          }
+        />
+      </FormField>
+      <FormActions
+        onCancel={() => navigation.goBack()}
+        onSave={onSave}
+        submitting={submitting}
+      />
+    </ScreenContainer>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  scrollContent: {
-    paddingBottom: ms(24),
-  },
-  form: {
-    marginTop: ms(16),
-    gap: ms(16),
-  },
-  field: {
-    marginBottom: ms(8),
-  },
-  loading: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    fontSize: fs(14),
-  },
-});
-
 export default EditEventTypeScreen;
-

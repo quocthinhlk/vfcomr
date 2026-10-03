@@ -1,6 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
   Platform,
@@ -10,16 +9,17 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {COLORS} from '../../../shared/constants/colors';
-import {CancelButton, SaveButton} from '../../../shared/components/ActionButtons';
+import {
+  FormActions,
+  ListEmptyState,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import {
   getOverseerGoalPeriodDetail,
@@ -185,22 +185,9 @@ const EditOverseerGoalsScreen = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header title={t('editGoals')} showMenu={false} />
-
-        {loading ? (
-          <View style={styles.centerContent}>
-            <ActivityIndicator size="small" color={COLORS.mainColor} />
-          </View>
-        ) : !detail ? (
-          <View style={styles.centerContent}>
-            <Text style={[styles.emptyText, {color: C.textSecondary}]}>
-              {t('noDataFound')}
-            </Text>
-          </View>
+    <ScreenContainer title={t('editGoals')} loading={loading}>
+        {!detail ? (
+          <ListEmptyState />
         ) : (
           <KeyboardAvoidingView
             style={styles.flex}
@@ -398,38 +385,20 @@ const EditOverseerGoalsScreen = () => {
             </ScrollView>
 
             <View style={[styles.footer, {borderTopColor: C.border}]}>
-              <CancelButton
-                label={t('cancel')}
-                onPress={() => navigation.goBack()}
-                disabled={submitting}
-              />
-              <SaveButton
-                label={submitting ? t('saving') : t('save')}
-                onPress={onSave}
-                disabled={submitting}
+              <FormActions
+                onCancel={() => navigation.goBack()}
+                onSave={onSave}
+                submitting={submitting}
               />
             </View>
           </KeyboardAvoidingView>
         )}
-      </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: ms(16),
-  },
   flex: {flex: 1},
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    fontSize: fs(14),
-  },
   tabs: {
     gap: ms(8),
     paddingVertical: ms(4),
@@ -559,9 +528,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   footer: {
-    flexDirection: 'row',
-    gap: ms(10),
-    paddingTop: ms(10),
+    paddingTop: ms(2),
     paddingBottom: ms(14),
     borderTopWidth: StyleSheet.hairlineWidth,
   },

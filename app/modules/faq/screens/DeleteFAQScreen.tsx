@@ -1,24 +1,18 @@
 import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, Alert} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
+import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {
   deleteFAQ,
   getFAQById,
 } from '../services/faq.service';
-import {
-  CancelButton,
-  DeleteButton,
-} from '../../../shared/components/ActionButtons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms} from '../../../shared/utils/scale';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {returnToList} from '../../../shared/utils/returnToList';
 import api from '../../../config/api';
+import {
+  DeleteConfirmView,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 
 export const DeleteFAQScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -27,7 +21,6 @@ export const DeleteFAQScreen: React.FC = () => {
   const [questionHeader, setQuestionHeader] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const {t} = useTranslation();
-  const C = useThemedColors();
   const [userRoleId, setUserRoleId] = useState<number | null>(null);
   const [checkingRole, setCheckingRole] = useState(true);
 
@@ -87,16 +80,10 @@ export const DeleteFAQScreen: React.FC = () => {
     }
   };
 
+  const title = `${t('delete') || 'Delete'} ${t('faq') || 'FAQ'}`;
+
   if (checkingRole) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
-          <Text style={{color: C.textPrimary}}>{t('loading') || 'Loading'}...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenContainer title={title} loading />;
   }
 
   if (!isSuperAdmin(userRoleId)) {
@@ -104,50 +91,16 @@ export const DeleteFAQScreen: React.FC = () => {
   }
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Header title={`${t('delete') || 'Delete'} ${t('faq') || 'FAQ'}`} />
-          <Text style={[styles.desc, {color: C.textSecondary}]}>
-            {`${t('delete') || 'Delete'} ${t('faq') || 'FAQ'} "${questionHeader}"?`}
-          </Text>
-          <View style={styles.row}>
-            <CancelButton
-              label={t('cancel') || 'Cancel'}
-              onPress={() => navigation.goBack()}
-              disabled={submitting}
-            />
-            <DeleteButton
-              label={t('delete') || 'Delete'}
-              onPress={onConfirm}
-              disabled={submitting}
-            />
-          </View>
-        </View>
-      </View>
-    </SafeAreaView>
+    <ScreenContainer title={title} scroll>
+      <DeleteConfirmView
+        name={questionHeader}
+        onCancel={() => navigation.goBack()}
+        onConfirm={onConfirm}
+        submitting={submitting}
+        disabled={!faqId}
+      />
+    </ScreenContainer>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  desc: {
-    color: '#555',
-    fontSize: fs(14),
-    marginTop: ms(16),
-  },
-  row: {
-    flexDirection: 'row',
-    marginTop: ms(24),
-    gap: ms(12),
-  },
-});
-
 export default DeleteFAQScreen;
-

@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -13,7 +12,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {Text} from '@ui-kitten/components';
 import * as RNFS from 'react-native-fs';
@@ -24,7 +22,6 @@ import {
   pick,
   types as documentTypes,
 } from '@react-native-documents/picker';
-import {Header} from '../../../shared/components/Header';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {
@@ -33,7 +30,10 @@ import {
 } from '../../../shared/components/ActionButtons';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {EditSvgIcon, DeleteSvgIcon} from '../../../shared/components/icons';
-import {globalStyles} from '../../../shared/styles/global';
+import {
+  ListEmptyState,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {formStyles} from '../../../shared/styles/form';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -635,47 +635,23 @@ export default function ResourceDetailScreen() {
   );
 
   if (loading && !refreshing) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={styles.headerWrap}>
-          <Header title={t('resourceDetailTitle')} showMenu={false} />
-        </View>
-        <View style={styles.centerWrap}>
-          <ActivityIndicator color={COLORS.mainColor} />
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenContainer title={t('resourceDetailTitle')} loading />;
   }
 
   if (!resource) {
     return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={styles.headerWrap}>
-          <Header title={t('resourceDetailTitle')} showMenu={false} />
-        </View>
+      <ScreenContainer title={t('resourceDetailTitle')}>
         {loadError ? (
           <ApiErrorState error={loadError} onRetry={load} />
         ) : (
-          <View style={styles.centerWrap}>
-            <Text style={[styles.loadingText, {color: C.textSecondary}]}>
-              {t('noDataFound')}
-            </Text>
-          </View>
+          <ListEmptyState />
         )}
-      </SafeAreaView>
+      </ScreenContainer>
     );
   }
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.screen, {backgroundColor: C.background}]}>
-        <Header title={t('resourceDetailTitle')} showMenu={false} />
+    <ScreenContainer title={t('resourceDetailTitle')}>
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           refreshControl={
@@ -827,7 +803,6 @@ export default function ResourceDetailScreen() {
             )}
           </View>
         </ScrollView>
-      </View>
 
       <Modal
         visible={fileModalVisible}
@@ -935,27 +910,11 @@ export default function ResourceDetailScreen() {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  screen: {
-    flex: 1,
-    paddingHorizontal: ms(16),
-  },
-  headerWrap: {
-    paddingHorizontal: ms(16),
-  },
-  centerWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  loadingText: {
-    marginTop: ms(10),
-    fontSize: fs(14),
-  },
   scrollContent: {
     paddingTop: ms(12),
     paddingBottom: ms(28),

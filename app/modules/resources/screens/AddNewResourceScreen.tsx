@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
@@ -10,15 +9,16 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import {CancelButton, SaveButton} from '../../../shared/components/ActionButtons';
-import {globalStyles} from '../../../shared/styles/global';
+import {
+  FormActions,
+  FormField,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {formStyles} from '../../../shared/styles/form';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -275,37 +275,13 @@ export default function AddNewResourceScreen() {
     }
   };
 
-  if (checkingRole || loading) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={styles.headerWrap}>
-          <Header
-            title={isEdit ? t('editResource') : t('addNewResource')}
-            showMenu={false}
-          />
-        </View>
-        <View style={styles.centerWrap}>
-          <ActivityIndicator color={COLORS.mainColor} />
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
+    <ScreenContainer
+      title={isEdit ? t('editResource') : t('addNewResource')}
+      loading={checkingRole || loading}>
       <KeyboardAvoidingView
         style={{flex: 1}}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={styles.headerWrap}>
-          <Header
-            title={isEdit ? t('editResource') : t('addNewResource')}
-            showMenu={false}
-          />
-        </View>
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
@@ -318,34 +294,28 @@ export default function AddNewResourceScreen() {
             </Text>
 
             <View
-              style={styles.field}
               onLayout={event => {
                 fieldPositions.current.name = event.nativeEvent.layout.y;
               }}>
-              <Text
-                style={[
-                  formStyles.label,
-                  {color: invalidFields.name ? COLORS.dangerColor : C.textPrimary},
-                ]}>
-                {t('name')} <Text style={styles.required}>*</Text>
-              </Text>
-              <AppInput
-                value={name}
-                onChangeText={value => {
-                  setName(value);
-                  if (invalidFields.name) {
-                    setInvalidFields(current => ({...current, name: false}));
-                  }
-                }}
-                placeholder={t('name')}
-                error={invalidFields.name}
-              />
+              <FormField
+                label={t('name')}
+                required
+                error={invalidFields.name ? t('required') : undefined}>
+                <AppInput
+                  value={name}
+                  onChangeText={value => {
+                    setName(value);
+                    if (invalidFields.name) {
+                      setInvalidFields(current => ({...current, name: false}));
+                    }
+                  }}
+                  placeholder={t('name')}
+                  error={invalidFields.name}
+                />
+              </FormField>
             </View>
 
-            <View style={styles.field}>
-              <Text style={[formStyles.label, {color: C.textPrimary}]}>
-                {t('resourceParent')}
-              </Text>
+            <FormField label={t('resourceParent')}>
               <ElementDropdown
                 data={[
                   {label: t('resourceRootFolder'), value: -1},
@@ -359,12 +329,9 @@ export default function AddNewResourceScreen() {
                 placeholder={t('resourceSelectParent')}
                 search
               />
-            </View>
+            </FormField>
 
-            <View style={styles.field}>
-              <Text style={[formStyles.label, {color: C.textPrimary}]}>
-                {t('resourceShortDescription')}
-              </Text>
+            <FormField label={t('resourceShortDescription')}>
               <AppInput
                 value={shortDescription}
                 onChangeText={setShortDescription}
@@ -373,7 +340,7 @@ export default function AddNewResourceScreen() {
                 containerStyle={styles.multiline}
                 style={styles.multilineInput}
               />
-            </View>
+            </FormField>
           </View>
 
           <View style={styles.plainSection}>
@@ -475,17 +442,14 @@ export default function AddNewResourceScreen() {
               })}
             </View>
 
-            <View style={styles.field}>
-              <Text style={[formStyles.label, {color: C.textPrimary}]}>
-                {t('resourceSortOrder')}
-              </Text>
+            <FormField label={t('resourceSortOrder')}>
               <AppInput
                 value={sortOrder}
                 onChangeText={setSortOrder}
                 keyboardType="number-pad"
                 placeholder="1"
               />
-            </View>
+            </FormField>
           </View>
         </ScrollView>
 
@@ -494,35 +458,19 @@ export default function AddNewResourceScreen() {
             styles.footer,
             {backgroundColor: C.background, borderTopColor: C.surfaceBorder},
           ]}>
-          <CancelButton
-            label={t('cancel')}
-            onPress={() => navigation.goBack()}
-            disabled={submitting}
-            style={styles.actionButton}
-          />
-          <SaveButton
-            label={submitting ? t('saving') : t('save')}
-            onPress={onSave}
-            disabled={submitting}
-            style={styles.actionButton}
+          <FormActions
+            onCancel={() => navigation.goBack()}
+            onSave={onSave}
+            submitting={submitting}
           />
         </View>
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  headerWrap: {
-    paddingHorizontal: ms(16),
-  },
-  centerWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   scrollContent: {
-    paddingHorizontal: ms(16),
     paddingTop: ms(12),
     paddingBottom: ms(24),
     gap: ms(14),
@@ -534,14 +482,9 @@ const styles = StyleSheet.create({
     paddingTop: ms(4),
   },
   sectionTitle: {
-    fontSize: fs(14),
+    fontSize: fs(17),
     fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-    marginBottom: ms(14),
-  },
-  field: {
-    marginBottom: ms(14),
+    marginBottom: ms(16),
   },
   required: {
     color: COLORS.dangerColor,
@@ -560,7 +503,7 @@ const styles = StyleSheet.create({
   },
   graphicPicker: {
     width: '100%',
-    borderRadius: rs(10),
+    borderRadius: rs(12),
     borderWidth: 1,
     borderStyle: 'dashed',
     overflow: 'hidden',
@@ -626,14 +569,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   footer: {
-    flexDirection: 'row',
-    gap: ms(12),
-    borderTopWidth: 1,
-    paddingHorizontal: ms(16),
-    paddingTop: ms(12),
+    borderTopWidth: StyleSheet.hairlineWidth,
+    paddingTop: ms(4),
     paddingBottom: ms(8),
-  },
-  actionButton: {
-    flex: 1,
   },
 });

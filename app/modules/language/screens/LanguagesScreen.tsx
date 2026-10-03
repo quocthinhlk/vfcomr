@@ -1,39 +1,27 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {
-  View,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  TouchableOpacity,
-  Platform,
-} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
-import {Header} from '../../../shared/components/Header';
-import {COLORS} from '../../../shared/constants/colors';
-import {globalStyles} from '../../../shared/styles/global';
+import {View, FlatList, RefreshControl, Platform} from 'react-native';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {listLanguages, LanguageItem} from '../services/language.service';
 import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
-import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
-import {fs, ws, ms, rs} from '../../../shared/utils/scale';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
-import {EditSvgIcon} from '../../../shared/components/icons';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {
+  CenteredLoader,
+  EntityListCard,
+  ListEmptyState,
+  ListPageBar,
+  ListToolbar,
+  ScreenContainer,
+  listContentStyle,
+} from '../../../shared/components/crud';
 
 export const LanguagesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const L = getListStyles(C, theme);
   const {t} = useTranslation();
   const [items, setItems] = useState<LanguageItem[]>([]);
   const [page, setPage] = useState(1);
@@ -117,248 +105,103 @@ export const LanguagesScreen: React.FC = () => {
     navigation.navigate('EditLanguage', {languageId: item.id});
   };
 
-  const handleDelete = (item: LanguageItem) => {
-    navigation.navigate('DeleteLanguage', {languageId: item.id});
+  const openActions = (item: LanguageItem) => {
+    setSelectedLanguage(item);
+    setActionsVisible(true);
+  };
+
+  const closeActions = () => {
+    setActionsVisible(false);
+    setSelectedLanguage(null);
   };
 
   const renderItem = ({item}: {item: LanguageItem}) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <EntityListCard
+      title={item.name}
       onPress={() => handleEdit(item)}
-      onLongPress={() => {
-        setSelectedLanguage(item);
-        setActionsVisible(true);
-      }}
-      delayLongPress={300}>
-      <View style={L.itemCard as any}>
-        <View style={L.itemRow as any}>
-          <View style={styles.itemCol}>
-            <Text style={[styles.name, {color: C.textPrimary}]}>
-              {item.name}
-            </Text>
-          </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={fs(15)} height={fs(15)} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+      onMorePress={() => openActions(item)}
+    />
   );
 
   const keyExtractor = (item: LanguageItem) => String(item.id);
 
-  const renderPagination = () => {
-    const itemsToRender: Array<{
-      label: string;
-      page: number;
-      active?: boolean;
-      disabled?: boolean;
-    }> = [];
-    itemsToRender.push({label: '<<', page: 1, disabled: page === 1});
-    for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) itemsToRender.push({label: String(p), page: p});
-    }
-    itemsToRender.push({label: String(page), page, active: true});
-    for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) itemsToRender.push({label: String(p), page: p});
-    }
-    itemsToRender.push({
-      label: '>>',
-      page: totalPages,
-      disabled: page === totalPages,
-    });
-    return (
-      <View style={L.pageNumbersContainer as any}>
-        {itemsToRender.map(p => (
-          <TouchableOpacity
-            key={`${p.label}-${p.page}`}
-            style={[
-              L.pageNumber as any,
-              p.active && (L.pageNumberActive as any),
-              (p.disabled || loading) && (L.pageNumberDisabled as any),
-            ]}
-            onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}
-          >
-            <Text
-              style={[
-                L.pageNumberText as any,
-                p.active && (L.pageNumberTextActive as any),
-              ]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
+  const isInitialLoading = loading && items.length === 0 && !refreshing;
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={[styles.container, {backgroundColor: C.background}]}>
-          <Header title={t('languages')} />
+    <ScreenContainer title={t('languages')} showMenu>
+      <ListToolbar
+        countText={`${total} ${t('languages').toLowerCase()}`}
+        addRoute="AddLanguage"
+      />
 
-          <View style={styles.headerRow}>
-            <AddNewHeaderButton
-              name="AddLanguage"
-              text={t('addNew')}
-              style={{
-                backgroundColor: C.surface,
-                borderWidth: 1,
-                borderColor: COLORS.mainColor,
-              }}
-              textStyle={{color: COLORS.mainColor}}
-            />
-          </View>
+      <SearchInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder={t('search')}
+        onSubmitEditing={() => goToPage(1)}
+      />
 
-          <SearchInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={t('search')}
-            onSubmitEditing={() => goToPage(1)}
+      <View style={{flex: 1, minHeight: 0}}>
+        <PaginatedListPager
+          page={page}
+          totalPages={totalPages}
+          onPageChange={goToPage}>
+          <FlatList
+            data={items}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            nestedScrollEnabled={Platform.OS === 'android'}
+            style={{flex: 1}}
+            contentContainerStyle={listContentStyle}
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListEmptyComponent={
+              isInitialLoading ? (
+                <CenteredLoader />
+              ) : !loading ? (
+                <ListEmptyState
+                  title={t('noDataFound')}
+                  hint={query ? undefined : t('emptyListHint')}
+                />
+              ) : null
+            }
           />
-
-          <View style={{flex: 1, minHeight: 0}}>
-            <PaginatedListPager
-              page={page}
-              totalPages={totalPages}
-              onPageChange={goToPage}>
-              <FlatList
-                data={items}
-                keyExtractor={keyExtractor}
-                renderItem={renderItem}
-                nestedScrollEnabled={Platform.OS === 'android'}
-                style={{flex: 1}}
-                refreshControl={
-                  <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-                }
-                ListEmptyComponent={
-                  !loading ? (
-                    <Text style={[styles.empty, {color: C.textSecondary}]}>
-                      No data found
-                    </Text>
-                  ) : null
-                }
-              />
-            </PaginatedListPager>
-          </View>
-          <Text style={[styles.subTitle, {color: C.textSecondary}]}>
-            {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
-          </Text>
-
-          <View style={styles.pagination}>{renderPagination()}</View>
-
-          <ActionSheetModal
-            visible={actionsVisible}
-            title={selectedLanguage?.name || t('languages')}
-            onRequestClose={() => {
-              setActionsVisible(false);
-              setSelectedLanguage(null);
-            }}
-            actions={((): ActionItem[] => {
-              const list: ActionItem[] = [];
-              list.push({
-                label: t('edit'),
-                icon: 'edit',
-                onPress: () => {
-                  if (selectedLanguage) {
-                    navigation.navigate('EditLanguage', {
-                      languageId: selectedLanguage.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedLanguage(null);
-                },
-              });
-              list.push({
-                label: t('delete'),
-                icon: 'delete',
-                type: 'danger',
-                onPress: () => {
-                  if (selectedLanguage) {
-                    navigation.navigate('DeleteLanguage', {
-                      languageId: selectedLanguage.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedLanguage(null);
-                },
-              });
-              return list;
-            })()}
-          />
-        </View>
+        </PaginatedListPager>
       </View>
-    </SafeAreaView>
+
+      <ListPageBar
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPageChange={goToPage}
+      />
+
+      <ActionSheetModal
+        visible={actionsVisible}
+        title={selectedLanguage?.name || t('languages')}
+        onRequestClose={closeActions}
+        actions={((): ActionItem[] => {
+          const go = (target: string) => () => {
+            if (selectedLanguage) {
+              navigation.navigate(target, {languageId: selectedLanguage.id});
+            }
+            closeActions();
+          };
+          // Delete opens a confirmation screen, never deletes directly.
+          return [
+            {label: t('edit'), icon: 'edit', onPress: go('EditLanguage')},
+            {
+              label: t('delete'),
+              icon: 'delete',
+              type: 'danger',
+              onPress: go('DeleteLanguage'),
+            },
+          ];
+        })()}
+      />
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  title: {
-    fontSize: fs(16),
-    fontWeight: '600',
-  },
-  subTitle: {
-    marginTop: ms(6),
-    marginBottom: ms(10),
-    fontSize: fs(12),
-  },
-  itemCol: {
-    flex: 1,
-    paddingRight: ms(8),
-  },
-  itemColRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: ms(8),
-    width: ws(72),
-  },
-  name: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    marginBottom: ms(2),
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: ms(40),
-  },
-  pagination: {
-    paddingVertical: ms(12),
-    alignItems: 'flex-end',
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: ms(6),
-  },
-  actionBtn: {
-    width: ws(25),
-    height: ws(25),
-    borderRadius: rs(4),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editBtn: {
-    backgroundColor: COLORS.successColor,
-  },
-});
 
 export default LanguagesScreen;

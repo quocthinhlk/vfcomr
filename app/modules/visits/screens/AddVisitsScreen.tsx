@@ -5,14 +5,14 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
-import {SaveButton, CancelButton} from '../../../shared/components/ActionButtons';
+import {
+  FormActions,
+  FormField,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
@@ -287,191 +287,158 @@ export const AddVisitsScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={[styles.loadingWrap, {backgroundColor: C.background}]}>
-          <ActivityIndicator size="small" color={C.textPrimary} />
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenContainer title={t('addVisits') || 'Add Visits & Events'} loading />;
   }
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
+    <ScreenContainer title={t('addVisits') || 'Add Visits & Events'}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-        style={{flex: 1}}>
-        <View style={{flex: 1, backgroundColor: C.background}}>
-          <View style={styles.container}>
-            <Header title={t('addVisits') || 'Add Visits & Events'} showMenu={false} />
+        style={styles.flex}>
+        <ScrollView
+          ref={ref => {
+            scrollRef.current = ref;
+          }}
 
-            <ScrollView
-              ref={ref => {
-                scrollRef.current = ref;
-              }}
+          contentContainerStyle={styles.scrollContent}>
+          <View style={styles.card}>
+            <Text style={[styles.headingTitle, {color: C.textPrimary}]}>
+              {t('visitsAndEventsInformationFor') || 'Visits and Events Information'}
+            </Text>
+            <Text style={[styles.headingVisitorName, {color: C.textPrimary}]}>
+              {visitorName || '-'}
+            </Text>
+            <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+              {t('pleaseSelectTheInformation') || 'Please Select the Information'}
+            </Text>
 
-              contentContainerStyle={styles.scrollContent}>
-              <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.border}]}>
-                <Text style={[styles.headingTitle, {color: C.textPrimary}]}>
-                  {t('visitsAndEventsInformationFor') || 'Visits and Events Information'}
-                </Text>
-                <Text style={[styles.headingVisitorName, {color: C.textPrimary}]}>
-                  {visitorName || '-'}
-                </Text>
-                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                  {t('pleaseSelectTheInformation') || 'Please Select the Information'}
-                </Text>
+            <View
+              onLayout={e => setFieldPos('user_id', e.nativeEvent.layout.y)}>
+              <FormField label={t('visitor') || 'Visitor'}>
+                <ElementDropdown
+                  data={visitorOptions}
+                  value={userId}
+                  onChange={value => {
+                    const selectedVisitor = visitorOptions.find(
+                      option => option.value === (value as number),
+                    );
+                    setUserId((value as number) || null);
+                    setVisitorName(selectedVisitor?.name || '');
+                    setVisitorRole(selectedVisitor?.role || '');
+                    clearInvalid('user_id');
+                    clearFieldError('user_id');
+                  }}
+                  placeholder={t('visitor') || 'Visitor'}
+                  containerStyle={{
+                    backgroundColor: C.inputBg,
+                    borderColor: invalid.user_id ? C.error || '#ff4444' : C.inputBorder,
+                  }}
+                />
+                {renderFieldError('user_id')}
+              </FormField>
+            </View>
 
-                <View
-                  style={styles.field}
-                  onLayout={e => setFieldPos('user_id', e.nativeEvent.layout.y)}>
-                  <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                    {t('visitor') || 'Visitor'}
-                  </Text>
+            <View style={styles.row}>
+              <View
+                style={styles.halfField}
+                onLayout={e => setFieldPos('selectedMonth', e.nativeEvent.layout.y)}>
+                <FormField label={t('month') || 'Month'}>
                   <ElementDropdown
-                    data={visitorOptions}
-                    value={userId}
+                    data={monthOptions}
+                    value={selectedMonth}
                     onChange={value => {
-                      const selectedVisitor = visitorOptions.find(
-                        option => option.value === (value as number),
-                      );
-                      setUserId((value as number) || null);
-                      setVisitorName(selectedVisitor?.name || '');
-                      setVisitorRole(selectedVisitor?.role || '');
-                      clearInvalid('user_id');
-                      clearFieldError('user_id');
+                      setSelectedMonth(value as number);
+                      clearInvalid('selectedMonth');
+                      clearFieldError('selectedMonth');
                     }}
-                    placeholder={t('visitor') || 'Visitor'}
+                    placeholder={t('month') || 'Month'}
                     containerStyle={{
                       backgroundColor: C.inputBg,
-                      borderColor: invalid.user_id ? C.error || '#ff4444' : C.inputBorder,
+                      borderColor: invalid.selectedMonth ? C.error || '#ff4444' : C.inputBorder,
                     }}
                   />
-                  {renderFieldError('user_id')}
-                </View>
-
-                <View style={styles.row}>
-                  <View
-                    style={[styles.field, styles.halfField]}
-                    onLayout={e => setFieldPos('selectedMonth', e.nativeEvent.layout.y)}>
-                    <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                      {t('month') || 'Month'}
-                    </Text>
-                    <ElementDropdown
-                      data={monthOptions}
-                      value={selectedMonth}
-                      onChange={value => {
-                        setSelectedMonth(value as number);
-                        clearInvalid('selectedMonth');
-                        clearFieldError('selectedMonth');
-                      }}
-                      placeholder={t('month') || 'Month'}
-                      containerStyle={{
-                        backgroundColor: C.inputBg,
-                        borderColor: invalid.selectedMonth ? C.error || '#ff4444' : C.inputBorder,
-                      }}
-                    />
-                    {renderFieldError('selectedMonth')}
-                  </View>
-                  <View
-                    style={[styles.field, styles.halfField]}
-                    onLayout={e => setFieldPos('selectedYear', e.nativeEvent.layout.y)}>
-                    <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                      {t('year') || 'Year'}
-                    </Text>
-                    <ElementDropdown
-                      data={yearOptions}
-                      value={selectedYear}
-                      onChange={value => {
-                        setSelectedYear(value as number);
-                        clearInvalid('selectedYear');
-                        clearFieldError('selectedYear');
-                      }}
-                      placeholder={t('year') || 'Year'}
-                      containerStyle={{
-                        backgroundColor: C.inputBg,
-                        borderColor: invalid.selectedYear ? C.error || '#ff4444' : C.inputBorder,
-                      }}
-                    />
-                    {renderFieldError('selectedYear')}
-                  </View>
-                </View>
-
-                <View
-                  style={styles.field}
-                  onLayout={e => setFieldPos('churchVisitCount', e.nativeEvent.layout.y)}>
-                  <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                    {t('numberOfChurchesVisited') || 'Number of Churches Visited'}
-                  </Text>
-                  <AppInput
-                    value={churchVisitCount}
-                    onChangeText={text => {
-                      setChurchVisitCount(normalizeCountInput(text));
-                      clearInvalid('churchVisitCount');
-                      clearFieldError('churchVisitCount');
-                    }}
-                    placeholder="0"
-                    keyboardType="number-pad"
-                    error={!!invalid.churchVisitCount}
-                  />
-                  {renderFieldError('churchVisitCount')}
-                </View>
-
-                <View
-                  style={styles.field}
-                  onLayout={e => setFieldPos('eventCount', e.nativeEvent.layout.y)}>
-                  <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                    {t('numberOfEventsYouOrganised') || 'Number of Events You Organised'}
-                  </Text>
-                  <AppInput
-                    value={eventCount}
-                    onChangeText={text => {
-                      setEventCount(normalizeCountInput(text));
-                      clearInvalid('eventCount');
-                      clearFieldError('eventCount');
-                    }}
-                    placeholder="0"
-                    keyboardType="number-pad"
-                    error={!!invalid.eventCount}
-                  />
-                  {renderFieldError('eventCount')}
-                </View>
+                  {renderFieldError('selectedMonth')}
+                </FormField>
               </View>
-
-              <View style={[styles.actions, {borderTopColor: C.border}]}>
-                <CancelButton
-                  label={t('cancel') || 'Cancel'}
-                  onPress={() => navigation.goBack()}
-                />
-                <SaveButton
-                  label={t('next') || 'Next'}
-                  onPress={goToDetailStep}
-                />
+              <View
+                style={styles.halfField}
+                onLayout={e => setFieldPos('selectedYear', e.nativeEvent.layout.y)}>
+                <FormField label={t('year') || 'Year'}>
+                  <ElementDropdown
+                    data={yearOptions}
+                    value={selectedYear}
+                    onChange={value => {
+                      setSelectedYear(value as number);
+                      clearInvalid('selectedYear');
+                      clearFieldError('selectedYear');
+                    }}
+                    placeholder={t('year') || 'Year'}
+                    containerStyle={{
+                      backgroundColor: C.inputBg,
+                      borderColor: invalid.selectedYear ? C.error || '#ff4444' : C.inputBorder,
+                    }}
+                  />
+                  {renderFieldError('selectedYear')}
+                </FormField>
               </View>
-            </ScrollView>
+            </View>
 
+            <View
+              onLayout={e => setFieldPos('churchVisitCount', e.nativeEvent.layout.y)}>
+              <FormField label={t('numberOfChurchesVisited') || 'Number of Churches Visited'}>
+                <AppInput
+                  value={churchVisitCount}
+                  onChangeText={text => {
+                    setChurchVisitCount(normalizeCountInput(text));
+                    clearInvalid('churchVisitCount');
+                    clearFieldError('churchVisitCount');
+                  }}
+                  placeholder="0"
+                  keyboardType="number-pad"
+                  error={!!invalid.churchVisitCount}
+                />
+                {renderFieldError('churchVisitCount')}
+              </FormField>
+            </View>
+
+            <View
+              onLayout={e => setFieldPos('eventCount', e.nativeEvent.layout.y)}>
+              <FormField label={t('numberOfEventsYouOrganised') || 'Number of Events You Organised'}>
+                <AppInput
+                  value={eventCount}
+                  onChangeText={text => {
+                    setEventCount(normalizeCountInput(text));
+                    clearInvalid('eventCount');
+                    clearFieldError('eventCount');
+                  }}
+                  placeholder="0"
+                  keyboardType="number-pad"
+                  error={!!invalid.eventCount}
+                />
+                {renderFieldError('eventCount')}
+              </FormField>
+            </View>
           </View>
-        </View>
+
+          <View style={[styles.actions, {borderTopColor: C.border}]}>
+            <FormActions
+              onCancel={() => navigation.goBack()}
+              onSave={goToDetailStep}
+              saveLabel={t('next') || 'Next'}
+            />
+          </View>
+        </ScrollView>
+
+
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  flex: {
     flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  loadingWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   scrollContent: {
     paddingBottom: ms(8),
@@ -504,26 +471,14 @@ const styles = StyleSheet.create({
   halfField: {
     flex: 1,
   },
-  field: {
-    marginBottom: ms(12),
-  },
-  fieldLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
-    marginBottom: ms(6),
-  },
   errorText: {
     marginTop: ms(6),
     fontSize: fs(12),
     fontWeight: '500',
   },
   actions: {
-    flexDirection: 'row',
-    gap: ms(12),
-    paddingTop: ms(8),
-    paddingBottom: ms(8),
+    paddingBottom: ms(12),
     borderTopWidth: StyleSheet.hairlineWidth,
-    justifyContent: 'flex-end',
   },
 });
 

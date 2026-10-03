@@ -9,12 +9,9 @@ import {
   StatusBar,
   TouchableOpacity,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
 import {
   updateStepsChart,
@@ -23,10 +20,7 @@ import {
   StepsChartItem,
 } from '../services/churchPlantingProjection.service';
 import api from '../../../config/api';
-import {
-  SaveButton,
-  CancelButton,
-} from '../../../shared/components/ActionButtons';
+import {FormActions, ScreenContainer} from '../../../shared/components/crud';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs, hs, ws} from '../../../shared/utils/scale';
@@ -183,23 +177,7 @@ export const EditStepsChartScreen: React.FC = () => {
   };
 
   if (loading || !stepsChart) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{flex: 1, backgroundColor: C.background}}>
-          <View style={styles.container}>
-            <Header
-              title={`${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'}`}
-              showMenu={false}
-            />
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('loading') || 'Loading'}...
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenContainer title={`${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'}`} loading />;
   }
 
   const rows = [
@@ -217,206 +195,181 @@ export const EditStepsChartScreen: React.FC = () => {
   const steps = [1, 2, 3, 4, 5, 6];
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Header
-            title={`${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'}`}
-            showMenu={false}
-          />
-          
-          {churchName ? (
-            <View style={styles.churchNameContainer}>
-              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {t('edit') || 'Edit'} {t('stepsChart') || 'Steps Chart'} {t('for') || 'for'} {churchName}
+    <ScreenContainer title={`${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'}`}>
+      {churchName ? (
+        <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
+          {t('edit') || 'Edit'} {t('stepsChart') || 'Steps Chart'} {t('for') || 'for'} {churchName}
+        </Text>
+      ) : null}
+
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={
+          Platform.OS === 'ios'
+            ? hs(64)
+            : (StatusBar.currentHeight || 0) + hs(50)
+        }
+        style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+          <View style={styles.form}>
+            {/* Row Titles */}
+            <View style={[styles.section, {backgroundColor: C.surface, borderColor: C.border, shadowColor: '#000'}]}>
+              <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                {t('rowTitles') || 'Row Titles'}
               </Text>
-            </View>
-          ) : null}
-          
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-            keyboardVerticalOffset={
-              Platform.OS === 'ios'
-                ? hs(64)
-                : (StatusBar.currentHeight || 0) + hs(50)
-            }
-            style={{flex: 1}}>
-            <ScrollView
-
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled">
-              <View style={styles.form}>
-                {/* Row Titles */}
-                <View style={[styles.section, {backgroundColor: C.surface, borderColor: C.border, shadowColor: '#000'}]}>
-                  <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                    {t('rowTitles') || 'Row Titles'}
+              {rows.map((row, index) => (
+                <View key={row.key} style={[styles.field, index < rows.length - 1 && {borderBottomColor: C.border}]}>
+                  <Text
+                    style={[
+                      formStyles.label,
+                      {color: C.textSecondary, marginBottom: ms(4)},
+                    ]}>
+                    {t('row') || 'Row'} {index + 1}:
                   </Text>
-                  {rows.map((row, index) => (
-                    <View key={row.key} style={[styles.field, index < rows.length - 1 && {borderBottomColor: C.border}]}>
-                      <Text
-                        style={[
-                          formStyles.label,
-                          {color: C.textSecondary, marginBottom: ms(4)},
-                        ]}>
-                        {t('row') || 'Row'} {index + 1}:
-                      </Text>
-                      <AppInput
-                        value={row.title}
-                        onChangeText={text => {
-                          const key = `${row.key}_title` as keyof StepsChartItem;
-                          setStepsChart({
-                            ...stepsChart,
-                            [key]: text,
-                          });
-                        }}
-                        placeholder={t('rowTitle') || 'Row Title'}
-                      />
-                    </View>
-                  ))}
+                  <AppInput
+                    value={row.title}
+                    onChangeText={text => {
+                      const key = `${row.key}_title` as keyof StepsChartItem;
+                      setStepsChart({
+                        ...stepsChart,
+                        [key]: text,
+                      });
+                    }}
+                    placeholder={t('rowTitle') || 'Row Title'}
+                  />
+                </View>
+              ))}
+            </View>
+
+            {/* Steps Data */}
+            {steps.map(stepNum => (
+              <View key={stepNum} style={[styles.section, {backgroundColor: C.surface, borderColor: C.border, shadowColor: '#000'}]}>
+                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                  {t('step') || 'Step'} {stepNum}
+                </Text>
+
+                <View style={[styles.field, {borderBottomColor: C.border}]}>
+                  <Text
+                    style={[
+                      formStyles.label,
+                      {color: C.textSecondary, marginBottom: ms(4)},
+                    ]}>
+                    {t('dateProposed') || 'Date Proposed'}:
+                  </Text>
+                  <DateTripleDropdown
+                    value={parseDateFromAPI(
+                      stepsChart[
+                        `step${stepNum}_date_proposed` as keyof StepsChartItem
+                      ] as string | null,
+                    )}
+                    onChange={date => {
+                      const dateStr = formatDateForAPI(date);
+                      updateStepField(stepNum, 'date_proposed', dateStr);
+                      updateStepField(stepNum, 'date_proposed_original', dateStr);
+                    }}
+                    yearRange={50}
+                    startYear={new Date().getFullYear()}
+                  />
                 </View>
 
-                {/* Steps Data */}
-                {steps.map(stepNum => (
-                  <View key={stepNum} style={[styles.section, {backgroundColor: C.surface, borderColor: C.border, shadowColor: '#000'}]}>
-                    <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                      {t('step') || 'Step'} {stepNum}
-                    </Text>
+                <View style={[styles.field, {borderBottomColor: C.border}]}>
+                  <Text
+                    style={[
+                      formStyles.label,
+                      {color: C.textSecondary, marginBottom: ms(4)},
+                    ]}>
+                    {t('dateCompleted') || 'Date Completed'}:
+                  </Text>
+                  <DateTripleDropdown
+                    value={parseDateFromAPI(
+                      stepsChart[
+                        `step${stepNum}_date_completed` as keyof StepsChartItem
+                      ] as string | null,
+                    )}
+                    onChange={date => {
+                      const dateStr = formatDateForAPI(date);
+                      updateStepField(stepNum, 'date_completed', dateStr);
+                    }}
+                    yearRange={50}
+                    startYear={new Date().getFullYear()}
+                  />
+                </View>
 
-                    <View style={[styles.field, {borderBottomColor: C.border}]}>
-                      <Text
-                        style={[
-                          formStyles.label,
-                          {color: C.textSecondary, marginBottom: ms(4)},
-                        ]}>
-                        {t('dateProposed') || 'Date Proposed'}:
-                      </Text>
-                      <DateTripleDropdown
-                        value={parseDateFromAPI(
-                          stepsChart[
-                            `step${stepNum}_date_proposed` as keyof StepsChartItem
-                          ] as string | null,
-                        )}
-                        onChange={date => {
-                          const dateStr = formatDateForAPI(date);
-                          updateStepField(stepNum, 'date_proposed', dateStr);
-                          updateStepField(stepNum, 'date_proposed_original', dateStr);
-                        }}
-                        yearRange={50}
-                        startYear={new Date().getFullYear()}
-                      />
-                    </View>
+                {rows.map((row, rowIndex) => {
+                  const valueKey = `step${stepNum}_${row.key}_value` as keyof StepsChartItem;
+                  const completedKey = `step${stepNum}_${row.key}_completed` as keyof StepsChartItem;
+                  const value = (stepsChart[valueKey] as string) || '';
+                  const completed = (stepsChart[completedKey] as boolean) || false;
 
-                    <View style={[styles.field, {borderBottomColor: C.border}]}>
-                      <Text
-                        style={[
-                          formStyles.label,
-                          {color: C.textSecondary, marginBottom: ms(4)},
-                        ]}>
-                        {t('dateCompleted') || 'Date Completed'}:
-                      </Text>
-                      <DateTripleDropdown
-                        value={parseDateFromAPI(
-                          stepsChart[
-                            `step${stepNum}_date_completed` as keyof StepsChartItem
-                          ] as string | null,
-                        )}
-                        onChange={date => {
-                          const dateStr = formatDateForAPI(date);
-                          updateStepField(stepNum, 'date_completed', dateStr);
-                        }}
-                        yearRange={50}
-                        startYear={new Date().getFullYear()}
-                      />
-                    </View>
-
-                    {rows.map((row, rowIndex) => {
-                      const valueKey = `step${stepNum}_${row.key}_value` as keyof StepsChartItem;
-                      const completedKey = `step${stepNum}_${row.key}_completed` as keyof StepsChartItem;
-                      const value = (stepsChart[valueKey] as string) || '';
-                      const completed = (stepsChart[completedKey] as boolean) || false;
-
-                      return (
-                        <View 
-                          key={row.key} 
+                  return (
+                    <View 
+                      key={row.key} 
+                      style={[
+                        styles.field,
+                        {borderBottomColor: C.border},
+                        rowIndex === rows.length - 1 && {borderBottomWidth: 0}
+                      ]}>
+                      <View style={styles.rowFieldHeader}>
+                        <Text
                           style={[
-                            styles.field,
-                            {borderBottomColor: C.border},
-                            rowIndex === rows.length - 1 && {borderBottomWidth: 0}
+                            formStyles.label,
+                            {color: C.textSecondary, marginBottom: ms(4), flex: 1},
                           ]}>
-                          <View style={styles.rowFieldHeader}>
-                            <Text
-                              style={[
-                                formStyles.label,
-                                {color: C.textSecondary, marginBottom: ms(4), flex: 1},
-                              ]}>
-                              {row.title}:
-                            </Text>
-                            <TouchableOpacity
-                              style={[
-                                styles.checkbox,
-                                {
-                                  backgroundColor: completed ? C.bgSelectedOption : C.inputBg,
-                                  borderColor: completed ? C.border : C.border,
-                                },
-                              ]}
-                              onPress={() => {
-                                updateStepField(stepNum, `${row.key}_completed`, !completed);
-                              }}>
-                              <Text style={[styles.checkboxText, {color: completed ? C.textPrimary : C.textSecondary}]}>
-                                {completed ? '✓' : ''}
-                              </Text>
-                            </TouchableOpacity>
-                          </View>
-                          <AppInput
-                            value={value}
-                            onChangeText={text => {
-                              updateStepField(stepNum, `${row.key}_value`, text);
-                            }}
-                            placeholder={t('value') || 'Value'}
-                            multiline
-                            numberOfLines={2}
-                            style={{textAlignVertical: 'top'}}
-                          />
-                        </View>
-                      );
-                    })}
-                  </View>
-                ))}
-
-                <View style={formStyles.buttonRow}>
-                  <CancelButton
-                    label={t('cancel') || 'Cancel'}
-                    onPress={() => navigation.goBack()}
-                    disabled={submitting}
-                  />
-                  <SaveButton
-                    label={t('save') || 'Save'}
-                    onPress={onSave}
-                    disabled={submitting}
-                  />
-                </View>
+                          {row.title}:
+                        </Text>
+                        <TouchableOpacity
+                          style={[
+                            styles.checkbox,
+                            {
+                              backgroundColor: completed ? C.bgSelectedOption : C.inputBg,
+                              borderColor: completed ? C.border : C.border,
+                            },
+                          ]}
+                          onPress={() => {
+                            updateStepField(stepNum, `${row.key}_completed`, !completed);
+                          }}>
+                          <Text style={[styles.checkboxText, {color: completed ? C.textPrimary : C.textSecondary}]}>
+                            {completed ? '✓' : ''}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                      <AppInput
+                        value={value}
+                        onChangeText={text => {
+                          updateStepField(stepNum, `${row.key}_value`, text);
+                        }}
+                        placeholder={t('value') || 'Value'}
+                        multiline
+                        numberOfLines={2}
+                        style={{textAlignVertical: 'top'}}
+                      />
+                    </View>
+                  );
+                })}
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </View>
-    </SafeAreaView>
+            ))}
+
+            <FormActions
+              onCancel={() => navigation.goBack()}
+              onSave={onSave}
+              submitting={submitting}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  flex: {
     flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  churchNameContainer: {
-    marginTop: ms(8),
-    marginBottom: ms(12),
   },
   churchNameText: {
+    marginTop: ms(8),
+    marginBottom: ms(12),
     fontSize: fs(14),
     fontWeight: '500',
   },
@@ -465,11 +418,6 @@ const styles = StyleSheet.create({
   checkboxText: {
     fontSize: fs(16),
     fontWeight: 'bold',
-  },
-  loading: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    fontSize: fs(14),
   },
 });
 

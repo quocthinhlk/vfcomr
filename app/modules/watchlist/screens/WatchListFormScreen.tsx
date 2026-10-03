@@ -1,19 +1,16 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
-  ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {SaveButton} from '../../../shared/components/ActionButtons';
+import AppInput from '../../../shared/components/AppInput';
+import {FormField, ScreenContainer} from '../../../shared/components/crud';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {COLORS} from '../../../shared/constants/colors';
@@ -34,6 +31,7 @@ export const WatchListFormScreen: React.FC = () => {
   const route = useRoute<any>();
   const watchListId = Number(route.params?.watchListId) || null;
   const C = useThemedColors();
+  const T = useUiTokens();
   const {t} = useTranslation();
   const tRef = useRef(t);
   tRef.current = t;
@@ -120,60 +118,30 @@ export const WatchListFormScreen: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return (
-      <SafeAreaView style={[styles.safeArea, {backgroundColor: C.background}]}>
-        <View style={[styles.container, {backgroundColor: C.background}]}>
-          <Header title={t('editWatchList')} />
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={COLORS.mainColor} />
-          </View>
-        </View>
-      </SafeAreaView>
-    );
-  }
-
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header
-          title={watchListId ? t('editWatchList') : t('createWatchList')}
-        />
-        <ScrollView
-          contentContainerStyle={styles.content}
-          keyboardShouldPersistTaps="handled">
-          <Text style={[styles.label, {color: C.textPrimary}]}>
-            {t('watchListName')}
-          </Text>
-          <TextInput
-            value={name}
-            onChangeText={value => {
-              setName(value);
-              if (value.trim()) {
-                setNameError(false);
-              }
-            }}
-            placeholder={t('watchListName')}
-            placeholderTextColor={C.textSecondary}
-            style={[
-              styles.input,
-              nameError && styles.inputError,
-              {
-                color: C.inputText,
-                backgroundColor: C.inputBg,
-                borderColor: nameError ? COLORS.danger : C.inputBorder,
-              },
-            ]}
-          />
-          {nameError ? (
-            <Text style={styles.errorText}>{t('required')}</Text>
-          ) : null}
+    <ScreenContainer
+      title={watchListId ? t('editWatchList') : t('createWatchList')}
+      showMenu
+      scroll
+      loading={loading}>
+          <FormField
+            label={t('watchListName')}
+            required
+            error={nameError ? t('required') : undefined}>
+            <AppInput
+              value={name}
+              onChangeText={value => {
+                setName(value);
+                if (value.trim()) {
+                  setNameError(false);
+                }
+              }}
+              placeholder={t('watchListName')}
+              error={nameError}
+            />
+          </FormField>
 
-          <Text style={[styles.label, {color: C.textPrimary}]}>
-            {t('sortBy')}
-          </Text>
+          <FormField label={t('sortBy')}>
           <View style={styles.options}>
             {SORT_OPTIONS.map(option => {
               const selected = option === sortBy;
@@ -181,6 +149,8 @@ export const WatchListFormScreen: React.FC = () => {
                 <TouchableOpacity
                   key={option}
                   onPress={() => setSortBy(option)}
+                  accessibilityRole="radio"
+                  accessibilityState={{selected}}
                   style={[
                     styles.option,
                     {
@@ -203,27 +173,18 @@ export const WatchListFormScreen: React.FC = () => {
               );
             })}
           </View>
+          </FormField>
 
-          <Text style={[styles.label, {color: C.textPrimary}]}>
-            {t('sortList')}
-          </Text>
-          <TextInput
-            value={sortList}
-            onChangeText={setSortList}
-            placeholder={t('sortListOptional')}
-            placeholderTextColor={C.textSecondary}
-            style={[
-              styles.input,
-              {
-                color: C.inputText,
-                backgroundColor: C.inputBg,
-                borderColor: C.inputBorder,
-              },
-            ]}
-          />
+          <FormField label={t('sortList')}>
+            <AppInput
+              value={sortList}
+              onChangeText={setSortList}
+              placeholder={t('sortListOptional')}
+            />
+          </FormField>
 
           <View style={styles.churchHeader}>
-            <Text style={[styles.label, {color: C.textPrimary}]}>
+            <Text style={[styles.label, styles.labelFlush, {color: C.textPrimary}]}>
               {t('selectedChurches')} ({Object.keys(churches).length})
             </Text>
             <TouchableOpacity
@@ -238,7 +199,7 @@ export const WatchListFormScreen: React.FC = () => {
               key={id}
               style={[
                 styles.churchRow,
-                {backgroundColor: C.surface, borderColor: C.border},
+                {backgroundColor: C.surface, borderColor: C.surfaceBorder},
               ]}>
               <Text style={[styles.churchName, {color: C.textPrimary}]}>
                 {churchName}
@@ -250,8 +211,11 @@ export const WatchListFormScreen: React.FC = () => {
                     delete next[Number(id)];
                     return next;
                   })
-                }>
-                <Text style={styles.remove}>×</Text>
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`${t('remove')} ${churchName}`}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <Text style={[styles.remove, {color: T.dangerText}]}>×</Text>
               </TouchableOpacity>
             </View>
           ))}
@@ -262,8 +226,6 @@ export const WatchListFormScreen: React.FC = () => {
             disabled={saving}
             style={styles.saveButton}
           />
-        </ScrollView>
-      </View>
       <ChurchMultiSelectModal
         visible={pickerVisible}
         selected={churches}
@@ -273,43 +235,24 @@ export const WatchListFormScreen: React.FC = () => {
           setPickerVisible(false);
         }}
       />
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {flex: 1},
-  container: {flex: 1, paddingHorizontal: ms(16)},
-  content: {paddingTop: ms(16), paddingBottom: ms(36)},
-  center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  label: {fontSize: fs(12), fontWeight: '700', marginBottom: ms(6)},
-  input: {
-    height: FORM_INPUT_HEIGHT,
-    borderWidth: 1,
-    borderRadius: rs(5),
-    paddingHorizontal: ms(10),
-    fontSize: fs(12),
-    marginBottom: ms(16),
-  },
-  inputError: {
-    marginBottom: ms(4),
-  },
-  errorText: {
-    color: COLORS.danger,
-    fontSize: fs(12),
-    marginBottom: ms(12),
-  },
-  options: {flexDirection: 'row', gap: ms(7), marginBottom: ms(16)},
+  label: {fontSize: fs(13), fontWeight: '600', marginBottom: ms(8)},
+  labelFlush: {marginBottom: 0},
+  options: {flexDirection: 'row', gap: ms(8)},
   option: {
     flex: 1,
     minHeight: FORM_INPUT_HEIGHT,
     borderWidth: 1,
-    borderRadius: rs(5),
+    borderRadius: rs(8),
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: ms(4),
   },
-  optionText: {fontSize: fs(10), fontWeight: '600', textAlign: 'center'},
+  optionText: {fontSize: fs(12), fontWeight: '600', textAlign: 'center'},
   churchHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -318,23 +261,23 @@ const styles = StyleSheet.create({
   },
   selectButton: {
     backgroundColor: COLORS.mainColor,
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(7),
-    borderRadius: rs(4),
+    paddingHorizontal: ms(12),
+    paddingVertical: ms(8),
+    borderRadius: rs(8),
   },
-  selectButtonText: {color: COLORS.white, fontSize: fs(10), fontWeight: '600'},
+  selectButtonText: {color: COLORS.white, fontSize: fs(12), fontWeight: '600'},
   churchRow: {
     minHeight: FORM_INPUT_HEIGHT,
-    borderWidth: 1,
-    borderRadius: rs(5),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: rs(8),
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: ms(10),
-    marginBottom: ms(7),
+    paddingHorizontal: ms(12),
+    marginBottom: ms(8),
   },
-  churchName: {flex: 1, fontSize: fs(11), paddingRight: ms(8)},
-  remove: {fontSize: fs(22), color: COLORS.dangerColor, fontWeight: '600'},
-  saveButton: {marginTop: ms(18)},
+  churchName: {flex: 1, fontSize: fs(13), paddingRight: ms(8)},
+  remove: {fontSize: fs(22), fontWeight: '600'},
+  saveButton: {marginTop: ms(16)},
 });
 
 export default WatchListFormScreen;

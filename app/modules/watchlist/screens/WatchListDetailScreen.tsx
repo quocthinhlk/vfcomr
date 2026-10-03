@@ -17,6 +17,11 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, ms, rs} from '../../../shared/utils/scale';
+import {
+  CenteredLoader,
+  ListEmptyState,
+} from '../../../shared/components/crud';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {returnToList} from '../../../shared/utils/returnToList';
 import ChurchMultiSelectModal from '../components/ChurchMultiSelectModal';
 import {
@@ -32,6 +37,7 @@ export const WatchListDetailScreen: React.FC = () => {
   const route = useRoute<any>();
   const watchListId = Number(route.params?.watchListId);
   const C = useThemedColors();
+  const T = useUiTokens();
   const {t} = useTranslation();
   const tRef = useRef(t);
   tRef.current = t;
@@ -181,15 +187,17 @@ export const WatchListDetailScreen: React.FC = () => {
       <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('watchListDetail')} />
         {loading && !item ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={COLORS.mainColor} />
-          </View>
+          <CenteredLoader />
         ) : item ? (
           <>
             <View
               style={[
                 styles.summary,
-                {backgroundColor: C.surface, borderColor: C.border},
+                {
+                  backgroundColor: C.surface,
+                  borderColor: C.surfaceBorder,
+                  shadowOpacity: T.shadowOpacity,
+                },
               ]}>
               <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={1}>
                 {item.name}
@@ -239,15 +247,17 @@ export const WatchListDetailScreen: React.FC = () => {
                 />
               }
               ListEmptyComponent={
-                <Text style={[styles.empty, {color: C.textSecondary}]}>
-                  {t('noChurchesFound')}
-                </Text>
+                <ListEmptyState title={t('noChurchesFound')} />
               }
               renderItem={({item: church}) => (
                 <View
                   style={[
                     styles.churchRow,
-                    {backgroundColor: C.surface, borderColor: C.border},
+                    {
+                      backgroundColor: C.surface,
+                      borderColor: C.surfaceBorder,
+                      shadowOpacity: T.shadowOpacity,
+                    },
                   ]}>
                   <Text style={[styles.churchName, {color: C.textPrimary}]}>
                     {church.church_name}
@@ -256,8 +266,13 @@ export const WatchListDetailScreen: React.FC = () => {
                     onPress={() =>
                       confirmRemove(church.church_id, church.church_name)
                     }
-                    disabled={mutating}>
-                    <Text style={styles.removeText}>{t('remove')}</Text>
+                    disabled={mutating}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('remove')} ${church.church_name}`}
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                    <Text style={[styles.removeText, {color: T.dangerText}]}>
+                      {t('remove')}
+                    </Text>
                   </TouchableOpacity>
                 </View>
               )}
@@ -282,38 +297,44 @@ export const WatchListDetailScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   container: {flex: 1, paddingHorizontal: ms(16)},
-  center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
   summary: {
-    borderWidth: 1,
-    borderRadius: rs(10),
-    paddingHorizontal: ms(12),
-    paddingVertical: ms(10),
-    marginTop: ms(8),
-    marginBottom: ms(12),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: rs(12),
+    padding: ms(16),
+    marginTop: ms(12),
+    marginBottom: ms(16),
+    shadowColor: '#000',
+    shadowRadius: rs(6),
+    shadowOffset: {width: 0, height: 2},
+    elevation: 1,
   },
-  name: {fontSize: fs(15), fontWeight: '700'},
-  meta: {fontSize: fs(12), marginTop: ms(2)},
+  name: {fontSize: fs(17), fontWeight: '700'},
+  meta: {fontSize: fs(13), marginTop: ms(4)},
   actions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: ms(16),
-    marginTop: ms(8),
+    gap: ms(20),
+    marginTop: ms(12),
   },
-  actionText: {fontSize: fs(13), fontWeight: '600'},
-  sectionTitle: {fontSize: fs(13), fontWeight: '700', marginBottom: ms(9)},
+  actionText: {fontSize: fs(14), fontWeight: '600'},
+  sectionTitle: {fontSize: fs(15), fontWeight: '700', marginBottom: ms(10)},
   churchRow: {
-    minHeight: ms(48),
-    borderWidth: 1,
-    borderRadius: rs(8),
-    padding: ms(11),
-    marginBottom: ms(8),
+    minHeight: ms(52),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: rs(12),
+    paddingVertical: ms(12),
+    paddingHorizontal: ms(16),
+    marginBottom: ms(10),
     flexDirection: 'row',
     alignItems: 'center',
+    shadowColor: '#000',
+    shadowRadius: rs(6),
+    shadowOffset: {width: 0, height: 2},
+    elevation: 1,
   },
-  churchName: {flex: 1, fontSize: fs(12), paddingRight: ms(8)},
-  removeText: {color: COLORS.dangerColor, fontSize: fs(11), fontWeight: '700'},
-  empty: {textAlign: 'center', marginTop: ms(30)},
-  listContent: {paddingBottom: ms(28)},
+  churchName: {flex: 1, fontSize: fs(14), fontWeight: '600', paddingRight: ms(8)},
+  removeText: {fontSize: fs(13), fontWeight: '600'},
+  listContent: {paddingTop: ms(4), paddingBottom: ms(28), flexGrow: 1},
   deleteButton: {marginTop: ms(12)},
   overlay: {
     ...StyleSheet.absoluteFillObject,

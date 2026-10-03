@@ -1,6 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -9,22 +8,24 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
 import SearchInput from '../../../shared/components/SearchInput';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
-import {globalStyles} from '../../../shared/styles/global';
+import {
+  CenteredLoader,
+  ListEmptyState,
+  ListToolbar,
+  ScreenContainer,
+  listContentStyle,
+} from '../../../shared/components/crud';
+import {MoreIcon} from '../../../shared/components/icons/UiIcons';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {COLORS} from '../../../shared/constants/colors';
 import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import {isSuperAdmin, resolveRoleIdFromUser} from '../../../shared/utils/permissions';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
@@ -57,8 +58,7 @@ export default function SearchResourcesScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const L = getListStyles(C, theme);
+  const T = useUiTokens();
   const {t} = useTranslation();
 
   const [items, setItems] = useState<ResourceListItem[]>([]);
@@ -150,14 +150,44 @@ export default function SearchResourcesScreen() {
     ]);
   };
 
+  const openActions = (item: ResourceListItem) => {
+    if (!canManage) {
+      return;
+    }
+    setSelectedItem(item);
+    setActionsVisible(true);
+  };
+
+  const closeActions = () => setActionsVisible(false);
+
+  // Close the sheet first so navigation / the delete Alert are not shown
+  // underneath it. Delete still goes through the existing Alert confirmation.
   const actionItems: ActionItem[] = selectedItem
     ? [
-        {label: t('edit'), icon: 'edit', onPress: () => handleEdit(selectedItem)},
+        {
+          label: t('view'),
+          icon: 'view',
+          onPress: () => {
+            closeActions();
+            handleOpen(selectedItem);
+          },
+        },
+        {
+          label: t('edit'),
+          icon: 'edit',
+          onPress: () => {
+            closeActions();
+            handleEdit(selectedItem);
+          },
+        },
         {
           label: t('delete'),
           icon: 'delete',
           type: 'danger',
-          onPress: () => handleDelete(selectedItem),
+          onPress: () => {
+            closeActions();
+            handleDelete(selectedItem);
+          },
         },
       ]
     : [];
@@ -168,147 +198,136 @@ export default function SearchResourcesScreen() {
 
     return (
       <TouchableOpacity
-        activeOpacity={0.8}
+        activeOpacity={0.7}
         onPress={() => handleOpen(item)}
-        onLongPress={() => {
-          if (!canManage) {
-            return;
-          }
-          setSelectedItem(item);
-          setActionsVisible(true);
-        }}
-        delayLongPress={300}>
-        <View style={L.itemCard as any}>
-          <View style={styles.row}>
-            {imageUrl ? (
-              <Image source={{uri: imageUrl}} style={styles.thumb} />
-            ) : (
-              <View
-                style={[
-                  styles.thumbPlaceholder,
-                  {backgroundColor: C.inputBg, borderColor: C.inputBorder},
-                ]}>
-                <Text style={[styles.thumbPlaceholderText, {color: C.textSecondary}]}>
-                  {t('resourceNoImageAvailable')}
-                </Text>
-              </View>
-            )}
-            <View style={styles.itemBody}>
-              <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={2}>
-                {item.name}
-              </Text>
-              {description ? (
-                <Text
-                  style={[styles.description, {color: C.textSecondary}]}
-                  numberOfLines={3}>
-                  {description}
-                </Text>
-              ) : null}
-            </View>
+        onLongPress={() => openActions(item)}
+        delayLongPress={300}
+        accessibilityRole="button"
+        accessibilityLabel={item.name}
+        style={[
+          styles.card,
+          {
+            backgroundColor: C.surface,
+            borderColor: C.surfaceBorder,
+            shadowOpacity: T.shadowOpacity,
+            paddingRight: canManage ? ms(4) : ms(16),
+          },
+        ]}>
+        {imageUrl ? (
+          <Image source={{uri: imageUrl}} style={styles.thumb} />
+        ) : (
+          <View
+            style={[
+              styles.thumbPlaceholder,
+              {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+            ]}>
+            <Text style={[styles.thumbPlaceholderText, {color: C.textSecondary}]}>
+              {t('resourceNoImageAvailable')}
+            </Text>
           </View>
+        )}
+        <View style={styles.itemBody}>
+          <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={2}>
+            {item.name}
+          </Text>
+          {description ? (
+            <Text
+              style={[styles.description, {color: C.textSecondary}]}
+              numberOfLines={3}>
+              {description}
+            </Text>
+          ) : null}
         </View>
+        {canManage ? (
+          <TouchableOpacity
+            onPress={() => openActions(item)}
+            hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}
+            style={styles.moreBtn}
+            accessibilityRole="button"
+            accessibilityLabel={`${t('moreActions')}: ${item.name}`}>
+            <MoreIcon color={C.textSecondary} />
+          </TouchableOpacity>
+        ) : null}
       </TouchableOpacity>
     );
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header title={t('resources')} />
-        {canManage ? (
-          <View style={styles.headerRow}>
-            <AddNewHeaderButton
-              name="AddNewResource"
-              text={t('addNew')}
-              style={{
-                backgroundColor: C.surface,
-                borderWidth: 1,
-                borderColor: COLORS.mainColor,
-              }}
-              textStyle={{color: COLORS.mainColor}}
+    <ScreenContainer title={t('resources')} showMenu>
+      <ListToolbar
+        countText={
+          loading && !refreshing
+            ? undefined
+            : `${items.length} ${t('resources').toLowerCase()}`
+        }
+        addRoute={canManage ? 'AddNewResource' : undefined}
+      />
+
+      <SearchInput
+        value={query}
+        onChangeText={setQuery}
+        placeholder={t('resourceSearchByName')}
+      />
+
+      {loading && !refreshing ? (
+        <CenteredLoader />
+      ) : loadError && items.length === 0 ? (
+        <ApiErrorState error={loadError} onRetry={fetchData} />
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={item => String(item.id)}
+          renderItem={renderItem}
+          contentContainerStyle={listContentStyle}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+          ListEmptyComponent={
+            <ListEmptyState
+              title={query.trim() ? t('resourceNoResults') : undefined}
+              hint={query.trim() ? t('tryDifferentSearchKeyword') : undefined}
             />
-          </View>
-        ) : null}
-
-        <SearchInput
-          value={query}
-          onChangeText={setQuery}
-          placeholder={t('resourceSearchByName')}
+          }
         />
-
-        {loading && !refreshing ? (
-          <View style={styles.centerWrap}>
-            <ActivityIndicator color={COLORS.mainColor} />
-          </View>
-        ) : loadError && items.length === 0 ? (
-          <ApiErrorState error={loadError} onRetry={fetchData} />
-        ) : (
-          <FlatList
-            data={items}
-            keyExtractor={item => String(item.id)}
-            renderItem={renderItem}
-            contentContainerStyle={styles.listContent}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              <Text style={[styles.emptyText, {color: C.textSecondary}]}>
-                {t('noDataFound')}
-              </Text>
-            }
-          />
-        )}
-      </View>
+      )}
 
       {canManage ? (
         <ActionSheetModal
           visible={actionsVisible}
           title={selectedItem?.name}
           actions={actionItems}
-          onRequestClose={() => setActionsVisible(false)}
+          onRequestClose={closeActions}
         />
       ) : null}
-    </SafeAreaView>
+    </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: ms(12),
-  },
-  headerRow: {
+  card: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
     alignItems: 'center',
-  },
-  centerWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  listContent: {
-    paddingTop: ms(8),
-    paddingBottom: ms(24),
-  },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    gap: ms(12),
+    paddingVertical: ms(12),
+    paddingLeft: ms(16),
+    marginBottom: ms(10),
+    borderRadius: rs(12),
+    borderWidth: StyleSheet.hairlineWidth,
+    shadowColor: '#000',
+    shadowRadius: rs(6),
+    shadowOffset: {width: 0, height: 2},
+    elevation: 1,
   },
   thumb: {
-    width: ws(72),
-    height: ws(72),
+    width: ws(64),
+    height: ws(64),
     borderRadius: rs(8),
-    marginRight: ms(12),
   },
   thumbPlaceholder: {
-    width: ws(72),
-    height: ws(72),
+    width: ws(64),
+    height: ws(64),
     borderRadius: rs(8),
-    borderWidth: 1,
-    marginRight: ms(12),
+    borderWidth: StyleSheet.hairlineWidth,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: ms(4),
@@ -320,19 +339,22 @@ const styles = StyleSheet.create({
   itemBody: {
     flex: 1,
     minWidth: 0,
+    gap: ms(6),
   },
   name: {
     fontSize: fs(15),
-    fontWeight: '700',
-    marginBottom: ms(4),
+    fontWeight: '600',
+    lineHeight: fs(20),
   },
   description: {
     fontSize: fs(13),
     lineHeight: fs(18),
   },
-  emptyText: {
-    textAlign: 'center',
-    marginTop: ms(24),
-    fontSize: fs(14),
+  moreBtn: {
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 22,
   },
 });

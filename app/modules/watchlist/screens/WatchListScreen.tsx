@@ -1,6 +1,5 @@
 import React, {useCallback, useMemo, useRef, useState} from 'react';
 import {
-  ActivityIndicator,
   Alert,
   RefreshControl,
   ScrollView,
@@ -9,17 +8,26 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {useFocusEffect, useNavigation} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, {Path} from 'react-native-svg';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import SearchInput from '../../../shared/components/SearchInput';
-import {EditSvgIcon} from '../../../shared/components/icons';
+import {
+  CenteredLoader,
+  ListEmptyState,
+  ListPageBar,
+  ListToolbar,
+  ScreenContainer,
+  StatusBadge,
+  listContentStyle,
+} from '../../../shared/components/crud';
+import {
+  PencilIcon,
+  TrashIcon,
+} from '../../../shared/components/icons/UiIcons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import {
@@ -82,6 +90,7 @@ const WatchListPanel: React.FC<{
   onOpenChurch: (church: WatchListChurchRow) => void;
 }> = ({item, onEdit, onDelete, onOpenChurch}) => {
   const C = useThemedColors();
+  const T = useUiTokens();
   const {t} = useTranslation();
   const [query, setQuery] = useState('');
   const [page, setPage] = useState(1);
@@ -122,8 +131,16 @@ const WatchListPanel: React.FC<{
   };
 
   return (
-    <View style={[styles.panel, {backgroundColor: C.surface, borderColor: C.border}]}>
-      <View style={[styles.panelHeader, {borderBottomColor: C.border}]}>
+    <View
+      style={[
+        styles.panel,
+        {
+          backgroundColor: C.surface,
+          borderColor: C.surfaceBorder,
+          shadowOpacity: T.shadowOpacity,
+        },
+      ]}>
+      <View style={[styles.panelHeader, {borderBottomColor: C.surfaceBorder}]}>
         <HeartIcon color="#e2557b" size={ms(18)} />
         <Text style={[styles.panelTitle, {color: C.textPrimary}]} numberOfLines={2}>
           {t('watchList')}: {item.name}
@@ -134,7 +151,7 @@ const WatchListPanel: React.FC<{
           accessibilityLabel={t('edit')}
           hitSlop={{top: 10, bottom: 10, left: 8, right: 8}}
           style={styles.iconButton}>
-          <EditSvgIcon width={ms(16)} height={ms(16)} color={C.textSecondary} />
+          <PencilIcon color={T.successText} size={ms(18)} />
         </TouchableOpacity>
         <TouchableOpacity
           onPress={onDelete}
@@ -142,7 +159,7 @@ const WatchListPanel: React.FC<{
           accessibilityLabel={t('delete')}
           hitSlop={{top: 10, bottom: 10, left: 8, right: 8}}
           style={styles.iconButton}>
-          <Text style={styles.deleteMark}>×</Text>
+          <TrashIcon color={T.dangerText} size={ms(18)} />
         </TouchableOpacity>
       </View>
 
@@ -163,19 +180,23 @@ const WatchListPanel: React.FC<{
             key={church.church_id}
             activeOpacity={0.7}
             onPress={() => onOpenChurch(church)}
-            style={[styles.churchRow, {borderBottomColor: C.border}]}>
-            <Text style={styles.churchName}>
+            style={[styles.churchRow, {borderBottomColor: C.surfaceBorder}]}>
+            <Text style={[styles.churchName, {color: C.textPrimary}]}>
               {church.church_name}
-              {church.is_msc ? (
-                <Text style={styles.badgeMsc}> [{t('msc')}]</Text>
-              ) : null}
-              {church.enable_cpm ? (
-                <Text style={styles.badgeHouse}> [{t('houseCp')}]</Text>
-              ) : null}
-              {church.is_mother_church ? (
-                <Text style={styles.badgeMother}> [{t('mother')}]</Text>
-              ) : null}
             </Text>
+            {church.is_msc || church.enable_cpm || church.is_mother_church ? (
+              <View style={styles.badgeRow}>
+                {church.is_msc ? (
+                  <StatusBadge label={t('msc')} tone="danger" />
+                ) : null}
+                {church.enable_cpm ? (
+                  <StatusBadge label={t('houseCp')} tone="success" />
+                ) : null}
+                {church.is_mother_church ? (
+                  <StatusBadge label={t('mother')} tone="brand" />
+                ) : null}
+              </View>
+            ) : null}
             <View style={styles.metaRow}>
               <Text
                 style={[styles.churchMeta, {color: C.textSecondary}]}
@@ -196,67 +217,18 @@ const WatchListPanel: React.FC<{
         {formatTemplate(t('showingEntries'), {from, to, total})}
       </Text>
       <View style={styles.pager}>
-        <PagerButton
-          label={t('pagerFirst')}
-          disabled={currentPage <= 1}
-          onPress={() => setPage(1)}
-        />
-        <PagerButton
-          label={t('pagerPrev')}
-          disabled={currentPage <= 1}
-          onPress={() => setPage(current => Math.max(1, current - 1))}
-        />
-        <PagerButton label={String(currentPage)} active onPress={() => undefined} />
-        <PagerButton
-          label={t('next')}
-          disabled={currentPage >= totalPages}
-          onPress={() => setPage(current => Math.min(totalPages, current + 1))}
-        />
-        <PagerButton
-          label={t('pagerLast')}
-          disabled={currentPage >= totalPages}
-          onPress={() => setPage(totalPages)}
+        <ListPageBar
+          page={currentPage}
+          totalPages={totalPages}
+          onPageChange={setPage}
         />
       </View>
     </View>
   );
 };
 
-const PagerButton: React.FC<{
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  active?: boolean;
-}> = ({label, onPress, disabled, active}) => {
-  const C = useThemedColors();
-  return (
-    <TouchableOpacity
-      onPress={onPress}
-      disabled={disabled || active}
-      accessibilityRole="button"
-      accessibilityState={{disabled: !!disabled, selected: !!active}}
-      style={[
-        styles.pagerButton,
-        {
-          backgroundColor: active ? COLORS.mainColor : C.surface,
-          borderColor: active ? COLORS.mainColor : C.border,
-          opacity: disabled ? 0.45 : 1,
-        },
-      ]}>
-      <Text
-        style={[
-          styles.pagerLabel,
-          {color: active ? COLORS.white : C.textPrimary},
-        ]}>
-        {label}
-      </Text>
-    </TouchableOpacity>
-  );
-};
-
 export const WatchListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const C = useThemedColors();
   const {t} = useTranslation();
   const tRef = useRef(t);
   tRef.current = t;
@@ -328,46 +300,34 @@ export const WatchListScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header title={t('watchList')} />
-        <View style={styles.addRow}>
-          <AddNewHeaderButton
-            name="WatchListForm"
-            text={t('addNew')}
-            style={{
-              backgroundColor: C.surface,
-              borderWidth: 1,
-              borderColor: COLORS.mainColor,
-            }}
-            textStyle={{color: COLORS.mainColor}}
-          />
-        </View>
+    <ScreenContainer title={t('watchList')} showMenu>
+      <ListToolbar
+        countText={
+          loading && items.length === 0
+            ? undefined
+            : `${items.length} ${t('watchLists').toLowerCase()}`
+        }
+        addRoute="WatchListForm"
+      />
 
-        {loading && items.length === 0 ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={COLORS.mainColor} />
-          </View>
-        ) : (
-          <ScrollView
-            contentContainerStyle={items.length === 0 ? styles.emptyList : styles.listContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={() => {
-                  setRefreshing(true);
-                  load(false);
-                }}
-                tintColor={COLORS.mainColor}
-              />
-            }>
-            {items.length === 0 ? (
-              <Text style={[styles.empty, {color: C.textSecondary}]}>
-                {t('noWatchLists')}
-              </Text>
-            ) : (
+      {loading && items.length === 0 ? (
+        <CenteredLoader />
+      ) : (
+        <ScrollView
+          contentContainerStyle={listContentStyle}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load(false);
+              }}
+              tintColor={COLORS.mainColor}
+            />
+          }>
+          {items.length === 0 ? (
+            <ListEmptyState title={t('noWatchLists')} hint={t('emptyListHint')} />
+          ) : (
               items.map(item => (
                 <WatchListPanel
                   key={item.id}
@@ -408,27 +368,19 @@ export const WatchListScreen: React.FC = () => {
             )}
           </ScrollView>
         )}
-      </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {flex: 1, paddingHorizontal: ms(16)},
-  addRow: {
-    alignItems: 'flex-end',
-    marginTop: ms(8),
-    marginBottom: ms(10),
-  },
-  center: {flex: 1, alignItems: 'center', justifyContent: 'center'},
-  listContent: {paddingBottom: ms(24)},
-  emptyList: {flexGrow: 1, justifyContent: 'center'},
-  empty: {textAlign: 'center', fontSize: fs(12)},
   panel: {
-    borderWidth: 1,
-    borderRadius: rs(8),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: rs(12),
     marginBottom: ms(14),
-    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowRadius: rs(6),
+    shadowOffset: {width: 0, height: 2},
+    elevation: 1,
   },
   panelHeader: {
     flexDirection: 'row',
@@ -438,18 +390,12 @@ const styles = StyleSheet.create({
     paddingVertical: ms(10),
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  panelTitle: {flex: 1, fontSize: fs(14), fontWeight: '700'},
+  panelTitle: {flex: 1, fontSize: fs(15), fontWeight: '600'},
   iconButton: {
-    minWidth: ms(32),
-    minHeight: ms(32),
+    minWidth: 44,
+    minHeight: 44,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  deleteMark: {
-    color: COLORS.dangerColor,
-    fontSize: fs(22),
-    fontWeight: '600',
-    lineHeight: fs(24),
   },
   search: {marginHorizontal: ms(12), marginTop: ms(10)},
   churchRow: {
@@ -458,49 +404,36 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
   churchName: {
-    color: COLORS.mainColor,
-    fontSize: fs(13),
+    fontSize: fs(14),
     fontWeight: '600',
-    lineHeight: fs(18),
+    lineHeight: fs(19),
+  },
+  badgeRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ms(6),
+    marginTop: ms(6),
   },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: ms(8),
-    marginTop: ms(3),
+    marginTop: ms(4),
   },
-  churchMeta: {flex: 1, fontSize: fs(12), lineHeight: fs(16)},
-  churchId: {fontSize: fs(11), fontWeight: '600', lineHeight: fs(16)},
-  badgeMsc: {color: '#b42318', fontWeight: '700', fontSize: fs(11)},
-  badgeHouse: {color: '#1b7f3b', fontWeight: '700', fontSize: fs(11)},
-  badgeMother: {color: '#1d4ed8', fontWeight: '700', fontSize: fs(11)},
+  churchMeta: {flex: 1, fontSize: fs(13), lineHeight: fs(18)},
+  churchId: {fontSize: fs(12), lineHeight: fs(18)},
   emptyRow: {
     textAlign: 'center',
-    fontSize: fs(12),
+    fontSize: fs(13),
     paddingVertical: ms(16),
   },
   showing: {
     textAlign: 'right',
-    fontSize: fs(11),
+    fontSize: fs(12),
     marginTop: ms(10),
     paddingHorizontal: ms(12),
   },
   pager: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'flex-end',
-    gap: ms(6),
     paddingHorizontal: ms(12),
-    paddingTop: ms(8),
-    paddingBottom: ms(12),
   },
-  pagerButton: {
-    minHeight: ms(32),
-    paddingHorizontal: ms(8),
-    borderWidth: 1,
-    borderRadius: rs(4),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pagerLabel: {fontSize: fs(11), fontWeight: '600'},
 });

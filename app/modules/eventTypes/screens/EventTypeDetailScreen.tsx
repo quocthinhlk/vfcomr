@@ -1,14 +1,35 @@
 import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, ScrollView} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {View, StyleSheet} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {getEventTypeById, EventTypeItem, resolveEventMeetingType} from '../services/eventType.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms, rs, hs} from '../../../shared/utils/scale';
+import {fs, ms, rs} from '../../../shared/utils/scale';
+import {
+  DetailActions,
+  DetailCard,
+  DetailRow,
+  ListEmptyState,
+  ScreenContainer,
+} from '../../../shared/components/crud';
+
+const ColorValue: React.FC<{color?: string | null}> = ({color}) => {
+  const C = useThemedColors();
+  return (
+    <View style={styles.colorRow}>
+      <View
+        style={[
+          styles.colorBox,
+          {backgroundColor: color || undefined, borderColor: C.inputBorder},
+        ]}
+      />
+      <Text style={[styles.colorValue, {color: C.textPrimary}]}>
+        {color || '-'}
+      </Text>
+    </View>
+  );
+};
 
 export const EventTypeDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -17,7 +38,6 @@ export const EventTypeDetailScreen: React.FC = () => {
   const [eventType, setEventType] = useState<EventTypeItem | null>(null);
   const [loading, setLoading] = useState(true);
   const {t} = useTranslation();
-  const C = useThemedColors();
 
   useEffect(() => {
     let mounted = true;
@@ -41,157 +61,62 @@ export const EventTypeDetailScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [eventTypeId]);
+    // refetchKey is set by returnAfterEdit, so the detail refreshes after editing.
+  }, [eventTypeId, route.params?.refetchKey]);
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Header title={t('eventTypeDetail') || 'Event Type Detail'} showMenu={false} />
-          {loading ? (
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('loading') || 'Loading'}...
-            </Text>
-          ) : !eventType ? (
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('noDataFound') || 'No data found'}
-            </Text>
-          ) : (
-            <ScrollView
-
-              contentContainerStyle={styles.scrollContent}>
-              <View style={styles.content}>
-                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('name') || 'Name'}
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {eventType.name}
-                    </Text>
-                  </View>
-                </View>
-
-                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('textColour') || 'Text Colour'}
-                    </Text>
-                    <View style={styles.colorRow}>
-                      <View style={[styles.colorBox, {backgroundColor: eventType.color, borderColor: C.inputBorder}]} />
-                      <Text style={[styles.colorValue, {color: C.textPrimary}]}>
-                        {eventType.color}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('reportCellColour') || 'Report Cell Colour'}
-                    </Text>
-                    <View style={styles.colorRow}>
-                      <View style={[styles.colorBox, {backgroundColor: eventType.cell_color, borderColor: C.inputBorder}]} />
-                      <Text style={[styles.colorValue, {color: C.textPrimary}]}>
-                        {eventType.cell_color}
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-
-                <View style={[styles.detailCard, styles.cardShadow, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
-                  <View style={styles.detailRow}>
-                    <Text style={[styles.label, {color: C.textSecondary}]}>
-                      {t('meetingType') || 'Meeting Type'}
-                    </Text>
-                    <Text style={[styles.value, {color: C.textPrimary}]}>
-                      {resolveEventMeetingType(eventType.meeting_type) === 'meeting_with'
-                        ? t('eventMeetingWith') || 'Meeting With'
-                        : t('eventAttendance') || 'Attendance'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            </ScrollView>
-          )}
-        </View>
-      </View>
-    </SafeAreaView>
+    <ScreenContainer
+      title={t('eventTypeDetail') || 'Event Type Detail'}
+      loading={loading}
+      scroll>
+      {!eventType ? (
+        <ListEmptyState title={t('noDataFound') || 'No data found'} />
+      ) : (
+        <>
+          <DetailCard title={eventType.name}>
+            <DetailRow label={t('textColour') || 'Text Colour'}>
+              <ColorValue color={eventType.color} />
+            </DetailRow>
+            <DetailRow label={t('reportCellColour') || 'Report Cell Colour'}>
+              <ColorValue color={eventType.cell_color} />
+            </DetailRow>
+            <DetailRow
+              label={t('meetingType') || 'Meeting Type'}
+              value={
+                resolveEventMeetingType(eventType.meeting_type) === 'meeting_with'
+                  ? t('eventMeetingWith') || 'Meeting With'
+                  : t('eventAttendance') || 'Attendance'
+              }
+            />
+          </DetailCard>
+          <DetailActions
+            itemName={eventType.name}
+            onEdit={() => navigation.navigate('EditEventType', {eventTypeId})}
+            onDelete={() => navigation.navigate('DeleteEventType', {eventTypeId})}
+          />
+        </>
+      )}
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  scrollContent: {
-    paddingBottom: ms(24),
-  },
-  content: {
-    marginTop: ms(16),
-    gap: ms(16),
-  },
-  detailCard: {
-    padding: ms(16),
-    borderRadius: rs(12),
-    borderWidth: 1,
-  },
-  cardShadow: {
-    shadowColor: '#000',
-    shadowOpacity: 0.06,
-    shadowRadius: rs(6),
-    shadowOffset: {width: 0, height: hs(3)},
-    elevation: 2,
-  },
-  detailRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    gap: ms(12),
-  },
-  label: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    flexShrink: 0,
-  },
-  value: {
-    fontSize: fs(14),
-    fontWeight: '500',
-    flex: 1,
-    textAlign: 'right',
-    flexShrink: 1,
-  },
   colorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: ms(12),
-    flex: 1,
-    justifyContent: 'flex-end',
+    gap: ms(8),
   },
   colorBox: {
-    width: ms(32),
-    height: ms(32),
+    width: ms(24),
+    height: ms(24),
     borderRadius: rs(6),
     borderWidth: 1,
-    flexShrink: 0,
   },
   colorValue: {
     fontSize: fs(14),
     fontWeight: '500',
     fontFamily: 'monospace',
-    minWidth: ms(70),
-  },
-  loading: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    fontSize: fs(14),
   },
 });
 
 export default EventTypeDetailScreen;
-

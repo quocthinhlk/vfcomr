@@ -1,18 +1,15 @@
 import React, {useCallback, useMemo, useRef, useState} from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
+import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import Svg, {Path} from 'react-native-svg';
-import {Header} from '../../../shared/components/Header';
 import {DeleteButton} from '../../../shared/components/ActionButtons';
-import {globalStyles} from '../../../shared/styles/global';
+import {
+  DetailCard,
+  DetailRow,
+  ListEmptyState,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {COLORS} from '../../../shared/constants/colors';
@@ -211,22 +208,9 @@ const OverseerGoalDetailScreen = () => {
   const cardStyle = {backgroundColor: C.surface, borderColor: C.border};
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={[styles.container, {backgroundColor: C.background}]}>
-        <Header title={t('overseerGoalDetail')} showMenu={false} />
-
-        {loading ? (
-          <View style={styles.centerContent}>
-            <ActivityIndicator size="small" color={COLORS.mainColor} />
-          </View>
-        ) : !detail ? (
-          <View style={styles.centerContent}>
-            <Text style={[styles.emptyText, {color: C.textSecondary}]}>
-              {t('noDataFound')}
-            </Text>
-          </View>
+    <ScreenContainer title={t('overseerGoalDetail')} loading={loading}>
+        {!detail ? (
+          <ListEmptyState />
         ) : (
           <ScrollView
             contentContainerStyle={styles.scrollContent}
@@ -305,25 +289,11 @@ const OverseerGoalDetailScreen = () => {
             </View>
 
             {detailRows.length > 0 ? (
-              <View style={[styles.card, cardStyle]}>
-                <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
-                  {t('details')}
-                </Text>
-                <View style={styles.grid}>
-                  {detailRows.map(row => (
-                    <View key={row.label} style={styles.gridCell}>
-                      <Text style={[styles.gridLabel, {color: C.textSecondary}]}>
-                        {row.label}
-                      </Text>
-                      <Text
-                        style={[styles.gridValue, {color: C.textPrimary}]}
-                        numberOfLines={2}>
-                        {row.value}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
+              <DetailCard title={t('details')}>
+                {detailRows.map(row => (
+                  <DetailRow key={row.label} label={row.label} value={row.value} />
+                ))}
+              </DetailCard>
             ) : null}
 
             {sectionSummaries.map(section => (
@@ -385,26 +355,13 @@ const OverseerGoalDetailScreen = () => {
             />
           </ScrollView>
         )}
-      </View>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingHorizontal: ms(16),
-  },
-  centerContent: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  emptyText: {
-    fontSize: fs(15),
-  },
   scrollContent: {
-    paddingTop: ms(4),
+    paddingTop: ms(12),
     paddingBottom: ms(28),
     gap: ms(12),
   },
@@ -470,23 +427,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   cardTitle: {fontSize: fs(15), fontWeight: '700', lineHeight: fs(20)},
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    marginTop: ms(4),
-  },
-  gridCell: {
-    width: '50%',
-    paddingRight: ms(8),
-    marginTop: ms(10),
-  },
-  gridLabel: {fontSize: fs(11), lineHeight: fs(15)},
-  gridValue: {
-    fontSize: fs(13),
-    fontWeight: '600',
-    lineHeight: fs(18),
-    marginTop: ms(2),
-  },
   sectionHead: {
     flexDirection: 'row',
     alignItems: 'center',

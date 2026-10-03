@@ -25,7 +25,6 @@ const RECORD_SCREENS = new Set([
   'ChurchPlantingProjectionDetail',
   'EditChurchPlantingProjection',
   'RelatingDetails',
-  'ChurchNetworkDetail',
 ]);
 
 export function returnToList(navigation: {

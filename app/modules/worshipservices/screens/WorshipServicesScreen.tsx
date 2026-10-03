@@ -2,41 +2,41 @@ import React, {useCallback, useEffect, useState} from 'react';
 import {
   View,
   FlatList,
-  Image,
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
   Alert,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {
   listWorshipServicesByChurch,
   WorshipServiceItem,
 } from '../services/worshipService.service';
 import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
 import {COLORS} from '../../../shared/constants/colors';
 import {MSC_FAQ_ID} from '../../../shared/constants/faq';
-import {fs, ws, ms, rs} from '../../../shared/utils/scale';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
-const editIcon = require('../../../assets/icons/edit.png');
+import {fs, ms, rs} from '../../../shared/utils/scale';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
+import {
+  CardMeta,
+  CenteredLoader,
+  EntityListCard,
+  ListEmptyState,
+  ListToolbar,
+  ScreenContainer,
+  listContentStyle,
+} from '../../../shared/components/crud';
+
 export const WorshipServicesScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const L = getListStyles(C, theme);
   const {t} = useTranslation();
   const [items, setItems] = useState<WorshipServiceItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -116,14 +116,6 @@ export const WorshipServicesScreen: React.FC = () => {
     navigation.navigate('WorshipServiceDetail', {worshipServiceId: item.id});
   };
 
-  const handleEdit = (item: WorshipServiceItem) => {
-    navigation.navigate('EditWorshipService', {worshipServiceId: item.id});
-  };
-
-  const handleDelete = (item: WorshipServiceItem) => {
-    navigation.navigate('DeleteWorshipService', {worshipServiceId: item.id});
-  };
-
   const formatTime = (timeString: string) => {
     if (!timeString) return '';
     const parts = timeString.split(':');
@@ -133,39 +125,20 @@ export const WorshipServicesScreen: React.FC = () => {
     return timeString;
   };
 
+  const openActions = (item: WorshipServiceItem) => {
+    setSelectedService(item);
+    setActionsVisible(true);
+  };
+
   const renderItem = ({item}: {item: WorshipServiceItem}) => (
-    <TouchableOpacity
-      activeOpacity={0.8}
+    <EntityListCard
+      title={item.name}
       onPress={() => handleView(item)}
-      onLongPress={() => {
-        setSelectedService(item);
-        setActionsVisible(true);
-      }}
-      delayLongPress={300}>
-      <View style={L.itemCard as any}>
-        <View style={L.itemRow as any}>
-          <View style={styles.itemCol}>
-            <Text style={[styles.name, {color: C.textPrimary}]}>
-              {item.name}
-            </Text>
-            <View style={styles.metaRow}>
-              <Text style={[styles.metaText, {color: C.textSecondary}]}>
-                {item.day_name} • {formatTime(item.time)}
-              </Text>
-            </View>
-          </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn, {backgroundColor: C.surface}]}
-                onPress={() => handleEdit(item)}>
-                <Image source={editIcon} style={styles.editIcon} resizeMode="contain" />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </View>
-    </TouchableOpacity>
+      onMorePress={() => openActions(item)}>
+      <CardMeta>
+        {item.day_name} • {formatTime(item.time)}
+      </CardMeta>
+    </EntityListCard>
   );
 
   const keyExtractor = (item: WorshipServiceItem) => String(item.id);
@@ -227,116 +200,109 @@ export const WorshipServicesScreen: React.FC = () => {
     </View>
   );
 
+  const isInitialLoading = loading && items.length === 0 && !refreshing;
+
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={[styles.container, {backgroundColor: C.background}]}>
-          <Header title={t('worshipServices') || 'Worship Services'} />
+    <ScreenContainer title={t('worshipServices') || 'Worship Services'} showMenu>
+      {churchName ? (
+        <Text
+          style={[styles.churchNameText, {color: C.textPrimary}]}
+          numberOfLines={2}>
+          {churchName}
+        </Text>
+      ) : null}
 
-          {churchName ? (
-            <View style={[styles.churchNameContainer, {backgroundColor: C.surface, borderColor: C.border}]}>
-              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {churchName}
-              </Text>
-            </View>
-          ) : null}
+      {/* Add New is intentionally hidden (no addRoute), as before. */}
+      <ListToolbar
+        countText={`${items.length} ${(t('worshipServices') || 'Worship Services').toLowerCase()}`}
+      />
 
-          {/* <View style={styles.headerRow}>
-            <AddNewHeaderButton
-              name="AddWorshipService"
-              text={t('addNew') || 'Add New'}
+      <FlatList
+        data={items}
+        keyExtractor={keyExtractor}
+        renderItem={renderItem}
+        style={styles.list}
+        contentContainerStyle={listContentStyle}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={
+          isInitialLoading ? (
+            <CenteredLoader />
+          ) : !loading ? (
+            <ListEmptyState
+              title={t('noWorshipServicesFound') || t('noDataFound')}
             />
-          </View> */}
+          ) : null
+        }
+        ListFooterComponent={renderMscNoteFooter}
+      />
 
-          <FlatList
-            data={items}
-            keyExtractor={keyExtractor}
-            renderItem={renderItem}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            ListEmptyComponent={
-              !loading ? (
-                <Text style={[styles.empty, {color: C.textSecondary}]}>
-                  {t('noDataFound') || 'No data found'}
-                </Text>
-              ) : null
-            }
-            ListFooterComponent={renderMscNoteFooter}
-          />
-
-          <ActionSheetModal
-            visible={actionsVisible}
-            title={selectedService?.name || t('worshipService') || 'Worship Service'}
-            onRequestClose={() => {
+      <ActionSheetModal
+        visible={actionsVisible}
+        title={selectedService?.name || t('worshipService') || 'Worship Service'}
+        onRequestClose={() => {
+          setActionsVisible(false);
+          setSelectedService(null);
+        }}
+        actions={((): ActionItem[] => {
+          const list: ActionItem[] = [];
+          list.push({
+            label: t('view') || 'View',
+            icon: 'view',
+            onPress: () => {
+              if (selectedService) {
+                navigation.navigate('WorshipServiceDetail', {
+                  worshipServiceId: selectedService.id,
+                });
+              }
               setActionsVisible(false);
               setSelectedService(null);
-            }}
-            actions={((): ActionItem[] => {
-              const list: ActionItem[] = [];
-              list.push({
-                label: t('view') || 'View',
-                icon: 'view',
-                onPress: () => {
-                  if (selectedService) {
-                    navigation.navigate('WorshipServiceDetail', {
-                      worshipServiceId: selectedService.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedService(null);
-                },
-              });
-              list.push({
-                label: t('edit') || 'Edit',
-                icon: 'edit',
-                onPress: () => {
-                  if (selectedService) {
-                    navigation.navigate('EditWorshipService', {
-                      worshipServiceId: selectedService.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedService(null);
-                },
-              });
-              list.push({
-                label: t('delete') || 'Delete',
-                icon: 'delete',
-                type: 'danger',
-                onPress: () => {
-                  if (selectedService) {
-                    navigation.navigate('DeleteWorshipService', {
-                      worshipServiceId: selectedService.id,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedService(null);
-                },
-              });
-              return list;
-            })()}
-          />
-        </View>
-      </View>
-    </SafeAreaView>
+            },
+          });
+          list.push({
+            label: t('edit') || 'Edit',
+            icon: 'edit',
+            onPress: () => {
+              if (selectedService) {
+                navigation.navigate('EditWorshipService', {
+                  worshipServiceId: selectedService.id,
+                });
+              }
+              setActionsVisible(false);
+              setSelectedService(null);
+            },
+          });
+          list.push({
+            label: t('delete') || 'Delete',
+            icon: 'delete',
+            type: 'danger',
+            onPress: () => {
+              if (selectedService) {
+                navigation.navigate('DeleteWorshipService', {
+                  worshipServiceId: selectedService.id,
+                });
+              }
+              setActionsVisible(false);
+              setSelectedService(null);
+            },
+          });
+          return list;
+        })()}
+      />
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  churchNameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  churchNameText: {
+    fontSize: fs(14),
+    fontWeight: '600',
     marginTop: ms(8),
-    marginBottom: ms(4),
-    paddingVertical: ms(4),
+  },
+  list: {
+    flex: 1,
+    marginTop: ms(8),
   },
   infoNote: {
     marginTop: ms(12),
@@ -376,66 +342,6 @@ const styles = StyleSheet.create({
     lineHeight: fs(16),
     fontWeight: '500',
     textAlign: 'center',
-  },
-  churchNameLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
-  },
-  churchNameText: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    marginTop: ms(8),
-    marginBottom: ms(12),
-  },
-  itemCol: {
-    flex: 1,
-    paddingRight: ms(8),
-  },
-  itemColRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: ms(8),
-    width: ws(72),
-  },
-  name: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    marginBottom: ms(4),
-  },
-  metaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(8),
-  },
-  metaText: {
-    fontSize: fs(12),
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: ms(40),
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: ms(6),
-  },
-  actionBtn: {
-    width: ws(25),
-    height: ws(25),
-    borderRadius: rs(4),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editBtn: {
-  },
-  editIcon: {
-    width: ws(16),
-    height: ws(16),
   },
 });
 

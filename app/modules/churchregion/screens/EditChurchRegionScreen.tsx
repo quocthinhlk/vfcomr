@@ -1,32 +1,25 @@
 import React, {useEffect, useState} from 'react';
-import {View, StyleSheet, Alert, TouchableOpacity, Image} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
+import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
-import {formStyles} from '../../../shared/styles/form';
 import {
   getChurchRegionById,
   updateChurchRegion,
   getChurchRegionHierarchy,
 } from '../services/churchregion.service';
-import {
-  SaveButton,
-  CancelButton,
-} from '../../../shared/components/ActionButtons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
 import ElementDropdown, {
   ElementDropdownItem,
 } from '../../../shared/components/ElementDropdown';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
 import api from '../../../config/api';
-import {Col, Row, Grid} from 'react-native-easy-grid';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import AppInput from '../../../shared/components/AppInput';
+import {
+  FormActions,
+  FormField,
+  ScreenContainer,
+} from '../../../shared/components/crud';
+import {ChurchRegionLogoField} from '../components/ChurchRegionUI';
 
 export const EditChurchRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -36,14 +29,14 @@ export const EditChurchRegionScreen: React.FC = () => {
   const [parentId, setParentId] = useState<number | null>(null);
   const [options, setOptions] = useState<ElementDropdownItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(!!churchRegionId);
+  const [nameError, setNameError] = useState('');
   const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
   const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null);
   const [imageRemoved, setImageRemoved] = useState(false);
   const {t} = useTranslation();
-  const C = useThemedColors();
-  const {theme} = useThemeMode();
   const {imagePath, handleImagePick, clearImage} = useImagePicker();
-  
+
   // Reset imageRemoved flag when user picks a new image
   useEffect(() => {
     if (imagePath) {
@@ -66,7 +59,12 @@ export const EditChurchRegionScreen: React.FC = () => {
           setExistingLogoUrl(logoUrl);
           setOriginalLogoUrl(logoUrl);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => {
+          if (mounted) {
+            setLoading(false);
+          }
+        });
     }
     return () => {
       mounted = false;
@@ -100,23 +98,30 @@ export const EditChurchRegionScreen: React.FC = () => {
     };
   }, []);
 
+  const onNameChange = (value: string) => {
+    setName(value);
+    if (nameError && value.trim()) {
+      setNameError('');
+    }
+  };
+
   const onSave = async () => {
     if (!churchRegionId) return;
     if (!name.trim()) {
-      Alert.alert(t('validation') || 'Validation', t('fillRequiredFields') || 'Please fill all required fields.');
+      setNameError(t('fillRequiredFields') || 'Please fill all required fields.');
       return;
     }
     try {
       setSubmitting(true);
-      
-      const updateData: any = { 
-        name: name.trim(), 
+
+      const updateData: any = {
+        name: name.trim(),
         parent_id: parentId ?? null
       };
-      
+
       // Determine if image was changed
       const imageChanged = imagePath || (imageRemoved && !existingLogoUrl);
-      
+
       if (imageChanged) {
         if (imagePath) {
           // User uploaded a new image
@@ -133,7 +138,7 @@ export const EditChurchRegionScreen: React.FC = () => {
         }
       }
       // If no image change, don't include logo_path in update
-      
+
       await updateChurchRegion(churchRegionId, updateData);
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('edit')} ${t('success')}`);
       returnAfterEdit(navigation);
@@ -145,146 +150,51 @@ export const EditChurchRegionScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Grid>
-            <Row>
-              <Col>
-                <Header
-                  title={`${t('edit')} ${t('churchApostolicRegions')}`}
-                  showMenu={false}
-                />
-                <Text
-                  style={[
-                    formStyles.label,
-                    {color: C.textPrimary, marginTop: ms(12)},
-                  ]}>
-                  {t('churchRegion') || t('churchApostolicRegions')}
-                </Text>
-                <AppInput
-                  value={name}
-                  onChangeText={setName}
-                  placeholder={t('churchRegion') || t('churchApostolicRegions')}
-                />
-                <Text style={[formStyles.label, {color: C.textPrimary}]}>
-                  {t('churchParent')}
-                </Text>
-                <ElementDropdown
-                  data={options}
-                  value={parentId}
-                  onChange={v =>
-                    setParentId(
-                      (typeof v === 'number' ? v : Number(v)) || null,
-                    )
-                  }
-                  placeholder={t('churchParent')}
-                  containerStyle={{marginBottom: ms(8)}}
-                />
-
-                <Text style={[formStyles.label, {color: C.textPrimary}]}>
-                  {t('logo')}
-                </Text>
-                <TouchableOpacity
-                  onPress={handleImagePick}
-                  style={
-                    [
-                      formStyles.avatarSquare as any,
-                      {
-                        backgroundColor: C.inputBg,
-                        borderColor: (C as any).inputBorder || C.border,
-                      },
-                    ] as any
-                  }>
-                  {imagePath ? (
-                    <>
-                      <Image
-                        source={{uri: imagePath}}
-                        style={formStyles.avatarImage as any}
-                        resizeMode="cover"
-                      />
-                      <TouchableOpacity
-                        onPress={clearImage}
-                        style={formStyles.avatarClose as any}>
-                        <Text style={{color: '#fff'}}>✗</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : existingLogoUrl ? (
-                    <>
-                      <Image
-                        source={{uri: existingLogoUrl}}
-                        style={formStyles.avatarImage as any}
-                        resizeMode="cover"
-                      />
-                      <TouchableOpacity
-                        onPress={() => {
-                          setExistingLogoUrl(null);
-                          setImageRemoved(true);
-                        }}
-                        style={formStyles.avatarClose as any}>
-                        <Text style={{color: '#fff'}}>✗</Text>
-                      </TouchableOpacity>
-                    </>
-                  ) : (
-                    <Text
-                      style={
-                        [formStyles.avatarPlus as any, {color: C.textSecondary}] as any
-                      }>
-                      +
-                    </Text>
-                  )}
-                </TouchableOpacity>
-
-                <View style={[formStyles.buttonRow, {marginTop: ms(24)}]}>
-                  <CancelButton
-                    label={t('cancel')}
-                    onPress={() => navigation.goBack()}
-                    disabled={submitting}
-                  />
-                  <SaveButton
-                    label={t('save')}
-                    onPress={onSave}
-                    disabled={submitting}
-                  />
-                </View>
-              </Col>
-            </Row>
-          </Grid>
-        </View>
-      </View>
-    </SafeAreaView>
+    <ScreenContainer
+      title={`${t('edit')} ${t('churchApostolicRegions')}`}
+      scroll
+      loading={loading}>
+      <FormField label={t('name')} required error={nameError}>
+        <AppInput
+          value={name}
+          onChangeText={onNameChange}
+          placeholder={t('churchRegion') || t('churchApostolicRegions')}
+          error={!!nameError}
+          editable={!submitting}
+          accessibilityLabel={`${t('name')}, ${t('required')}`}
+        />
+      </FormField>
+      <FormField label={t('churchParent')}>
+        <ElementDropdown
+          data={options}
+          value={parentId}
+          onChange={v =>
+            setParentId(
+              (typeof v === 'number' ? v : Number(v)) || null,
+            )
+          }
+          placeholder={t('churchParent')}
+        />
+      </FormField>
+      <ChurchRegionLogoField
+        imageUri={imagePath || existingLogoUrl}
+        onPick={handleImagePick}
+        onClear={
+          imagePath
+            ? clearImage
+            : () => {
+                setExistingLogoUrl(null);
+                setImageRemoved(true);
+              }
+        }
+      />
+      <FormActions
+        onCancel={() => navigation.goBack()}
+        onSave={onSave}
+        submitting={submitting}
+      />
+    </ScreenContainer>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  input: {
-    height: hs(44),
-    borderWidth: 1,
-    borderColor: '#ddd',
-    borderRadius: rs(6),
-    paddingHorizontal: ms(12),
-    color: '#000',
-  },
-  label: {
-    marginTop: ms(8),
-    marginBottom: ms(4),
-    color: '#333',
-    fontWeight: '600',
-  },
-  row: {
-    flexDirection: 'row',
-    marginTop: ms(24),
-    gap: ms(12),
-  },
-});
-
 export default EditChurchRegionScreen;
-
-

@@ -8,28 +8,24 @@ import {
   Platform,
   StatusBar,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
-import {formStyles} from '../../../shared/styles/form';
 import {
   updateChurchPlantingProjection,
   getChurchPlantingProjectionById,
 } from '../services/churchPlantingProjection.service';
 import {
-  SaveButton,
-  CancelButton,
-} from '../../../shared/components/ActionButtons';
+  FormActions,
+  FormField,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms, rs, hs, ws} from '../../../shared/utils/scale';
+import {fs, ms, hs} from '../../../shared/utils/scale';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
 
 export const EditChurchPlantingProjectionScreen: React.FC = () => {
@@ -239,304 +235,189 @@ export const EditChurchPlantingProjectionScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{flex: 1, backgroundColor: C.background}}>
-          <View style={styles.container}>
-            <Header
-              title={`${t('update') || 'Update'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`}
-              showMenu={false}
-            />
-            <Text style={[styles.loading, {color: C.textPrimary}]}>
-              {t('loading') || 'Loading'}...
-            </Text>
-          </View>
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenContainer title={`${t('update') || 'Update'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`} loading />;
   }
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Header
-            title={`${t('update') || 'Update'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`}
-            showMenu={false}
-          />
-          
-          {churchName ? (
-            <View style={styles.churchNameContainer}>
-              <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
-                {t('update') || 'Update'} {t('churchPlantingProjection') || 'Church Planting Projection'} {t('for') || 'for'} {churchName}
-              </Text>
-            </View>
-          ) : null}
-          
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-            keyboardVerticalOffset={
-              Platform.OS === 'ios'
-                ? hs(64)
-                : (StatusBar.currentHeight || 0) + hs(50)
-            }
-            style={{flex: 1}}>
-            <ScrollView
+    <ScreenContainer title={`${t('update') || 'Update'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`}>
+      {churchName ? (
+        <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
+          {t('update') || 'Update'} {t('churchPlantingProjection') || 'Church Planting Projection'} {t('for') || 'for'} {churchName}
+        </Text>
+      ) : null}
 
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled">
-              <View style={styles.form}>
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('town') || 'Town'}{' '}
-                    <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
+        keyboardVerticalOffset={
+          Platform.OS === 'ios'
+            ? hs(64)
+            : (StatusBar.currentHeight || 0) + hs(50)
+        }
+        style={styles.flex}>
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled">
+          <View>
+            <FormField label={t('town') || 'Town'} required>
+              <AppInput
+                value={town}
+                onChangeText={(text) => {
+                  setTown(text);
+                  clearInvalid('town');
+                }}
+                placeholder={t('town') || 'Town'}
+                error={!!invalid.town}
+              />
+            </FormField>
+
+            <FormField label={t('country') || 'Country'} required>
+              <ElementDropdown
+                data={countryOptions.map(opt => ({label: opt.label, value: opt.value}))}
+                value={countryId as any}
+                onChange={v => {
+                  setCountryId(v as number);
+                  clearInvalid('countryId');
+                }}
+                placeholder={t('selectCountry') || 'Select Country'}
+                error={!!invalid.countryId}
+                containerStyle={
+                  {
+                    backgroundColor: C.inputBg,
+                    borderColor: invalid.countryId ? '#db2d2d' : C.inputBorder,
+                  } as any
+                }
+                onFocus={async () => {
+                  if (countryOptions.length === 0) {
+                    await loadCountries(1);
+                  }
+                }}
+                onSearchText={async text => {
+                  setCountryQuery(text);
+                  await loadCountries(1, text);
+                }}
+                onEndReached={async () => {
+                  if (countryHasNext) {
+                    await loadCountries(countryPage + 1, countryQuery);
+                  }
+                }}
+              />
+            </FormField>
+
+            <FormField label={t('proposedChurchName') || 'Proposed Church Name'} required>
+              <AppInput
+                value={proposedChurchName}
+                onChangeText={(text) => {
+                  setProposedChurchName(text);
+                  clearInvalid('proposedChurchName');
+                }}
+                placeholder={t('proposedChurchName') || 'Proposed Church Name'}
+                error={!!invalid.proposedChurchName}
+              />
+            </FormField>
+
+            <FormField label={t('proposedLeaderName') || 'Proposed Leader Name'} required>
+              <AppInput
+                value={proposedLeaderName}
+                onChangeText={(text) => {
+                  setProposedLeaderName(text);
+                  clearInvalid('proposedLeaderName');
+                }}
+                placeholder={t('proposedLeaderName') || 'Proposed Leader Name'}
+                error={!!invalid.proposedLeaderName}
+              />
+            </FormField>
+
+            <FormField label={t('population') || 'Population'}>
+              <AppInput
+                value={population}
+                onChangeText={setPopulation}
+                placeholder={t('population') || 'Population'}
+                keyboardType="numeric"
+              />
+            </FormField>
+
+            <FormField label={t('startDatePreparation') || 'Start Date Preparation'} required>
+              <DateTripleDropdown
+                value={startDatePreparation}
+                onChange={(date) => {
+                  setStartDatePreparation(date);
+                  clearInvalid('startDatePreparation');
+                }}
+                yearRange={50}
+                startYear={new Date().getFullYear()}
+                error={!!invalid.startDatePreparation}
+              />
+            </FormField>
+
+            <FormField label={t('startDatePioneering') || 'Start Date Pioneering'} required>
+              <DateTripleDropdown
+                value={startDatePioneering}
+                onChange={(date) => {
+                  setStartDatePioneering(date);
+                  clearInvalid('startDatePioneering');
+                }}
+                yearRange={50}
+                startYear={new Date().getFullYear()}
+                error={!!invalid.startDatePioneering}
+              />
+            </FormField>
+
+            <FormField label={t('distanceToTown') || 'Distance to Town'} required>
+              <View style={{flexDirection: 'row', gap: ms(8)}}>
+                <View style={{flex: 2}}>
                   <AppInput
-                    value={town}
+                    value={distanceToTown}
                     onChangeText={(text) => {
-                      setTown(text);
-                      clearInvalid('town');
+                      setDistanceToTown(text);
+                      clearInvalid('distanceToTown');
                     }}
-                    placeholder={t('town') || 'Town'}
-                    error={!!invalid.town}
+                    placeholder={t('distance') || 'Distance'}
+                    keyboardType="numeric"
+                    error={!!invalid.distanceToTown}
                   />
                 </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('country') || 'Country'}{' '}
-                    <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
+                <View style={{flex: 1}}>
                   <ElementDropdown
-                    data={countryOptions.map(opt => ({label: opt.label, value: opt.value}))}
-                    value={countryId as any}
-                    onChange={v => {
-                      setCountryId(v as number);
-                      clearInvalid('countryId');
-                    }}
-                    placeholder={t('selectCountry') || 'Select Country'}
-                    error={!!invalid.countryId}
+                    data={distanceUnitOptions}
+                    value={distanceToTownUnit as any}
+                    onChange={v => setDistanceToTownUnit(v as string)}
+                    placeholder={t('unit') || 'Unit'}
                     containerStyle={
                       {
                         backgroundColor: C.inputBg,
-                        borderColor: invalid.countryId ? '#db2d2d' : C.inputBorder,
+                        borderColor: C.inputBorder,
                       } as any
                     }
-                    onFocus={async () => {
-                      if (countryOptions.length === 0) {
-                        await loadCountries(1);
-                      }
-                    }}
-                    onSearchText={async text => {
-                      setCountryQuery(text);
-                      await loadCountries(1, text);
-                    }}
-                    onEndReached={async () => {
-                      if (countryHasNext) {
-                        await loadCountries(countryPage + 1, countryQuery);
-                      }
-                    }}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('proposedChurchName') || 'Proposed Church Name'}{' '}
-                    <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <AppInput
-                    value={proposedChurchName}
-                    onChangeText={(text) => {
-                      setProposedChurchName(text);
-                      clearInvalid('proposedChurchName');
-                    }}
-                    placeholder={t('proposedChurchName') || 'Proposed Church Name'}
-                    error={!!invalid.proposedChurchName}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('proposedLeaderName') || 'Proposed Leader Name'}{' '}
-                    <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <AppInput
-                    value={proposedLeaderName}
-                    onChangeText={(text) => {
-                      setProposedLeaderName(text);
-                      clearInvalid('proposedLeaderName');
-                    }}
-                    placeholder={t('proposedLeaderName') || 'Proposed Leader Name'}
-                    error={!!invalid.proposedLeaderName}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('population') || 'Population'}
-                  </Text>
-                  <AppInput
-                    value={population}
-                    onChangeText={setPopulation}
-                    placeholder={t('population') || 'Population'}
-                    keyboardType="numeric"
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('startDatePreparation') || 'Start Date Preparation'}{' '}
-                    <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <DateTripleDropdown
-                    value={startDatePreparation}
-                    onChange={(date) => {
-                      setStartDatePreparation(date);
-                      clearInvalid('startDatePreparation');
-                    }}
-                    yearRange={50}
-                    startYear={new Date().getFullYear()}
-                    error={!!invalid.startDatePreparation}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('startDatePioneering') || 'Start Date Pioneering'}{' '}
-                    <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <DateTripleDropdown
-                    value={startDatePioneering}
-                    onChange={(date) => {
-                      setStartDatePioneering(date);
-                      clearInvalid('startDatePioneering');
-                    }}
-                    yearRange={50}
-                    startYear={new Date().getFullYear()}
-                    error={!!invalid.startDatePioneering}
-                  />
-                </View>
-
-                <View style={styles.field}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textSecondary, marginBottom: ms(4)},
-                    ]}>
-                    {t('distanceToTown') || 'Distance to Town'}{' '}
-                    <Text style={{color: '#c00000'}}>*</Text>
-                  </Text>
-                  <View style={{flexDirection: 'row', gap: ms(8)}}>
-                    <View style={{flex: 2}}>
-                      <AppInput
-                        value={distanceToTown}
-                        onChangeText={(text) => {
-                          setDistanceToTown(text);
-                          clearInvalid('distanceToTown');
-                        }}
-                        placeholder={t('distance') || 'Distance'}
-                        keyboardType="numeric"
-                        error={!!invalid.distanceToTown}
-                      />
-                    </View>
-                    <View style={{flex: 1}}>
-                      <ElementDropdown
-                        data={distanceUnitOptions}
-                        value={distanceToTownUnit as any}
-                        onChange={v => setDistanceToTownUnit(v as string)}
-                        placeholder={t('unit') || 'Unit'}
-                        containerStyle={
-                          {
-                            backgroundColor: C.inputBg,
-                            borderColor: C.inputBorder,
-                          } as any
-                        }
-                      />
-                    </View>
-                  </View>
-                </View>
-
-                <View style={formStyles.buttonRow}>
-                  <CancelButton
-                    label={t('cancel') || 'Cancel'}
-                    onPress={() => navigation.goBack()}
-                    disabled={submitting}
-                  />
-                  <SaveButton
-                    label={t('save') || 'Save'}
-                    onPress={onSave}
-                    disabled={submitting}
                   />
                 </View>
               </View>
-            </ScrollView>
-          </KeyboardAvoidingView>
-        </View>
-      </View>
-    </SafeAreaView>
+            </FormField>
+
+            <FormActions
+              onCancel={() => navigation.goBack()}
+              onSave={onSave}
+              submitting={submitting}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  churchNameContainer: {
+  churchNameText: {
     marginTop: ms(8),
     marginBottom: ms(12),
-  },
-  churchNameText: {
     fontSize: fs(14),
     fontWeight: '500',
   },
+  flex: {
+    flex: 1,
+  },
   scrollContent: {
+    paddingTop: ms(8),
     paddingBottom: ms(24),
-  },
-  form: {
-    marginTop: ms(8),
-    gap: ms(16),
-  },
-  field: {
-    marginBottom: ms(8),
-  },
-  loading: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    fontSize: fs(14),
   },
 });
 

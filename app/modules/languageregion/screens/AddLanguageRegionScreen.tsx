@@ -1,29 +1,23 @@
 import React, {useState, useEffect} from 'react';
-import {View, StyleSheet, Alert, TextInput, Switch} from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
+import {Alert} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
-import {formStyles} from '../../../shared/styles/form';
 import {
   createLanguageRegion,
   listLanguageRegions,
   LanguageRegionItem,
 } from '../services/languageregion.service';
-import {
-  SaveButton,
-  CancelButton,
-} from '../../../shared/components/ActionButtons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
+import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown, {
   ElementDropdownItem,
 } from '../../../shared/components/ElementDropdown';
-import {Col, Row, Grid} from 'react-native-easy-grid';
-import {fs, hs, ms, rs} from '../../../shared/utils/scale';
-import {COLORS} from '../../../shared/constants/colors';
+import {
+  FormActions,
+  FormDivider,
+  FormField,
+  FormSwitchRow,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 
 export const AddLanguageRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -33,8 +27,6 @@ export const AddLanguageRegionScreen: React.FC = () => {
   const [options, setOptions] = useState<ElementDropdownItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const {t} = useTranslation();
-  const C = useThemedColors();
-  const {theme} = useThemeMode();
 
   useEffect(() => {
     let mounted = true;
@@ -78,101 +70,42 @@ export const AddLanguageRegionScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
-      <View style={{flex: 1, backgroundColor: C.background}}>
-        <View style={styles.container}>
-          <Grid>
-            <Row>
-              <Col>
-                <Header
-                  title={`${t('addNew')} ${t('languageRegion')}`}
-                  showMenu={false}
-                />
-                <Text
-                  style={[
-                    formStyles.label,
-                    {color: C.textPrimary, marginTop: ms(12)},
-                  ]}>
-                  {t('languageRegion')}
-                </Text>
-                <TextInput
-                  style={[
-                    formStyles.textField,
-                    {
-                      marginTop: ms(4),
-                      marginBottom: ms(12),
-                      borderColor: (C as any).inputBorder || C.border,
-                      color: C.textPrimary,
-                      backgroundColor: (C as any).card || C.background,
-                    },
-                  ]}
-                  placeholder={t('languageRegion')}
-                  placeholderTextColor={C.textSecondary}
-                  value={name}
-                  onChangeText={setName}
-                />
-                <Text style={[formStyles.label, {color: C.textPrimary}]}>
-                  {t('churchParent')}
-                </Text>
-                <ElementDropdown
-                  data={options}
-                  value={parentId}
-                  onChange={v =>
-                    setParentId(
-                      (typeof v === 'number' ? v : Number(v)) || null,
-                    )
-                  }
-                  placeholder={t('churchParent')}
-                  containerStyle={{marginBottom: ms(8)}}
-                />
-                <View style={formStyles.switchRow}>
-                  <Text
-                    style={[
-                      formStyles.label,
-                      {color: C.textPrimary, marginBottom: 0},
-                    ]}>
-                    {t('disabled')}
-                  </Text>
-                  <Switch
-                    style={{transform: [{scaleX: 0.9}, {scaleY: 0.9}]}}
-                    value={disabled}
-                    onValueChange={setDisabled}
-                    thumbColor={COLORS.white}
-                    trackColor={{
-                      false: C.border,
-                      true: COLORS.mainColor,
-                    }}
-                  />
-                </View>
-                <View style={formStyles.buttonRow}>
-                  <CancelButton
-                    label={t('cancel')}
-                    onPress={() => navigation.goBack()}
-                    disabled={submitting}
-                  />
-                  <SaveButton
-                    label={t('save')}
-                    onPress={onSave}
-                    disabled={submitting}
-                  />
-                </View>
-              </Col>
-            </Row>
-          </Grid>
-        </View>
-      </View>
-    </SafeAreaView>
+    <ScreenContainer title={`${t('addNew')} ${t('languageRegion')}`} scroll>
+      <FormField label={t('name')} required>
+        <AppInput
+          value={name}
+          onChangeText={setName}
+          placeholder={t('languageRegion')}
+          editable={!submitting}
+          accessibilityLabel={`${t('name')}, ${t('required')}`}
+        />
+      </FormField>
+      <FormField label={t('churchParent')}>
+        <ElementDropdown
+          data={options}
+          value={parentId}
+          onChange={v =>
+            setParentId(
+              (typeof v === 'number' ? v : Number(v)) || null,
+            )
+          }
+          placeholder={t('churchParent')}
+        />
+      </FormField>
+      <FormDivider />
+      <FormSwitchRow
+        label={t('disabled')}
+        value={disabled}
+        onValueChange={setDisabled}
+        disabled={submitting}
+      />
+      <FormActions
+        onCancel={() => navigation.goBack()}
+        onSave={onSave}
+        submitting={submitting}
+      />
+    </ScreenContainer>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-});
 
 export default AddLanguageRegionScreen;

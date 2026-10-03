@@ -5,14 +5,10 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  ActivityIndicator,
 } from 'react-native';
-import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnToList} from '../../../shared/utils/returnToList';
-import {Header} from '../../../shared/components/Header';
-import {globalStyles} from '../../../shared/styles/global';
 import {
   createEventsBulk,
   createVisitsBulk,
@@ -20,10 +16,14 @@ import {
   CreateVisitPayload,
   listVisits,
 } from '../services/visit.service';
-import {SaveButton, CancelButton} from '../../../shared/components/ActionButtons';
+import {
+  FormActions,
+  FormField,
+  ScreenContainer,
+} from '../../../shared/components/crud';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ms} from '../../../shared/utils/scale';
 import ElementDropdown, {ElementDropdownItem} from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
@@ -619,365 +619,321 @@ export const EditVisitDetailsScreen: React.FC = () => {
   };
 
   if (loading) {
-    return (
-      <SafeAreaView
-        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={[styles.loadingWrap, {backgroundColor: C.background}]}>
-          <ActivityIndicator size="small" color={C.textPrimary} />
-        </View>
-      </SafeAreaView>
-    );
+    return <ScreenContainer title={`${t('edit') || 'Edit'} ${t('addVisits') || 'Add Visits'}`} loading />;
   }
 
   return (
-    <SafeAreaView
-      style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
-      edges={['top', 'bottom', 'left', 'right']}>
+    <ScreenContainer title={`${t('edit') || 'Edit'} ${t('addVisits') || 'Add Visits'}`}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}
-        style={{flex: 1}}>
-        <View style={{flex: 1, backgroundColor: C.background}}>
-          <View style={styles.container}>
-            <Header title={`${t('edit') || 'Edit'} ${t('addVisits') || 'Add Visits'}`} showMenu={false} />
+        style={styles.flex}>
+        <ScrollView
+          ref={ref => {
+            scrollRef.current = ref;
+          }}
 
-            <ScrollView
-              ref={ref => {
-                scrollRef.current = ref;
-              }}
+          contentContainerStyle={styles.scrollContent}>
+          <View style={styles.form}>
+            <View
+              style={styles.summaryCard}
+              onLayout={e => setFieldPos('form', e.nativeEvent.layout.y)}>
+              <Text style={[styles.summaryTitle, {color: C.textPrimary}]}>
+                {`${t('visitsAndEventsInformationFor') || 'Visits and Events Information For'} : ${
+                  visitorName || '-'
+                }${visitorRole ? `, ${visitorRole}` : ''}`}
+              </Text>
+              <Text style={[styles.summaryText, {color: C.textPrimary}]}>
+                {`${t('month') || 'Month'}: ${monthLabel}    ${t('year') || 'Year'}: ${
+                  selectedYear || '-'
+                }`}
+              </Text>
+              {renderFieldError('form')}
+              {renderFieldError('user_id')}
+            </View>
 
-              contentContainerStyle={styles.scrollContent}>
-              <View style={styles.form}>
+            {visitEntries.map((entry, index) => (
+              <View
+                key={`visit-${index}`}
+                style={styles.card}>
+                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                  {`${t('myVisitToChurch') || 'My Visit to Church'} ${index + 1}`}
+                </Text>
+
                 <View
-                  style={[styles.summaryCard, {backgroundColor: C.surface, borderColor: C.border}]}
-                  onLayout={e => setFieldPos('form', e.nativeEvent.layout.y)}>
-                  <Text style={[styles.summaryTitle, {color: C.textPrimary}]}>
-                    {`${t('visitsAndEventsInformationFor') || 'Visits and Events Information For'} : ${
-                      visitorName || '-'
-                    }${visitorRole ? `, ${visitorRole}` : ''}`}
-                  </Text>
-                  <Text style={[styles.summaryText, {color: C.textPrimary}]}>
-                    {`${t('month') || 'Month'}: ${monthLabel}    ${t('year') || 'Year'}: ${
-                      selectedYear || '-'
-                    }`}
-                  </Text>
-                  {renderFieldError('form')}
-                  {renderFieldError('user_id')}
+                  onLayout={e => setFieldPos(`visit.${index}.country_id`, e.nativeEvent.layout.y)}>
+                  <FormField label={t('nation') || 'Nation'}>
+                    <ElementDropdown
+                      data={countryOptions}
+                      value={entry.country_id}
+                      onChange={value => {
+                        handleSelectVisitCountry(index, value as number);
+                        clearInvalid(`visit.${index}.country_id`);
+                        clearFieldError(`visit.${index}.country_id`);
+                      }}
+                      placeholder={t('selectNation') || 'Select nation'}
+                      containerStyle={{
+                        backgroundColor: C.inputBg,
+                        borderColor: invalid[`visit.${index}.country_id`]
+                          ? C.error || '#ff4444'
+                          : C.inputBorder,
+                      }}
+                    />
+                    {renderFieldError(`visit.${index}.country_id`)}
+                  </FormField>
                 </View>
 
-                {visitEntries.map((entry, index) => (
-                  <View
-                    key={`visit-${index}`}
-                    style={[styles.card, {backgroundColor: C.surface, borderColor: C.border}]}>
-                    <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                      {`${t('myVisitToChurch') || 'My Visit to Church'} ${index + 1}`}
-                    </Text>
+                <View
+                  onLayout={e => setFieldPos(`visit.${index}.city_id`, e.nativeEvent.layout.y)}>
+                  <FormField label={t('city') || 'City'}>
+                    <ElementDropdown
+                      data={entry.cityOptions}
+                      value={entry.city_id}
+                      onChange={value => {
+                        handleSelectVisitCity(index, value as number);
+                        clearInvalid(`visit.${index}.city_id`);
+                        clearFieldError(`visit.${index}.city_id`);
+                      }}
+                      placeholder={t('city') || 'City'}
+                      containerStyle={{
+                        backgroundColor: C.inputBg,
+                        borderColor: invalid[`visit.${index}.city_id`]
+                          ? C.error || '#ff4444'
+                          : C.inputBorder,
+                      }}
+                    />
+                    {renderFieldError(`visit.${index}.city_id`)}
+                  </FormField>
+                </View>
 
-                    <View
-                      style={styles.field}
-                      onLayout={e => setFieldPos(`visit.${index}.country_id`, e.nativeEvent.layout.y)}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('nation') || 'Nation'}
-                      </Text>
-                      <ElementDropdown
-                        data={countryOptions}
-                        value={entry.country_id}
-                        onChange={value => {
-                          handleSelectVisitCountry(index, value as number);
-                          clearInvalid(`visit.${index}.country_id`);
-                          clearFieldError(`visit.${index}.country_id`);
-                        }}
-                        placeholder={t('selectNation') || 'Select nation'}
-                        containerStyle={{
-                          backgroundColor: C.inputBg,
-                          borderColor: invalid[`visit.${index}.country_id`]
-                            ? C.error || '#ff4444'
-                            : C.inputBorder,
-                        }}
-                      />
-                      {renderFieldError(`visit.${index}.country_id`)}
-                    </View>
+                <View
+                  onLayout={e => setFieldPos(`visit.${index}.church_id`, e.nativeEvent.layout.y)}>
+                  <FormField label={t('church') || 'Church'}>
+                    <ElementDropdown
+                      data={entry.churchOptions}
+                      value={entry.church_id}
+                      onChange={value =>
+                        updateVisitEntry(index, current => ({
+                          ...current,
+                          church_id: value as number,
+                        }))
+                      }
+                      placeholder={t('selectChurch') || 'Select church'}
+                      containerStyle={{
+                        backgroundColor: C.inputBg,
+                        borderColor: invalid[`visit.${index}.church_id`]
+                          ? C.error || '#ff4444'
+                          : C.inputBorder,
+                      }}
+                    />
+                    {renderFieldError(`visit.${index}.church_id`)}
+                  </FormField>
+                </View>
+                <View onLayout={e => setFieldPos(`visit.${index}.weeks`, e.nativeEvent.layout.y)}>
+                  {renderFieldError(`visit.${index}.weeks`)}
+                </View>
 
-                    <View
-                      style={styles.field}
-                      onLayout={e => setFieldPos(`visit.${index}.city_id`, e.nativeEvent.layout.y)}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('city') || 'City'}
-                      </Text>
-                      <ElementDropdown
-                        data={entry.cityOptions}
-                        value={entry.city_id}
-                        onChange={value => {
-                          handleSelectVisitCity(index, value as number);
-                          clearInvalid(`visit.${index}.city_id`);
-                          clearFieldError(`visit.${index}.city_id`);
-                        }}
-                        placeholder={t('city') || 'City'}
-                        containerStyle={{
-                          backgroundColor: C.inputBg,
-                          borderColor: invalid[`visit.${index}.city_id`]
-                            ? C.error || '#ff4444'
-                            : C.inputBorder,
-                        }}
-                      />
-                      {renderFieldError(`visit.${index}.city_id`)}
-                    </View>
-
-                    <View
-                      style={styles.field}
-                      onLayout={e => setFieldPos(`visit.${index}.church_id`, e.nativeEvent.layout.y)}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('church') || 'Church'}
-                      </Text>
-                      <ElementDropdown
-                        data={entry.churchOptions}
-                        value={entry.church_id}
-                        onChange={value =>
-                          updateVisitEntry(index, current => ({
-                            ...current,
-                            church_id: value as number,
-                          }))
-                        }
-                        placeholder={t('selectChurch') || 'Select church'}
-                        containerStyle={{
-                          backgroundColor: C.inputBg,
-                          borderColor: invalid[`visit.${index}.church_id`]
-                            ? C.error || '#ff4444'
-                            : C.inputBorder,
-                        }}
-                      />
-                      {renderFieldError(`visit.${index}.church_id`)}
-                    </View>
-                    <View onLayout={e => setFieldPos(`visit.${index}.weeks`, e.nativeEvent.layout.y)}>
-                      {renderFieldError(`visit.${index}.weeks`)}
-                    </View>
-
-                    {weekColumns.map(column => (
-                      <View key={`visit-${index}-week-${column.weekNumber}`} style={styles.field}>
-                        <Text style={[styles.weekLabel, {color: C.textSecondary}]}>
-                          {`wk${column.weekNumber}, ${selectedYear} (${column.rangeLabel})`}
-                        </Text>
-                        <AppInput
-                          value={entry.daysByWeek[column.weekNumber]}
-                          onChangeText={text =>
-                            updateVisitEntry(index, current => ({
-                              ...current,
-                              daysByWeek: {
-                                ...current.daysByWeek,
-                                [column.weekNumber]: normalizePositiveIntegerInput(text),
-                              },
-                            }))
-                          }
-                          keyboardType="numeric"
-                          placeholder={t('numberOfDays') || 'Number of Days'}
-                        />
-                      </View>
-                    ))}
-                  </View>
+                {weekColumns.map(column => (
+                  <FormField key={`visit-${index}-week-${column.weekNumber}`} label={`wk${column.weekNumber}, ${selectedYear} (${column.rangeLabel})`}>
+                    <AppInput
+                      value={entry.daysByWeek[column.weekNumber]}
+                      onChangeText={text =>
+                        updateVisitEntry(index, current => ({
+                          ...current,
+                          daysByWeek: {
+                            ...current.daysByWeek,
+                            [column.weekNumber]: normalizePositiveIntegerInput(text),
+                          },
+                        }))
+                      }
+                      keyboardType="numeric"
+                      placeholder={t('numberOfDays') || 'Number of Days'}
+                    />
+                  </FormField>
                 ))}
+              </View>
+            ))}
 
-                {eventEntries.map((entry, index) => (
+            {eventEntries.map((entry, index) => (
+              <View
+                key={`event-${index}`}
+                style={styles.card}>
+                <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
+                  {`${t('myVisitToMyOrganisedEvent') || 'My Visit to My Organised Event'} ${
+                    index + 1
+                  }`}
+                </Text>
+
+                <View
+                  onLayout={e => setFieldPos(`event.${index}.country_id`, e.nativeEvent.layout.y)}>
+                  <FormField label={t('nation') || 'Nation'}>
+                    <ElementDropdown
+                      data={countryOptions}
+                      value={entry.country_id}
+                      onChange={value =>
+                        updateEventEntry(index, current => ({
+                          ...current,
+                          country_id: value as number,
+                        }))
+                      }
+                      placeholder={t('selectNation') || 'Select nation'}
+                      containerStyle={{
+                        backgroundColor: C.inputBg,
+                        borderColor: invalid[`event.${index}.country_id`]
+                          ? C.error || '#ff4444'
+                          : C.inputBorder,
+                      }}
+                    />
+                    {renderFieldError(`event.${index}.country_id`)}
+                  </FormField>
+                </View>
+
+                <View
+                  onLayout={e => setFieldPos(`event.${index}.event_type_id`, e.nativeEvent.layout.y)}>
+                  <FormField label={t('eventType') || 'Event Type'}>
+                    <ElementDropdown
+                      data={eventTypeOptions}
+                      value={entry.event_type_id}
+                      onChange={value => {
+                        clearInvalid(`event.${index}.attendance`);
+                        clearInvalid(`event.${index}.meeting_with`);
+                        clearFieldError(`event.${index}.attendance`);
+                        clearFieldError(`event.${index}.meeting_with`);
+                        updateEventEntry(index, current => ({
+                          ...current,
+                          event_type_id: value as number,
+                          attendance: '',
+                          meeting_with: null,
+                        }));
+                      }}
+                      placeholder={t('eventType') || 'Event Type'}
+                      containerStyle={{
+                        backgroundColor: C.inputBg,
+                        borderColor: invalid[`event.${index}.event_type_id`]
+                          ? C.error || '#ff4444'
+                          : C.inputBorder,
+                      }}
+                    />
+                    {renderFieldError(`event.${index}.event_type_id`)}
+                  </FormField>
+                </View>
+
+                {resolveEventMeetingType(
+                  getSelectedEventType(entry.event_type_id)?.meeting_type,
+                ) === 'attendance' && (
                   <View
-                    key={`event-${index}`}
-                    style={[styles.card, {backgroundColor: C.surface, borderColor: C.border}]}>
-                    <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                      {`${t('myVisitToMyOrganisedEvent') || 'My Visit to My Organised Event'} ${
-                        index + 1
-                      }`}
-                    </Text>
-
-                    <View
-                      style={styles.field}
-                      onLayout={e => setFieldPos(`event.${index}.country_id`, e.nativeEvent.layout.y)}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('nation') || 'Nation'}
-                      </Text>
-                      <ElementDropdown
-                        data={countryOptions}
-                        value={entry.country_id}
-                        onChange={value =>
-                          updateEventEntry(index, current => ({
-                            ...current,
-                            country_id: value as number,
-                          }))
-                        }
-                        placeholder={t('selectNation') || 'Select nation'}
-                        containerStyle={{
-                          backgroundColor: C.inputBg,
-                          borderColor: invalid[`event.${index}.country_id`]
-                            ? C.error || '#ff4444'
-                            : C.inputBorder,
-                        }}
-                      />
-                      {renderFieldError(`event.${index}.country_id`)}
-                    </View>
-
-                    <View
-                      style={styles.field}
-                      onLayout={e => setFieldPos(`event.${index}.event_type_id`, e.nativeEvent.layout.y)}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('eventType') || 'Event Type'}
-                      </Text>
-                      <ElementDropdown
-                        data={eventTypeOptions}
-                        value={entry.event_type_id}
-                        onChange={value => {
-                          clearInvalid(`event.${index}.attendance`);
-                          clearInvalid(`event.${index}.meeting_with`);
-                          clearFieldError(`event.${index}.attendance`);
-                          clearFieldError(`event.${index}.meeting_with`);
-                          updateEventEntry(index, current => ({
-                            ...current,
-                            event_type_id: value as number,
-                            attendance: '',
-                            meeting_with: null,
-                          }));
-                        }}
-                        placeholder={t('eventType') || 'Event Type'}
-                        containerStyle={{
-                          backgroundColor: C.inputBg,
-                          borderColor: invalid[`event.${index}.event_type_id`]
-                            ? C.error || '#ff4444'
-                            : C.inputBorder,
-                        }}
-                      />
-                      {renderFieldError(`event.${index}.event_type_id`)}
-                    </View>
-
-                    {resolveEventMeetingType(
-                      getSelectedEventType(entry.event_type_id)?.meeting_type,
-                    ) === 'attendance' && (
-                      <View
-                        style={styles.field}
-                        onLayout={e =>
-                          setFieldPos(`event.${index}.attendance`, e.nativeEvent.layout.y)
-                        }>
-                        <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                          {t('eventAttendance') || 'Attendance'}
-                        </Text>
-                        <AppInput
-                          value={entry.attendance}
-                          error={!!invalid[`event.${index}.attendance`]}
-                          onChangeText={text =>
-                            updateEventEntry(index, current => ({
-                              ...current,
-                              attendance: normalizePositiveIntegerInput(text),
-                            }))
-                          }
-                          keyboardType="numeric"
-                          placeholder="0"
-                        />
-                        {renderFieldError(`event.${index}.attendance`)}
-                      </View>
-                    )}
-
-                    {resolveEventMeetingType(
-                      getSelectedEventType(entry.event_type_id)?.meeting_type,
-                    ) === 'meeting_with' && (
-                      <View
-                        style={styles.field}
-                        onLayout={e =>
-                          setFieldPos(`event.${index}.meeting_with`, e.nativeEvent.layout.y)
-                        }>
-                        <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                          {t('eventMeetingWith') || 'Meeting With'}
-                        </Text>
-                        <ElementDropdown
-                          data={userOptions}
-                          value={entry.meeting_with}
-                          onChange={value =>
-                            updateEventEntry(index, current => ({
-                              ...current,
-                              meeting_with: value as number,
-                            }))
-                          }
-                          placeholder={t('selectMeetingWith') || 'Select person'}
-                          containerStyle={{
-                            backgroundColor: C.inputBg,
-                            borderColor: invalid[`event.${index}.meeting_with`]
-                              ? C.error || '#ff4444'
-                              : C.inputBorder,
-                          }}
-                        />
-                        {renderFieldError(`event.${index}.meeting_with`)}
-                      </View>
-                    )}
-
-                    <View
-                      style={styles.field}
-                      onLayout={e => setFieldPos(`event.${index}.name`, e.nativeEvent.layout.y)}>
-                      <Text style={[styles.fieldLabel, {color: C.textSecondary}]}>
-                        {t('nameTheEvent') || 'Name the Event'}
-                      </Text>
+                    onLayout={e =>
+                      setFieldPos(`event.${index}.attendance`, e.nativeEvent.layout.y)
+                    }>
+                    <FormField label={t('eventAttendance') || 'Attendance'}>
                       <AppInput
-                        value={entry.name}
-                        error={!!invalid[`event.${index}.name`]}
+                        value={entry.attendance}
+                        error={!!invalid[`event.${index}.attendance`]}
                         onChangeText={text =>
                           updateEventEntry(index, current => ({
                             ...current,
-                            name: text,
+                            attendance: normalizePositiveIntegerInput(text),
                           }))
                         }
-                        placeholder={t('name') || 'Name'}
+                        keyboardType="numeric"
+                        placeholder="0"
                       />
-                      {renderFieldError(`event.${index}.name`)}
-                    </View>
-                    <View onLayout={e => setFieldPos(`event.${index}.weeks`, e.nativeEvent.layout.y)}>
-                      {renderFieldError(`event.${index}.weeks`)}
-                    </View>
-
-                    {weekColumns.map(column => (
-                      <View key={`event-${index}-week-${column.weekNumber}`} style={styles.field}>
-                        <Text style={[styles.weekLabel, {color: C.textSecondary}]}>
-                          {`wk${column.weekNumber}, ${selectedYear} (${column.rangeLabel})`}
-                        </Text>
-                        <AppInput
-                          value={entry.daysByWeek[column.weekNumber]}
-                          onChangeText={text =>
-                            updateEventEntry(index, current => ({
-                              ...current,
-                              daysByWeek: {
-                                ...current.daysByWeek,
-                                [column.weekNumber]: normalizePositiveIntegerInput(text),
-                              },
-                            }))
-                          }
-                          keyboardType="numeric"
-                          placeholder={t('numberOfDays') || 'Number of Days'}
-                        />
-                      </View>
-                    ))}
+                      {renderFieldError(`event.${index}.attendance`)}
+                    </FormField>
                   </View>
+                )}
+
+                {resolveEventMeetingType(
+                  getSelectedEventType(entry.event_type_id)?.meeting_type,
+                ) === 'meeting_with' && (
+                  <View
+                    onLayout={e =>
+                      setFieldPos(`event.${index}.meeting_with`, e.nativeEvent.layout.y)
+                    }>
+                    <FormField label={t('eventMeetingWith') || 'Meeting With'}>
+                      <ElementDropdown
+                        data={userOptions}
+                        value={entry.meeting_with}
+                        onChange={value =>
+                          updateEventEntry(index, current => ({
+                            ...current,
+                            meeting_with: value as number,
+                          }))
+                        }
+                        placeholder={t('selectMeetingWith') || 'Select person'}
+                        containerStyle={{
+                          backgroundColor: C.inputBg,
+                          borderColor: invalid[`event.${index}.meeting_with`]
+                            ? C.error || '#ff4444'
+                            : C.inputBorder,
+                        }}
+                      />
+                      {renderFieldError(`event.${index}.meeting_with`)}
+                    </FormField>
+                  </View>
+                )}
+
+                <View
+                  onLayout={e => setFieldPos(`event.${index}.name`, e.nativeEvent.layout.y)}>
+                  <FormField label={t('nameTheEvent') || 'Name the Event'}>
+                    <AppInput
+                      value={entry.name}
+                      error={!!invalid[`event.${index}.name`]}
+                      onChangeText={text =>
+                        updateEventEntry(index, current => ({
+                          ...current,
+                          name: text,
+                        }))
+                      }
+                      placeholder={t('name') || 'Name'}
+                    />
+                    {renderFieldError(`event.${index}.name`)}
+                  </FormField>
+                </View>
+                <View onLayout={e => setFieldPos(`event.${index}.weeks`, e.nativeEvent.layout.y)}>
+                  {renderFieldError(`event.${index}.weeks`)}
+                </View>
+
+                {weekColumns.map(column => (
+                  <FormField key={`event-${index}-week-${column.weekNumber}`} label={`wk${column.weekNumber}, ${selectedYear} (${column.rangeLabel})`}>
+                    <AppInput
+                      value={entry.daysByWeek[column.weekNumber]}
+                      onChangeText={text =>
+                        updateEventEntry(index, current => ({
+                          ...current,
+                          daysByWeek: {
+                            ...current.daysByWeek,
+                            [column.weekNumber]: normalizePositiveIntegerInput(text),
+                          },
+                        }))
+                      }
+                      keyboardType="numeric"
+                      placeholder={t('numberOfDays') || 'Number of Days'}
+                    />
+                  </FormField>
                 ))}
               </View>
-            </ScrollView>
-
-            <View style={[styles.actions, {borderTopColor: C.border}]}>
-              <CancelButton label={t('back') || 'Back'} onPress={() => navigation.goBack()} disabled={submitting} />
-              <SaveButton
-                label={submitting ? t('saving') || 'Saving...' : t('save') || 'Save'}
-                onPress={onSave}
-                disabled={submitting}
-              />
-            </View>
+            ))}
           </View>
+        </ScrollView>
+
+        <View style={[styles.actions, {borderTopColor: C.border}]}>
+          <FormActions
+            onCancel={() => navigation.goBack()}
+            onSave={onSave}
+            submitting={submitting}
+            cancelLabel={t('back') || 'Back'}
+          />
         </View>
+
       </KeyboardAvoidingView>
-    </SafeAreaView>
+    </ScreenContainer>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  flex: {
     flex: 1,
-    paddingLeft: ms(16),
-    paddingRight: ms(16),
-  },
-  loadingWrap: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   scrollContent: {
     paddingBottom: ms(24),
@@ -1007,29 +963,14 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: ms(12),
   },
-  field: {
-    marginBottom: ms(12),
-  },
-  fieldLabel: {
-    fontSize: fs(14),
-    fontWeight: '500',
-    marginBottom: ms(6),
-  },
-  weekLabel: {
-    fontSize: fs(12),
-    marginBottom: ms(6),
-  },
   errorText: {
     marginTop: ms(6),
     fontSize: fs(12),
     fontWeight: '500',
   },
   actions: {
-    flexDirection: 'row',
-    gap: ms(12),
-    paddingVertical: ms(16),
+    paddingBottom: ms(12),
     borderTopWidth: StyleSheet.hairlineWidth,
-    justifyContent: 'flex-end',
   },
 });
 
