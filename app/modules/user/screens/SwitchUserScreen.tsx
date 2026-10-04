@@ -17,6 +17,7 @@ import {useNavigation} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -100,11 +101,28 @@ export const SwitchUserScreen = () => {
   const fetchData = useCallback(async (targetPage: number, search: string) => {
     setLoading(true);
     try {
-      const res = await listUsers({
+      const params = {
         page: targetPage,
         limit: DEFAULT_PAGE_LIMIT,
         search,
-      });
+      };
+      let res = await listUsers(params);
+      // On first open the API sometimes returns pagination totals that
+      // contradict the page itself (e.g. total: 1 with 10 items) while other
+      // requests (users/me) run concurrently. Retry once when that happens.
+      const looksInconsistent = (d: any) => {
+        if (!d) {
+          return false;
+        }
+        const count = d.items?.length ?? 0;
+        return (
+          (d.total ?? 0) < count ||
+          (!!d.has_next && (d.total_pages ?? 1) <= (d.page ?? targetPage))
+        );
+      };
+      if (looksInconsistent(res?.data)) {
+        res = await listUsers(params);
+      }
       setItems(res?.data?.items ?? []);
       setTotalPages(res?.data?.total_pages ?? 1);
       setTotal(res?.data?.total ?? 0);
@@ -248,57 +266,6 @@ export const SwitchUserScreen = () => {
     );
   };
 
-  const renderPagination = () => {
-    const itemsToRender: Array<{
-      label: string;
-      page: number;
-      active?: boolean;
-      disabled?: boolean;
-    }> = [];
-
-    itemsToRender.push({label: '<<', page: 1, disabled: page === 1});
-    for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) {
-        itemsToRender.push({label: String(p), page: p});
-      }
-    }
-    itemsToRender.push({label: String(page), page, active: true});
-    for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) {
-        itemsToRender.push({label: String(p), page: p});
-      }
-    }
-    itemsToRender.push({
-      label: '>>',
-      page: totalPages,
-      disabled: page === totalPages,
-    });
-
-    return (
-      <View style={listStyles.pageNumbersContainer as any}>
-        {itemsToRender.map(p => (
-          <TouchableOpacity
-            key={`${p.label}-${p.page}`}
-            style={[
-              listStyles.pageNumber as any,
-              p.active && (listStyles.pageNumberActive as any),
-              (p.disabled || loading) && (listStyles.pageNumberDisabled as any),
-            ]}
-            onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}>
-            <Text
-              style={[
-                listStyles.pageNumberText as any,
-                p.active && (listStyles.pageNumberTextActive as any),
-              ]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -312,6 +279,7 @@ export const SwitchUserScreen = () => {
           <Text style={[styles.notice, {color: C.textSecondary}]}>
             {t('switchUserViewOnly')}
           </Text>
+          <ListToolbar countText={`${total} ${t('users').toLowerCase()}`} />
           <SearchInput
             value={query}
             onChangeText={setQuery}
@@ -347,10 +315,12 @@ export const SwitchUserScreen = () => {
               </PaginatedListPager>
             )}
           </View>
-          <Text style={[styles.subTitle, {color: C.textSecondary}]}>
-            {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
-          </Text>
-          <View style={styles.pagination}>{renderPagination()}</View>
+          <ListPageBar
+            page={page}
+            totalPages={totalPages}
+            loading={loading}
+            onPageChange={goToPage}
+          />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -415,14 +385,6 @@ const styles = StyleSheet.create({
     color: COLORS.mainColor,
     fontSize: fs(13),
     fontWeight: '700',
-  },
-  subTitle: {
-    marginTop: ms(6),
-    marginBottom: ms(10),
-    fontSize: fs(12),
-  },
-  pagination: {
-    alignItems: 'flex-end',
   },
   loader: {
     marginTop: ms(24),

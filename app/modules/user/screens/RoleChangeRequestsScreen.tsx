@@ -21,6 +21,7 @@ import {
   RoleChangeRequestItem,
 } from '../services/roleChangeRequest.service';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 import {resolveRoleIdFromUser, isSuperAdmin} from '../../../shared/utils/permissions';
 import api from '../../../config/api';
 import {useNavigation, useFocusEffect} from '@react-navigation/native';
@@ -66,11 +67,28 @@ export const RoleChangeRequestsScreen: React.FC = () => {
     async (targetPage: number, reset = false) => {
       try {
         setLoading(true);
-        const res = await listRoleChangeRequests({
+        const params = {
           status: 'pending',
           page: targetPage,
           sort_desc: true,
-        });
+        } as const;
+        let res = await listRoleChangeRequests(params);
+        // On first open the API sometimes returns pagination totals that
+        // contradict the page itself (e.g. total: 1 with 10 items) while other
+        // requests (users/me) run concurrently. Retry once when that happens.
+        const looksInconsistent = (d: any) => {
+          if (!d) {
+            return false;
+          }
+          const count = d.items?.length ?? 0;
+          return (
+            (d.total ?? 0) < count ||
+            (!!d.has_next && (d.total_pages ?? 1) <= (d.page ?? targetPage))
+          );
+        };
+        if (looksInconsistent(res?.data)) {
+          res = await listRoleChangeRequests(params);
+        }
         const data = res?.data;
         const nextItems = (data?.items ?? []) as RoleChangeRequestItem[];
         setTotalPages(data?.total_pages ?? 1);
@@ -166,6 +184,9 @@ export const RoleChangeRequestsScreen: React.FC = () => {
           </View>
         ) : (
           <View style={{flex: 1}}>
+            <ListToolbar
+              countText={`${total} ${t('roleChangeRequests').toLowerCase()}`}
+            />
             <PaginatedListPager page={page} totalPages={totalPages} onPageChange={goToPage}>
               <FlatList
                 data={items}
@@ -184,6 +205,12 @@ export const RoleChangeRequestsScreen: React.FC = () => {
                 }
               />
             </PaginatedListPager>
+            <ListPageBar
+              page={page}
+              totalPages={totalPages}
+              loading={loading}
+              onPageChange={goToPage}
+            />
           </View>
         )}
       </View>
