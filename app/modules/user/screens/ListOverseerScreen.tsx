@@ -25,6 +25,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 
 type OverseerItem = {
   id: number;
@@ -65,13 +66,28 @@ export const ListOverseerScreen: React.FC = () => {
           return;
         }
         setLoading(true);
-        const res = await api.get('users/overseers', {
-          params: {
-            page: targetPage,
-            limit: DEFAULT_PAGE_LIMIT,
-            ...(query?.trim() ? {search: query.trim()} : {}),
-          },
-        });
+        const params = {
+          page: targetPage,
+          limit: DEFAULT_PAGE_LIMIT,
+          ...(query?.trim() ? {search: query.trim()} : {}),
+        };
+        let res = await api.get('users/overseers', {params});
+        // On first open the API sometimes returns pagination totals that
+        // contradict the page itself (e.g. total: 1 with 10 items) while other
+        // requests (users/me) run concurrently. Retry once when that happens.
+        const looksInconsistent = (d: any) => {
+          if (!d) {
+            return false;
+          }
+          const count = d.items?.length ?? 0;
+          return (
+            (d.total ?? 0) < count ||
+            (!!d.has_next && (d.total_pages ?? 1) <= (d.page ?? targetPage))
+          );
+        };
+        if (looksInconsistent(res?.data?.data)) {
+          res = await api.get('users/overseers', {params});
+        }
         const data = res?.data?.data;
         const nextItems = (data?.items ?? []) as OverseerItem[];
         setTotalPages(data?.total_pages ?? 1);
@@ -177,55 +193,6 @@ export const ListOverseerScreen: React.FC = () => {
 
   const keyExtractor = (item: OverseerItem) => String(item.id);
 
-  const renderPagination = () => {
-    const itemsToRender: Array<{
-      label: string;
-      page: number;
-      active?: boolean;
-      disabled?: boolean;
-    }> = [];
-    itemsToRender.push({label: '<<', page: 1, disabled: page === 1});
-    for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) {
-        itemsToRender.push({label: String(p), page: p});
-      }
-    }
-    itemsToRender.push({label: String(page), page, active: true});
-    for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) {
-        itemsToRender.push({label: String(p), page: p});
-      }
-    }
-    itemsToRender.push({
-      label: '>>',
-      page: totalPages,
-      disabled: page === totalPages,
-    });
-    return (
-      <View style={listStyles.pageNumbersContainer as any}>
-        {itemsToRender.map(p => (
-          <TouchableOpacity
-            key={`${p.label}-${p.page}`}
-            style={[
-              listStyles.pageNumber as any,
-              p.active && (listStyles.pageNumberActive as any),
-              (p.disabled || loading) && (listStyles.pageNumberDisabled as any),
-            ]}
-            onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}>
-            <Text
-              style={[
-                listStyles.pageNumberText as any,
-                p.active && (listStyles.pageNumberTextActive as any),
-              ]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -236,6 +203,8 @@ export const ListOverseerScreen: React.FC = () => {
         style={{flex: 1, backgroundColor: C.background}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={t('overseers')} />
+
+          <ListToolbar countText={`${total} ${t('overseers').toLowerCase()}`} />
 
           <SearchInput
             value={query}
@@ -271,11 +240,12 @@ export const ListOverseerScreen: React.FC = () => {
               />
             </PaginatedListPager>
           </View>
-          <Text
-            style={[styles.subTitle, {color: C.textSecondary}]}
-          >{`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}</Text>
-
-          <View style={styles.pagination}>{renderPagination()}</View>
+          <ListPageBar
+            page={page}
+            totalPages={totalPages}
+            loading={loading}
+            onPageChange={goToPage}
+          />
 
           <ActionSheetModal
             visible={actionsVisible}
@@ -345,11 +315,6 @@ const styles = StyleSheet.create({
     fontSize: fs(22),
     fontWeight: '600',
   },
-  subTitle: {
-    marginTop: ms(6),
-    marginBottom: ms(10),
-    fontSize: fs(12),
-  },
   search: {
     height: hs(40),
     borderWidth: 1,
@@ -402,10 +367,6 @@ const styles = StyleSheet.create({
   empty: {
     textAlign: 'center',
     marginTop: ms(40),
-  },
-  pagination: {
-    paddingVertical: ms(12),
-    alignItems: 'flex-end',
   },
   pageNumbersContainer: {
     flexDirection: 'row',
