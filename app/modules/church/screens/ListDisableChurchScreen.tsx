@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   Image,
@@ -34,6 +34,7 @@ import {
 import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 import SearchInput from '../../../shared/components/SearchInput';
 
 const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
@@ -84,40 +85,53 @@ export const ChurchesListScreen: React.FC = () => {
   const [roleId, setRoleId] = useState<number | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedChurch, setSelectedChurch] = useState<ChurchListItem | null>(null);
+  const requestId = useRef(0);
+  const queryRef = useRef(query);
+  queryRef.current = query;
 
-  const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
-      try {
-        if (loading) {
-          return;
-        }
-        setLoading(true);
-        const data = await getChurchesList({
-          page: targetPage,
-          limit: DEFAULT_PAGE_LIMIT,
-          sort_by: 'id',
-          sort_desc: true,
-          search: query && query.trim() ? query.trim() : undefined,
-          disabled: true,
-        });
-        const nextItems = (data?.items ?? []) as ChurchListItem[];
-        setTotalPages(data?.total_pages ?? 1);
-        setTotal(data?.total ?? 0);
-        setPage(data?.page ?? targetPage);
-        setItems(reset ? nextItems : [...items, ...nextItems]);
-      } catch (e) {
-        // noop UI-level
-      } finally {
+  const fetchData = useCallback(async (targetPage: number) => {
+    const id = ++requestId.current;
+    setLoading(true);
+    try {
+      const q = queryRef.current.trim();
+      const data = await getChurchesList({
+        page: targetPage,
+        limit: DEFAULT_PAGE_LIMIT,
+        sort_by: 'id',
+        sort_desc: true,
+        search: q || undefined,
+        disabled: true,
+      });
+      if (id !== requestId.current) {
+        return;
+      }
+      const nextItems = (data?.items ?? []) as ChurchListItem[];
+      const limit = Number(data?.limit) || DEFAULT_PAGE_LIMIT;
+      const reportedTotal = Number(data?.total);
+      const reportedPages = Number(data?.total_pages);
+      const nextTotal = Number.isFinite(reportedTotal)
+        ? Math.max(reportedTotal, nextItems.length)
+        : nextItems.length;
+      const nextPages =
+        Number.isFinite(reportedPages) && reportedPages > 0
+          ? reportedPages
+          : Math.max(1, Math.ceil(nextTotal / limit));
+      setItems(nextItems);
+      setTotal(nextTotal);
+      setTotalPages(Math.max(nextPages, Math.ceil(nextTotal / limit) || 1));
+      setPage(Number(data?.page ?? targetPage) || targetPage);
+    } catch {
+      // noop UI-level
+    } finally {
+      if (id === requestId.current) {
         setLoading(false);
       }
-    },
-    [loading, query, items],
-  );
+    }
+  }, []);
 
   useEffect(() => {
-    setItems([]);
-    fetchData(1, true);
-  }, [query]);
+    fetchData(1);
+  }, [query, fetchData]);
 
   useEffect(() => {
     (async () => {
@@ -131,23 +145,22 @@ export const ChurchesListScreen: React.FC = () => {
 
   useEffect(() => {
     if (route?.params?.refresh || route?.params?.reload) {
-      setItems([]);
-      fetchData(1, true);
+      fetchData(1);
       navigation.setParams({refresh: false, reload: undefined});
     }
-  }, [route?.params?.refresh, route?.params?.reload]);
+  }, [route?.params?.refresh, route?.params?.reload, fetchData, navigation]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
+    await fetchData(1);
     setRefreshing(false);
   };
 
   const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {return;}
-    setItems([]);
-    fetchData(targetPage, true);
+    if (targetPage < 1 || targetPage > totalPages || loading) {
+      return;
+    }
+    fetchData(targetPage);
   };
 
   const renderItem = ({item}: {item: ChurchListItem}) => {
@@ -211,51 +224,6 @@ export const ChurchesListScreen: React.FC = () => {
 
   const keyExtractor = (item: ChurchListItem) => String(item.id);
 
-  const renderPagination = () => {
-    const itemsToRender: Array<{
-      label: string;
-      page: number;
-      active?: boolean;
-      disabled?: boolean;
-    }> = [];
-    itemsToRender.push({label: '<<', page: 1, disabled: page === 1});
-    for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) {itemsToRender.push({label: String(p), page: p});}
-    }
-    itemsToRender.push({label: String(page), page, active: true});
-    for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) {itemsToRender.push({label: String(p), page: p});}
-    }
-    itemsToRender.push({
-      label: '>>',
-      page: totalPages,
-      disabled: page === totalPages,
-    });
-    return (
-      <View style={listStyles.pageNumbersContainer as any}>
-        {itemsToRender.map(p => (
-          <TouchableOpacity
-            key={`${p.label}-${p.page}`}
-            style={[
-              listStyles.pageNumber as any,
-              p.active && (listStyles.pageNumberActive as any),
-              (p.disabled || loading) && (listStyles.pageNumberDisabled as any),
-            ]}
-            onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}>
-            <Text
-              style={[
-                listStyles.pageNumberText as any,
-                p.active && (listStyles.pageNumberTextActive as any),
-              ]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -267,13 +235,9 @@ export const ChurchesListScreen: React.FC = () => {
         <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('disabledChurches')} />
 
-        {/* <View style={styles.headerRow}>
-          <TouchableOpacity
-            style={styles.addButton}
-            onPress={() => navigation.navigate('AddChurch')}>
-            <Text style={styles.addButtonText}>+ Add New</Text>
-          </TouchableOpacity>
-        </View> */}
+        <ListToolbar
+          countText={`${total} ${(total === 1 ? t('church') : t('churches')).toLowerCase()}`}
+        />
 
         <SearchInput
           value={query}
@@ -310,10 +274,12 @@ export const ChurchesListScreen: React.FC = () => {
             />
           </PaginatedListPager>
         </View>
-        <Text style={[styles.subTitle, {color: C.textSecondary}]}>
-          {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
-        </Text>
-        <View style={styles.pagination}>{renderPagination()}</View>
+        <ListPageBar
+          page={page}
+          totalPages={totalPages}
+          loading={loading}
+          onPageChange={goToPage}
+        />
 
         <ActionSheetModal
           visible={actionsVisible}

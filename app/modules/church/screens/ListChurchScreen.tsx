@@ -39,7 +39,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
@@ -133,6 +133,8 @@ export const ChurchesListScreen: React.FC = () => {
   const pageLoadingRef = useRef(pageLoading);
   pageLoadingRef.current = pageLoading;
   const queryRef = useRef(query);
+  const pageRef = useRef(page);
+  pageRef.current = page;
   // Bumped whenever the query/filter changes, to discard in-flight stale responses.
   const fetchTokenRef = useRef(0);
 
@@ -176,9 +178,21 @@ export const ChurchesListScreen: React.FC = () => {
         // Discard responses from a previous query/filter.
         if (token !== fetchTokenRef.current) {return;}
         const nextItems = (data?.items ?? []) as ChurchListItem[];
-        setTotalPages(data?.total_pages ?? 1);
-        setTotal(data?.total ?? 0);
         setPages(prev => ({...prev, [targetPage]: nextItems}));
+        // Only the page on screen updates the count. Prefetch must not replace it.
+        if (targetPage === pageRef.current || force) {
+          const limit = Number(data?.limit) || DEFAULT_PAGE_LIMIT;
+          const reportedTotal = Number(data?.total);
+          const reportedPages = Number(data?.total_pages);
+          const nextTotal = Number.isFinite(reportedTotal)
+            ? Math.max(reportedTotal, nextItems.length)
+            : nextItems.length;
+          const nextPages = Number.isFinite(reportedPages) && reportedPages > 0
+            ? reportedPages
+            : Math.max(1, Math.ceil(nextTotal / limit));
+          setTotal(nextTotal);
+          setTotalPages(Math.max(nextPages, Math.ceil(nextTotal / limit) || 1));
+        }
       } catch {
         // noop — errors surface via empty state
       } finally {
@@ -330,7 +344,11 @@ export const ChurchesListScreen: React.FC = () => {
                 }}
                 style={styles.badgeRowFlex}
               />
-              <Text style={[styles.churchId, {color: C.textSecondary}]}>
+              <Text
+                style={[
+                  styles.churchId,
+                  {color: C.textSecondary, marginLeft: 'auto'},
+                ]}>
                 #{item.id}
               </Text>
             </View>
@@ -341,45 +359,6 @@ export const ChurchesListScreen: React.FC = () => {
   };
 
   const keyExtractor = (item: ChurchListItem) => String(item.id);
-
-  // ─── Pagination ───────────────────────────────────────────────────────────
-  const renderPagination = () => {
-    if (totalPages <= 1) {return null;}
-    const pageButtons: Array<{label: string; page: number; active?: boolean; disabled?: boolean}> = [];
-    pageButtons.push({label: '«', page: 1, disabled: page === 1});
-    for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) {pageButtons.push({label: String(p), page: p});}
-    }
-    pageButtons.push({label: String(page), page, active: true});
-    for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) {pageButtons.push({label: String(p), page: p});}
-    }
-    pageButtons.push({label: '»', page: totalPages, disabled: page === totalPages});
-
-    return (
-      <View style={listStyles.pageNumbersContainer as any}>
-        {pageButtons.map((p, idx) => (
-          <TouchableOpacity
-            key={`${p.label}-${p.page}-${idx}`}
-            style={[
-              listStyles.pageNumber as any,
-              p.active && (listStyles.pageNumberActive as any),
-              (p.disabled || loading) && (listStyles.pageNumberDisabled as any),
-            ]}
-            onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}>
-            <Text
-              style={[
-                listStyles.pageNumberText as any,
-                p.active && (listStyles.pageNumberTextActive as any),
-              ]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
 
   // ─── Empty / skeleton states ──────────────────────────────────────────────
   const loading = !!pageLoading[page];
@@ -453,18 +432,10 @@ export const ChurchesListScreen: React.FC = () => {
 
           <Header title={t('churchesList')} />
 
-          <View style={styles.headerRow}>
-            <AddNewHeaderButton
-              name="AddChurch"
-              text={t('addNew')}
-              style={{
-                backgroundColor: C.surface,
-                borderWidth: 1,
-                borderColor: COLORS.mainColor,
-              }}
-              textStyle={{color: COLORS.mainColor}}
-            />
-          </View>
+          <ListToolbar
+            countText={`${total} ${(total === 1 ? t('church') : t('churches')).toLowerCase()}`}
+            addRoute="AddChurch"
+          />
 
           <SearchInput
             value={query}
@@ -490,26 +461,25 @@ export const ChurchesListScreen: React.FC = () => {
             />
           </View>
 
-          {/* Footer: info + stats + pagination */}
           {!isInitialLoad && (
             <>
-              <Text style={[styles.subTitle, {color: C.textSecondary}]}>
-                {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
-              </Text>
-              <View style={styles.paginationRow}>
-                <TouchableOpacity
-                  style={styles.attrKeyBtn}
-                  onPress={() => setAttributeKeyVisible(true)}
-                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                  <View style={[styles.attrKeyIcon, {borderColor: C.textSecondary}]}>
-                    <Text style={[styles.attrKeyIconText, {color: C.textSecondary}]}>i</Text>
-                  </View>
-                  <Text style={[styles.attrKeyLabel, {color: C.textSecondary}]}>
-                    View Attribute Info
-                  </Text>
-                </TouchableOpacity>
-                <View style={styles.pagination}>{renderPagination()}</View>
-              </View>
+              <TouchableOpacity
+                style={styles.attrKeyBtn}
+                onPress={() => setAttributeKeyVisible(true)}
+                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
+                <View style={[styles.attrKeyIcon, {borderColor: C.textSecondary}]}>
+                  <Text style={[styles.attrKeyIconText, {color: C.textSecondary}]}>i</Text>
+                </View>
+                <Text style={[styles.attrKeyLabel, {color: C.textSecondary}]}>
+                  View Attribute Info
+                </Text>
+              </TouchableOpacity>
+              <ListPageBar
+                page={page}
+                totalPages={totalPages}
+                loading={loading}
+                onPageChange={goToPage}
+              />
             </>
           )}
 
