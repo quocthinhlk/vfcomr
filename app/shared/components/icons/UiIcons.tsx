@@ -132,3 +132,9 @@ export const ChurchIcon: React.FC<UiIconProps> = ({size = LG, color}) => (
     <Path d="M3 21h18M10 21v-4a2 2 0 0 1 4 0v4" {...stroke(color)} />
   </Svg>
 );
+
+export const CheckIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M5 12.5l4.5 4.5L19 7.5" {...stroke(color)} />
+  </Svg>
+);

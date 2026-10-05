@@ -41,6 +41,7 @@ import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import AppLoadingView from '../../../shared/components/AppLoadingView';
+import {useOnReconnect} from '../../../shared/hooks/useOnReconnect';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -140,6 +141,11 @@ export default function DashboardScreen() {
     void loadCurrentUser();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Back online: refresh what's on screen.
+  useOnReconnect(() => {
+    void loadCurrentUser();
+  });
 
   // Load profile display fields
   useEffect(() => {

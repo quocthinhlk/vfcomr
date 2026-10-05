@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { useNavigation } from '@react-navigation/native';
+import { CommonActions, useNavigation } from '@react-navigation/native';
 import { networkEventEmitter } from '../utils/networkEvents';
 
 /**
@@ -26,8 +26,17 @@ export const NetworkReloadListener: React.FC = () => {
           };
           
           const currentRoute = getCurrentRoute(state);
-          if (currentRoute && currentRoute.name) {
-            navigation.navigate(currentRoute.name as never, { reload: true } as never);
+          if (currentRoute?.key) {
+            // Merge reload flags into the current route's params (keeps ids etc.).
+            // Screens react to `reload`/`refresh` (lists) or `refetchKey` (details).
+            navigation.dispatch({
+              ...CommonActions.setParams({
+                reload: true,
+                refresh: true,
+                refetchKey: Date.now(),
+              }),
+              source: currentRoute.key,
+            });
           }
         }
       } catch (err) {

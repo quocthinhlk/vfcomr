@@ -37,6 +37,7 @@ import ImagePicker from 'react-native-image-crop-picker';
 import {updateUser} from '../../user/services/user.service';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import AppLoadingView from '../../../shared/components/AppLoadingView';
+import {useOnReconnect} from '../../../shared/hooks/useOnReconnect';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -222,6 +223,11 @@ export default function OverseerDashboardScreen() {
       setLoading(false);
     }
   }, []);
+
+  // Back online: refresh what's on screen.
+  useOnReconnect(() => {
+    void loadDashboard();
+  });
 
   useEffect(() => {
     void loadDashboard();

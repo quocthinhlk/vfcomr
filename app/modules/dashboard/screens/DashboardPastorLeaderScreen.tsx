@@ -47,6 +47,7 @@ import {
   resolveRoleIdFromUser,
 } from '../../../shared/utils/permissions';
 import AppLoadingView from '../../../shared/components/AppLoadingView';
+import {useOnReconnect} from '../../../shared/hooks/useOnReconnect';
 
 // Helper function to decode HTML entities (e.g., &#x20ab; -> ₫)
 const decodeHtmlEntity = (str: string): string => {
@@ -593,6 +594,8 @@ export default function DashboardPastorLeaderScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  // Back online: re-run the dashboard loaders.
+  useOnReconnect(() => setReloadToken(token => token + 1));
   const [logoError, setLogoError] = useState(false);
   const [bannerError, setBannerError] = useState(false);
   const [profileError, setProfileError] = useState(false);

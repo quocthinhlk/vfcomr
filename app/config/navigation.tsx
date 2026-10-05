@@ -1,6 +1,8 @@
 // app/config/navigation.tsx
 import React, { useState, useEffect } from 'react';
 import { DeviceEventEmitter, View } from 'react-native';
+import NetworkStatusBar from '../shared/components/NetworkStatusBar';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -373,6 +375,10 @@ export default function Navigation() {
       <NavigationContainer ref={navigationRef}>
         <NetworkReloadListener />
         <View style={{ flex: 1 }}>
+        <NetworkStatusBar />
+        {/* Nested provider sits below the status strip, so screens' SafeAreaViews
+            measure their top inset from here: no double gap while the strip shows. */}
+        <SafeAreaProvider style={{ flex: 1 }}>
         {isAuthenticated ? <SwitchSessionBar /> : null}
         {isAuthenticated ? <NotificationListener /> : null}
         <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -535,6 +541,7 @@ export default function Navigation() {
             </>
           )}
         </Stack.Navigator>
+        </SafeAreaProvider>
         </View>
       </NavigationContainer>
     </AuthContext.Provider>
