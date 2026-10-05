@@ -126,7 +126,9 @@ export const EditChurchLocationScreen: React.FC = () => {
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.screen, {backgroundColor: C.background}]}>
-        <Header title={t('addLocation') || 'Add Location'} showMenu={false} />
+        <View style={styles.header}>
+          <Header title={t('addLocation') || 'Add Location'} showMenu={false} />
+        </View>
         <View style={styles.container}>
           <MapView
             ref={mapRef}
@@ -198,6 +200,10 @@ export const EditChurchLocationScreen: React.FC = () => {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+  },
+  header: {
+    paddingHorizontal: ms(15),
+    paddingTop: ms(5),
   },
   container: {
     flex: 1,

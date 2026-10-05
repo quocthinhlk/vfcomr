@@ -643,6 +643,7 @@ export default function OverseerDashboardScreen() {
           justifyContent: 'space-between',
           alignItems: 'center',
           marginBottom: ms(10),
+          paddingTop: ms(28),
           paddingHorizontal: ms(16),
           backgroundColor: C.background,
         }}>
