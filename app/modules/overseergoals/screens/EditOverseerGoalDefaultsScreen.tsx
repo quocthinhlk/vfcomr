@@ -32,6 +32,9 @@ const EditOverseerGoalDefaultsScreen = () => {
   const {t} = useTranslation();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryLoad = () => setReloadKey(k => k + 1);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [assignedTo, setAssignedTo] = useState('');
   const [localChurchId, setLocalChurchId] = useState<number | null>(null);
@@ -104,8 +107,13 @@ const EditOverseerGoalDefaultsScreen = () => {
         setNationId(goalPeriod?.nation_id ?? null);
         setStartYear(goalPeriod?.start_year ? String(goalPeriod.start_year) : '');
         setEndYear(goalPeriod?.end_year ? String(goalPeriod.end_year) : '');
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to load goal period parameters:', error);
+        // Don't offer a blank parameters form that would overwrite real values.
+        if (mounted) {
+          setLoadError(error);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -118,7 +126,7 @@ const EditOverseerGoalDefaultsScreen = () => {
     return () => {
       mounted = false;
     };
-  }, [goalPeriodId]);
+  }, [goalPeriodId, reloadKey]);
 
   const onSave = async () => {
     const startYearNumber = Number(startYear);
@@ -153,7 +161,11 @@ const EditOverseerGoalDefaultsScreen = () => {
   };
 
   return (
-    <ScreenContainer title={t('editParameters')} loading={loading}>
+    <ScreenContainer
+      title={t('editParameters')}
+      loading={loading}
+      error={loadError}
+      onRetry={retryLoad}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         keyboardVerticalOffset={

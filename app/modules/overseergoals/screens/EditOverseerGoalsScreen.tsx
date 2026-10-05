@@ -46,6 +46,9 @@ const EditOverseerGoalsScreen = () => {
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [detail, setDetail] = useState<GoalPeriodDetailData | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryLoad = () => setReloadKey(k => k + 1);
   const [activeSection, setActiveSection] = useState<GoalSectionKey>(
     GOAL_SECTION_OPTIONS[0].key,
   );
@@ -82,11 +85,13 @@ const EditOverseerGoalsScreen = () => {
         const response = await getOverseerGoalPeriodDetail(goalPeriodId);
         if (mounted) {
           setDetail(response?.data ?? null);
+          setLoadError(null);
         }
       } catch (error) {
         console.error('Failed to load edit goals detail:', error);
         if (mounted) {
           setDetail(null);
+          setLoadError(error);
         }
       } finally {
         if (mounted) {
@@ -100,7 +105,7 @@ const EditOverseerGoalsScreen = () => {
     return () => {
       mounted = false;
     };
-  }, [goalPeriodId]);
+  }, [goalPeriodId, reloadKey]);
 
   const updateRowField = (
     sectionKey: GoalSectionKey,
@@ -185,7 +190,11 @@ const EditOverseerGoalsScreen = () => {
   };
 
   return (
-    <ScreenContainer title={t('editGoals')} loading={loading}>
+    <ScreenContainer
+      title={t('editGoals')}
+      loading={loading}
+      error={!detail ? loadError : null}
+      onRetry={retryLoad}>
         {!detail ? (
           <ListEmptyState />
         ) : (

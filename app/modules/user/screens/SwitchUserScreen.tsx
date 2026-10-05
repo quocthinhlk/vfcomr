@@ -17,7 +17,12 @@ import {useNavigation} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
-import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
+import {
+  ListEmptyState,
+  ListLoadState,
+  ListPageBar,
+  ListToolbar,
+} from '../../../shared/components/crud';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -81,6 +86,9 @@ export const SwitchUserScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [switchingId, setSwitchingId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const itemsCountRef = useRef(0);
+  itemsCountRef.current = items.length;
 
   useEffect(() => {
     let mounted = true;
@@ -127,13 +135,19 @@ export const SwitchUserScreen = () => {
       setTotalPages(res?.data?.total_pages ?? 1);
       setTotal(res?.data?.total ?? 0);
       setPage(res?.data?.page ?? targetPage);
+      setLoadError(null);
     } catch (error: any) {
-      setItems([]);
-      const message =
-        error?.response?.data?.message ||
-        error?.message ||
-        tRef.current('switchUserFailed');
-      Alert.alert(tRef.current('switchUser'), String(message));
+      if (itemsCountRef.current === 0) {
+        // Nothing on screen: show a recoverable error instead of "no users".
+        setLoadError(error);
+      } else {
+        // Keep the users already on screen (e.g. pull-to-refresh failed).
+        const message =
+          error?.response?.data?.message ||
+          error?.message ||
+          tRef.current('switchUserFailed');
+        Alert.alert(tRef.current('switchUser'), String(message));
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -279,7 +293,11 @@ export const SwitchUserScreen = () => {
           <Text style={[styles.notice, {color: C.textSecondary}]}>
             {t('switchUserViewOnly')}
           </Text>
-          <ListToolbar countText={`${total} ${t('users').toLowerCase()}`} />
+          <ListToolbar
+            countText={
+              loadError && !total ? undefined : `${total} ${t('users').toLowerCase()}`
+            }
+          />
           <SearchInput
             value={query}
             onChangeText={setQuery}
@@ -298,18 +316,20 @@ export const SwitchUserScreen = () => {
                   keyboardShouldPersistTaps="handled"
                   automaticallyAdjustKeyboardInsets
                   contentInsetAdjustmentBehavior="always"
-                  contentContainerStyle={{paddingBottom: ms(24)}}
+                  contentContainerStyle={styles.listContent}
                   nestedScrollEnabled={Platform.OS === 'android'}
                   style={{flex: 1}}
                   refreshControl={
                     <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                   }
                   ListEmptyComponent={
-                    !loading ? (
-                      <Text style={[styles.empty, {color: C.textSecondary}]}>
-                        {t('noUsersFound')}
-                      </Text>
-                    ) : null
+                    loading ? null : (
+                      <ListLoadState
+                        error={loadError}
+                        onRetry={() => fetchData(page, query)}>
+                        <ListEmptyState title={t('noUsersFound')} />
+                      </ListLoadState>
+                    )
                   }
                 />
               </PaginatedListPager>
@@ -328,6 +348,7 @@ export const SwitchUserScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  listContent: {flexGrow: 1, paddingBottom: ms(24)},
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -388,10 +409,5 @@ const styles = StyleSheet.create({
   },
   loader: {
     marginTop: ms(24),
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    fontSize: fs(14),
   },
 });

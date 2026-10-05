@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {getFAQById} from '../services/faq.service';
@@ -97,31 +97,42 @@ export const FAQDetailScreen: React.FC = () => {
     })();
   }, []);
 
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  const loadFaq = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    if (!faqId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await getFAQById(faqId);
+      if (requestId !== requestRef.current) {
+        return;
+      }
+      setFaq(res?.data || null);
+      setLoadError(null);
+    } catch (e) {
+      if (requestId === requestRef.current) {
+        console.error('Error fetching FAQ:', e);
+        setLoadError(e);
+      }
+    } finally {
+      if (requestId === requestRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [faqId]);
+
   // Refetch whenever the screen regains focus (e.g. after editing).
   useFocusEffect(
     useCallback(() => {
-      let mounted = true;
-      if (faqId) {
-        getFAQById(faqId)
-          .then(res => {
-            if (!mounted) {
-              return;
-            }
-            setFaq(res?.data || null);
-          })
-          .catch(() => {})
-          .finally(() => {
-            if (mounted) {
-              setLoading(false);
-            }
-          });
-      } else {
-        setLoading(false);
-      }
+      loadFaq();
       return () => {
-        mounted = false;
+        requestRef.current += 1;
       };
-    }, [faqId]),
+    }, [loadFaq]),
   );
 
   const tags = (faq?.tags ?? []).filter(tag => tag.tag_name);
@@ -131,6 +142,9 @@ export const FAQDetailScreen: React.FC = () => {
     <ScreenContainer
       title={t('faqDetail') || 'FAQ Detail'}
       loading={loading && !faq}
+      // A failed focus refetch keeps the FAQ already on screen.
+      error={faq ? null : loadError}
+      onRetry={loadFaq}
       scroll>
       {!faq ? (
         <ListEmptyState title={t('noDataFound') || 'No data found'} />

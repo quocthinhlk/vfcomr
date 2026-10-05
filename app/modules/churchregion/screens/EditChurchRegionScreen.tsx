@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
@@ -31,6 +31,8 @@ export const EditChurchRegionScreen: React.FC = () => {
   const [options, setOptions] = useState<ElementDropdownItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!churchRegionId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const [nameError, setNameError] = useState('');
   const [existingLogoUrl, setExistingLogoUrl] = useState<string | null>(null);
   const [originalLogoUrl, setOriginalLogoUrl] = useState<string | null>(null);
@@ -46,31 +48,45 @@ export const EditChurchRegionScreen: React.FC = () => {
   }, [imagePath]);
 
   useEffect(() => {
-    let mounted = true;
-    if (churchRegionId) {
-      getChurchRegionById(churchRegionId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const data = res?.data?.data || res?.data;
-          setName(data?.name || '');
-          setParentId(data?.parent_id ?? null);
-          const logoUrl = data?.logo_url || null;
-          setExistingLogoUrl(logoUrl);
-          setOriginalLogoUrl(logoUrl);
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    }
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
+  }, []);
+
+  // Named so the error state's "Try again" can re-run it.
+  const load = useCallback(async () => {
+    if (!churchRegionId) {
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getChurchRegionById(churchRegionId);
+      if (!mountedRef.current) {
+        return;
+      }
+      const data = res?.data?.data || res?.data;
+      setName(data?.name || '');
+      setParentId(data?.parent_id ?? null);
+      const logoUrl = data?.logo_url || null;
+      setExistingLogoUrl(logoUrl);
+      setOriginalLogoUrl(logoUrl);
+    } catch (e) {
+      // Without the record the form would be blank: show a retryable error.
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [churchRegionId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     let mounted = true;
@@ -158,7 +174,9 @@ export const EditChurchRegionScreen: React.FC = () => {
     <ScreenContainer
       title={`${t('edit')} ${t('churchApostolicRegions')}`}
       scroll
-      loading={loading}>
+      loading={loading}
+      error={loadError}
+      onRetry={load}>
       <FormField label={t('name')} required error={nameError}>
         <AppInput
           value={name}

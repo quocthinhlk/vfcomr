@@ -35,6 +35,7 @@ import AppButton from '../../../shared/components/AppButton';
 import {fs, hs, ms, rs} from '../../../shared/utils/scale';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {ROLES} from '../../../shared/utils/permissions';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {createCity} from '../services/city.service';
 import {COLORS} from '../../../shared/constants/colors';
 
@@ -381,22 +382,35 @@ export default function NewPastorAndChurchScreen() {
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
+  // users/form-data provides the (required) OMR status / role options; without
+  // it the pastor half of the form can never be submitted, so a failure shows a
+  // retryable error instead of the form.
+  const [formDataError, setFormDataError] = useState<unknown>(null);
+  const formDataMountedRef = useRef(true);
+  const loadFormData = () =>
     api
       .get('/users/form-data')
       .then(res => {
-        if (!mounted) {
+        if (!formDataMountedRef.current) {
           return;
         }
         const d = res?.data?.data;
         setPrefixOptions(d?.prefixes || []);
         setRoleOptions(Array.isArray(d?.roles) ? d.roles : []);
         setCredentialOptions(d?.credentials || []);
+        setFormDataError(null);
       })
-      .catch(() => {});
+      .catch(e => {
+        if (formDataMountedRef.current) {
+          setFormDataError(e);
+        }
+      });
+
+  useEffect(() => {
+    formDataMountedRef.current = true;
+    loadFormData();
     return () => {
-      mounted = false;
+      formDataMountedRef.current = false;
     };
   }, []);
 
@@ -593,6 +607,9 @@ export default function NewPastorAndChurchScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('addNewChurchAndPastor')} showMenu={false} />
+        {formDataError ? (
+          <ApiErrorState error={formDataError} onRetry={loadFormData} />
+        ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={
@@ -2068,6 +2085,7 @@ export default function NewPastorAndChurchScreen() {
             )}
           </ScrollView>
         </KeyboardAvoidingView>
+        )}
       </Layout>
     </SafeAreaView>
   );

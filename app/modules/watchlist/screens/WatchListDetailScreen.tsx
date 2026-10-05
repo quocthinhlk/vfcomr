@@ -22,6 +22,7 @@ import {
   ListEmptyState,
 } from '../../../shared/components/crud';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {returnToList} from '../../../shared/utils/returnToList';
 import ChurchMultiSelectModal from '../components/ChurchMultiSelectModal';
 import {
@@ -45,19 +46,27 @@ export const WatchListDetailScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [pickerVisible, setPickerVisible] = useState(false);
   const [mutating, setMutating] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const hasItemRef = useRef(false);
+  hasItemRef.current = item != null;
 
   const load = useCallback(async () => {
     setLoading(true);
     try {
       const response = await getWatchList(watchListId);
       setItem(response.data);
+      setLoadError(null);
     } catch (error) {
-      Alert.alert(
-        tRef.current('error'),
-        error instanceof Error
-          ? error.message
-          : tRef.current('failedToLoadWatchList'),
-      );
+      setLoadError(error);
+      // Nothing loaded yet: the screen shows a recoverable error state instead.
+      if (hasItemRef.current) {
+        Alert.alert(
+          tRef.current('error'),
+          error instanceof Error
+            ? error.message
+            : tRef.current('failedToLoadWatchList'),
+        );
+      }
     } finally {
       setLoading(false);
     }
@@ -278,6 +287,8 @@ export const WatchListDetailScreen: React.FC = () => {
               )}
             />
           </>
+        ) : loadError ? (
+          <ApiErrorState error={loadError} onRetry={load} />
         ) : null}
       </View>
       <ChurchMultiSelectModal

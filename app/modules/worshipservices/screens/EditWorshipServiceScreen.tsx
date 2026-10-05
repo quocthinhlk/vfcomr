@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
@@ -38,50 +38,63 @@ export const EditWorshipServiceScreen: React.FC = () => {
     {label: 'Saturday', value: 'Saturday'},
   ];
 
-  useEffect(() => {
-    let mounted = true;
-    if (worshipServiceId) {
-      getWorshipServiceById(worshipServiceId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const service = res?.data;
-          if (service) {
-            setName(service.name || '');
-            setDayName(service.day_name || null);
-            setTime(service.time || null);
-            setChurchId(service.church_id);
-            // Fetch church name
-            if (service.church_id) {
-              api
-                .get(`churches/${service.church_id}`)
-                .then(churchRes => {
-                  const churchData = churchRes?.data?.data;
-                  if (churchData?.name && mounted) {
-                    setChurchName(churchData.name);
-                  }
-                })
-                .catch(() => {});
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    } else {
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  const loadService = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    if (!worshipServiceId) {
       setLoading(false);
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    try {
+      const res = await getWorshipServiceById(worshipServiceId);
+      if (!isCurrent()) {
+        return;
+      }
+      const service = res?.data;
+      if (service) {
+        setName(service.name || '');
+        setDayName(service.day_name || null);
+        setTime(service.time || null);
+        setChurchId(service.church_id);
+        // Fetch church name
+        if (service.church_id) {
+          api
+            .get(`churches/${service.church_id}`)
+            .then(churchRes => {
+              const churchData = churchRes?.data?.data;
+              if (churchData?.name && isCurrent()) {
+                setChurchName(churchData.name);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+      setLoadError(null);
+    } catch (e) {
+      if (isCurrent()) {
+        console.error('Error fetching worship service:', e);
+        // Never show a blank form the user could save over real data.
+        setLoadError(e);
+      }
+    } finally {
+      if (isCurrent()) {
+        setLoading(false);
+      }
+    }
   }, [worshipServiceId]);
 
+  useEffect(() => {
+    loadService();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadService]);
+
   const onSave = async () => {
-    if (!worshipServiceId) return;
+    if (!worshipServiceId || loadError) return;
 
     const newInvalid: Record<string, boolean> = {};
     newInvalid.name = !name.trim();
@@ -119,7 +132,11 @@ export const EditWorshipServiceScreen: React.FC = () => {
   const title = `${t('update') || 'Update'} ${t('worshipService') || 'Worship Service'}`;
 
   return (
-    <ScreenContainer title={title} loading={loading}>
+    <ScreenContainer
+      title={title}
+      loading={loading}
+      error={loadError}
+      onRetry={loadService}>
       <WorshipServiceForm
         subtitle={
           churchName

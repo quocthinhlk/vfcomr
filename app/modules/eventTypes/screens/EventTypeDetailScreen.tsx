@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {View, StyleSheet} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -39,35 +39,49 @@ export const EventTypeDetailScreen: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const {t} = useTranslation();
 
-  useEffect(() => {
-    let mounted = true;
-    if (eventTypeId) {
-      getEventTypeById(eventTypeId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          setEventType(res?.data || null);
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    } else {
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  const loadEventType = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    if (!eventTypeId) {
       setLoading(false);
+      return;
     }
+    try {
+      const res = await getEventTypeById(eventTypeId);
+      if (requestId !== requestRef.current) {
+        return;
+      }
+      setEventType(res?.data || null);
+      setLoadError(null);
+    } catch (e) {
+      if (requestId === requestRef.current) {
+        console.error('Error fetching event type:', e);
+        setLoadError(e);
+      }
+    } finally {
+      if (requestId === requestRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [eventTypeId]);
+
+  useEffect(() => {
+    loadEventType();
     return () => {
-      mounted = false;
+      // Invalidate the in-flight request on unmount / param change.
+      requestRef.current += 1;
     };
     // refetchKey is set by returnAfterEdit, so the detail refreshes after editing.
-  }, [eventTypeId, route.params?.refetchKey]);
+  }, [loadEventType, route.params?.refetchKey]);
 
   return (
     <ScreenContainer
       title={t('eventTypeDetail') || 'Event Type Detail'}
       loading={loading}
+      error={loadError}
+      onRetry={loadEventType}
       scroll>
       {!eventType ? (
         <ListEmptyState title={t('noDataFound') || 'No data found'} />

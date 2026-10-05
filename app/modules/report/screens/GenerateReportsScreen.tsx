@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import FileViewer from 'react-native-file-viewer';
 import Svg, {Path, Rect, Text as SvgText} from 'react-native-svg';
 import {useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -88,10 +89,9 @@ export const GenerateReportsScreen = () => {
     typeof route.params?.group === 'string' ? route.params.group : 'church';
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
-  const tRef = useRef(t);
-  tRef.current = t;
   const [catalog, setCatalog] = useState<ReportCatalog | null>(null);
   const [loadingCatalog, setLoadingCatalog] = useState(true);
+  const [catalogError, setCatalogError] = useState<unknown>(null);
   const [submitting, setSubmitting] = useState(false);
   const [group, setGroup] = useState(selectedGroup);
   const [reportType, setReportType] = useState('');
@@ -138,8 +138,12 @@ export const GenerateReportsScreen = () => {
     try {
       const next = await getReportCatalog();
       setCatalog(next);
+      setCatalogError(null);
     } catch (error) {
-      Alert.alert(tRef.current('error'), getApiErrorMessage(error, tRef.current));
+      // Without the catalog there are no report types to pick: show a retry
+      // instead of an Alert followed by an unusable form.
+      console.error('Failed to load report catalog:', error);
+      setCatalogError(error);
     } finally {
       setLoadingCatalog(false);
     }
@@ -398,6 +402,8 @@ export const GenerateReportsScreen = () => {
           <Header title={groupLabel(group)} />
           {loadingCatalog ? (
             <ActivityIndicator color={COLORS.mainColor} style={styles.loader} />
+          ) : catalogError && !catalog ? (
+            <ApiErrorState error={catalogError} onRetry={loadCatalog} />
           ) : (
             <ScrollView
               keyboardShouldPersistTaps="handled"

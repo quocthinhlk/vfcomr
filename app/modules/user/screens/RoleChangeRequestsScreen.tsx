@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
   View,
@@ -6,14 +6,13 @@ import {
   RefreshControl,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {fs, hs, ms, ws} from '../../../shared/utils/scale';
+import {fs, ms, ws} from '../../../shared/utils/scale';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
 import {
@@ -21,7 +20,13 @@ import {
   RoleChangeRequestItem,
 } from '../services/roleChangeRequest.service';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
-import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
+import {
+  ListEmptyState,
+  ListLoadState,
+  ListPageBar,
+  ListToolbar,
+} from '../../../shared/components/crud';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {resolveRoleIdFromUser, isSuperAdmin} from '../../../shared/utils/permissions';
 import api from '../../../config/api';
 import {useNavigation, useFocusEffect} from '@react-navigation/native';
@@ -43,25 +48,36 @@ export const RoleChangeRequestsScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  // users/me failing must not read as "Access denied".
+  const [roleError, setRoleError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+
+  const loadCurrentUser = useCallback(async () => {
+    try {
+      const res = await api.get('users/me');
+      if (!mountedRef.current) {
+        return;
+      }
+      const roleId = resolveRoleIdFromUser(res?.data?.data);
+      setCurrentUserRoleId(roleId);
+      setRoleError(null);
+    } catch (e) {
+      if (!mountedRef.current) {
+        return;
+      }
+      setCurrentUserRoleId(null);
+      setRoleError(e);
+    }
+  }, []);
 
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await api.get('users/me');
-        if (!mounted) {
-          return;
-        }
-        const roleId = resolveRoleIdFromUser(res?.data?.data);
-        setCurrentUserRoleId(roleId);
-      } catch {
-        setCurrentUserRoleId(null);
-      }
-    })();
+    mountedRef.current = true;
+    loadCurrentUser();
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
-  }, []);
+  }, [loadCurrentUser]);
 
   const fetchData = useCallback(
     async (targetPage: number, reset = false) => {
@@ -95,14 +111,11 @@ export const RoleChangeRequestsScreen: React.FC = () => {
         setTotal(data?.total ?? 0);
         setPage(data?.page ?? targetPage);
         setItems(prev => (reset ? nextItems : [...prev, ...nextItems]));
+        setLoadError(null);
       } catch (error: any) {
         console.error('Failed to load role change requests:', error);
-        const message =
-          error?.response?.data?.message ||
-          error?.message ||
-          // use English fallback if translation hook changes between renders
-          'Failed to load role change requests.';
-        Alert.alert('Error', message);
+        // Shown in place of the empty list (with Try again) instead of an Alert.
+        setLoadError(error);
       } finally {
         setLoading(false);
       }
@@ -168,7 +181,9 @@ export const RoleChangeRequestsScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('roleChangeRequests')} />
-        {!isSuperAdmin(currentUserRoleId) ? (
+        {roleError && currentUserRoleId == null ? (
+          <ApiErrorState error={roleError} onRetry={loadCurrentUser} />
+        ) : !isSuperAdmin(currentUserRoleId) ? (
           <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
             <Text style={{color: C.textPrimary, textAlign: 'center', paddingHorizontal: 24}}>
               {t('accessDenied') ||
@@ -179,7 +194,11 @@ export const RoleChangeRequestsScreen: React.FC = () => {
           <View style={{flex: 1}}>
             <View style={styles.toolbarWrap}>
               <ListToolbar
-                countText={`${total} ${t('roleChangeRequests').toLowerCase()}`}
+                countText={
+                  loadError && !total
+                    ? undefined
+                    : `${total} ${t('roleChangeRequests').toLowerCase()}`
+                }
               />
             </View>
             <PaginatedListPager page={page} totalPages={totalPages} onPageChange={goToPage}>
@@ -187,16 +206,17 @@ export const RoleChangeRequestsScreen: React.FC = () => {
                 data={items}
                 keyExtractor={keyExtractor}
                 renderItem={renderItem}
-                contentContainerStyle={{paddingBottom: ms(24)}}
+                contentContainerStyle={styles.listContent}
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
                 ListEmptyComponent={
-                  !loading ? (
-                    <Text style={[styles.empty, {color: C.textSecondary}]}>
-                      {t('noPendingRoleChangeRequests')}
-                    </Text>
-                  ) : null
+                  <ListLoadState
+                    loading={loading}
+                    error={loadError}
+                    onRetry={() => fetchData(page, true)}>
+                    <ListEmptyState title={t('noPendingRoleChangeRequests')} />
+                  </ListLoadState>
                 }
               />
             </PaginatedListPager>
@@ -214,6 +234,7 @@ export const RoleChangeRequestsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  listContent: {flexGrow: 1, paddingBottom: ms(24)},
   toolbarWrap: {
     marginBottom: ms(12),
   },
@@ -264,11 +285,6 @@ const styles = StyleSheet.create({
     fontSize: fs(22),
     lineHeight: fs(22),
     marginLeft: ws(2),
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: hs(40),
-    fontSize: fs(14),
   },
 });
 

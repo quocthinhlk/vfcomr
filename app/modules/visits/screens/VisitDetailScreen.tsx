@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {getVisitById} from '../services/visit.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -22,43 +22,56 @@ export const VisitDetailScreen: React.FC = () => {
   const [churchName, setChurchName] = useState<string>('');
   const {t} = useTranslation();
 
-  useEffect(() => {
-    let mounted = true;
-    if (visitId) {
-      getVisitById(visitId)
-        .then(async res => {
-          if (!mounted) {
-            return;
-          }
-          const visitData = res?.data || null;
-          setVisit(visitData);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
 
-          // Fetch church name
-          if (visitData?.church_id) {
-            try {
-              const churchRes = await api.get(`churches/${visitData.church_id}`);
-              const churchData = churchRes?.data?.data;
-              if (churchData?.name && mounted) {
-                setChurchName(churchData.name);
-              }
-            } catch (e) {
-              console.error('Error fetching church info:', e);
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    } else {
+  const loadVisit = useCallback(async () => {
+    if (!visitId) {
       setLoading(false);
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    setLoading(true);
+    try {
+      const res = await getVisitById(visitId);
+      if (!mountedRef.current) {
+        return;
+      }
+      const visitData = res?.data || null;
+      setVisit(visitData);
+      setLoadError(null);
+
+      // Fetch church name
+      if (visitData?.church_id) {
+        try {
+          const churchRes = await api.get(`churches/${visitData.church_id}`);
+          const churchData = churchRes?.data?.data;
+          if (churchData?.name && mountedRef.current) {
+            setChurchName(churchData.name);
+          }
+        } catch (e) {
+          console.error('Error fetching church info:', e);
+        }
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [visitId]);
+
+  useEffect(() => {
+    loadVisit();
+  }, [loadVisit]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
@@ -76,7 +89,10 @@ export const VisitDetailScreen: React.FC = () => {
   }, [t, visit]);
 
   return (
-    <ScreenContainer title={t('visitDetail') || 'Visit Detail'} loading={loading} scroll>
+    <ScreenContainer title={t('visitDetail') || 'Visit Detail'} loading={loading}
+      error={!visit ? loadError : null}
+      onRetry={loadVisit}
+      scroll>
       {!visit ? (
         <ListEmptyState />
       ) : (

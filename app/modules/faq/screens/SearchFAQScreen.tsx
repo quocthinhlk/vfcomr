@@ -16,9 +16,9 @@ import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import {formStyles} from '../../../shared/styles/form';
 import {
-  CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ScreenContainer,
   StatusBadge,
   listContentStyle,
@@ -45,6 +45,7 @@ export const SearchFAQScreen: React.FC = () => {
   const [languages, setLanguages] = useState<LanguageOption[]>([]);
   const [userRoleId, setUserRoleId] = useState<number | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const loadLanguages = useCallback(async () => {
     try {
@@ -92,6 +93,7 @@ export const SearchFAQScreen: React.FC = () => {
     if (!searchQuery.trim() && (!selectedLanguageId || selectedLanguageId === 0)) {
       setItems([]);
       setHasSearched(false);
+      setLoadError(null);
       return;
     }
 
@@ -115,9 +117,12 @@ export const SearchFAQScreen: React.FC = () => {
         : allFaqs;
       
       setItems(filteredFaqs);
+      setLoadError(null);
     } catch (e) {
       console.error(e);
       setItems([]);
+      // A failed search shows a recoverable error, not "No data found".
+      setLoadError(e);
     } finally {
       setLoading(false);
     }
@@ -137,6 +142,7 @@ export const SearchFAQScreen: React.FC = () => {
     else if (hasSearched && !searchQuery.trim() && (!selectedLanguageId || selectedLanguageId === 0)) {
       setItems([]);
       setHasSearched(false);
+      setLoadError(null);
     }
   }, [searchQuery, hasSearched, selectedLanguageId, performSearch]);
 
@@ -239,10 +245,12 @@ export const SearchFAQScreen: React.FC = () => {
         }
         ListEmptyComponent={
           isInitialLoading ? (
-            <CenteredLoader />
+            <ListLoadState loading />
           ) : !loading ? (
             hasSearched ? (
-              <ListEmptyState title={t('noDataFound') || 'No data found'} />
+              <ListLoadState error={loadError} onRetry={performSearch}>
+                <ListEmptyState title={t('noDataFound') || 'No data found'} />
+              </ListLoadState>
             ) : (
               <ListEmptyState
                 title={

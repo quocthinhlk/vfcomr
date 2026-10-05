@@ -1,4 +1,4 @@
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useRef, useState} from 'react';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {
   getWorshipServiceById,
@@ -51,39 +51,44 @@ export const WorshipServiceDetailScreen: React.FC = () => {
     }
   };
 
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  const loadService = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    if (!worshipServiceId) {
+      setService(null);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const res = await getWorshipServiceById(worshipServiceId);
+      if (isCurrent()) {
+        setService(res?.data ?? null);
+        setLoadError(null);
+      }
+    } catch (e) {
+      if (isCurrent()) {
+        console.error('Error fetching worship service:', e);
+        // Keep what is on screen; the error state shows only when there is nothing.
+        setLoadError(e);
+      }
+    } finally {
+      if (isCurrent()) {
+        setLoading(false);
+      }
+    }
+  }, [worshipServiceId]);
+
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      (async () => {
-        if (!worshipServiceId) {
-          if (!cancelled) {
-            setService(null);
-            setLoading(false);
-          }
-          return;
-        }
-        if (!cancelled) {
-          setLoading(true);
-        }
-        try {
-          const res = await getWorshipServiceById(worshipServiceId);
-          if (!cancelled) {
-            setService(res?.data ?? null);
-          }
-        } catch {
-          if (!cancelled) {
-            setService(null);
-          }
-        } finally {
-          if (!cancelled) {
-            setLoading(false);
-          }
-        }
-      })();
+      loadService();
       return () => {
-        cancelled = true;
+        requestRef.current += 1;
       };
-    }, [worshipServiceId]),
+    }, [loadService]),
   );
 
   const handleEdit = () => {
@@ -102,6 +107,8 @@ export const WorshipServiceDetailScreen: React.FC = () => {
     <ScreenContainer
       title={t('worshipServiceDetail') || 'Worship Service Detail'}
       loading={loading}
+      error={service ? null : loadError}
+      onRetry={loadService}
       scroll>
       {!service ? (
         <ListEmptyState title={t('noDataFound') || 'No data found'} />

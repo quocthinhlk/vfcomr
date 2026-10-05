@@ -138,6 +138,9 @@ export const EditVisitDetailsScreen: React.FC = () => {
   const eventCount: number = route?.params?.eventCount ?? 0;
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryLoad = () => setReloadKey(k => k + 1);
   const [submitting, setSubmitting] = useState(false);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -329,6 +332,7 @@ export const EditVisitDetailsScreen: React.FC = () => {
         if (!selectedMonth || !selectedYear) {
           return;
         }
+        setLoading(true);
 
         const [countriesRes, eventTypesRes, usersRes] = await Promise.all([
           api.get('countries', {params: {page: 1, limit: 1000, sort_by: 'name', sort_desc: false}}),
@@ -438,8 +442,16 @@ export const EditVisitDetailsScreen: React.FC = () => {
             }),
           );
         }
+        if (mounted) {
+          setLoadError(null);
+        }
       } catch (error) {
         console.error('Failed to load edit visit details:', error);
+        // Lookups (countries / event types / users) failed: show a retry
+        // instead of a form whose dropdowns are silently empty.
+        if (mounted) {
+          setLoadError(error);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -451,7 +463,7 @@ export const EditVisitDetailsScreen: React.FC = () => {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [churchVisitCount, eventCount, selectedMonth, selectedYear, visitId, userId]);
+  }, [churchVisitCount, eventCount, selectedMonth, selectedYear, visitId, userId, reloadKey]);
 
   const onSave = async () => {
     setInvalid({});
@@ -620,6 +632,12 @@ export const EditVisitDetailsScreen: React.FC = () => {
 
   if (loading) {
     return <ScreenContainer title={`${t('edit') || 'Edit'} ${t('addVisits') || 'Add Visits'}`} loading />;
+  }
+
+  if (loadError) {
+    return (
+      <ScreenContainer title={`${t('edit') || 'Edit'} ${t('addVisits') || 'Add Visits'}`} error={loadError} onRetry={retryLoad} />
+    );
   }
 
   return (

@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
@@ -18,30 +18,46 @@ export const EditCountryScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!countryId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const [nameError, setNameError] = useState('');
   const {t} = useTranslation();
 
   useEffect(() => {
-    let mounted = true;
-    if (countryId) {
-      getCountryById(countryId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          setName(res?.data?.name || '');
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    }
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
+  }, []);
+
+  // Named so the error state's "Try again" can re-run it.
+  const load = useCallback(async () => {
+    if (!countryId) {
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getCountryById(countryId);
+      if (!mountedRef.current) {
+        return;
+      }
+      setName(res?.data?.name || '');
+    } catch (e) {
+      // Without the record the form would be blank: show a retryable error.
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [countryId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const onNameChange = (value: string) => {
     setName(value);
@@ -69,7 +85,7 @@ export const EditCountryScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title={`${t('edit')} ${t('country')}`} scroll loading={loading}>
+    <ScreenContainer title={`${t('edit')} ${t('country')}`} scroll loading={loading} error={loadError} onRetry={load}>
       <FormField label={t('name')} required error={nameError}>
         <AppInput
           value={name}

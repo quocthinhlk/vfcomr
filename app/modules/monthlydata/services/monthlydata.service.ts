@@ -206,7 +206,11 @@ export async function getWeeklyReport(
   } catch (err: any) {
     const message = err?.response?.data?.message || err?.message || 'Failed to get weekly report';
     console.error('Get weekly report error:', message);
-    throw new Error(message);
+    // Keep the original error so callers can tell "offline / timed out"
+    // apart from "no report for this week yet".
+    const wrapped = new Error(message) as Error & {cause?: unknown};
+    wrapped.cause = err;
+    throw wrapped;
   }
 }
 

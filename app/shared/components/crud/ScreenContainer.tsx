@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Header} from '../Header';
+import ApiErrorState from '../ApiErrorState';
 import {globalStyles} from '../../styles/global';
 import {useThemedColors} from '../../styles/theme';
 import {COLORS} from '../../constants/colors';
@@ -23,6 +24,9 @@ type Props = {
   scroll?: boolean;
   /** Replace the content with a centred spinner. */
   loading?: boolean;
+  /** Initial load failed: show a recoverable error state instead of the content. */
+  error?: unknown;
+  onRetry?: () => void | Promise<unknown>;
   children?: React.ReactNode;
 };
 
@@ -33,6 +37,8 @@ export const ScreenContainer: React.FC<Props> = ({
   onBackPress,
   scroll = false,
   loading = false,
+  error,
+  onRetry,
   children,
 }) => {
   const C = useThemedColors();
@@ -44,6 +50,8 @@ export const ScreenContainer: React.FC<Props> = ({
         <Header title={title} showMenu={showMenu} onBackPress={onBackPress} />
         {loading ? (
           <CenteredLoader />
+        ) : error ? (
+          <ApiErrorState error={error} onRetry={onRetry} />
         ) : scroll ? (
           <KeyboardAvoidingView
             style={styles.flex}

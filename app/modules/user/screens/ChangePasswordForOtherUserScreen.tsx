@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { View, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Layout, Text } from '@ui-kitten/components';
@@ -16,6 +16,7 @@ import { Col, Row, Grid } from 'react-native-easy-grid';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
 import { ms, hs } from '../../../shared/utils/scale';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 export default function ChangePasswordForOtherUserScreen() {
   const navigation = useNavigation<any>();
@@ -38,19 +39,34 @@ export default function ChangePasswordForOtherUserScreen() {
   };
   const clearInvalid = (key: string) => setInvalid(prev => ({ ...prev, [key]: false }));
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await api.get('users/me');
-        if (!mounted) return;
-        const r = res?.data?.data?.role?.id;
-        if (typeof r === 'number') setCurrentUserRoleId(r);
-      } catch {}
-      if (mounted) setLoading(false);
-    })();
-    return () => { mounted = false; };
+  // users/me decides whether "old password" is required; if it fails, show a
+  // retryable error rather than guessing the wrong form.
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+  const loadCurrentUser = useCallback(async () => {
+    try {
+      const res = await api.get('users/me');
+      if (!mountedRef.current) {
+        return;
+      }
+      const r = res?.data?.data?.role?.id;
+      if (typeof r === 'number') setCurrentUserRoleId(r);
+      setLoadError(null);
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    }
+    if (mountedRef.current) {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadCurrentUser();
+    return () => { mountedRef.current = false; };
+  }, [loadCurrentUser]);
 
   const isSuperAdminUser = isSuperAdmin(currentUserRoleId || undefined);
 
@@ -62,6 +78,17 @@ export default function ChangePasswordForOtherUserScreen() {
           <ScrollView>
             <Text style={{ color: C.textPrimary }}>{t('loading')}</Text>
           </ScrollView>
+        </Layout>
+      </SafeAreaView>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
+        <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
+          <Header title={t('changePassword')} />
+          <ApiErrorState error={loadError} onRetry={loadCurrentUser} />
         </Layout>
       </SafeAreaView>
     );

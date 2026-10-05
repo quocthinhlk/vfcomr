@@ -25,7 +25,12 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
-import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
+import {
+  ListEmptyState,
+  ListLoadState,
+  ListPageBar,
+  ListToolbar,
+} from '../../../shared/components/crud';
 
 type OverseerItem = {
   id: number;
@@ -58,6 +63,7 @@ export const ListOverseerScreen: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const fetchData = useCallback(
     async (targetPage: number, reset = false) => {
@@ -94,8 +100,11 @@ export const ListOverseerScreen: React.FC = () => {
         setTotal(data?.total ?? 0);
         setPage(data?.page ?? targetPage);
         setItems(reset ? nextItems : [...items, ...nextItems]);
+        setLoadError(null);
       } catch (e) {
         console.error(e);
+        // Surface the failure as a recoverable error, never as "no users".
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
@@ -204,7 +213,11 @@ export const ListOverseerScreen: React.FC = () => {
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={t('overseers')} />
 
-          <ListToolbar countText={`${total} ${t('overseers').toLowerCase()}`} />
+          <ListToolbar
+            countText={
+              loadError && !total ? undefined : `${total} ${t('overseers').toLowerCase()}`
+            }
+          />
 
           <SearchInput
             value={query}
@@ -224,18 +237,19 @@ export const ListOverseerScreen: React.FC = () => {
                 renderItem={renderItem}
 
                 keyboardShouldPersistTaps="handled"
-                contentContainerStyle={{paddingBottom: ms(24)}}
+                contentContainerStyle={styles.listContent}
                 nestedScrollEnabled={Platform.OS === 'android'}
                 style={{flex: 1}}
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
                 ListEmptyComponent={
-                  !loading ? (
-                    <Text style={[styles.empty, {color: C.textSecondary}]}>
-                      {t('noUsersFound')}
-                    </Text>
-                  ) : null
+                  <ListLoadState
+                    loading={loading}
+                    error={loadError}
+                    onRetry={() => fetchData(page, true)}>
+                    <ListEmptyState title={t('noUsersFound')} />
+                  </ListLoadState>
                 }
               />
             </PaginatedListPager>
@@ -301,6 +315,7 @@ export const ListOverseerScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  listContent: {flexGrow: 1, paddingBottom: ms(24)},
   container: {
     flex: 1,
     paddingTop: 0,
@@ -363,10 +378,6 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     backgroundColor: COLORS.dangerColor,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: ms(40),
   },
   pageNumbersContainer: {
     flexDirection: 'row',

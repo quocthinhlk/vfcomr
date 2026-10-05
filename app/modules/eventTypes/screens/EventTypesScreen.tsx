@@ -10,9 +10,9 @@ import ActionSheetModal, {
 import {ms, rs, ws} from '../../../shared/utils/scale';
 import {
   CardMeta,
-  CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ListToolbar,
   ScreenContainer,
   listContentStyle,
@@ -36,6 +36,7 @@ export const EventTypesScreen: React.FC = () => {
   const [items, setItems] = useState<EventTypeItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState<EventTypeItem | null>(null);
 
@@ -51,14 +52,18 @@ export const EventTypesScreen: React.FC = () => {
         const eventTypes = res?.data ?? [];
         console.log('EventTypes parsed:', eventTypes);
         setItems(eventTypes);
+        setLoadError(null);
       } catch (e) {
         console.error('Error fetching event types:', e);
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
     },
     [loading],
   );
+
+  const reload = useCallback(() => fetchData(true), [fetchData]);
 
   useEffect(() => {
     fetchData(true);
@@ -126,7 +131,11 @@ export const EventTypesScreen: React.FC = () => {
   return (
     <ScreenContainer title={t('eventType') || 'Event Types'} showMenu>
       <ListToolbar
-        countText={`${items.length} ${(t('eventType') || 'Event Types').toLowerCase()}`}
+        countText={
+          loadError && items.length === 0
+            ? undefined
+            : `${items.length} ${(t('eventType') || 'Event Types').toLowerCase()}`
+        }
         addRoute="AddEventType"
       />
 
@@ -140,13 +149,16 @@ export const EventTypesScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          isInitialLoading ? (
-            <CenteredLoader />
-          ) : !loading ? (
-            <ListEmptyState
-              title={t('noDataFound') || 'No data found'}
-              hint={t('emptyListHint')}
-            />
+          isInitialLoading || !loading ? (
+            <ListLoadState
+              loading={isInitialLoading}
+              error={loadError}
+              onRetry={reload}>
+              <ListEmptyState
+                title={t('noDataFound') || 'No data found'}
+                hint={t('emptyListHint')}
+              />
+            </ListLoadState>
           ) : null
         }
       />

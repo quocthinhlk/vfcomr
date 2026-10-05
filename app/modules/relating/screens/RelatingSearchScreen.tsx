@@ -13,6 +13,7 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
@@ -76,6 +77,8 @@ export default function RelatingSearchScreen() {
   const [showEditProfileForEmailError, setShowEditProfileForEmailError] =
     useState(false);
   const countryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Failure of the unfiltered country list that the whole form depends on.
+  const [countriesLoadError, setCountriesLoadError] = useState<unknown>(null);
 
   const loadCountries = useCallback(async (keyword?: string) => {
     try {
@@ -86,12 +89,18 @@ export default function RelatingSearchScreen() {
         name: keyword ?? '',
       });
       setCountries(data);
-    } catch {
+      setCountriesLoadError(null);
+    } catch (error) {
       setCountries([]);
+      if (!keyword) {
+        setCountriesLoadError(error);
+      }
     } finally {
       setLoadingCountries(false);
     }
   }, []);
+
+  const retryLoadCountries = useCallback(() => loadCountries(''), [loadCountries]);
 
   const loadCities = useCallback(async (countryId: number) => {
     try {
@@ -340,6 +349,9 @@ export default function RelatingSearchScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('relating')} />
+        {countriesLoadError && countries.length === 0 && !selectedCountry ? (
+          <ApiErrorState error={countriesLoadError} onRetry={retryLoadCountries} />
+        ) : (
         <KeyboardAvoidingView
           style={styles.keyboardWrap}
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
@@ -602,6 +614,7 @@ export default function RelatingSearchScreen() {
           ) : null}
           </ScrollView>
         </KeyboardAvoidingView>
+        )}
       </View>
     </SafeAreaView>
   );

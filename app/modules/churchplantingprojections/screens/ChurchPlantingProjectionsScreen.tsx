@@ -17,9 +17,9 @@ import api from '../../../config/api';
 import SearchInput from '../../../shared/components/SearchInput';
 import {
   CardMeta,
-  CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ListToolbar,
   ScreenContainer,
   listContentStyle,
@@ -33,6 +33,7 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
   const [items, setItems] = useState<ChurchPlantingProjectionItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedProjection, setSelectedProjection] =
     useState<ChurchPlantingProjectionItem | null>(null);
@@ -85,16 +86,20 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
           : allProjections;
         
         setItems(filtered);
+        setLoadError(null);
         await fetchChurchInfo(id);
       } catch (e) {
         console.error('Error fetching church planting projections:', e);
-        Alert.alert(t('error') || 'Error', t('failedToLoadProjections') || 'Failed to load church planting projections');
+        // Shown as a recoverable error state in the list (not an Alert + empty list).
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
     },
     [loading, t, fetchChurchInfo, query],
   );
+
+  const reload = useCallback(() => fetchData(true), [fetchData]);
 
   useEffect(() => {
     fetchData(true);
@@ -165,9 +170,13 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
       ) : null}
 
       <ListToolbar
-        countText={`${items.length} ${(
-          t('churchPlantingProjections') || 'Church Planting Projections'
-        ).toLowerCase()}`}
+        countText={
+          loadError && items.length === 0
+            ? undefined
+            : `${items.length} ${(
+                t('churchPlantingProjections') || 'Church Planting Projections'
+              ).toLowerCase()}`
+        }
         addRoute="AddChurchPlantingProjection"
       />
 
@@ -187,10 +196,13 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          isInitialLoading ? (
-            <CenteredLoader />
-          ) : !loading ? (
-            <ListEmptyState hint={query ? undefined : t('emptyListHint')} />
+          isInitialLoading || !loading ? (
+            <ListLoadState
+              loading={isInitialLoading}
+              error={loadError}
+              onRetry={reload}>
+              <ListEmptyState hint={query ? undefined : t('emptyListHint')} />
+            </ListLoadState>
           ) : null
         }
       />

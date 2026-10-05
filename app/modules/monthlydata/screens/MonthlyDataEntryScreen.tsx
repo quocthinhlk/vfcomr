@@ -15,6 +15,8 @@ import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {parseApiError} from '../../../shared/utils/apiErrorHandler';
 import {globalStyles} from '../../../shared/styles/global';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useLanguage} from '../../../shared/context/LanguageContext';
@@ -250,6 +252,8 @@ export default function MonthlyDataEntryScreen() {
   );
   const [worshipSessions, setWorshipSessions] = useState<WorshipSession[]>([]);
   const [loading, setLoading] = useState(true);
+  /** First week could not be fetched (offline / timeout): never show it as an empty, saveable form. */
+  const [initialLoadError, setInitialLoadError] = useState<unknown>(null);
   const [loadingWeeks, setLoadingWeeks] = useState<Set<number>>(new Set());
   const [saving, setSaving] = useState(false);
   const [saveOption, setSaveOption] = useState<'continue' | 'goToChurch'>(
@@ -642,6 +646,7 @@ export default function MonthlyDataEntryScreen() {
   const loadInitialData = async () => {
     if (!churchId) {return;}
     setLoading(true);
+    setInitialLoadError(null);
     try {
       const firstWeekNumber = sortedWeekNumbers[0];
 
@@ -764,6 +769,15 @@ export default function MonthlyDataEntryScreen() {
           }
         }
       } catch (error: any) {
+        // Offline / timed out: the report may well exist, so an empty form
+        // would risk overwriting it. Show a recoverable error for the first week.
+        const cause = error?.cause ?? error;
+        const parsed = parseApiError(cause);
+        if (isFirstWeek && (parsed.isNetworkError || parsed.isTimeout)) {
+          setInitialLoadError(cause);
+          setLoading(false);
+          return;
+        }
         // If report doesn't exist, create empty structure
         const worshipSessionsForWeek = await fetchWorshipServices();
         const emptyData: WeeklyReportData = {
@@ -1461,7 +1475,9 @@ export default function MonthlyDataEntryScreen() {
           />
         </View>
 
-        {showSkeleton ? (
+        {initialLoadError ? (
+          <ApiErrorState error={initialLoadError} onRetry={loadInitialData} />
+        ) : showSkeleton ? (
           <ScrollView
             style={styles.scrollView}
             contentContainerStyle={styles.scrollContent}

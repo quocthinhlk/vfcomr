@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   StyleSheet,
@@ -38,46 +38,60 @@ export const EditStepsChartScreen: React.FC = () => {
   const {t} = useTranslation();
   const C = useThemedColors();
 
-  useEffect(() => {
-    let mounted = true;
-    if (projectionId) {
-      Promise.all([
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  // Named so the error state's "Try again" can re-run it.
+  const loadStepsChart = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    if (!projectionId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const [stepsRes, projectionRes] = await Promise.all([
         getStepsChartByProjectionId(projectionId),
         getChurchPlantingProjectionById(projectionId),
-      ])
-        .then(([stepsRes, projectionRes]) => {
-          if (!mounted) {
-            return;
-          }
-          setStepsChart(stepsRes?.data || null);
-          
-          // Fetch church name
-          const projection = projectionRes?.data;
-          if (projection?.church_id) {
-            api
-              .get(`churches/${projection.church_id}`)
-              .then(churchRes => {
-                const churchData = churchRes?.data?.data;
-                if (churchData?.name && mounted) {
-                  setChurchName(churchData.name);
-                }
-              })
-              .catch(() => {});
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    } else {
-      setLoading(false);
+      ]);
+      if (!isCurrent()) {
+        return;
+      }
+      setStepsChart(stepsRes?.data || null);
+      setLoadError(null);
+
+      // Fetch church name
+      const projection = projectionRes?.data;
+      if (projection?.church_id) {
+        api
+          .get(`churches/${projection.church_id}`)
+          .then(churchRes => {
+            const churchData = churchRes?.data?.data;
+            if (churchData?.name && isCurrent()) {
+              setChurchName(churchData.name);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch (e) {
+      if (isCurrent()) {
+        console.error('Error fetching steps chart:', e);
+        // Previously this left an endless spinner.
+        setLoadError(e);
+      }
+    } finally {
+      if (isCurrent()) {
+        setLoading(false);
+      }
     }
-    return () => {
-      mounted = false;
-    };
   }, [projectionId]);
+
+  useEffect(() => {
+    loadStepsChart();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadStepsChart]);
 
   const formatDateForAPI = (date: Date | null): string | null => {
     if (!date) return null;
@@ -176,8 +190,15 @@ export const EditStepsChartScreen: React.FC = () => {
     }
   };
 
-  if (loading || !stepsChart) {
-    return <ScreenContainer title={`${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'}`} loading />;
+  if (loading || loadError || !stepsChart) {
+    return (
+      <ScreenContainer
+        title={`${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'}`}
+        loading={!loadError}
+        error={loadError}
+        onRetry={loadStepsChart}
+      />
+    );
   }
 
   const rows = [

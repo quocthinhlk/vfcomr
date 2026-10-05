@@ -14,6 +14,7 @@ import {Text} from '@ui-kitten/components';
 import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {Header} from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -57,10 +58,11 @@ export default function MonthlyDataSelectScreen() {
   const [weekInfos, setWeekInfos] = useState<WeekInfo[]>([]);
   const [selectedWeeks, setSelectedWeeks] = useState<Set<number>>(new Set());
   const [loadingWeeks, setLoadingWeeks] = useState(false);
+  // Church lookup failed with no church to fall back on: nothing can be entered.
+  const [churchLoadError, setChurchLoadError] = useState<unknown>(null);
+  const [weeksLoadError, setWeeksLoadError] = useState<unknown>(null);
   const lastWeekLoadKeyRef = useRef<string | null>(null);
   const didInitialFocusRef = useRef(false);
-  const tRef = useRef(t);
-  tRef.current = t;
   const localeMap: Record<string, string> = {
     en: 'en',
     pt: 'pt',
@@ -113,71 +115,77 @@ export default function MonthlyDataSelectScreen() {
   }, [langCode]);
 
   // Load church ID from AsyncStorage or Dashboard API
-  useEffect(() => {
-    (async () => {
-      try {
-        // Try AsyncStorage first
-        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        const savedChurchName = await AsyncStorage.getItem('selectedChurchName');
-        let hasSavedChurchId = false;
-        let effectiveChurchId: number | null = null;
-        if (savedChurchId) {
-          const id = parseInt(savedChurchId, 10);
-          if (!isNaN(id)) {
-            console.log('Church ID from AsyncStorage:', id);
-            setChurchId(id);
-            effectiveChurchId = id;
-            hasSavedChurchId = true;
-            if (savedChurchName) {
-              setChurchName(savedChurchName);
-            }
+  const loadChurch = useCallback(async () => {
+    let effectiveChurchId: number | null = null;
+    try {
+      // Try AsyncStorage first
+      const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+      const savedChurchName = await AsyncStorage.getItem('selectedChurchName');
+      let hasSavedChurchId = false;
+      if (savedChurchId) {
+        const id = parseInt(savedChurchId, 10);
+        if (!isNaN(id)) {
+          console.log('Church ID from AsyncStorage:', id);
+          setChurchId(id);
+          effectiveChurchId = id;
+          hasSavedChurchId = true;
+          if (savedChurchName) {
+            setChurchName(savedChurchName);
           }
         }
-
-        // If no AsyncStorage (or missing name), get from dashboard API
-        if (!hasSavedChurchId || !savedChurchName) {
-          console.log('Fetching dashboard for church info...');
-          const response = await api.get('dashboard');
-          const dashboardInfo = response.data?.data?.dashboard_info;
-          const dashboardChurchId = dashboardInfo?.church_id;
-          const dashboardChurchName = dashboardInfo?.church_name;
-          const dashboardLastReportDate = dashboardInfo?.last_report_date;
-        
-          if (dashboardChurchId) {
-            console.log('Church ID from Dashboard API:', dashboardChurchId);
-            setChurchId(dashboardChurchId);
-            effectiveChurchId = dashboardChurchId;
-            await AsyncStorage.setItem('selectedChurchId', String(dashboardChurchId));
-            if (dashboardChurchName) {
-              setChurchName(dashboardChurchName);
-              await AsyncStorage.setItem('selectedChurchName', String(dashboardChurchName));
-            }
-          } else if (!hasSavedChurchId) {
-            console.error('No church_id found in dashboard response');
-          }
-
-          if (dashboardLastReportDate) {
-            setLastReportDate(String(dashboardLastReportDate));
-          }
-        } else if (effectiveChurchId) {
-          // We have church from AsyncStorage; still fetch dashboard to get last report date.
-          try {
-            const response = await api.get('dashboard', {
-              params: {church_id: effectiveChurchId},
-            });
-            const dashboardInfo = response.data?.data?.dashboard_info;
-            if (dashboardInfo?.last_report_date) {
-              setLastReportDate(String(dashboardInfo.last_report_date));
-            }
-          } catch {
-            // ignore
-          }
-        }
-      } catch (error) {
-        console.error('Error loading church ID:', error);
       }
-    })();
+
+      // If no AsyncStorage (or missing name), get from dashboard API
+      if (!hasSavedChurchId || !savedChurchName) {
+        console.log('Fetching dashboard for church info...');
+        const response = await api.get('dashboard');
+        const dashboardInfo = response.data?.data?.dashboard_info;
+        const dashboardChurchId = dashboardInfo?.church_id;
+        const dashboardChurchName = dashboardInfo?.church_name;
+        const dashboardLastReportDate = dashboardInfo?.last_report_date;
+      
+        if (dashboardChurchId) {
+          console.log('Church ID from Dashboard API:', dashboardChurchId);
+          setChurchId(dashboardChurchId);
+          effectiveChurchId = dashboardChurchId;
+          await AsyncStorage.setItem('selectedChurchId', String(dashboardChurchId));
+          if (dashboardChurchName) {
+            setChurchName(dashboardChurchName);
+            await AsyncStorage.setItem('selectedChurchName', String(dashboardChurchName));
+          }
+        } else if (!hasSavedChurchId) {
+          console.error('No church_id found in dashboard response');
+        }
+
+        if (dashboardLastReportDate) {
+          setLastReportDate(String(dashboardLastReportDate));
+        }
+      } else if (effectiveChurchId) {
+        // We have church from AsyncStorage; still fetch dashboard to get last report date.
+        try {
+          const response = await api.get('dashboard', {
+            params: {church_id: effectiveChurchId},
+          });
+          const dashboardInfo = response.data?.data?.dashboard_info;
+          if (dashboardInfo?.last_report_date) {
+            setLastReportDate(String(dashboardInfo.last_report_date));
+          }
+        } catch {
+          // ignore
+        }
+      }
+      setChurchLoadError(null);
+    } catch (error) {
+      console.error('Error loading church ID:', error);
+      if (!effectiveChurchId) {
+        setChurchLoadError(error);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    loadChurch();
+  }, [loadChurch]);
 
   useEffect(() => {
     if (route?.params?.resetKey) {
@@ -200,12 +208,14 @@ export default function MonthlyDataSelectScreen() {
       setWeekInfos(Array.isArray(weeks) ? weeks : []);
       setSelectedWeeks(new Set()); // Reset selection when weeks change
       lastWeekLoadKeyRef.current = loadKey;
+      setWeeksLoadError(null);
     } catch (error: any) {
       console.error('Error loading week numbers:', error);
-      Alert.alert(
-        tRef.current('error') || 'Error',
-        error?.message || tRef.current('failedToLoadWeekNumbers') || 'Failed to load week numbers',
-      );
+      // Weeks still on screen belong to a different month: drop them and show
+      // a recoverable error instead of "No weeks available".
+      setWeekInfos([]);
+      setSelectedWeeks(new Set());
+      setWeeksLoadError(error);
     } finally {
       setLoadingWeeks(false);
     }
@@ -288,6 +298,9 @@ export default function MonthlyDataSelectScreen() {
           />
         </View>
         
+        {churchLoadError && !churchId ? (
+          <ApiErrorState error={churchLoadError} onRetry={loadChurch} />
+        ) : (
         <ScrollView
           style={[styles.scrollView, {backgroundColor: C.background}]}
           contentContainerStyle={[styles.scrollContent, {backgroundColor: C.background}]}
@@ -364,6 +377,8 @@ export default function MonthlyDataSelectScreen() {
                     {t('loading')}...
                   </Text>
                 </View>
+              ) : weeksLoadError && weekInfos.length === 0 ? (
+                <ApiErrorState compact error={weeksLoadError} onRetry={loadWeekNumbers} />
               ) : weekInfos.length > 0 ? (
                 weekInfos.map((weekInfo) => {
                   const weekNumber = weekInfo.week_number;
@@ -427,6 +442,7 @@ export default function MonthlyDataSelectScreen() {
             />
           </View>
         </ScrollView>
+        )}
       </KeyboardAvoidingView>
     </SafeAreaView>
   );

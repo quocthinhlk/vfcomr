@@ -46,6 +46,8 @@ type Props = {
   retryLabel?: string;
   /** Force the visual variant; inferred from `error` / `message` otherwise. */
   variant?: Variant;
+  /** Smaller, non-flex layout for use inside cards / sections. */
+  compact?: boolean;
 };
 
 const VARIANT_BY_KEY: Partial<Record<ApiErrorMessageKey, Variant>> = {
@@ -96,6 +98,7 @@ export function ApiErrorState({
   onRetry,
   retryLabel,
   variant: variantProp,
+  compact = false,
 }: Props) {
   const C = useThemedColors();
   const T = useUiTokens();
@@ -131,6 +134,7 @@ export function ApiErrorState({
     }
   };
 
+  const hasRetry = !!onRetry;
   // Network errors recover by themselves:
   //  - immediately when NetInfo reports offline -> online,
   //  - when the app returns to the foreground (e.g. back from Settings),
@@ -139,7 +143,7 @@ export function ApiErrorState({
   const retryRef = useRef(handleRetry);
   retryRef.current = handleRetry;
   useEffect(() => {
-    if (variant !== 'network' || !onRetry) {
+    if (variant !== 'network' || !hasRetry) {
       return;
     }
     let cancelled = false;
@@ -210,24 +214,37 @@ export function ApiErrorState({
       unsubscribeNet();
       appStateSub.remove();
     };
-  }, [variant, onRetry]);
+    // Depend on whether a retry exists, not its identity: callers often pass a
+    // new function each render, which would otherwise keep resetting the timer.
+  }, [variant, hasRetry]);
 
   return (
-    <View style={styles.container} accessibilityRole="alert">
+    <View
+      style={compact ? styles.containerCompact : styles.container}
+      accessibilityRole="alert">
       <View style={styles.content}>
-        <View style={[styles.halo, {backgroundColor: toneTint}]}>
-          <View style={[styles.iconCircle, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
-            <Icon color={toneColor} size={ws(34)} />
-          </View>
+        <View
+          style={[
+            compact ? styles.haloCompact : styles.halo,
+            {backgroundColor: toneTint},
+          ]}>
+          {compact ? (
+            <Icon color={toneColor} size={ws(24)} />
+          ) : (
+            <View style={[styles.iconCircle, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+              <Icon color={toneColor} size={ws(34)} />
+            </View>
+          )}
         </View>
 
         <Text
-          style={[styles.title, {color: C.textPrimary}]}
+          style={[styles.title, compact && styles.titleCompact, {color: C.textPrimary}]}
           accessibilityRole="header">
           {t(ui.title)}
         </Text>
 
-        <Text style={[styles.message, {color: C.textSecondary}]}>
+        <Text
+          style={[styles.message, compact && styles.messageCompact, {color: C.textSecondary}]}>
           {displayMessage}
         </Text>
 
@@ -274,6 +291,28 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(24),
     // Sit slightly above the true centre, where the eye expects it.
     paddingBottom: ms(64),
+  },
+  containerCompact: {
+    alignItems: 'center',
+    paddingVertical: ms(16),
+  },
+  haloCompact: {
+    width: ws(52),
+    height: ws(52),
+    borderRadius: ws(26),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: ms(12),
+  },
+  titleCompact: {
+    fontSize: fs(16),
+    lineHeight: fs(22),
+    marginBottom: ms(4),
+  },
+  messageCompact: {
+    fontSize: fs(13),
+    lineHeight: fs(19),
+    marginBottom: ms(16),
   },
   content: {
     width: '100%',

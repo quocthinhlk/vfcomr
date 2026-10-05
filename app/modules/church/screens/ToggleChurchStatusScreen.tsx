@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {SafeAreaView, View, Alert} from 'react-native';
 import {Layout, Text} from '@ui-kitten/components';
 import {globalStyles} from '../../../shared/styles/global';
@@ -14,6 +14,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import AppButton from '../../../shared/components/AppButton';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnToList} from '../../../shared/utils/returnToList';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 export default function ToggleChurchStatusScreen() {
   const navigation = useNavigation<any>();
@@ -23,17 +24,24 @@ export default function ToggleChurchStatusScreen() {
   const [disabled, setDisabled] = useState<boolean | null>(null);
   const [name, setName] = useState<string>('');
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+
+  const loadDetail = useCallback(async () => {
+    if (!churchId) return;
+    try {
+      const d = await getChurchDetail(churchId);
+      setDisabled(!!d?.disabled);
+      setName(d?.name || '');
+      setLoadError(null);
+    } catch (e) {
+      // Without the current status the toggle is unusable: show a retryable error.
+      setLoadError(e);
+    }
+  }, [churchId]);
 
   useEffect(() => {
-    (async () => {
-      if (!churchId) return;
-      try {
-        const d = await getChurchDetail(churchId);
-        setDisabled(!!d?.disabled);
-        setName(d?.name || '');
-      } catch {}
-    })();
-  }, [churchId]);
+    loadDetail();
+  }, [loadDetail]);
 
   const toggle = async () => {
     if (!churchId || disabled === null) return;
@@ -60,6 +68,9 @@ export default function ToggleChurchStatusScreen() {
       <Header />
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <BackButton title="Church status" />
+        {loadError ? (
+          <ApiErrorState error={loadError} onRetry={loadDetail} />
+        ) : (
         <View style={{paddingHorizontal: ms(16), paddingTop: ms(8)}}>
           <Text
             category="label"
@@ -86,6 +97,7 @@ export default function ToggleChurchStatusScreen() {
             {disabled ? 'Enable' : 'Disable'}
           </AppButton>
         </View>
+        )}
       </Layout>
     </SafeAreaView>
   );

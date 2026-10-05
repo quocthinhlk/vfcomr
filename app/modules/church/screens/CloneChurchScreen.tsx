@@ -30,7 +30,13 @@ import {
 } from '../../../shared/components/icons';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
-import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
+import {
+  ListEmptyState,
+  ListLoadState,
+  ListPageBar,
+  ListToolbar,
+} from '../../../shared/components/crud';
+import {ChurchIcon} from '../../../shared/components/icons/UiIcons';
 import SearchInput from '../../../shared/components/SearchInput';
 
 export const CloneChurchScreen: React.FC = () => {
@@ -45,6 +51,7 @@ export const CloneChurchScreen: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
 
   const fetchData = useCallback(
@@ -83,8 +90,10 @@ export const CloneChurchScreen: React.FC = () => {
         setTotal(data?.total ?? 0);
         setPage(data?.page ?? targetPage);
         setItems(reset ? nextItems : [...items, ...nextItems]);
+        setLoadError(null);
       } catch (e) {
-        // noop UI-level
+        // Surface the failure as a recoverable error, never as "no churches".
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
@@ -199,7 +208,11 @@ export const CloneChurchScreen: React.FC = () => {
           </TouchableOpacity>
         </View> */}
 
-        <ListToolbar countText={`${total} ${t('churches').toLowerCase()}`} />
+        <ListToolbar
+          countText={
+            loadError && !total ? undefined : `${total} ${t('churches').toLowerCase()}`
+          }
+        />
 
         <SearchInput
           value={query}
@@ -219,15 +232,17 @@ export const CloneChurchScreen: React.FC = () => {
               renderItem={renderItem}
               nestedScrollEnabled={Platform.OS === 'android'}
               style={{flex: 1}}
+              contentContainerStyle={styles.listContent}
               refreshControl={
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
               }
               ListEmptyComponent={
-                !loading ? (
-                  <Text style={[styles.empty, {color: C.textSecondary}]}>
-                    {t('noChurchesFound')}
-                  </Text>
-                ) : null
+                <ListLoadState
+                  loading={loading}
+                  error={loadError}
+                  onRetry={() => fetchData(page, true)}>
+                  <ListEmptyState icon={ChurchIcon} title={t('noChurchesFound')} />
+                </ListLoadState>
               }
             />
           </PaginatedListPager>
@@ -315,7 +330,7 @@ const styles = StyleSheet.create({
   copyBtn: {
     backgroundColor: COLORS.mainColor,
   },
-  empty: {textAlign: 'center', marginTop: ms(40)},
+  listContent: {flexGrow: 1},
   pageNumbersContainer: {flexDirection: 'row', alignItems: 'center'},
   pageNumber: {
     width: ws(20),

@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {View, StyleSheet} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -32,47 +32,59 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
   const {t} = useTranslation();
   const C = useThemedColors();
 
-  useEffect(() => {
-    let mounted = true;
-    if (projectionId) {
-      Promise.all([
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  const loadProjection = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    if (!projectionId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const [projectionRes, stepsRes] = await Promise.all([
         getChurchPlantingProjectionById(projectionId),
         getStepsChartByProjectionId(projectionId),
-      ])
-        .then(([projectionRes, stepsRes]) => {
-          if (!mounted) {
-            return;
-          }
-          const projectionData = projectionRes?.data || null;
-          setProjection(projectionData);
-          setStepsChart(stepsRes?.data || null);
-          
-          // Fetch church name
-          if (projectionData?.church_id) {
-            api
-              .get(`churches/${projectionData.church_id}`)
-              .then(churchRes => {
-                const churchData = churchRes?.data?.data;
-                if (churchData?.name && mounted) {
-                  setChurchName(churchData.name);
-                }
-              })
-              .catch(() => {});
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    } else {
-      setLoading(false);
+      ]);
+      if (!isCurrent()) {
+        return;
+      }
+      const projectionData = projectionRes?.data || null;
+      setProjection(projectionData);
+      setStepsChart(stepsRes?.data || null);
+      setLoadError(null);
+
+      // Fetch church name
+      if (projectionData?.church_id) {
+        api
+          .get(`churches/${projectionData.church_id}`)
+          .then(churchRes => {
+            const churchData = churchRes?.data?.data;
+            if (churchData?.name && isCurrent()) {
+              setChurchName(churchData.name);
+            }
+          })
+          .catch(() => {});
+      }
+    } catch (e) {
+      if (isCurrent()) {
+        console.error('Error fetching church planting projection:', e);
+        setLoadError(e);
+      }
+    } finally {
+      if (isCurrent()) {
+        setLoading(false);
+      }
     }
+  }, [projectionId]);
+
+  useEffect(() => {
+    loadProjection();
     return () => {
-      mounted = false;
+      requestRef.current += 1;
     };
-  }, [projectionId, route.params?.refetchKey]);
+  }, [loadProjection, route.params?.refetchKey]);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return '-';
@@ -179,6 +191,9 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
     <ScreenContainer
       title={t('churchPlantingProjectionDetail') || 'Church Planting Projection Detail'}
       loading={loading}
+      // A failed refetch (after editing) keeps the projection already on screen.
+      error={projection ? null : loadError}
+      onRetry={loadProjection}
       scroll>
       {churchName ? (
         <Text style={[styles.churchNameText, {color: C.textPrimary}]}>

@@ -33,6 +33,7 @@ import {Col, Row, Grid} from 'react-native-easy-grid';
 import {ms, hs, fs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {getLanguageById} from '../../language/services/language.service';
 
 export default function AddChurchScreen() {
@@ -289,15 +290,21 @@ export default function AddChurchScreen() {
     }
   }, [countryOptions]);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
+  // Edit-mode prefill failed: show a retryable error instead of a blank, savable form.
+  // (Create-mode defaults are optional and keep failing silently.)
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const loadTokenRef = useRef(0);
+
+  const loadInitial = async () => {
+    const token = ++loadTokenRef.current;
+    const mounted = () => token === loadTokenRef.current;
       if (editId) {
         try {
           const d = await getChurchDetail(editId);
-          if (!mounted || !d) {
+          if (!mounted() || !d) {
             return;
           }
+          setLoadError(null);
           // prefill basic fields via Formik setFieldValue through initialValues override approach using key prop
           setInitialFormValues({
             name: d.name || '',
@@ -338,12 +345,16 @@ export default function AddChurchScreen() {
           if (d.country_id) {
             await loadCities(d.country_id);
           }
-        } catch {}
+        } catch (e) {
+          if (mounted()) {
+            setLoadError(e);
+          }
+        }
       } else {
         // Load defaults for create mode
         try {
           const res = await api.get('churches/defaults');
-          if (!mounted) return;
+          if (!mounted()) return;
           const defaults = res?.data?.data;
           if (defaults) {
             setInitialFormValues(prev => ({
@@ -358,10 +369,15 @@ export default function AddChurchScreen() {
           console.error('Error loading church defaults:', error);
         }
       }
-    })();
+  };
+
+  useEffect(() => {
+    loadInitial();
     return () => {
-      mounted = false;
+      // Invalidate the in-flight request (unmount / id change).
+      loadTokenRef.current += 1;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editId]);
 
   const [initialFormValues, setInitialFormValues] = useState<AddChurchFormValues>({
@@ -466,6 +482,9 @@ export default function AddChurchScreen() {
           title={maybeParams?.id ? t('editChurch') : t('addNewChurch')}
           showMenu={false}
         />
+        {!!editId && loadError ? (
+          <ApiErrorState error={loadError} onRetry={loadInitial} />
+        ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
@@ -1775,6 +1794,7 @@ export default function AddChurchScreen() {
           </Formik>
         </ScrollView>
         </KeyboardAvoidingView>
+        )}
       </Layout>
     </SafeAreaView>
   );

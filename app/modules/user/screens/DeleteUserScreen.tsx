@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {View, StyleSheet, Alert} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
@@ -14,6 +14,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnToList} from '../../../shared/utils/returnToList';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 export const DeleteUserScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -25,23 +26,36 @@ export const DeleteUserScreen: React.FC = () => {
   const [userName, setUserName] = useState<string>(initialUserName);
   const [submitting, setSubmitting] = useState(false);
 
-  useEffect(() => {
-    let mounted = true;
-    if (userId && !initialUserName) {
-      getUserById(userId)
-        .then((res: any) => {
-          if (!mounted) {
-            return;
-          }
-          const user = res?.data?.data ?? res?.data ?? res;
-          setUserName(user?.name || user?.username || '');
-        })
-        .catch(() => {});
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+
+  const loadUser = useCallback(async () => {
+    if (!userId || initialUserName) {
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    try {
+      const res: any = await getUserById(userId);
+      if (!mountedRef.current) {
+        return;
+      }
+      const user = res?.data?.data ?? res?.data ?? res;
+      setUserName(user?.name || user?.username || '');
+      setLoadError(null);
+    } catch (e) {
+      // Don't ask to confirm deleting a user we couldn't load.
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    }
   }, [userId, initialUserName]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadUser();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [loadUser]);
 
   const onConfirm = async () => {
     if (!userId) return;
@@ -63,6 +77,10 @@ export const DeleteUserScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('deleteUser')} />
+        {loadError ? (
+          <ApiErrorState error={loadError} onRetry={loadUser} />
+        ) : (
+        <>
         <Text style={[styles.desc, {color: C.textSecondary}]}>
           {t('confirmDeleteUser').replace('{userName}', userName)}
         </Text>
@@ -80,6 +98,8 @@ export const DeleteUserScreen: React.FC = () => {
             style={styles.btn}
           />
         </View>
+        </>
+        )}
       </View>
     </SafeAreaView>
   );

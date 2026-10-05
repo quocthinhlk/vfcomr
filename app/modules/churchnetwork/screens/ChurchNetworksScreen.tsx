@@ -13,9 +13,9 @@ import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
 import {
-  CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ListPageBar,
   ListToolbar,
   ScreenContainer,
@@ -33,6 +33,7 @@ export const ChurchNetworksScreen: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedNetwork, setSelectedNetwork] = useState<ChurchNetworkItem | null>(null);
@@ -64,8 +65,11 @@ export const ChurchNetworksScreen: React.FC = () => {
         pageRef.current = validPage;
         setPage(validPage);
         setItems(pageSlice);
+        setLoadError(null);
       } catch (e) {
         console.error(e);
+        // A failed load shows a recoverable error, never the empty state.
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
@@ -131,7 +135,11 @@ export const ChurchNetworksScreen: React.FC = () => {
   return (
     <ScreenContainer title={t('churchNetworks')} showMenu>
       <ListToolbar
-        countText={`${total} ${t('churchNetworks').toLowerCase()}`}
+        countText={
+          loadError && !total
+            ? undefined
+            : `${total} ${t('churchNetworks').toLowerCase()}`
+        }
         addRoute="AddChurchNetwork"
       />
 
@@ -158,14 +166,18 @@ export const ChurchNetworksScreen: React.FC = () => {
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
             ListEmptyComponent={
-              isInitialLoading ? (
-                <CenteredLoader />
-              ) : !loading ? (
-                <ListEmptyState
-                  icon={NetworkIcon}
-                  title={t('noChurchNetworksFound')}
-                  hint={query ? undefined : t('emptyListHint')}
-                />
+              // Pull-to-refresh with no items: show nothing until it settles.
+              isInitialLoading || !loading ? (
+                <ListLoadState
+                  loading={isInitialLoading}
+                  error={loadError}
+                  onRetry={() => fetchData(1, true)}>
+                  <ListEmptyState
+                    icon={NetworkIcon}
+                    title={t('noChurchNetworksFound')}
+                    hint={query ? undefined : t('emptyListHint')}
+                  />
+                </ListLoadState>
               ) : null
             }
           />

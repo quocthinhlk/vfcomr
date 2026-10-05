@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {View, StyleSheet, Alert} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
@@ -14,6 +14,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnToList} from '../../../shared/utils/returnToList';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 const DisableChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -23,23 +24,35 @@ const DisableChurchScreen: React.FC = () => {
   const C = useThemedColors();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+
+  const loadDetail = useCallback(async () => {
+    if (!churchId) {
+      return;
+    }
+    try {
+      const d = await getChurchDetail(churchId);
+      if (!mountedRef.current) {
+        return;
+      }
+      setName(d?.name || 'this church');
+      setLoadError(null);
+    } catch (e) {
+      // Don't ask to confirm an action on a church we couldn't load.
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    }
+  }, [churchId]);
 
   useEffect(() => {
-    let mounted = true;
-    if (churchId) {
-      getChurchDetail(churchId)
-        .then(d => {
-          if (!mounted) {
-            return;
-          }
-          setName(d?.name || 'this church');
-        })
-        .catch(() => {});
-    }
+    mountedRef.current = true;
+    loadDetail();
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
-  }, [churchId]);
+  }, [loadDetail]);
 
   const onCancel = () => {
     navigation.goBack();
@@ -65,6 +78,9 @@ const DisableChurchScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('disableChurch')} />
+        {loadError ? (
+          <ApiErrorState error={loadError} onRetry={loadDetail} />
+        ) : (
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Text style={[styles.desc, {color: C.textSecondary}]}>
             {t('confirmDisableChurch').replace('{name}', name)}
@@ -82,6 +98,7 @@ const DisableChurchScreen: React.FC = () => {
             />
           </View>
         </View>
+        )}
       </Layout>
     </SafeAreaView>
   );

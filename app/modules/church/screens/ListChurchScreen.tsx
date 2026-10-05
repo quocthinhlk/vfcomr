@@ -44,6 +44,8 @@ import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import {ListEmptyState, ListLoadState} from '../../../shared/components/crud';
+import {ChurchIcon} from '../../../shared/components/icons/UiIcons';
 
 const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
 
@@ -119,6 +121,7 @@ export const ChurchesListScreen: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [pageLoading, setPageLoading] = useState<Record<number, boolean>>({});
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
@@ -196,6 +199,9 @@ export const ChurchesListScreen: React.FC = () => {
         if (token !== fetchTokenRef.current) {return;}
         const nextItems = (data?.items ?? []) as ChurchListItem[];
         setPages(prev => ({...prev, [targetPage]: nextItems}));
+        if (targetPage === pageRef.current || force) {
+          setLoadError(null);
+        }
         // Only the page on screen updates the count. Prefetch must not replace it.
         if (targetPage === pageRef.current || force) {
           const limit = Number(data?.limit) || DEFAULT_PAGE_LIMIT;
@@ -210,8 +216,12 @@ export const ChurchesListScreen: React.FC = () => {
           setTotal(nextTotal);
           setTotalPages(Math.max(nextPages, Math.ceil(nextTotal / limit) || 1));
         }
-      } catch {
-        // noop — errors surface via empty state
+      } catch (e) {
+        // A failed load of the page on screen shows a recoverable error,
+        // never the "no churches" empty state.
+        if (token === fetchTokenRef.current && (targetPage === pageRef.current || force)) {
+          setLoadError(e);
+        }
       } finally {
         if (token === fetchTokenRef.current) {
           setPageLoading(prev => {
@@ -392,17 +402,13 @@ export const ChurchesListScreen: React.FC = () => {
       );
     }
     return (
-      <View style={styles.emptyWrap}>
-        <Text style={styles.emptyIcon}>⛪</Text>
-        <Text style={[styles.emptyTitle, {color: C.textPrimary}]}>
-          {query ? 'No results found' : t('noChurchesFound')}
-        </Text>
-        {!!query && (
-          <Text style={[styles.emptyHint, {color: C.textSecondary}]}>
-            Try a different search term
-          </Text>
-        )}
-      </View>
+      <ListLoadState error={loadError} onRetry={resetAndLoad}>
+        <ListEmptyState
+          icon={ChurchIcon}
+          title={query ? 'No results found' : t('noChurchesFound')}
+          hint={query ? 'Try a different search term' : undefined}
+        />
+      </ListLoadState>
     );
   };
 
@@ -450,7 +456,11 @@ export const ChurchesListScreen: React.FC = () => {
           <Header title={t('churchesList')} />
 
           <ListToolbar
-            countText={`${total} ${(total === 1 ? t('church') : t('churches')).toLowerCase()}`}
+            countText={
+              loadError && !total
+                ? undefined
+                : `${total} ${(total === 1 ? t('church') : t('churches')).toLowerCase()}`
+            }
             addRoute="AddChurch"
           />
 
@@ -641,14 +651,6 @@ const styles = StyleSheet.create({
     paddingTop: ms(60),
   },
   // Empty state
-  emptyWrap: {
-    alignItems: 'center',
-    paddingTop: ms(60),
-    gap: ms(8),
-  },
-  emptyIcon: {fontSize: fs(40)},
-  emptyTitle: {fontSize: fs(14), fontWeight: '600'},
-  emptyHint: {fontSize: fs(12)},
   // Pagination footer row
   paginationRow: {
     flexDirection: 'row',

@@ -36,6 +36,7 @@ import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {getLanguageById} from '../../language/services/language.service';
 import {isPastorLeader} from '../../../shared/utils/permissions';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 export default function EditChurchScreen() {
   const navigation = useNavigation<any>();
@@ -107,6 +108,9 @@ export default function EditChurchScreen() {
 
   // Validation + scroll to first invalid
   const scrollRef = useRef<ScrollView>(null);
+  // Prefill (church detail) failed: show a retryable error instead of a blank, savable form.
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
@@ -323,15 +327,14 @@ export default function EditChurchScreen() {
     setCurrencyOpts(localCurrencyOptions);
   }, [localCurrencyOptions]);
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
+  const loadChurch = async () => {
       if (editId) {
         try {
           const d = await getChurchDetail(editId);
-          if (!mounted || !d) {
+          if (!mountedRef.current || !d) {
             return;
           }
+          setLoadError(null);
           setInitialFormValues({
             name: d.name || '',
             short_name: d.short_name || '',
@@ -403,12 +406,21 @@ export default function EditChurchScreen() {
           if (d.country_id) {
             await loadCities(d.country_id);
           }
-        } catch {}
+        } catch (e) {
+          if (mountedRef.current) {
+            setLoadError(e);
+          }
+        }
       }
-    })();
+  };
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadChurch();
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const [initialFormValues, setInitialFormValues] =
@@ -502,6 +514,9 @@ export default function EditChurchScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('editChurch')} showMenu={false} />
+        {loadError ? (
+          <ApiErrorState error={loadError} onRetry={loadChurch} />
+        ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={
@@ -1564,6 +1579,7 @@ export default function EditChurchScreen() {
             </Formik>
           </ScrollView>
         </KeyboardAvoidingView>
+        )}
       </Layout>
     </SafeAreaView>
   );

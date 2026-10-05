@@ -28,7 +28,12 @@ import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
-import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
+import {
+  ListEmptyState,
+  ListLoadState,
+  ListPageBar,
+  ListToolbar,
+} from '../../../shared/components/crud';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 
@@ -45,6 +50,7 @@ export const UserListScreen: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
   const [roleId, setRoleId] = useState<number | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
@@ -106,9 +112,11 @@ export const UserListScreen: React.FC = () => {
         setTotal(res?.data?.total ?? 0);
         setPage(res?.data?.page ?? targetPage);
         setItems(reset ? nextItems : [...items, ...nextItems]);
+        setLoadError(null);
       } catch (e) {
-        // You can add error handling UI here
         console.error(e);
+        // Surface the failure as a recoverable error, never as "no users".
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
@@ -257,7 +265,9 @@ export const UserListScreen: React.FC = () => {
           <Header title={t('usersList')} />
 
           <ListToolbar
-            countText={`${total} ${t('users').toLowerCase()}`}
+            countText={
+              loadError && !total ? undefined : `${total} ${t('users').toLowerCase()}`
+            }
             addRoute="AddUser"
           />
 
@@ -280,18 +290,19 @@ export const UserListScreen: React.FC = () => {
                 keyboardShouldPersistTaps="handled"
                 automaticallyAdjustKeyboardInsets
                 contentInsetAdjustmentBehavior="always"
-                contentContainerStyle={{paddingBottom: ms(24)}}
+                contentContainerStyle={styles.listContent}
                 nestedScrollEnabled={Platform.OS === 'android'}
                 style={{flex: 1}}
                 refreshControl={
                   <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
                 }
                 ListEmptyComponent={
-                  !loading ? (
-                    <Text style={[styles.empty, {color: C.textSecondary}]}>
-                      {t('noUsersFound')}
-                    </Text>
-                  ) : null
+                  <ListLoadState
+                    loading={loading}
+                    error={loadError}
+                    onRetry={() => fetchData(page, true)}>
+                    <ListEmptyState title={t('noUsersFound')} />
+                  </ListLoadState>
                 }
               />
             </PaginatedListPager>
@@ -366,6 +377,7 @@ export const UserListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  listContent: {flexGrow: 1, paddingBottom: ms(24)},
   container: {
     flex: 1,
     backgroundColor: '#fff',
@@ -422,12 +434,6 @@ const styles = StyleSheet.create({
   },
   deleteBtn: {
     backgroundColor: COLORS.dangerColor,
-  },
-  empty: {
-    textAlign: 'center',
-    marginTop: ms(40),
-    color: '#888',
-    fontSize: fs(14),
   },
   pageNumbersContainer: {
     flexDirection: 'row',

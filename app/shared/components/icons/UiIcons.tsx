@@ -124,3 +124,11 @@ export const RefreshIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
     <Path d="M20 21v-5h-5" {...stroke(color)} />
   </Svg>
 );
+
+export const ChurchIcon: React.FC<UiIconProps> = ({size = LG, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M12 2v4M10 4h4" {...stroke(color)} />
+    <Path d="M12 6l-6 5v10h12V11l-6-5z" {...stroke(color)} />
+    <Path d="M3 21h18M10 21v-4a2 2 0 0 1 4 0v4" {...stroke(color)} />
+  </Svg>
+);

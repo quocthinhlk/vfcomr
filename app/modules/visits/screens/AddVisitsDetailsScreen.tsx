@@ -145,6 +145,9 @@ export const AddVisitsDetailsScreen: React.FC = () => {
   const eventCount: number = route?.params?.eventCount ?? 0;
 
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryLoad = () => setReloadKey(k => k + 1);
   const [submitting, setSubmitting] = useState(false);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -184,6 +187,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
         if (!selectedMonth || !selectedYear) {
           return;
         }
+        setLoading(true);
 
         const [countriesRes, eventTypesRes, usersRes] = await Promise.all([
           api.get('countries', {params: {page: 1, limit: 1000, sort_by: 'name', sort_desc: false}}),
@@ -231,8 +235,16 @@ export const AddVisitsDetailsScreen: React.FC = () => {
             daysByWeek: {...emptyWeekState},
           })),
         );
+        if (mounted) {
+          setLoadError(null);
+        }
       } catch (error) {
         console.error('Failed to load visit/event details:', error);
+        // Lookups (countries / event types / users) failed: show a retry
+        // instead of a form whose dropdowns are silently empty.
+        if (mounted) {
+          setLoadError(error);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -243,7 +255,7 @@ export const AddVisitsDetailsScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [churchVisitCount, eventCount, selectedMonth, selectedYear]);
+  }, [churchVisitCount, eventCount, selectedMonth, selectedYear, reloadKey]);
 
   const updateVisitEntry = (index: number, updater: (entry: VisitEntry) => VisitEntry) => {
     setVisitEntries(prev => prev.map((entry, idx) => (idx === index ? updater(entry) : entry)));
@@ -566,6 +578,12 @@ export const AddVisitsDetailsScreen: React.FC = () => {
 
   if (loading) {
     return <ScreenContainer title={t('addVisits') || 'Add Visits'} loading />;
+  }
+
+  if (loadError) {
+    return (
+      <ScreenContainer title={t('addVisits') || 'Add Visits'} error={loadError} onRetry={retryLoad} />
+    );
   }
 
   return (

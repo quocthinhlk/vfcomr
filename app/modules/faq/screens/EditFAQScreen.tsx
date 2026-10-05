@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState, useEffect, useCallback, useRef} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
@@ -136,39 +136,51 @@ export const EditFAQScreen: React.FC = () => {
     })();
   }, [navigation, t]);
 
-  useEffect(() => {
-    let mounted = true;
-    if (faqId) {
-      getFAQById(faqId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const faq = res?.data;
-          if (faq) {
-            setQuestionHeader(faq.question_header || '');
-            setAnswer(convertHtmlToText(faq.answer || ''));
-            setLanguageId(faq.language_id || null);
-            if (faq.tags && faq.tags.length > 0) {
-              setTags(faq.tags.map(tag => tag.tag_name || ''));
-            } else {
-              setTags(['']);
-            }
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    } else {
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  const loadFaq = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    if (!faqId) {
       setLoading(false);
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    try {
+      const res = await getFAQById(faqId);
+      if (requestId !== requestRef.current) {
+        return;
+      }
+      const faq = res?.data;
+      if (faq) {
+        setQuestionHeader(faq.question_header || '');
+        setAnswer(convertHtmlToText(faq.answer || ''));
+        setLanguageId(faq.language_id || null);
+        if (faq.tags && faq.tags.length > 0) {
+          setTags(faq.tags.map(tag => tag.tag_name || ''));
+        } else {
+          setTags(['']);
+        }
+      }
+      setLoadError(null);
+    } catch (e) {
+      if (requestId === requestRef.current) {
+        console.error('Error fetching FAQ:', e);
+        // Never show a blank form the user could save over real data.
+        setLoadError(e);
+      }
+    } finally {
+      if (requestId === requestRef.current) {
+        setLoading(false);
+      }
+    }
   }, [faqId]);
+
+  useEffect(() => {
+    loadFaq();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadFaq]);
 
   const handleAddTag = () => {
     setTags([...tags, '']);
@@ -187,7 +199,7 @@ export const EditFAQScreen: React.FC = () => {
   };
 
   const onSave = async () => {
-    if (!faqId) return;
+    if (!faqId || loadError) return;
     if (!questionHeader.trim()) {
       Alert.alert(t('validation') || 'Validation', t('fillRequiredFields') || 'Please fill all required fields.');
       return;
@@ -231,7 +243,11 @@ export const EditFAQScreen: React.FC = () => {
   }
 
   return (
-    <ScreenContainer title={title} loading={loading}>
+    <ScreenContainer
+      title={title}
+      loading={loading}
+      error={loadError}
+      onRetry={loadFaq}>
       <FAQFormScroll>
         <FAQForm
           questionHeader={questionHeader}

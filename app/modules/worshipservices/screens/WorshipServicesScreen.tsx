@@ -25,9 +25,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
 import {
   CardMeta,
-  CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ListToolbar,
   ScreenContainer,
   listContentStyle,
@@ -41,6 +41,7 @@ export const WorshipServicesScreen: React.FC = () => {
   const [items, setItems] = useState<WorshipServiceItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedService, setSelectedService] = useState<WorshipServiceItem | null>(null);
   const [churchId, setChurchId] = useState<number | null>(null);
@@ -81,16 +82,20 @@ export const WorshipServicesScreen: React.FC = () => {
         const services = res?.data ?? [];
         console.log('WorshipServices parsed:', services);
         setItems(services);
+        setLoadError(null);
         await fetchChurchInfo(id);
       } catch (e) {
         console.error('Error fetching worship services:', e);
-        Alert.alert(t('error') || 'Error', t('failedToLoadWorshipServices') || 'Failed to load worship services');
+        // Shown as a recoverable error state in the list (not an Alert + empty list).
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
     },
     [loading, t, fetchChurchInfo],
   );
+
+  const reload = useCallback(() => fetchData(true), [fetchData]);
 
   useEffect(() => {
     fetchData(true);
@@ -214,7 +219,11 @@ export const WorshipServicesScreen: React.FC = () => {
 
       {/* Add New is intentionally hidden (no addRoute), as before. */}
       <ListToolbar
-        countText={`${items.length} ${(t('worshipServices') || 'Worship Services').toLowerCase()}`}
+        countText={
+          loadError && items.length === 0
+            ? undefined
+            : `${items.length} ${(t('worshipServices') || 'Worship Services').toLowerCase()}`
+        }
       />
 
       <FlatList
@@ -227,12 +236,15 @@ export const WorshipServicesScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          isInitialLoading ? (
-            <CenteredLoader />
-          ) : !loading ? (
-            <ListEmptyState
-              title={t('noWorshipServicesFound') || t('noDataFound')}
-            />
+          isInitialLoading || !loading ? (
+            <ListLoadState
+              loading={isInitialLoading}
+              error={loadError}
+              onRetry={reload}>
+              <ListEmptyState
+                title={t('noWorshipServicesFound') || t('noDataFound')}
+              />
+            </ListLoadState>
           ) : null
         }
         ListFooterComponent={renderMscNoteFooter}

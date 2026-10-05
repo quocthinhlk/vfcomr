@@ -15,6 +15,7 @@ import SearchInput from '../../../shared/components/SearchInput';
 import {
   CenteredLoader,
   ListEmptyState,
+  ListLoadState,
   ListPageBar,
   ListToolbar,
   ScreenContainer,
@@ -235,6 +236,9 @@ export const WatchListScreen: React.FC = () => {
   const [items, setItems] = useState<WatchListView[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const hasItemsRef = useRef(false);
+  hasItemsRef.current = items.length > 0;
 
   const load = useCallback(async (showLoader = true) => {
     if (showLoader) {
@@ -254,14 +258,20 @@ export const WatchListScreen: React.FC = () => {
           return {...list, churches};
         }),
       );
+      setLoadError(null);
     } catch (error) {
       console.error('Error loading watch lists:', error);
-      Alert.alert(
-        tRef.current('error'),
-        error instanceof Error
-          ? error.message
-          : tRef.current('failedToLoadWatchLists'),
-      );
+      setLoadError(error);
+      // With nothing loaded the screen shows a recoverable error state;
+      // keep the Alert only when a refresh fails over already-loaded lists.
+      if (hasItemsRef.current) {
+        Alert.alert(
+          tRef.current('error'),
+          error instanceof Error
+            ? error.message
+            : tRef.current('failedToLoadWatchLists'),
+        );
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -303,7 +313,7 @@ export const WatchListScreen: React.FC = () => {
     <ScreenContainer title={t('watchList')} showMenu>
       <ListToolbar
         countText={
-          loading && items.length === 0
+          (loading || loadError) && items.length === 0
             ? undefined
             : `${items.length} ${t('watchLists').toLowerCase()}`
         }
@@ -326,7 +336,9 @@ export const WatchListScreen: React.FC = () => {
             />
           }>
           {items.length === 0 ? (
-            <ListEmptyState title={t('noWatchLists')} hint={t('emptyListHint')} />
+            <ListLoadState error={loadError} onRetry={() => load()}>
+              <ListEmptyState title={t('noWatchLists')} hint={t('emptyListHint')} />
+            </ListLoadState>
           ) : (
               items.map(item => (
                 <WatchListPanel

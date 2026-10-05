@@ -10,9 +10,9 @@ import api from '../../../config/api';
 import SearchInput from '../../../shared/components/SearchInput';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {
-  CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ListToolbar,
   ScreenContainer,
   StatusBadge,
@@ -27,6 +27,7 @@ export const FAQsScreen: React.FC = () => {
   const [items, setItems] = useState<FAQItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,14 +68,18 @@ export const FAQsScreen: React.FC = () => {
           : allFaqs;
 
         setItems(filteredFaqs);
+        setLoadError(null);
       } catch (e) {
         console.error(e);
+        setLoadError(e);
       } finally {
         setLoading(false);
       }
     },
     [loading, searchQuery],
   );
+
+  const reload = useCallback(() => fetchData(true), [fetchData]);
 
   useEffect(() => {
     fetchData(true);
@@ -133,7 +138,11 @@ export const FAQsScreen: React.FC = () => {
   return (
     <ScreenContainer title={t('faq') || 'FAQ'} showMenu>
       <ListToolbar
-        countText={`${items.length} ${(t('faq') || 'FAQ')}`}
+        countText={
+          loadError && items.length === 0
+            ? undefined
+            : `${items.length} ${(t('faq') || 'FAQ')}`
+        }
         addRoute={canManage ? 'AddFAQ' : undefined}
       />
 
@@ -154,13 +163,16 @@ export const FAQsScreen: React.FC = () => {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListEmptyComponent={
-          isInitialLoading ? (
-            <CenteredLoader />
-          ) : !loading ? (
-            <ListEmptyState
-              title={t('noDataFound') || 'No data found'}
-              hint={searchQuery || !canManage ? undefined : t('emptyListHint')}
-            />
+          isInitialLoading || !loading ? (
+            <ListLoadState
+              loading={isInitialLoading}
+              error={loadError}
+              onRetry={reload}>
+              <ListEmptyState
+                title={t('noDataFound') || 'No data found'}
+                hint={searchQuery || !canManage ? undefined : t('emptyListHint')}
+              />
+            </ListLoadState>
           ) : null
         }
       />

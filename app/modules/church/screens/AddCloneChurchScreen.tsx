@@ -33,6 +33,7 @@ import {Col, Row, Grid} from 'react-native-easy-grid';
 import {ms, hs, fs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 export const AddCloneChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -130,17 +131,21 @@ export const AddCloneChurchScreen: React.FC = () => {
     facebook: '', instagram: '', twitter: '', date_of_birth: null,
   });
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
+  // Source church failed to load: show a retryable error instead of a blank clone form.
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const loadTokenRef = useRef(0);
+
+  const loadSource = async () => {
       if (!sourceId) {
         return;
       }
+      const token = ++loadTokenRef.current;
       try {
         const d = await getChurchDetail(sourceId);
-        if (!mounted || !d) {
+        if (token !== loadTokenRef.current || !d) {
           return;
         }
+        setLoadError(null);
         const name = (d.name || '').trim();
         const shortName = (d.short_name || '').trim();
         const makeCopyShort = (s: string) => {
@@ -190,11 +195,20 @@ export const AddCloneChurchScreen: React.FC = () => {
         if (d.country_id) {
           await loadCities(d.country_id);
         }
-      } catch {}
-    })();
+      } catch (e) {
+        if (token === loadTokenRef.current) {
+          setLoadError(e);
+        }
+      }
+  };
+
+  useEffect(() => {
+    loadSource();
     return () => {
-      mounted = false;
+      // Invalidate the in-flight request (unmount / source change).
+      loadTokenRef.current += 1;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceId]);
 
   return (
@@ -203,6 +217,9 @@ export const AddCloneChurchScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('addNewClonedChurch')} showMenu={false} />
+        {loadError ? (
+          <ApiErrorState error={loadError} onRetry={loadSource} />
+        ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={
@@ -1176,6 +1193,7 @@ export const AddCloneChurchScreen: React.FC = () => {
             </Formik>
           </ScrollView>
         </KeyboardAvoidingView>
+        )}
       </Layout>
     </SafeAreaView>
   );

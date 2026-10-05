@@ -22,6 +22,7 @@ import AppButton from '../../../shared/components/AppButton';
 import {DeleteButton} from '../../../shared/components/ActionButtons';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 const blankChurch = require('../../../assets/images/church.png');
 const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
@@ -39,6 +40,7 @@ export default function ChurchDetailScreen() {
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
   const [imageModalVisible, setImageModalVisible] = useState<boolean>(false);
   const [imageError, setImageError] = useState<boolean>(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const fetchChurch = React.useCallback(async () => {
     if (!churchId) {
@@ -49,7 +51,10 @@ export default function ChurchDetailScreen() {
       setLoading(true);
       const res = await api.get(`churches/${churchId}`);
       setData(res?.data?.data || null);
-    } catch {
+      setLoadError(null);
+    } catch (e) {
+      // Shown only when nothing is on screen yet; a failed focus-refresh keeps the details.
+      setLoadError(e);
     } finally {
       setLoading(false);
     }
@@ -186,6 +191,9 @@ export default function ChurchDetailScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('churchDetail')} />
+        {!loading && !data && loadError ? (
+          <ApiErrorState error={loadError} onRetry={fetchChurch} />
+        ) : (
         <ScrollView
 
           contentContainerStyle={{paddingBottom: ms(24)}}>
@@ -455,6 +463,7 @@ export default function ChurchDetailScreen() {
             </>
           )}
         </ScrollView>
+        )}
       </Layout>
     </SafeAreaView>
   );

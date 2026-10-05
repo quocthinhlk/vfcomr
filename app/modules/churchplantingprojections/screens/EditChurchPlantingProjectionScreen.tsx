@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   StyleSheet,
@@ -93,84 +93,98 @@ export const EditChurchPlantingProjectionScreen: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    let mounted = true;
-    if (projectionId) {
-      getChurchPlantingProjectionById(projectionId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const projection = res?.data;
-          if (projection) {
-            setTown(projection.town || '');
-            setCountryId(projection.country_id);
-            setProposedChurchName(projection.proposed_church_name || '');
-            setProposedLeaderName(projection.proposed_leader_name || '');
-            setPopulation(projection.population ? String(projection.population) : '');
-            setStartDatePreparation(
-              projection.start_date_preparation
-                ? new Date(projection.start_date_preparation)
-                : null,
-            );
-            setStartDatePioneering(
-              projection.start_date_pioneering
-                ? new Date(projection.start_date_pioneering)
-                : null,
-            );
-            setDistanceToTown(projection.distance_to_town || '');
-            setDistanceToTownUnit(projection.distance_to_town_unit || 'km');
-            setChurchId(projection.church_id);
-            setUserId(projection.user_id);
-            // Fetch church name
-            if (projection.church_id) {
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  // Named so the error state's "Try again" can re-run it.
+  const loadProjection = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    if (!projectionId) {
+      setLoading(false);
+      return;
+    }
+    try {
+      const res = await getChurchPlantingProjectionById(projectionId);
+      if (!isCurrent()) {
+        return;
+      }
+      setLoadError(null);
+      const projection = res?.data;
+      if (projection) {
+        setTown(projection.town || '');
+        setCountryId(projection.country_id);
+        setProposedChurchName(projection.proposed_church_name || '');
+        setProposedLeaderName(projection.proposed_leader_name || '');
+        setPopulation(projection.population ? String(projection.population) : '');
+        setStartDatePreparation(
+          projection.start_date_preparation
+            ? new Date(projection.start_date_preparation)
+            : null,
+        );
+        setStartDatePioneering(
+          projection.start_date_pioneering
+            ? new Date(projection.start_date_pioneering)
+            : null,
+        );
+        setDistanceToTown(projection.distance_to_town || '');
+        setDistanceToTownUnit(projection.distance_to_town_unit || 'km');
+        setChurchId(projection.church_id);
+        setUserId(projection.user_id);
+        // Fetch church name
+        if (projection.church_id) {
+          api
+            .get(`churches/${projection.church_id}`)
+            .then(churchRes => {
+              const churchData = churchRes?.data?.data;
+              if (churchData?.name && isCurrent()) {
+                setChurchName(churchData.name);
+              }
+            })
+            .catch(() => {});
+        }
+        // Load countries and set selected
+        loadCountries(1).then(() => {
+          // Ensure selected country is in options
+          if (projection.country_id && isCurrent()) {
+            const found = countryOptions.find(opt => opt.value === projection.country_id);
+            if (!found) {
+              // Try to fetch the specific country
               api
-                .get(`churches/${projection.church_id}`)
-                .then(churchRes => {
-                  const churchData = churchRes?.data?.data;
-                  if (churchData?.name && mounted) {
-                    setChurchName(churchData.name);
+                .get(`countries/${projection.country_id}`)
+                .then(countryRes => {
+                  const countryData = countryRes?.data?.data;
+                  if (countryData && isCurrent()) {
+                    setCountryOptions(prev => [
+                      {label: countryData.name, value: countryData.id},
+                      ...prev,
+                    ]);
                   }
                 })
                 .catch(() => {});
             }
-            // Load countries and set selected
-            loadCountries(1).then(() => {
-              // Ensure selected country is in options
-              if (projection.country_id && mounted) {
-                const found = countryOptions.find(opt => opt.value === projection.country_id);
-                if (!found) {
-                  // Try to fetch the specific country
-                  api
-                    .get(`countries/${projection.country_id}`)
-                    .then(countryRes => {
-                      const countryData = countryRes?.data?.data;
-                      if (countryData && mounted) {
-                        setCountryOptions(prev => [
-                          {label: countryData.name, value: countryData.id},
-                          ...prev,
-                        ]);
-                      }
-                    })
-                    .catch(() => {});
-                }
-              }
-            });
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
           }
         });
-    } else {
-      setLoading(false);
+      }
+    } catch (e) {
+      if (isCurrent()) {
+        console.error('Error fetching church planting projection:', e);
+        // Never show a blank form the user could save over real data.
+        setLoadError(e);
+      }
+    } finally {
+      if (isCurrent()) {
+        setLoading(false);
+      }
     }
-    return () => {
-      mounted = false;
-    };
   }, [projectionId]);
+
+  useEffect(() => {
+    loadProjection();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadProjection]);
 
   const formatDateForAPI = (date: Date | null): string => {
     if (!date) return '';
@@ -181,7 +195,7 @@ export const EditChurchPlantingProjectionScreen: React.FC = () => {
   };
 
   const onSave = async () => {
-    if (!projectionId) return;
+    if (!projectionId || loadError) return;
 
     const newInvalid: Record<string, boolean> = {};
     newInvalid.town = !town.trim();
@@ -234,8 +248,15 @@ export const EditChurchPlantingProjectionScreen: React.FC = () => {
     }
   };
 
-  if (loading) {
-    return <ScreenContainer title={`${t('update') || 'Update'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`} loading />;
+  if (loading || loadError) {
+    return (
+      <ScreenContainer
+        title={`${t('update') || 'Update'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`}
+        loading={loading}
+        error={loadError}
+        onRetry={loadProjection}
+      />
+    );
   }
 
   return (

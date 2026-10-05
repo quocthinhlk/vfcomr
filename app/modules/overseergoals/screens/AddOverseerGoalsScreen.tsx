@@ -86,10 +86,22 @@ const AddOverseerGoalsScreen = () => {
     );
   };
 
-  useEffect(() => {
-    Promise.all([loadUsers(), loadChurches(), loadNations()]).catch(error => {
+  const [loadError, setLoadError] = useState<unknown>(null);
+
+  const loadFormData = async () => {
+    try {
+      await Promise.all([loadUsers(), loadChurches(), loadNations()]);
+      setLoadError(null);
+    } catch (error) {
       console.error('Failed to load add goal period form data:', error);
-    });
+      // Empty user / church / nation pickers would make the form unusable.
+      setLoadError(error);
+    }
+  };
+
+  useEffect(() => {
+    loadFormData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const onSave = async () => {
@@ -138,7 +150,10 @@ const AddOverseerGoalsScreen = () => {
   };
 
   return (
-    <ScreenContainer title={t('addGoalPeriod')}>
+    <ScreenContainer
+      title={t('addGoalPeriod')}
+      error={loadError}
+      onRetry={loadFormData}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
         keyboardVerticalOffset={

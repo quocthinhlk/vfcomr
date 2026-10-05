@@ -1,8 +1,9 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {ActivityIndicator, Alert, ScrollView, StyleSheet, View} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {Header} from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -32,23 +33,29 @@ export const OmrSupportScreen = () => {
     message?: string;
   }>({});
 
-  useEffect(() => {
-    const loadIntro = async () => {
-      try {
-        setLoadingIntro(true);
-        const data = await getOmrSupportIntro();
-        if (data?.title) {
-          setTitle(data.title);
-        }
-        setIntroMessage(data?.message || '');
-      } catch {
-        setIntroMessage('');
-      } finally {
-        setLoadingIntro(false);
+  const [introError, setIntroError] = useState<unknown>(null);
+
+  const loadIntro = useCallback(async () => {
+    try {
+      setLoadingIntro(true);
+      const data = await getOmrSupportIntro();
+      if (data?.title) {
+        setTitle(data.title);
       }
-    };
-    loadIntro();
+      setIntroMessage(data?.message || '');
+      setIntroError(null);
+    } catch (error) {
+      console.error('Failed to load OMR support intro:', error);
+      setIntroMessage('');
+      setIntroError(error);
+    } finally {
+      setLoadingIntro(false);
+    }
   }, []);
+
+  useEffect(() => {
+    loadIntro();
+  }, [loadIntro]);
 
   const onSubmit = async () => {
     const nextErrors: {[key: string]: string} = {};
@@ -110,6 +117,8 @@ export const OmrSupportScreen = () => {
               <View style={styles.loadingWrap}>
                 <ActivityIndicator color={COLORS.mainColor} />
               </View>
+            ) : introError ? (
+              <ApiErrorState compact error={introError} onRetry={loadIntro} />
             ) : (
               <>
                 <Text style={[styles.title, {color: C.textPrimary}]}>

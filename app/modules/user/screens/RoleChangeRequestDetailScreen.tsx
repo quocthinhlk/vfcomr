@@ -1,4 +1,4 @@
-import React, {useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
   ActivityIndicator,
@@ -14,6 +14,7 @@ import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import AppButton from '../../../shared/components/AppButton';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, hs, ms, rs} from '../../../shared/utils/scale';
 import api from '../../../config/api';
@@ -59,52 +60,67 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
   const [actioning, setActioning] = useState<RoleChangeRequestStatus | null>(null);
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
 
+  // users/me failing must not read as "Access denied"; a failed detail load
+  // must not read as "No data found". Both show a retryable error.
+  const [roleError, setRoleError] = useState<unknown>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const res = await api.get('users/me');
-        if (!mounted) {
-          return;
-        }
-        setCurrentUserRoleId(resolveRoleIdFromUser(res?.data?.data));
-      } catch {
-        setCurrentUserRoleId(null);
-      }
-    })();
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
+  const loadCurrentUser = useCallback(async () => {
+    try {
+      const res = await api.get('users/me');
+      if (!mountedRef.current) {
+        return;
+      }
+      setCurrentUserRoleId(resolveRoleIdFromUser(res?.data?.data));
+      setRoleError(null);
+    } catch (e) {
+      if (!mountedRef.current) {
+        return;
+      }
+      setCurrentUserRoleId(null);
+      setRoleError(e);
+    }
+  }, []);
+
   useEffect(() => {
-    let mounted = true;
+    loadCurrentUser();
+  }, [loadCurrentUser]);
+
+  const loadRequest = useCallback(async () => {
     if (!requestId) {
       setLoading(false);
       return;
     }
-    (async () => {
-      try {
-        setLoading(true);
-        const res = await getRoleChangeRequest(requestId);
-        if (mounted) {
-          setRequest(res?.data ?? null);
-        }
-      } catch (error) {
-        console.error('Failed to load role change request detail:', error);
-        if (mounted) {
-          setRequest(null);
-        }
-      } finally {
-        if (mounted) {
-          setLoading(false);
-        }
+    try {
+      setLoading(true);
+      const res = await getRoleChangeRequest(requestId);
+      if (mountedRef.current) {
+        setRequest(res?.data ?? null);
+        setLoadError(null);
       }
-    })();
-    return () => {
-      mounted = false;
-    };
+    } catch (error) {
+      console.error('Failed to load role change request detail:', error);
+      if (mountedRef.current) {
+        setRequest(null);
+        setLoadError(error);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [requestId]);
+
+  useEffect(() => {
+    loadRequest();
+  }, [loadRequest]);
 
   const statusLabel = useMemo(() => {
     const status = String(request?.status ?? '').toLowerCase();
@@ -184,6 +200,10 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
   );
 
   const renderBody = () => {
+    if (roleError && currentUserRoleId == null) {
+      return <ApiErrorState error={roleError} onRetry={loadCurrentUser} />;
+    }
+
     if (!isAdmin) {
       return (
         <View style={styles.centerWrap}>
@@ -203,6 +223,10 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
           </Text>
         </View>
       );
+    }
+
+    if (!request && loadError) {
+      return <ApiErrorState error={loadError} onRetry={loadRequest} />;
     }
 
     if (!request) {

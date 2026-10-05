@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
@@ -31,32 +31,48 @@ export const EditLanguageRegionScreen: React.FC = () => {
   const [options, setOptions] = useState<ElementDropdownItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!languageRegionId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const {t} = useTranslation();
 
   useEffect(() => {
-    let mounted = true;
-    if (languageRegionId) {
-      getLanguageRegionById(languageRegionId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const data = res?.data;
-          setName(data?.name || '');
-          setParentId(data?.parent_id ?? null);
-          setDisabled(!!data?.disabled);
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    }
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
+  }, []);
+
+  // Named so the error state's "Try again" can re-run it.
+  const load = useCallback(async () => {
+    if (!languageRegionId) {
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getLanguageRegionById(languageRegionId);
+      if (!mountedRef.current) {
+        return;
+      }
+      const data = res?.data;
+      setName(data?.name || '');
+      setParentId(data?.parent_id ?? null);
+      setDisabled(!!data?.disabled);
+    } catch (e) {
+      // Without the record the form would be blank: show a retryable error.
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [languageRegionId]);
+
+  useEffect(() => {
+    load();
+  }, [load]);
 
   useEffect(() => {
     let mounted = true;
@@ -104,7 +120,9 @@ export const EditLanguageRegionScreen: React.FC = () => {
     <ScreenContainer
       title={`${t('edit')} ${t('languageRegion')}`}
       scroll
-      loading={loading}>
+      loading={loading}
+      error={loadError}
+      onRetry={load}>
       <FormField label={t('name')} required>
         <AppInput
           value={name}

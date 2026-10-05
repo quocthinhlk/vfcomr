@@ -33,6 +33,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {ROLES} from '../../../shared/utils/permissions';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 /** Sentinel value for credentials dropdown when user has no credential type. */
 const CREDENTIALS_NONE_VALUE = 'No';
@@ -197,35 +198,64 @@ export default function AddUserScreen() {
     } catch {}
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
+  // users/form-data (roles) and language-regions feed required fields; if
+  // either fails the form can't be submitted, so show a retryable error.
+  const [formDataError, setFormDataError] = useState<unknown>(null);
+  const [languagesError, setLanguagesError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+
+  const loadFormData = () =>
     api
       .get<FormDataApi>('/users/form-data')
       .then(res => {
-        if (!mounted) {
+        if (!mountedRef.current) {
           return;
         }
         const d = res.data?.data;
         setPrefixOptions(d?.prefixes || []);
         setRoleOptions(d?.roles || []);
         setCredentialOptions(d?.credentials || []);
+        setFormDataError(null);
       })
-      .catch(() => {});
+      .catch(e => {
+        if (mountedRef.current) {
+          setFormDataError(e);
+        }
+      });
+
+  const loadLanguages = () =>
     api
       .get('/language-regions', {params: {sort_by: 'name', sort_desc: false}})
       .then(res => {
-        if (!mounted) {
+        if (!mountedRef.current) {
           return;
         }
         const arr = Array.isArray(res.data?.data) ? res.data.data : [];
         const roots = arr.filter((x: any) => x.parent_id == null && !x.disabled);
         setLanguageOptions(roots.map((x: any) => ({id: x.id, name: x.name})));
+        setLanguagesError(null);
       })
-      .catch(() => {});
+      .catch(e => {
+        if (mountedRef.current) {
+          setLanguagesError(e);
+        }
+      });
+
+  const optionsError = formDataError || languagesError;
+  const retryOptions = () =>
+    Promise.all([
+      formDataError ? loadFormData() : null,
+      languagesError ? loadLanguages() : null,
+    ]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadFormData();
+    loadLanguages();
     loadChurches(1);
     loadCountries(1);
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
@@ -248,6 +278,9 @@ export default function AddUserScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('addNewPastor')} showMenu={false} />
+        {optionsError ? (
+          <ApiErrorState error={optionsError} onRetry={retryOptions} />
+        ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={
@@ -969,6 +1002,7 @@ export default function AddUserScreen() {
             </Formik>
           </ScrollView>
         </KeyboardAvoidingView>
+        )}
       </Layout>
     </SafeAreaView>
   );

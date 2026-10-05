@@ -1,4 +1,4 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useState} from 'react';
 import {
   Alert,
   StyleSheet,
@@ -33,8 +33,6 @@ export const WatchListFormScreen: React.FC = () => {
   const C = useThemedColors();
   const T = useUiTokens();
   const {t} = useTranslation();
-  const tRef = useRef(t);
-  tRef.current = t;
   const [name, setName] = useState('');
   const [sortBy, setSortBy] = useState<WatchListSortBy>('country_id');
   const [sortList, setSortList] = useState('');
@@ -44,40 +42,42 @@ export const WatchListFormScreen: React.FC = () => {
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState(false);
 
-  useEffect(() => {
+  const [loadError, setLoadError] = useState<unknown>(null);
+
+  const loadWatchList = useCallback(async () => {
     if (!watchListId) {
       return;
     }
-    (async () => {
-      try {
-        const response = await getWatchList(watchListId);
-        const item = response.data;
-        setName(item.name ?? '');
-        setSortBy(
-          SORT_OPTIONS.includes(item.sort_by as WatchListSortBy)
-            ? (item.sort_by as WatchListSortBy)
-            : 'country_id',
-        );
-        setSortList(item.sortlist ?? '');
-        setChurches(
-          (item.churches ?? []).reduce<Record<number, string>>((result, church) => {
-            result[church.church_id] = church.church_name;
-            return result;
-          }, {}),
-        );
-      } catch (error) {
-        Alert.alert(
-          tRef.current('error'),
-          error instanceof Error
-            ? error.message
-            : tRef.current('failedToLoadWatchList'),
-        );
-        navigation.goBack();
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, [navigation, watchListId]);
+    setLoading(true);
+    try {
+      const response = await getWatchList(watchListId);
+      const item = response.data;
+      setName(item.name ?? '');
+      setSortBy(
+        SORT_OPTIONS.includes(item.sort_by as WatchListSortBy)
+          ? (item.sort_by as WatchListSortBy)
+          : 'country_id',
+      );
+      setSortList(item.sortlist ?? '');
+      setChurches(
+        (item.churches ?? []).reduce<Record<number, string>>((result, church) => {
+          result[church.church_id] = church.church_name;
+          return result;
+        }, {}),
+      );
+      setLoadError(null);
+    } catch (error) {
+      // Show a recoverable error instead of a blank edit form that could be saved.
+      console.error('Error loading watch list:', error);
+      setLoadError(error);
+    } finally {
+      setLoading(false);
+    }
+  }, [watchListId]);
+
+  useEffect(() => {
+    loadWatchList();
+  }, [loadWatchList]);
 
   const sortLabel = (value: WatchListSortBy) => {
     if (value === 'country_id') {
@@ -123,7 +123,9 @@ export const WatchListFormScreen: React.FC = () => {
       title={watchListId ? t('editWatchList') : t('createWatchList')}
       showMenu
       scroll
-      loading={loading}>
+      loading={loading}
+      error={loadError}
+      onRetry={loadWatchList}>
           <FormField
             label={t('watchListName')}
             required

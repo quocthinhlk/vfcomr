@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import {
 } from 'react-native-safe-area-context';
 import {getChurchesList, ChurchListItem} from '../../church/services/church.service';
 import SearchInput from '../../../shared/components/SearchInput';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {COLORS} from '../../../shared/constants/colors';
@@ -44,6 +45,8 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
   const [items, setItems] = useState<ChurchListItem[]>([]);
   const [draft, setDraft] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
 
   useEffect(() => {
     if (visible) {
@@ -56,6 +59,7 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
     if (!visible) {
       return;
     }
+    const requestId = ++requestRef.current;
     setLoading(true);
     try {
       const data = await getChurchesList({
@@ -66,12 +70,22 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
         search: query.trim() || undefined,
         disabled: false,
       });
+      if (requestId !== requestRef.current) {
+        return;
+      }
       setItems(data?.items ?? []);
+      setLoadError(null);
     } catch (error) {
       console.error('Error loading churches for watch list:', error);
+      if (requestId !== requestRef.current) {
+        return;
+      }
       setItems([]);
+      setLoadError(error);
     } finally {
-      setLoading(false);
+      if (requestId === requestRef.current) {
+        setLoading(false);
+      }
     }
   }, [query, visible]);
 
@@ -135,9 +149,12 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
             keyboardShouldPersistTaps="handled"
             onRefresh={loadChurches}
             refreshing={loading}
+            contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               loading ? (
                 <ActivityIndicator color={COLORS.mainColor} />
+              ) : loadError ? (
+                <ApiErrorState error={loadError} onRetry={loadChurches} />
               ) : (
                 <Text style={[styles.empty, {color: C.textSecondary}]}>
                   {t('noChurchesFound')}
@@ -218,6 +235,7 @@ const styles = StyleSheet.create({
   checkmark: {color: COLORS.white, fontSize: fs(13), fontWeight: '700'},
   churchName: {flex: 1, fontSize: fs(12)},
   empty: {textAlign: 'center', marginTop: ms(30)},
+  listContent: {flexGrow: 1},
 });
 
 export default ChurchMultiSelectModal;

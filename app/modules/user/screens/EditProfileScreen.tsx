@@ -22,6 +22,7 @@ import {formStyles} from '../../../shared/styles/form';
 import {getChurchesList} from '../../church/services/church.service';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {getUserById, updateUser} from '../services/user.service';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
 import {Formik} from 'formik';
@@ -179,15 +180,20 @@ export default function EditProfileScreen() {
     } catch {}
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    async function run() {
+  // Prefill (user + form-data) failed: show a retryable error instead of a
+  // blank, savable form (was an Alert + empty form).
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const loadTokenRef = useRef(0);
+
+  const loadProfile = useCallback(async () => {
+    const token = ++loadTokenRef.current;
+    const isCurrent = () => token === loadTokenRef.current;
       try {
         const [form, userRes] = await Promise.all([
           api.get('/users/form-data'),
           getUserById(userId),
         ]);
-        if (!mounted) {
+        if (!isCurrent()) {
           return;
         }
         const d = form.data?.data || {};
@@ -297,8 +303,9 @@ export default function EditProfileScreen() {
               ? {id: churchIdResolved, name: `Church #${churchIdResolved}`}
               : null;
 
+        setLoadError(null);
         await loadChurches(1);
-        if (mounted) {
+        if (isCurrent()) {
           const seed = userChurchForDropdownRef.current;
           if (seed && seed.id > 0 && seed.name.trim() !== '') {
             setChurchItems(prev =>
@@ -307,30 +314,23 @@ export default function EditProfileScreen() {
           }
         }
       } catch (e: any) {
-        Alert.alert(t('error'), t('failedToChangePassword'));
-        // Set fallback so the form doesn't get stuck on loading state
-        if (mounted) {
-          userChurchForDropdownRef.current = null;
-          setInitial({
-            username: '', password: '', prefix: '', title: '',
-            first_name: '', last_name: '', role_id: null,
-            user_photo: '', photo_url: '', sensitive_nation: false,
-            language_id: null, church_id: null, email_address: '',
-            mobile_phone: '', credentials: '', credentials_number: '',
-            credentials_form: '', credentials_expiry_date: null,
-          });
+        if (isCurrent()) {
+          setLoadError(e);
         }
       } finally {
-        if (mounted) {
+        if (isCurrent()) {
           setLoading(false);
         }
       }
-    }
-    run();
-    return () => {
-      mounted = false;
-    };
   }, [userId, loadChurches]);
+
+  useEffect(() => {
+    loadProfile();
+    return () => {
+      // Invalidate the in-flight request (unmount / user change).
+      loadTokenRef.current += 1;
+    };
+  }, [loadProfile]);
 
   const prefixDropdownData = useMemo(
     () => prefixOptions.map(p => ({label: p, value: p})),
@@ -352,6 +352,19 @@ export default function EditProfileScreen() {
     () => churchItems.map(c => ({label: c.name, value: c.id})),
     [churchItems],
   );
+
+  if (loadError && !initial) {
+    return (
+      <SafeAreaView
+        style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
+        edges={['top', 'bottom', 'left', 'right']}>
+        <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
+          <Header title={t('editUser')} showMenu={false} />
+          <ApiErrorState error={loadError} onRetry={loadProfile} />
+        </Layout>
+      </SafeAreaView>
+    );
+  }
 
   if (loading || !initial) {
     return (

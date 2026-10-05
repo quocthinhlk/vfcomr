@@ -3,6 +3,7 @@ import { ScrollView, View, KeyboardAvoidingView, Platform, Alert, StatusBar } fr
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Layout, Text } from '@ui-kitten/components';
 import { Header } from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import { globalStyles } from '../../../shared/styles/global';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import api from '../../../config/api';
@@ -19,6 +20,7 @@ export default function BibleVerseScreen() {
   const [saving, setSaving] = useState<boolean>(false);
   const [verseHeading, setVerseHeading] = useState<string>('');
   const [verseBody, setVerseBody] = useState<string>('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const loadVerse = useCallback(async () => {
     if (loading) return;
@@ -28,12 +30,15 @@ export default function BibleVerseScreen() {
       const d = res?.data?.data || {};
       setVerseHeading(d?.verse_heading || '');
       setVerseBody(d?.verse_body || '');
+      setLoadError(null);
     } catch (e: any) {
-      Alert.alert(t('error'), e?.response?.data?.message || e?.message || 'Failed to load verse');
+      // Show a recoverable error instead of a blank form that would overwrite the verse on save.
+      console.error('Failed to load verse:', e);
+      setLoadError(e);
     } finally {
       setLoading(false);
     }
-  }, [loading, t]);
+  }, [loading]);
 
   useEffect(() => {
     let mounted = true;
@@ -59,6 +64,9 @@ export default function BibleVerseScreen() {
     <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
       <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
         <Header title={t('bibleVerse')} />
+        {loadError ? (
+          <ApiErrorState error={loadError} onRetry={loadVerse} />
+        ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : ((StatusBar.currentHeight || 0) + hs(50))}
@@ -109,6 +117,7 @@ export default function BibleVerseScreen() {
             </View>
           </ScrollView>
         </KeyboardAvoidingView>
+        )}
       </Layout>
     </SafeAreaView>
   );

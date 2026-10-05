@@ -11,6 +11,7 @@ import {
   CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ListPageBar,
   ListToolbar,
   ScreenContainer,
@@ -32,6 +33,7 @@ export const OverseerGoalsScreen = () => {
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
 
   const getSafeText = (value?: string | null) => {
     if (typeof value !== 'string') {
@@ -55,8 +57,10 @@ export const OverseerGoalsScreen = () => {
         setTotal(data?.total ?? 0);
         setPage(data?.page ?? targetPage);
         setTotalPages(Math.max(1, data?.total_pages ?? 1));
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to load overseer goals:', error);
+        setLoadError(error);
         setItems([]);
         setTotal(0);
         setPage(1);
@@ -119,7 +123,11 @@ export const OverseerGoalsScreen = () => {
   return (
     <ScreenContainer title={t('overseerGoals')} showMenu>
       <ListToolbar
-        countText={`${total} ${t('overseerGoals').toLowerCase()}`}
+        countText={
+          loadError && items.length === 0
+            ? undefined
+            : `${total} ${t('overseerGoals').toLowerCase()}`
+        }
         addRoute="AddOverseerGoals"
       />
 
@@ -155,9 +163,11 @@ export const OverseerGoalsScreen = () => {
               isInitialLoad ? (
                 <CenteredLoader />
               ) : !loading ? (
-                <ListEmptyState
-                  hint={query ? t('tryDifferentSearchKeyword') : t('emptyListHint')}
-                />
+                <ListLoadState error={loadError} onRetry={() => fetchData(page)}>
+                  <ListEmptyState
+                    hint={query ? t('tryDifferentSearchKeyword') : t('emptyListHint')}
+                  />
+                </ListLoadState>
               ) : null
             }
           />

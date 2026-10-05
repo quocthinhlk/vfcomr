@@ -55,6 +55,9 @@ export default function AddNewResourceScreen() {
 
   const [checkingRole, setCheckingRole] = useState(true);
   const [loading, setLoading] = useState(isEdit);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryLoad = () => setReloadKey(k => k + 1);
   const [submitting, setSubmitting] = useState(false);
   const [invalidFields, setInvalidFields] = useState({
     name: false,
@@ -142,8 +145,13 @@ export default function AddNewResourceScreen() {
         setSortOrder(String(detail.sort_order ?? 1));
         setFileIds((detail.files ?? []).map(file => file.id));
         setChildIds((detail.children ?? []).map(child => child.id));
+        setLoadError(null);
       } catch (error) {
-        Alert.alert(t('error'), getApiErrorMessage(error, t));
+        // Show a recoverable error instead of a blank edit form that could be saved.
+        console.error(error);
+        if (mounted) {
+          setLoadError(error);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -153,7 +161,7 @@ export default function AddNewResourceScreen() {
     return () => {
       mounted = false;
     };
-  }, [isEdit, resourceId, selectedLanguage]);
+  }, [isEdit, resourceId, selectedLanguage, reloadKey]);
 
   const previewUri = useMemo(() => {
     if (imagePath) {
@@ -278,7 +286,9 @@ export default function AddNewResourceScreen() {
   return (
     <ScreenContainer
       title={isEdit ? t('editResource') : t('addNewResource')}
-      loading={checkingRole || loading}>
+      loading={checkingRole || loading}
+      error={loadError}
+      onRetry={retryLoad}>
       <KeyboardAvoidingView
         style={{flex: 1}}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>

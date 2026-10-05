@@ -49,6 +49,9 @@ export const EditVisitScreen: React.FC = () => {
   const [churchVisitCount, setChurchVisitCount] = useState('0');
   const [eventCount, setEventCount] = useState('0');
   const [prefillVisit, setPrefillVisit] = useState<VisitItem | null>(null);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryLoad = () => setReloadKey(k => k + 1);
 
   const MONTHS = useMemo(() => Array.from({length: 12}, (_, i) => ({value: i + 1})), []);
   const localeMap: Record<string, string> = useMemo(
@@ -139,6 +142,7 @@ export const EditVisitScreen: React.FC = () => {
     let mounted = true;
 
     (async () => {
+      setLoading(true);
       try {
         const [meRes, visitorsRes, visitRes] = await Promise.all([
           api.get('users/me'),
@@ -196,8 +200,15 @@ export const EditVisitScreen: React.FC = () => {
           await loadExistingVisitChurchCount(defaultUserId!, visitData.year, inferredMonth);
           setEventCount('0');
         }
+        if (mounted) {
+          setLoadError(null);
+        }
       } catch (e) {
         console.error('Failed to load edit visit setup:', e);
+        // Never show (and let the user submit) a blank form that failed to load.
+        if (mounted) {
+          setLoadError(e);
+        }
       } finally {
         if (mounted) setLoading(false);
       }
@@ -207,7 +218,7 @@ export const EditVisitScreen: React.FC = () => {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [visitId]);
+  }, [visitId, reloadKey]);
 
   const clearInvalid = (key: string) => {
     setInvalid(prev => ({...prev, [key]: false}));
@@ -308,6 +319,16 @@ export const EditVisitScreen: React.FC = () => {
 
   if (loading) {
     return <ScreenContainer title={`${t('edit') || 'Edit'} ${t('visits') || 'Visits'}`} loading />;
+  }
+
+  if (loadError) {
+    return (
+      <ScreenContainer
+        title={`${t('edit') || 'Edit'} ${t('visits') || 'Visits'}`}
+        error={loadError}
+        onRetry={retryLoad}
+      />
+    );
   }
 
   return (

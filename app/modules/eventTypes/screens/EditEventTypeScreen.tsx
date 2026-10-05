@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
@@ -37,38 +37,50 @@ export const EditEventTypeScreen: React.FC = () => {
     {label: t('eventMeetingWith') || 'Meeting With', value: 'meeting_with' as const},
   ];
 
-  useEffect(() => {
-    let mounted = true;
-    if (eventTypeId) {
-      getEventTypeById(eventTypeId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const eventType = res?.data;
-          if (eventType) {
-            setName(eventType.name || '');
-            setColor(eventType.color || '#808080');
-            setCellColor(eventType.cell_color || '#D9D9D9');
-            setMeetingType(resolveEventMeetingType(eventType.meeting_type));
-          }
-        })
-        .catch(() => {})
-        .finally(() => {
-          if (mounted) {
-            setLoading(false);
-          }
-        });
-    } else {
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const requestRef = useRef(0);
+
+  const loadEventType = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    if (!eventTypeId) {
       setLoading(false);
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    try {
+      const res = await getEventTypeById(eventTypeId);
+      if (requestId !== requestRef.current) {
+        return;
+      }
+      const eventType = res?.data;
+      if (eventType) {
+        setName(eventType.name || '');
+        setColor(eventType.color || '#808080');
+        setCellColor(eventType.cell_color || '#D9D9D9');
+        setMeetingType(resolveEventMeetingType(eventType.meeting_type));
+      }
+      setLoadError(null);
+    } catch (e) {
+      if (requestId === requestRef.current) {
+        console.error('Error fetching event type:', e);
+        // Never show a blank form the user could save over real data.
+        setLoadError(e);
+      }
+    } finally {
+      if (requestId === requestRef.current) {
+        setLoading(false);
+      }
+    }
   }, [eventTypeId]);
 
+  useEffect(() => {
+    loadEventType();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [loadEventType]);
+
   const onSave = async () => {
-    if (!eventTypeId) return;
+    if (!eventTypeId || loadError) return;
     
     const newInvalid: Record<string, boolean> = {};
     newInvalid.name = !name.trim();
@@ -103,7 +115,9 @@ export const EditEventTypeScreen: React.FC = () => {
     <ScreenContainer
       title={`${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'}`}
       scroll
-      loading={loading}>
+      loading={loading}
+      error={loadError}
+      onRetry={loadEventType}>
       <FormField
         label={t('eventTypeName') || 'Event Type Name'}
         required

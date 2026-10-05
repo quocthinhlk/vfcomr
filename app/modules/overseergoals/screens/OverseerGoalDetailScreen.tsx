@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Pressable, ScrollView, StyleSheet, View} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
@@ -112,45 +112,50 @@ const OverseerGoalDetailScreen = () => {
   const [detail, setDetail] = useState<GoalPeriodDetailData | null>(null);
   const hasDetail = useRef(false);
 
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
+
+  const loadDetail = useCallback(async () => {
+    if (!goalPeriodId) {
+      setLoading(false);
+      return;
+    }
+
+    if (!hasDetail.current) {
+      setLoading(true);
+    }
+
+    try {
+      const response = await getOverseerGoalPeriodDetail(goalPeriodId);
+      if (mountedRef.current) {
+        const nextDetail = response?.data ?? null;
+        hasDetail.current = nextDetail != null;
+        setDetail(nextDetail);
+        setLoadError(null);
+      }
+    } catch (error) {
+      console.error('Failed to load goal period detail:', error);
+      if (mountedRef.current && !hasDetail.current) {
+        setDetail(null);
+        setLoadError(error);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [goalPeriodId]);
+
   useFocusEffect(
     useCallback(() => {
-      let mounted = true;
-
-      const loadDetail = async () => {
-        if (!goalPeriodId) {
-          setLoading(false);
-          return;
-        }
-
-        if (!hasDetail.current) {
-          setLoading(true);
-        }
-
-        try {
-          const response = await getOverseerGoalPeriodDetail(goalPeriodId);
-          if (mounted) {
-            const nextDetail = response?.data ?? null;
-            hasDetail.current = nextDetail != null;
-            setDetail(nextDetail);
-          }
-        } catch (error) {
-          console.error('Failed to load goal period detail:', error);
-          if (mounted && !hasDetail.current) {
-            setDetail(null);
-          }
-        } finally {
-          if (mounted) {
-            setLoading(false);
-          }
-        }
-      };
-
       loadDetail();
-
-      return () => {
-        mounted = false;
-      };
-    }, [goalPeriodId]),
+    }, [loadDetail]),
   );
 
   const sectionSummaries = useMemo(() => {
@@ -208,7 +213,11 @@ const OverseerGoalDetailScreen = () => {
   const cardStyle = {backgroundColor: C.surface, borderColor: C.border};
 
   return (
-    <ScreenContainer title={t('overseerGoalDetail')} loading={loading}>
+    <ScreenContainer
+      title={t('overseerGoalDetail')}
+      loading={loading}
+      error={!detail ? loadError : null}
+      onRetry={loadDetail}>
         {!detail ? (
           <ListEmptyState />
         ) : (

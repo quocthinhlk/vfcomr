@@ -88,6 +88,9 @@ export const AddVisitsScreen: React.FC = () => {
   const [selectedYear, setSelectedYear] = useState<number | null>(new Date().getFullYear());
   const [churchVisitCount, setChurchVisitCount] = useState('0');
   const [eventCount, setEventCount] = useState('0');
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const retryLoad = () => setReloadKey(k => k + 1);
 
   const monthOptions = useMemo(() => {
     const locale = localeMap[selectedLanguage as string] || 'en-US';
@@ -115,6 +118,7 @@ export const AddVisitsScreen: React.FC = () => {
     let mounted = true;
 
     (async () => {
+      setLoading(true);
       try {
         const [meRes, visitorsRes] = await Promise.all([
           api.get('users/me'),
@@ -168,8 +172,13 @@ export const AddVisitsScreen: React.FC = () => {
         setUserId(selectedVisitor?.value ?? meId);
         setVisitorName(selectedVisitor?.name || '');
         setVisitorRole(selectedVisitor?.role || '');
+        setLoadError(null);
       } catch (error) {
         console.error('Failed to load visit/event setup:', error);
+        // Without the current user the form cannot be submitted: show a retry.
+        if (mounted) {
+          setLoadError(error);
+        }
       } finally {
         if (mounted) {
           setLoading(false);
@@ -180,7 +189,7 @@ export const AddVisitsScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const clearInvalid = (key: string) => {
     setInvalid(prev => ({...prev, [key]: false}));
@@ -288,6 +297,16 @@ export const AddVisitsScreen: React.FC = () => {
 
   if (loading) {
     return <ScreenContainer title={t('addVisits') || 'Add Visits & Events'} loading />;
+  }
+
+  if (loadError) {
+    return (
+      <ScreenContainer
+        title={t('addVisits') || 'Add Visits & Events'}
+        error={loadError}
+        onRetry={retryLoad}
+      />
+    );
   }
 
   return (

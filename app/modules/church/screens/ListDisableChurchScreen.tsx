@@ -34,7 +34,13 @@ import {
 import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
-import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
+import {
+  ListEmptyState,
+  ListLoadState,
+  ListPageBar,
+  ListToolbar,
+} from '../../../shared/components/crud';
+import {ChurchIcon} from '../../../shared/components/icons/UiIcons';
 import SearchInput from '../../../shared/components/SearchInput';
 
 const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
@@ -81,6 +87,7 @@ export const ChurchesListScreen: React.FC = () => {
   const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
   const [roleId, setRoleId] = useState<number | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
@@ -137,8 +144,12 @@ export const ChurchesListScreen: React.FC = () => {
       setTotal(nextTotal);
       setTotalPages(Math.max(nextPages, Math.ceil(nextTotal / limit) || 1));
       setPage(Number(data?.page ?? targetPage) || targetPage);
-    } catch {
-      // noop UI-level
+      setLoadError(null);
+    } catch (e) {
+      // Surface the failure as a recoverable error, never as "no churches".
+      if (id === requestId.current) {
+        setLoadError(e);
+      }
     } finally {
       if (id === requestId.current) {
         setLoading(false);
@@ -253,7 +264,11 @@ export const ChurchesListScreen: React.FC = () => {
         <Header title={t('disabledChurches')} />
 
         <ListToolbar
-          countText={`${total} ${(total === 1 ? t('church') : t('churches')).toLowerCase()}`}
+          countText={
+            loadError && !total
+              ? undefined
+              : `${total} ${(total === 1 ? t('church') : t('churches')).toLowerCase()}`
+          }
         />
 
         <SearchInput
@@ -282,11 +297,12 @@ export const ChurchesListScreen: React.FC = () => {
                 <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
               }
               ListEmptyComponent={
-                !loading ? (
-                  <Text style={[styles.empty, {color: C.textSecondary}]}>
-                    {t('noChurchesFound')}
-                  </Text>
-                ) : null
+                <ListLoadState
+                  loading={loading}
+                  error={loadError}
+                  onRetry={() => fetchData(page)}>
+                  <ListEmptyState icon={ChurchIcon} title={t('noChurchesFound')} />
+                </ListLoadState>
               }
             />
           </PaginatedListPager>
@@ -394,7 +410,6 @@ const styles = StyleSheet.create({
   copyBtn: {
     backgroundColor: COLORS.mainColor,
   },
-  empty: {textAlign: 'center', marginTop: ms(40)},
   pagination: {paddingVertical: ms(12), alignItems: 'flex-end'},
   pageNumbersContainer: {flexDirection: 'row', alignItems: 'center'},
   pageNumber: {

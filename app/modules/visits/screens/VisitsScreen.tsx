@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   FlatList,
@@ -28,6 +28,7 @@ import {
   CenteredLoader,
   EntityListCard,
   ListEmptyState,
+  ListLoadState,
   ListPageBar,
   ListToolbar,
   ScreenContainer,
@@ -50,6 +51,9 @@ export const VisitsScreen: React.FC = () => {
   const [year, setYear] = useState<number>(new Date().getFullYear());
   const [weekNumber, setWeekNumber] = useState<number | null>(null);
   const [query, setQuery] = useState('');
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const hasItemsRef = useRef(false);
+  hasItemsRef.current = items.length > 0;
 
   const fetchData = useCallback(
     async (targetPage: number = 1, reset = false) => {
@@ -91,9 +95,15 @@ export const VisitsScreen: React.FC = () => {
         setTotalPages(res?.data?.total_pages ?? 1);
         setPage(res?.data?.page ?? targetPage);
         setItems(filtered);
+        setLoadError(null);
       } catch (e) {
         console.error('Error fetching visits:', e);
-        Alert.alert(t('error') || 'Error', t('failedToLoadVisits') || 'Failed to load visits');
+        setLoadError(e);
+        // Nothing on screen: the list shows a recoverable error state instead.
+        // Already-loaded items stay visible; just tell the user the reload failed.
+        if (hasItemsRef.current) {
+          Alert.alert(t('error') || 'Error', t('failedToLoadVisits') || 'Failed to load visits');
+        }
       } finally {
         setLoading(false);
       }
@@ -181,7 +191,11 @@ export const VisitsScreen: React.FC = () => {
   return (
     <ScreenContainer title={t('visits') || 'Visits'} showMenu>
       <ListToolbar
-        countText={`${total} ${(t('visits') || 'Visits').toLowerCase()}`}
+        countText={
+          loadError && items.length === 0
+            ? undefined
+            : `${total} ${(t('visits') || 'Visits').toLowerCase()}`
+        }
         addRoute="AddVisits"
       />
 
@@ -248,7 +262,9 @@ export const VisitsScreen: React.FC = () => {
               isInitialLoading ? (
                 <CenteredLoader />
               ) : !loading ? (
-                <ListEmptyState hint={query ? undefined : t('emptyListHint')} />
+                <ListLoadState error={loadError} onRetry={() => fetchData(1, true)}>
+                  <ListEmptyState hint={query ? undefined : t('emptyListHint')} />
+                </ListLoadState>
               ) : null
             }
           />
