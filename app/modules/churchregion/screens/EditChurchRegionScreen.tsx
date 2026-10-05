@@ -8,6 +8,7 @@ import {
   getChurchRegionHierarchy,
 } from '../services/churchregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ElementDropdown, {
   ElementDropdownItem,
 } from '../../../shared/components/ElementDropdown';
@@ -128,10 +129,14 @@ export const EditChurchRegionScreen: React.FC = () => {
           const form = new FormData();
           const fileName = imagePath.split('/').pop() || 'logo.jpg';
           form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
-          form.append('entity_type', 'church-regions');
+          form.append('entity_type', 'all');
           form.append('alt_text', name.trim());
           const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-          updateData.logo_path = uploadRes?.data?.data?.path || '';
+          const uploadedPath = uploadRes?.data?.data?.path;
+          if (!uploadedPath) {
+            throw new Error(t('apiErrorUnexpected'));
+          }
+          updateData.logo_path = uploadedPath;
         } else if (imageRemoved && !existingLogoUrl) {
           // User removed the image without uploading a new one
           updateData.logo_path = '';
@@ -143,7 +148,7 @@ export const EditChurchRegionScreen: React.FC = () => {
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('edit')} ${t('success')}`);
       returnAfterEdit(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to update church region');
+      Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
       setSubmitting(false);
     }

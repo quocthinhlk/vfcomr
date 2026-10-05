@@ -168,13 +168,30 @@ export const ChurchesListScreen: React.FC = () => {
       setPageLoading(prev => ({...prev, [targetPage]: true}));
       try {
         const q = queryRef.current;
-        const data = await getChurchesList({
+        const params = {
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
           sort_by: 'id',
           sort_desc: true,
           search: q && q.trim() ? q.trim() : undefined,
-        });
+        };
+        let data = await getChurchesList(params);
+        // On first open the API sometimes returns pagination totals that
+        // contradict the page itself (e.g. total: 1 with 10 items) while other
+        // requests (users/me) run concurrently. Retry once when that happens.
+        const looksInconsistent = (d: any) => {
+          if (!d) {
+            return false;
+          }
+          const count = d.items?.length ?? 0;
+          return (
+            (Number(d.total) || 0) < count ||
+            (!!d.has_next && (Number(d.total_pages) || 1) <= (Number(d.page) || targetPage))
+          );
+        };
+        if (looksInconsistent(data) && token === fetchTokenRef.current) {
+          data = await getChurchesList(params);
+        }
         // Discard responses from a previous query/filter.
         if (token !== fetchTokenRef.current) {return;}
         const nextItems = (data?.items ?? []) as ChurchListItem[];

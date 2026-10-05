@@ -6,6 +6,7 @@ import {
   getChurchRegionHierarchy,
 } from '../services/churchregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ElementDropdown, {
   ElementDropdownItem,
 } from '../../../shared/components/ElementDropdown';
@@ -77,21 +78,24 @@ export const AddChurchRegionScreen: React.FC = () => {
         const form = new FormData();
         const fileName = imagePath.split('/').pop() || 'logo.jpg';
         form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
-        form.append('entity_type', 'church-regions');
+        form.append('entity_type', 'all');
         form.append('alt_text', name.trim());
         const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
         uploadedLogoPath = uploadRes?.data?.data?.path || null;
+        if (!uploadedLogoPath) {
+          throw new Error(t('apiErrorUnexpected'));
+        }
       }
 
       await createChurchRegion({
         name: name.trim(),
         parent_id: parentId ?? null,
-        logo_path: uploadedLogoPath ?? undefined,
+        logo_path: uploadedLogoPath ?? '',
       } as any);
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('add')} ${t('success')}`);
       navigation.navigate('ChurchRegions', { reload: true });
     } catch (e: any) {
-      Alert.alert(t('error') || 'Error', e?.message || 'Failed to create church region');
+      Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
       setSubmitting(false);
     }

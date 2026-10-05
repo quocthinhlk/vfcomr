@@ -137,32 +137,25 @@ export const RoleChangeRequestsScreen: React.FC = () => {
         activeOpacity={0.7}
         onPress={() => navigation.navigate('RoleChangeRequestDetail', {id: item.id})}
         style={listStyles.itemCard as any}>
-        <View style={styles.row}>
-          <View style={styles.avatar}>
-            <Text style={styles.avatarText}>{initialsOf(item.user_name)}</Text>
-          </View>
-          <View style={{flex: 1}}>
-            <View style={styles.titleRow}>
-              <Text style={[styles.title, {color: C.textPrimary}]} numberOfLines={1}>
-                {item.user_name}
-              </Text>
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{t('statusPending')}</Text>
-              </View>
-            </View>
-            <Text style={styles.roleLine} numberOfLines={2}>
-              <Text style={[styles.roleFrom, {color: C.textSecondary}]}>
-                {item.old_role_name}
-              </Text>
-              <Text style={styles.roleArrow}> → </Text>
-              <Text style={styles.roleTo}>{item.new_role_name}</Text>
-            </Text>
-            <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
-              {t('requestedBy')}: {item.requested_by_name}
-            </Text>
+        <View style={styles.titleRow}>
+          <Text style={[styles.title, {color: C.textPrimary}]} numberOfLines={1}>
+            {item.user_name}
+          </Text>
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{t('statusPending')}</Text>
           </View>
           <Text style={[styles.chevron, {color: C.textSecondary}]}>›</Text>
         </View>
+        <Text style={styles.roleLine} numberOfLines={1}>
+          <Text style={[styles.roleFrom, {color: C.textSecondary}]}>
+            {item.old_role_name}
+          </Text>
+          <Text style={styles.roleArrow}> → </Text>
+          <Text style={styles.roleTo}>{item.new_role_name}</Text>
+        </Text>
+        <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+          {t('requestedBy')}: {item.requested_by_name}
+        </Text>
       </TouchableOpacity>
     );
   };
@@ -184,9 +177,11 @@ export const RoleChangeRequestsScreen: React.FC = () => {
           </View>
         ) : (
           <View style={{flex: 1}}>
-            <ListToolbar
-              countText={`${total} ${t('roleChangeRequests').toLowerCase()}`}
-            />
+            <View style={styles.toolbarWrap}>
+              <ListToolbar
+                countText={`${total} ${t('roleChangeRequests').toLowerCase()}`}
+              />
+            </View>
             <PaginatedListPager page={page} totalPages={totalPages} onPageChange={goToPage}>
               <FlatList
                 data={items}
@@ -218,46 +213,20 @@ export const RoleChangeRequestsScreen: React.FC = () => {
   );
 };
 
-function initialsOf(name?: string): string {
-  return (
-    (name || '')
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map(part => part[0]?.toUpperCase())
-      .join('') || 'U'
-  );
-}
-
 const styles = StyleSheet.create({
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ws(12),
-  },
-  avatar: {
-    width: ms(40),
-    height: ms(40),
-    borderRadius: ms(20),
-    backgroundColor: COLORS.mainColor,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    color: COLORS.white,
-    fontSize: fs(14),
-    fontWeight: '700',
+  toolbarWrap: {
+    marginBottom: ms(12),
   },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: ws(8),
-    marginBottom: ms(4),
+    marginBottom: ms(6),
   },
   title: {
+    flex: 1,
     fontSize: fs(15),
     fontWeight: '700',
-    flexShrink: 1,
   },
   badge: {
     paddingHorizontal: ms(8),
@@ -274,7 +243,7 @@ const styles = StyleSheet.create({
   },
   roleLine: {
     fontSize: fs(13),
-    marginBottom: ms(2),
+    marginBottom: ms(4),
   },
   roleFrom: {
     fontSize: fs(13),
@@ -292,8 +261,9 @@ const styles = StyleSheet.create({
     fontSize: fs(12),
   },
   chevron: {
-    fontSize: fs(24),
-    marginLeft: ws(4),
+    fontSize: fs(22),
+    lineHeight: fs(22),
+    marginLeft: ws(2),
   },
   empty: {
     textAlign: 'center',

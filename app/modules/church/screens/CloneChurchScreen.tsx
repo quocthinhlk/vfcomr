@@ -30,6 +30,7 @@ import {
 } from '../../../shared/components/icons';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 import SearchInput from '../../../shared/components/SearchInput';
 
 export const CloneChurchScreen: React.FC = () => {
@@ -53,13 +54,30 @@ export const CloneChurchScreen: React.FC = () => {
           return;
         }
         setLoading(true);
-        const data = await getChurchesList({
+        const params = {
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
           sort_by: 'id',
           sort_desc: true,
           search: query && query.trim() ? query.trim() : undefined,
-        });
+        };
+        let data = await getChurchesList(params);
+        // On first open the API sometimes returns pagination totals that
+        // contradict the page itself (e.g. total: 1 with 10 items) while other
+        // requests (users/me) run concurrently. Retry once when that happens.
+        const looksInconsistent = (d: any) => {
+          if (!d) {
+            return false;
+          }
+          const count = d.items?.length ?? 0;
+          return (
+            (Number(d.total) || 0) < count ||
+            (!!d.has_next && (Number(d.total_pages) || 1) <= (Number(d.page) || targetPage))
+          );
+        };
+        if (looksInconsistent(data)) {
+          data = await getChurchesList(params);
+        }
         const nextItems = (data?.items ?? []) as ChurchListItem[];
         setTotalPages(data?.total_pages ?? 1);
         setTotal(data?.total ?? 0);
@@ -165,55 +183,6 @@ export const CloneChurchScreen: React.FC = () => {
 
   const keyExtractor = (item: ChurchListItem) => String(item.id);
 
-  const renderPagination = () => {
-    const itemsToRender: Array<{
-      label: string;
-      page: number;
-      active?: boolean;
-      disabled?: boolean;
-    }> = [];
-    itemsToRender.push({label: '<<', page: 1, disabled: page === 1});
-    for (let p = page - 2; p <= page - 1; p++) {
-      if (p >= 1) {
-        itemsToRender.push({label: String(p), page: p});
-      }
-    }
-    itemsToRender.push({label: String(page), page, active: true});
-    for (let p = page + 1; p <= page + 2; p++) {
-      if (p <= totalPages) {
-        itemsToRender.push({label: String(p), page: p});
-      }
-    }
-    itemsToRender.push({
-      label: '>>',
-      page: totalPages,
-      disabled: page === totalPages,
-    });
-    return (
-      <View style={listStyles.pageNumbersContainer as any}>
-        {itemsToRender.map(p => (
-          <TouchableOpacity
-            key={`${p.label}-${p.page}`}
-            style={[
-              listStyles.pageNumber as any,
-              p.active && (listStyles.pageNumberActive as any),
-              (p.disabled || loading) && (listStyles.pageNumberDisabled as any),
-            ]}
-            onPress={() => goToPage(p.page)}
-            disabled={!!p.disabled || loading}>
-            <Text
-              style={[
-                listStyles.pageNumberText as any,
-                p.active && (listStyles.pageNumberTextActive as any),
-              ]}>
-              {p.label}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -229,6 +198,8 @@ export const CloneChurchScreen: React.FC = () => {
             <Text style={styles.addButtonText}>+ Add New</Text>
           </TouchableOpacity>
         </View> */}
+
+        <ListToolbar countText={`${total} ${t('churches').toLowerCase()}`} />
 
         <SearchInput
           value={query}
@@ -261,10 +232,12 @@ export const CloneChurchScreen: React.FC = () => {
             />
           </PaginatedListPager>
         </View>
-        <Text style={[styles.subTitle, {color: C.textSecondary}]}>
-          {`${t('total')}: ${total} • ${t('page')} ${page}/${totalPages} • ${DEFAULT_PAGE_LIMIT} ${t('perPage')}`}
-        </Text>
-        <View style={styles.pagination}>{renderPagination()}</View>
+        <ListPageBar
+          page={page}
+          totalPages={totalPages}
+          loading={loading}
+          onPageChange={goToPage}
+        />
       </View>
     </SafeAreaView>
   );
@@ -282,11 +255,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {fontSize: fs(16), fontWeight: '600'},
-  subTitle: {
-    marginTop: ms(6),
-    marginBottom: ms(10),
-    fontSize: fs(12),
-  },
   addButton: {
     backgroundColor: COLORS.mainColor,
     paddingHorizontal: ms(12),
@@ -348,7 +316,6 @@ const styles = StyleSheet.create({
     backgroundColor: COLORS.mainColor,
   },
   empty: {textAlign: 'center', marginTop: ms(40)},
-  pagination: {paddingVertical: ms(12), alignItems: 'flex-end'},
   pageNumbersContainer: {flexDirection: 'row', alignItems: 'center'},
   pageNumber: {
     width: ws(20),
