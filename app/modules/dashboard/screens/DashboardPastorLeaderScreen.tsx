@@ -46,6 +46,7 @@ import {
   promptPermissionSettings,
   resolveRoleIdFromUser,
 } from '../../../shared/utils/permissions';
+import AppLoadingView from '../../../shared/components/AppLoadingView';
 
 // Helper function to decode HTML entities (e.g., &#x20ab; -> ₫)
 const decodeHtmlEntity = (str: string): string => {
@@ -1816,14 +1817,7 @@ export default function DashboardPastorLeaderScreen() {
   const visibleStats = showAllStats ? allStats : allStats.slice(0, 4);
 
   if (loading) {
-    return (
-      <SafeAreaView style={[styles.container, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}>
-        <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(16) }}>
-          <ActivityIndicator size="large" color={COLORS.mainColor} />
-          <Text style={{ color: C.textPrimary, fontSize: fs(15) }}>{t('loading')}...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <AppLoadingView />;
   }
 
   if (!userProfile || loadError) {

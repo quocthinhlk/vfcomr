@@ -1,7 +1,6 @@
 import React, {useCallback, useContext, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActionSheetIOS,
-  ActivityIndicator,
   Alert,
   Animated,
   Easing,
@@ -37,6 +36,7 @@ import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
 import {updateUser} from '../../user/services/user.service';
 import {BellSvgIcon} from '../../../shared/components/icons';
+import AppLoadingView from '../../../shared/components/AppLoadingView';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -611,16 +611,7 @@ export default function OverseerDashboardScreen() {
   });
 
   if (loading) {
-    return (
-      <SafeAreaView
-        style={{flex: 1, backgroundColor: C.background}}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View style={{flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(12)}}>
-          <ActivityIndicator size="large" color={COLORS.mainColor} />
-          <Text style={{color: C.textPrimary}}>{t('loading')}...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <AppLoadingView />;
   }
 
   if (loadError) {

@@ -9,7 +9,6 @@ import {
   Modal,
   Animated,
   Easing,
-  ActivityIndicator,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text, Button} from '@ui-kitten/components';
@@ -41,6 +40,7 @@ import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatList
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {BellSvgIcon} from '../../../shared/components/icons';
+import AppLoadingView from '../../../shared/components/AppLoadingView';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -231,17 +231,7 @@ export default function DashboardScreen() {
   ];
 
   if (loading) {
-    return (
-      <SafeAreaView
-        style={{flex: 1, backgroundColor: C.background}}
-        edges={['top', 'bottom', 'left', 'right']}>
-        <View
-          style={{flex: 1, justifyContent: 'center', alignItems: 'center', gap: ms(12)}}>
-          <ActivityIndicator size="large" color={COLORS.mainColor} />
-          <Text style={{color: C.textPrimary}}>{t('loading')}...</Text>
-        </View>
-      </SafeAreaView>
-    );
+    return <AppLoadingView />;
   }
 
   if (loadError) {
