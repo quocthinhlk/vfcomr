@@ -89,3 +89,38 @@ export const NetworkIcon: React.FC<UiIconProps> = ({size = LG, color}) => (
     <Path d="M12 7.5v5M12 12.5L6.5 17M12 12.5l5.5 4.5" {...stroke(color)} />
   </Svg>
 );
+
+export const WifiOffIcon: React.FC<UiIconProps> = ({size = LG, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M2 2l20 20" {...stroke(color)} />
+    <Path d="M8.5 16.4a5 5 0 0 1 7 0" {...stroke(color)} />
+    <Path d="M5 12.9a10 10 0 0 1 5.2-2.7M14 10.3a10 10 0 0 1 5 2.6" {...stroke(color)} />
+    <Path d="M1.5 9.3a15 15 0 0 1 4.3-2.8M10.7 5a15 15 0 0 1 11.8 4.3" {...stroke(color)} />
+    <Circle cx={12} cy={20} r={1.2} fill={color} />
+  </Svg>
+);
+
+export const ServerIcon: React.FC<UiIconProps> = ({size = LG, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={3} y={4} width={18} height={7} rx={2} {...stroke(color)} />
+    <Rect x={3} y={13} width={18} height={7} rx={2} {...stroke(color)} />
+    <Circle cx={7} cy={7.5} r={1} fill={color} />
+    <Circle cx={7} cy={16.5} r={1} fill={color} />
+  </Svg>
+);
+
+export const ClockIcon: React.FC<UiIconProps> = ({size = LG, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx={12} cy={12} r={9} {...stroke(color)} />
+    <Path d="M12 7v5l3 2" {...stroke(color)} />
+  </Svg>
+);
+
+export const RefreshIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M20 11a8 8 0 0 0-14.3-4.9L4 8" {...stroke(color)} />
+    <Path d="M4 3v5h5" {...stroke(color)} />
+    <Path d="M4 13a8 8 0 0 0 14.3 4.9L20 16" {...stroke(color)} />
+    <Path d="M20 21v-5h-5" {...stroke(color)} />
+  </Svg>
+);
