@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   StyleSheet,
@@ -57,68 +57,91 @@ export const AddChurchPlantingProjectionScreen: React.FC = () => {
     {label: 'miles', value: 'miles'},
   ];
 
+  const fetchCountries = async (page: number = 1, name: string = '') => {
+    const res = await api.get('countries', {
+      params: {page, limit: 20, name, sort_by: 'name', sort_desc: false},
+    });
+    const data = res?.data?.data;
+    if (page === 1) {
+      setCountryOptions(
+        (data?.items || []).map((item: any) => ({
+          label: item.name,
+          value: item.id,
+        })),
+      );
+    } else {
+      setCountryOptions(prev => [
+        ...prev,
+        ...(data?.items || []).map((item: any) => ({
+          label: item.name,
+          value: item.id,
+        })),
+      ]);
+    }
+    setCountryHasNext(data?.has_next || false);
+    setCountryPage(page);
+  };
+
+  // Dropdown search / paging: keep the current list if a page fails.
   const loadCountries = async (page: number = 1, name: string = '') => {
     try {
-      const res = await api.get('countries', {
-        params: {page, limit: 20, name, sort_by: 'name', sort_desc: false},
-      });
-      const data = res?.data?.data;
-      if (page === 1) {
-        setCountryOptions(
-          (data?.items || []).map((item: any) => ({
-            label: item.name,
-            value: item.id,
-          })),
-        );
-      } else {
-        setCountryOptions(prev => [
-          ...prev,
-          ...(data?.items || []).map((item: any) => ({
-            label: item.name,
-            value: item.id,
-          })),
-        ]);
-      }
-      setCountryHasNext(data?.has_next || false);
-      setCountryPage(page);
+      await fetchCountries(page, name);
     } catch (e) {
       console.error('Error loading countries:', e);
     }
   };
 
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        if (!savedChurchId) {
-          Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
-          navigation.goBack();
-          return;
-        }
-        const id = parseInt(savedChurchId, 10);
-        if (isNaN(id)) {
-          Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
-          navigation.goBack();
-          return;
-        }
-        setChurchId(id);
-        // Fetch church name
-        const res = await api.get(`churches/${id}`);
-        const churchData = res?.data?.data;
-        if (churchData?.name && mounted) {
-          setChurchName(churchData.name);
-        }
-        // Load countries
-        await loadCountries(1);
-      } catch (e) {
-        console.error('Error fetching church info:', e);
+  // Church + countries are required by the form: if they fail (e.g. offline)
+  // show a retryable error instead of a form with an empty Nation dropdown.
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
+
+  const loadInitial = useCallback(async () => {
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+      if (!savedChurchId) {
+        Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
+        navigation.goBack();
+        return;
       }
-    })();
-    return () => {
-      mounted = false;
-    };
+      const id = parseInt(savedChurchId, 10);
+      if (isNaN(id)) {
+        Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
+        navigation.goBack();
+        return;
+      }
+      setChurchId(id);
+      const res = await api.get(`churches/${id}`);
+      if (!mountedRef.current) {
+        return;
+      }
+      const churchData = res?.data?.data;
+      if (churchData?.name) {
+        setChurchName(churchData.name);
+      }
+      await fetchCountries(1);
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [navigation, t]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    loadInitial();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [loadInitial]);
 
   const formatDateForAPI = (date: Date | null): string => {
     if (!date) return '';
@@ -185,7 +208,11 @@ export const AddChurchPlantingProjectionScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title={`${t('create') || 'Create'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`}>
+    <ScreenContainer
+      title={`${t('create') || 'Create'} ${t('churchPlantingProjection') || 'Church Planting Projection'}`}
+      loading={loading}
+      error={loadError}
+      onRetry={loadInitial}>
       {churchName ? (
         <Text style={[styles.churchNameText, {color: C.textPrimary}]}>
           {t('create') || 'Create'} {t('churchPlantingProjection') || 'Church Planting Projection'} {t('for') || 'for'} {churchName}

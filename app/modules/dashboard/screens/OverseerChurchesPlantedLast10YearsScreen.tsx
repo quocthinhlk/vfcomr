@@ -5,6 +5,7 @@ import {Text} from '@ui-kitten/components';
 import Svg, {G, Line, Rect, Text as SvgText} from 'react-native-svg';
 import {useFocusEffect} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -108,6 +109,8 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
   const [loading, setLoading] = useState(true);
+  // Offline / server error must not look like "No data found".
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [years, setYears] = useState<PlantedClosedYearRow[]>([]);
   const [pastorName, setPastorName] = useState('');
   const [regionNation, setRegionNation] = useState('');
@@ -117,6 +120,7 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await getOverseerIndicators();
       const graph = data?.church_planted_graph;
       const list = graph?.data;
@@ -133,8 +137,9 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
         pickGraphHeaderValue(graph, ['reporting_period', 'period']) ||
           formatReportingPeriod(normalised.map(row => row.year)),
       );
-    } catch {
+    } catch (e) {
       setYears([]);
+      setLoadError(e);
     } finally {
       setLoading(false);
     }
@@ -471,6 +476,8 @@ export default function OverseerChurchesPlantedLast10YearsScreen() {
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={COLORS.mainColor} />
           </View>
+        ) : loadError ? (
+          <ApiErrorState error={loadError} onRetry={load} />
         ) : (
           <View style={styles.content}>
             <View

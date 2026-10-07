@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -20,24 +20,41 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
+  const [loading, setLoading] = useState(!!churchNetworkId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const {t} = useTranslation();
 
-  useEffect(() => {
-    let mounted = true;
-    if (churchNetworkId) {
-      getChurchNetworkById(churchNetworkId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          setName(res?.data?.name || 'this church network');
-        })
-        .catch(() => {});
+  // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
+  const load = useCallback(async () => {
+    if (!churchNetworkId) {
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getChurchNetworkById(churchNetworkId);
+      if (mountedRef.current) {
+        setName(res?.data?.name || 'this church network');
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [churchNetworkId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    load();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [load]);
 
   const onConfirm = async () => {
     if (!churchNetworkId) return;
@@ -58,7 +75,12 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title={`${t('delete')} ${t('churchNetwork')}`} scroll>
+    <ScreenContainer
+      title={`${t('delete')} ${t('churchNetwork')}`}
+      scroll
+      loading={loading}
+      error={loadError}
+      onRetry={load}>
       <DeleteConfirmView
         name={name}
         onCancel={() => navigation.goBack()}

@@ -1,18 +1,12 @@
-import React, {useState, useEffect, useCallback} from 'react';
+import React, {useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {createFAQ} from '../services/faq.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import api from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {useSuperAdminGuard} from '../hooks/useSuperAdminGuard';
+import {useFaqLanguageOptions} from '../hooks/useFaqLanguageOptions';
 import {ScreenContainer} from '../../../shared/components/crud';
 import {FAQForm, FAQFormScroll} from '../components/FAQForm';
-
-interface LanguageOption {
-  id: number;
-  name: string;
-}
 
 // Function to convert HTML to formatted text
 const convertHtmlToText = (html: string): string => {
@@ -79,58 +73,13 @@ export const AddFAQScreen: React.FC = () => {
   const [tags, setTags] = useState<string[]>(['']);
   const [submitting, setSubmitting] = useState(false);
   const {t} = useTranslation();
-  const [languageOptions, setLanguageOptions] = useState<{label: string; value: number}[]>([]);
-  const [userRoleId, setUserRoleId] = useState<number | null>(null);
-  const [checkingRole, setCheckingRole] = useState(true);
 
-  // Check user role on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get('users/me');
-        const roleId = res?.data?.data?.role?.id;
-        if (typeof roleId === 'number') {
-          setUserRoleId(roleId);
-          if (!isSuperAdmin(roleId)) {
-            // Redirect non-admin users
-            Alert.alert(t('error') || 'Error', t('accessDenied') || 'Access denied. Only administrators can add FAQs.');
-            navigation.goBack();
-            return;
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching user role:', e);
-        Alert.alert(t('error') || 'Error', t('failedToVerifyPermissions') || 'Failed to verify permissions.');
-        navigation.goBack();
-      } finally {
-        setCheckingRole(false);
-      }
-    })();
-  }, [navigation, t]);
+  const {isAdmin, checkingRole, roleError, checkRole} = useSuperAdminGuard(
+    t('accessDenied') || 'Access denied. Only administrators can add FAQs.',
+  );
+  const {languageOptions, languagesLoading, languagesError, loadLanguages} =
+    useFaqLanguageOptions();
 
-  const loadLanguages = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-      const res = await api.get('/languages', {
-        params: {page: 1, limit: 100, sort_by: 'name', sort_desc: false},
-        headers: {Authorization: `Bearer ${token}`},
-      });
-      const langItems = res?.data?.data?.items || [];
-      setLanguageOptions(
-        langItems.map((lang: LanguageOption) => ({
-          label: lang.name,
-          value: lang.id,
-        })),
-      );
-    } catch (e) {
-      console.error('Error loading languages:', e);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadLanguages();
-  }, [loadLanguages]);
 
   const handleAddTag = () => {
     setTags([...tags, '']);
@@ -181,8 +130,26 @@ export const AddFAQScreen: React.FC = () => {
     }
   };
 
+  const title = `${t('addNew') || 'Add New'} ${t('faq') || 'FAQ'}`;
+
+  if (checkingRole) {
+    return <ScreenContainer title={title} loading />;
+  }
+
+  if (roleError) {
+    return <ScreenContainer title={title} error={roleError} onRetry={checkRole} />;
+  }
+
+  if (!isAdmin) {
+    return null; // Redirected by useSuperAdminGuard
+  }
+
   return (
-    <ScreenContainer title={`${t('addNew') || 'Add New'} ${t('faq') || 'FAQ'}`}>
+    <ScreenContainer
+      title={title}
+      loading={languagesLoading}
+      error={languagesError}
+      onRetry={loadLanguages}>
       <FAQFormScroll>
         <FAQForm
           questionHeader={questionHeader}

@@ -4,16 +4,10 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {updateFAQ, getFAQById} from '../services/faq.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import api from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {useSuperAdminGuard} from '../hooks/useSuperAdminGuard';
+import {useFaqLanguageOptions} from '../hooks/useFaqLanguageOptions';
 import {ScreenContainer} from '../../../shared/components/crud';
 import {FAQForm, FAQFormScroll} from '../components/FAQForm';
-
-interface LanguageOption {
-  id: number;
-  name: string;
-}
 
 // Function to convert HTML to formatted text
 const convertHtmlToText = (html: string): string => {
@@ -83,58 +77,13 @@ export const EditFAQScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
   const {t} = useTranslation();
-  const [languageOptions, setLanguageOptions] = useState<{label: string; value: number}[]>([]);
-  const [userRoleId, setUserRoleId] = useState<number | null>(null);
-  const [checkingRole, setCheckingRole] = useState(true);
 
-  const loadLanguages = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-      const res = await api.get('/languages', {
-        params: {page: 1, limit: 100, sort_by: 'name', sort_desc: false},
-        headers: {Authorization: `Bearer ${token}`},
-      });
-      const langItems = res?.data?.data?.items || [];
-      setLanguageOptions(
-        langItems.map((lang: LanguageOption) => ({
-          label: lang.name,
-          value: lang.id,
-        })),
-      );
-    } catch (e) {
-      console.error('Error loading languages:', e);
-    }
-  }, []);
+  const {languageOptions, languagesLoading, languagesError, loadLanguages} =
+    useFaqLanguageOptions();
 
-  useEffect(() => {
-    loadLanguages();
-  }, [loadLanguages]);
-
-  // Check user role on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get('users/me');
-        const roleId = res?.data?.data?.role?.id;
-        if (typeof roleId === 'number') {
-          setUserRoleId(roleId);
-          if (!isSuperAdmin(roleId)) {
-            // Redirect non-admin users
-            Alert.alert(t('error') || 'Error', t('accessDenied') || 'Access denied. Only administrators can edit FAQs.');
-            navigation.goBack();
-            return;
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching user role:', e);
-        Alert.alert(t('error') || 'Error', t('failedToVerifyPermissions') || 'Failed to verify permissions.');
-        navigation.goBack();
-      } finally {
-        setCheckingRole(false);
-      }
-    })();
-  }, [navigation, t]);
+  const {isAdmin, checkingRole, roleError, checkRole} = useSuperAdminGuard(
+    t('accessDenied') || 'Access denied. Only administrators can edit FAQs.',
+  );
 
   const [loadError, setLoadError] = useState<unknown>(null);
   const requestRef = useRef(0);
@@ -238,16 +187,25 @@ export const EditFAQScreen: React.FC = () => {
     return <ScreenContainer title={title} loading />;
   }
 
-  if (!isSuperAdmin(userRoleId)) {
+  if (roleError) {
+    return <ScreenContainer title={title} error={roleError} onRetry={checkRole} />;
+  }
+
+  if (!isAdmin) {
     return null; // Will redirect in useEffect
   }
 
   return (
     <ScreenContainer
       title={title}
-      loading={loading}
-      error={loadError}
-      onRetry={loadFaq}>
+      loading={loading || languagesLoading}
+      error={loadError || languagesError}
+      onRetry={() =>
+        Promise.all([
+          loadError ? loadFaq() : undefined,
+          languagesError ? loadLanguages() : undefined,
+        ])
+      }>
       <FAQFormScroll>
         <FAQForm
           questionHeader={questionHeader}

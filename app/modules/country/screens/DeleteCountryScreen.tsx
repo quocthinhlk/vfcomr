@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {deleteCountry, getCountryById} from '../services/country.service';
@@ -15,24 +15,41 @@ export const DeleteCountryScreen: React.FC = () => {
   const countryId: number | undefined = route.params?.countryId;
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(!!countryId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const {t} = useTranslation();
 
-  useEffect(() => {
-    let mounted = true;
-    if (countryId) {
-      getCountryById(countryId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          setName(res?.data?.name || 'this country');
-        })
-        .catch(() => {});
+  // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
+  const load = useCallback(async () => {
+    if (!countryId) {
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getCountryById(countryId);
+      if (mountedRef.current) {
+        setName(res?.data?.name || 'this country');
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [countryId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    load();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [load]);
 
   const onConfirm = async () => {
     if (!countryId) return;
@@ -49,7 +66,12 @@ export const DeleteCountryScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title={`${t('delete')} ${t('country')}`} scroll>
+    <ScreenContainer
+      title={`${t('delete')} ${t('country')}`}
+      scroll
+      loading={loading}
+      error={loadError}
+      onRetry={load}>
       <DeleteConfirmView
         name={name}
         onCancel={() => navigation.goBack()}

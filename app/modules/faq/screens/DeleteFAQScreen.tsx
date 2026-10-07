@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -6,9 +6,8 @@ import {
   getFAQById,
 } from '../services/faq.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {useSuperAdminGuard} from '../hooks/useSuperAdminGuard';
 import {returnToList} from '../../../shared/utils/returnToList';
-import api from '../../../config/api';
 import {
   DeleteConfirmView,
   ScreenContainer,
@@ -21,50 +20,46 @@ export const DeleteFAQScreen: React.FC = () => {
   const [questionHeader, setQuestionHeader] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const {t} = useTranslation();
-  const [userRoleId, setUserRoleId] = useState<number | null>(null);
-  const [checkingRole, setCheckingRole] = useState(true);
+  const [loading, setLoading] = useState(!!faqId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
 
-  // Check user role on mount
-  useEffect(() => {
-    (async () => {
-      try {
-        const res = await api.get('users/me');
-        const roleId = res?.data?.data?.role?.id;
-        if (typeof roleId === 'number') {
-          setUserRoleId(roleId);
-          if (!isSuperAdmin(roleId)) {
-            // Redirect non-admin users
-            Alert.alert(t('error') || 'Error', t('accessDenied') || 'Access denied. Only administrators can delete FAQs.');
-            navigation.goBack();
-            return;
-          }
-        }
-      } catch (e) {
-        console.error('Error fetching user role:', e);
-        Alert.alert(t('error') || 'Error', t('failedToVerifyPermissions') || 'Failed to verify permissions.');
-        navigation.goBack();
-      } finally {
-        setCheckingRole(false);
+  const {isAdmin, checkingRole, roleError, checkRole} = useSuperAdminGuard(
+    t('accessDenied') || 'Access denied. Only administrators can delete FAQs.',
+  );
+
+  // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
+  const load = useCallback(async () => {
+    if (!faqId) {
+      return;
+    }
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getFAQById(faqId);
+      if (mountedRef.current) {
+        setQuestionHeader(res?.data?.question_header || 'this FAQ');
       }
-    })();
-  }, [navigation, t]);
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [faqId]);
 
   useEffect(() => {
-    let mounted = true;
-    if (faqId && isSuperAdmin(userRoleId)) {
-      getFAQById(faqId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          setQuestionHeader(res?.data?.question_header || 'this FAQ');
-        })
-        .catch(() => {});
+    mountedRef.current = true;
+    if (isAdmin) {
+      load();
     }
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
-  }, [faqId, userRoleId]);
+  }, [isAdmin, load]);
 
   const onConfirm = async () => {
     if (!faqId) return;
@@ -86,12 +81,21 @@ export const DeleteFAQScreen: React.FC = () => {
     return <ScreenContainer title={title} loading />;
   }
 
-  if (!isSuperAdmin(userRoleId)) {
+  if (roleError) {
+    return <ScreenContainer title={title} error={roleError} onRetry={checkRole} />;
+  }
+
+  if (!isAdmin) {
     return null; // Will redirect in useEffect
   }
 
   return (
-    <ScreenContainer title={title} scroll>
+    <ScreenContainer
+      title={title}
+      scroll
+      loading={loading}
+      error={loadError}
+      onRetry={load}>
       <DeleteConfirmView
         name={questionHeader}
         onCancel={() => navigation.goBack()}

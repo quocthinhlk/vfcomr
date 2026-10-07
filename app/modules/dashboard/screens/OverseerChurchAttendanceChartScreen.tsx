@@ -20,6 +20,7 @@ import Svg, {
 } from 'react-native-svg';
 import {useFocusEffect} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -124,6 +125,8 @@ export default function OverseerChurchAttendanceChartScreen() {
   const {t, selectedLanguage} = useTranslation();
   const exportSvgRef = useRef<Svg>(null);
   const [loading, setLoading] = useState(true);
+  // Offline / server error must not look like "No data found".
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [saving, setSaving] = useState(false);
   const [showExportSvg, setShowExportSvg] = useState(false);
   const capturingRef = useRef(false);
@@ -139,6 +142,7 @@ export default function OverseerChurchAttendanceChartScreen() {
   const load = useCallback(async () => {
     try {
       setLoading(true);
+      setLoadError(null);
       const data = await getOverseerIndicators();
       const graph = data?.attendance_graph;
       const list = graph?.data;
@@ -162,8 +166,9 @@ export default function OverseerChurchAttendanceChartScreen() {
         pickGraphHeaderValue(graph, ['reporting_period', 'period']) ||
           formatReportingPeriod([minYear, currentYear]),
       );
-    } catch {
+    } catch (e) {
       setPoints([]);
+      setLoadError(e);
     } finally {
       setLoading(false);
     }
@@ -565,6 +570,8 @@ export default function OverseerChurchAttendanceChartScreen() {
           <View style={styles.loadingWrap}>
             <ActivityIndicator color={COLORS.mainColor} />
           </View>
+        ) : loadError ? (
+          <ApiErrorState error={loadError} onRetry={load} />
         ) : points.length === 0 ? (
           <View style={styles.loadingWrap}>
             <Text style={[styles.infoText, {color: C.textSecondary}]}>{t('noDataFound')}</Text>

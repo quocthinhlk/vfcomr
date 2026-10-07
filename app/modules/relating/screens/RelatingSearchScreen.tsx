@@ -79,6 +79,11 @@ export default function RelatingSearchScreen() {
   const countryDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Failure of the unfiltered country list that the whole form depends on.
   const [countriesLoadError, setCountriesLoadError] = useState<unknown>(null);
+  // A failed keyword search keeps the current list and says why, instead of
+  // looking like "no country matches".
+  const [countrySearchError, setCountrySearchError] = useState<unknown>(null);
+  // Without cities the form can't be completed: show a retryable error.
+  const [citiesLoadError, setCitiesLoadError] = useState<unknown>(null);
 
   const loadCountries = useCallback(async (keyword?: string) => {
     try {
@@ -90,9 +95,12 @@ export default function RelatingSearchScreen() {
       });
       setCountries(data);
       setCountriesLoadError(null);
+      setCountrySearchError(null);
     } catch (error) {
-      setCountries([]);
-      if (!keyword) {
+      if (keyword) {
+        setCountrySearchError(error);
+      } else {
+        setCountries([]);
         setCountriesLoadError(error);
       }
     } finally {
@@ -105,10 +113,12 @@ export default function RelatingSearchScreen() {
   const loadCities = useCallback(async (countryId: number) => {
     try {
       setLoadingCities(true);
+      setCitiesLoadError(null);
       const data = await listCitiesByCountry(countryId);
       setCities(data);
-    } catch {
+    } catch (error) {
       setCities([]);
+      setCitiesLoadError(error);
     } finally {
       setLoadingCities(false);
     }
@@ -151,6 +161,7 @@ export default function RelatingSearchScreen() {
     setSelectedCity(null);
     setSelectedCityId(null);
     setCities([]);
+    setCitiesLoadError(null);
     setResult(null);
     setName('');
     setEmail('');
@@ -395,6 +406,10 @@ export default function RelatingSearchScreen() {
                 <Text style={[styles.helperText, {color: C.textSecondary}]}>
                   {t('loadingCountries')}
                 </Text>
+              ) : countrySearchError ? (
+                <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>
+                  {getApiErrorMessage(countrySearchError, t)}
+                </Text>
               ) : null}
             </View>
 
@@ -403,6 +418,13 @@ export default function RelatingSearchScreen() {
                 <Text style={[styles.label, {color: C.textSecondary}]}>
                   {t('city')}
                 </Text>
+                {citiesLoadError && !loadingCities ? (
+                  <ApiErrorState
+                    compact
+                    error={citiesLoadError}
+                    onRetry={() => loadCities(selectedCountryId)}
+                  />
+                ) : (
                 <ElementDropdown
                   data={cityOptions}
                   value={selectedCityId}
@@ -424,6 +446,7 @@ export default function RelatingSearchScreen() {
                 }
                   error={!!fieldErrors.city}
                 />
+                )}
                 {fieldErrors.city ? (
                   <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{fieldErrors.city}</Text>
                 ) : null}

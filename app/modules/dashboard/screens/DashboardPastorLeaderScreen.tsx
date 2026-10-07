@@ -26,7 +26,7 @@ import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatList
 import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
-import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import {getApiErrorMessage, parseApiError} from '../../../shared/utils/apiErrorHandler';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {getUserById, updateUser} from '../../user/services/user.service';
@@ -887,7 +887,8 @@ export default function DashboardPastorLeaderScreen() {
     });
   };
 
-  const handleSelectAssignedChurch = async (church: any) => {
+  /** Returns false when offline / timed out (the error state is shown instead). */
+  const handleSelectAssignedChurch = async (church: any): Promise<boolean> => {
     const churchIdNum = parseRouteChurchId(church?.id) ?? null;
     const churchNameFromParam = typeof church?.name === 'string' ? church.name.trim() : '';
     const churchCountryFromParam = typeof church?.country_name === 'string' ? church.country_name.trim() : '';
@@ -923,6 +924,12 @@ export default function DashboardPastorLeaderScreen() {
         data = normalizePastorLeaderDashboard(getAxiosDataPayload(res), {fallbackChurchId: churchIdNum});
       } catch (apiErr: any) {
         console.warn('[handleSelectAssignedChurch] dashboard API failed:', apiErr?.message);
+        // Offline: don't pass off an empty dashboard (all zeros) as real data.
+        const parsed = parseApiError(apiErr);
+        if (parsed.isNetworkError || parsed.isTimeout) {
+          setLoadError(getApiErrorMessage(apiErr, tRef.current));
+          return false;
+        }
         // Build a minimal data structure so the screen is still usable
         data = normalizePastorLeaderDashboard(
           { dashboard_info: { church_id: churchIdNum, church_name: churchNameFromParam, country_name: churchCountryFromParam }, dashboard_indicators: {} },
@@ -1021,6 +1028,7 @@ export default function DashboardPastorLeaderScreen() {
         profileImage: (prev && prev.profileImage) || '',
         bannerImage: data.dashboard_info?.photo_url || '',
       }));
+      return true;
     } catch (e) {
       console.warn('[handleSelectAssignedChurch] unexpected error:', e);
       // Even on unexpected error, show church info from params so screen is not blank
@@ -1042,6 +1050,7 @@ export default function DashboardPastorLeaderScreen() {
           bannerImage: prev?.bannerImage || '',
         }));
       }
+      return true;
     } finally {
       setLoading(false);
     }
@@ -1107,7 +1116,7 @@ export default function DashboardPastorLeaderScreen() {
                 ? String(savedChurchCountryName).trim()
                 : undefined;
 
-          await handleSelectAssignedChurch({
+          const churchLoaded = await handleSelectAssignedChurch({
             id: effectiveChurchId,
             name: resolvedName,
             country_name: resolvedCountry,
@@ -1142,7 +1151,7 @@ export default function DashboardPastorLeaderScreen() {
               // ignore
             }
           }
-          if (mounted) {
+          if (mounted && churchLoaded) {
             setLoadError(null);
           }
           return;

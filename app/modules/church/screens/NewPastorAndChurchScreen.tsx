@@ -169,6 +169,8 @@ export default function NewPastorAndChurchScreen() {
     languageRegionOptions,
     countryOptions,
     localCurrencyOptions,
+    error: optionsError,
+    reload: reloadOptions,
   } = useFormOptions();
 
   const {
@@ -607,8 +609,16 @@ export default function NewPastorAndChurchScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('addNewChurchAndPastor')} showMenu={false} />
-        {formDataError ? (
-          <ApiErrorState error={formDataError} onRetry={loadFormData} />
+        {formDataError || optionsError ? (
+          <ApiErrorState
+            error={formDataError || optionsError}
+            onRetry={() =>
+              Promise.all([
+                optionsError ? reloadOptions() : undefined,
+                formDataError ? loadFormData() : undefined,
+              ])
+            }
+          />
         ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}

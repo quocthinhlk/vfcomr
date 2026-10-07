@@ -16,6 +16,7 @@ import {
   resumeSessionWithBiometrics,
 } from '../../../shared/services/biometrics.service';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
+import { parseApiError } from '../../../shared/utils/apiErrorHandler';
 
 function getLoginErrorMessage(error: unknown): string {
   if (!axios.isAxiosError(error)) {
@@ -31,6 +32,12 @@ function getLoginErrorMessage(error: unknown): string {
     status === 404
   ) {
     return 'invalidCredentials';
+  }
+
+  // Offline / timed out: say so instead of a generic "login failed".
+  const { messageKey } = parseApiError(error);
+  if (messageKey === 'apiErrorNetwork' || messageKey === 'apiErrorTimeout') {
+    return messageKey;
   }
 
   return 'loginFailed';

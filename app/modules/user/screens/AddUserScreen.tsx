@@ -162,7 +162,14 @@ export default function AddUserScreen() {
     return only.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
   };
 
+  // Church and nation are required: if their first page fails (e.g. offline)
+  // the form can't be completed, so it joins the retryable error below.
+  // A failed search / next page just keeps the current list.
+  const [churchesError, setChurchesError] = useState<unknown>(null);
+  const [countriesError, setCountriesError] = useState<unknown>(null);
+
   const loadChurches = useCallback(async (page: number, query?: string) => {
+    const isInitial = page === 1 && !query?.trim();
     try {
       const data = await getChurchesList({
         page,
@@ -175,10 +182,18 @@ export default function AddUserScreen() {
       setChurchItems(prev => (page === 1 ? items : [...prev, ...items]));
       setChurchTotal(data?.total ?? items.length);
       setChurchPage(data?.page ?? page);
-    } catch {}
+      if (isInitial) {
+        setChurchesError(null);
+      }
+    } catch (e) {
+      if (isInitial) {
+        setChurchesError(e);
+      }
+    }
   }, []);
 
   const loadCountries = useCallback(async (page: number, query?: string) => {
+    const isInitial = page === 1 && !query?.trim();
     try {
       const res = await api.get('/countries', {
         params: {
@@ -195,7 +210,14 @@ export default function AddUserScreen() {
       setCountryItems(prev => (page === 1 ? mapped : [...prev, ...mapped]));
       setCountryTotal(data?.total ?? mapped.length);
       setCountryPage(data?.page ?? page);
-    } catch {}
+      if (isInitial) {
+        setCountriesError(null);
+      }
+    } catch (e) {
+      if (isInitial) {
+        setCountriesError(e);
+      }
+    }
   }, []);
 
   // users/form-data (roles) and language-regions feed required fields; if
@@ -241,11 +263,14 @@ export default function AddUserScreen() {
         }
       });
 
-  const optionsError = formDataError || languagesError;
+  const optionsError =
+    formDataError || languagesError || churchesError || countriesError;
   const retryOptions = () =>
     Promise.all([
       formDataError ? loadFormData() : null,
       languagesError ? loadLanguages() : null,
+      churchesError ? loadChurches(1) : null,
+      countriesError ? loadCountries(1) : null,
     ]);
 
   useEffect(() => {

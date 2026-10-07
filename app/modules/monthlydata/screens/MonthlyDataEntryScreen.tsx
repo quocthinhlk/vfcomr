@@ -553,7 +553,11 @@ export default function MonthlyDataEntryScreen() {
   }, [churchId, sortedWeekNumbers]);
 
   const fetchWorshipServices = useCallback(
-    async (force = false): Promise<WorshipSession[]> => {
+    /**
+     * `strict`: throw instead of returning []. Forms built from server data need
+     * the full service list; without it, sessions would silently go missing.
+     */
+    async (force = false, strict = false): Promise<WorshipSession[]> => {
       if (!churchId) {return [];}
       if (!force && worshipServicesRef.current) {
         return worshipServicesRef.current;
@@ -582,6 +586,9 @@ export default function MonthlyDataEntryScreen() {
         return mapped;
       } catch (error) {
         console.error('Error loading worship services:', error);
+        if (strict) {
+          throw error;
+        }
         return [];
       }
     },
@@ -714,6 +721,16 @@ export default function MonthlyDataEntryScreen() {
       loadingWeeksRef.current.add(weekNumber);
       setLoadingWeeks(prev => new Set(prev).add(weekNumber));
 
+      // Only the first week has the error screen; a failed background
+      // preload is simply not cached and is re-fetched on switch.
+      const showWeekError = (cause: unknown) => {
+        if (isFirstWeek) {
+          setInitialLoadError(cause);
+          setLoading(false);
+        }
+      };
+      let reportLoaded = false;
+
       try {
         // Check context first
         const contextData = getWeekData(churchId, year, weekNumber);
@@ -745,7 +762,8 @@ export default function MonthlyDataEntryScreen() {
         } else {
           // Load from API
           const data = await getWeeklyReport(churchId, year, weekNumber);
-          const baseServices = await fetchWorshipServices();
+          reportLoaded = true;
+          const baseServices = await fetchWorshipServices(false, true);
           const worshipSessionsForWeek = mergeWorshipSessions(
             baseServices,
             data.worship_sessions || [],
@@ -769,17 +787,22 @@ export default function MonthlyDataEntryScreen() {
           }
         }
       } catch (error: any) {
-        // Offline / timed out: the report may well exist, so an empty form
-        // would risk overwriting it. Show a recoverable error for the first week.
+        // Offline / timed out, or the report loaded but its services didn't:
+        // the report may well exist, so an empty form would risk overwriting it.
         const cause = error?.cause ?? error;
         const parsed = parseApiError(cause);
-        if (isFirstWeek && (parsed.isNetworkError || parsed.isTimeout)) {
-          setInitialLoadError(cause);
-          setLoading(false);
+        if (reportLoaded || parsed.isNetworkError || parsed.isTimeout) {
+          showWeekError(cause);
           return;
         }
-        // If report doesn't exist, create empty structure
-        const worshipSessionsForWeek = await fetchWorshipServices();
+        // If report doesn't exist, create empty structure from the church's services
+        let worshipSessionsForWeek: WorshipSession[];
+        try {
+          worshipSessionsForWeek = await fetchWorshipServices(false, true);
+        } catch (servicesError) {
+          showWeekError(servicesError);
+          return;
+        }
         const emptyData: WeeklyReportData = {
           church_id: churchId,
           year,
@@ -884,10 +907,13 @@ export default function MonthlyDataEntryScreen() {
       }
 
       // Load from API
+      setInitialLoadError(null);
       setLoadingWeeks(prev => new Set(prev).add(weekNumber));
+      let reportLoaded = false;
       try {
         const data = await getWeeklyReport(churchId, year, weekNumber);
-        const baseServices = await fetchWorshipServices();
+        reportLoaded = true;
+        const baseServices = await fetchWorshipServices(false, true);
         const worshipSessionsForWeek = mergeWorshipSessions(
           baseServices,
           data.worship_sessions || [],
@@ -901,8 +927,23 @@ export default function MonthlyDataEntryScreen() {
           setWorshipSessions(worshipSessionsForWeek);
         }
       } catch (error: any) {
-        // If report doesn't exist, create empty structure
-        const worshipSessionsForWeek = await fetchWorshipServices();
+        // Offline / timed out, or the report loaded but its services didn't:
+        // don't show an incomplete or empty form that could overwrite an
+        // existing report; show the retryable error for this week instead.
+        const cause = error?.cause ?? error;
+        const parsed = parseApiError(cause);
+        if (reportLoaded || parsed.isNetworkError || parsed.isTimeout) {
+          setInitialLoadError(cause);
+          return;
+        }
+        // If report doesn't exist, create empty structure from the church's services
+        let worshipSessionsForWeek: WorshipSession[];
+        try {
+          worshipSessionsForWeek = await fetchWorshipServices(false, true);
+        } catch (servicesError) {
+          setInitialLoadError(servicesError);
+          return;
+        }
         const emptyData: WeeklyReportData = {
           church_id: churchId,
           year,
@@ -1476,7 +1517,14 @@ export default function MonthlyDataEntryScreen() {
         </View>
 
         {initialLoadError ? (
-          <ApiErrorState error={initialLoadError} onRetry={loadInitialData} />
+          <ApiErrorState
+            error={initialLoadError}
+            onRetry={() =>
+              currentWeekNumber === sortedWeekNumbers[0]
+                ? loadInitialData()
+                : loadWeekData(currentWeekNumber)
+            }
+          />
         ) : showSkeleton ? (
           <ScrollView
             style={styles.scrollView}

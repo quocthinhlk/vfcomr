@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -18,25 +18,42 @@ export const DeleteChurchRegionScreen: React.FC = () => {
   const churchRegionId: number | undefined = route.params?.churchRegionId;
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(!!churchRegionId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const {t} = useTranslation();
 
-  useEffect(() => {
-    let mounted = true;
-    if (churchRegionId) {
-      getChurchRegionById(churchRegionId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const data = res?.data?.data || res?.data;
-          setName(data?.name || 'this region');
-        })
-        .catch(() => {});
+  // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
+  const load = useCallback(async () => {
+    if (!churchRegionId) {
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getChurchRegionById(churchRegionId);
+      if (mountedRef.current) {
+        const data = res?.data?.data || res?.data;
+        setName(data?.name || 'this region');
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [churchRegionId]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    load();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [load]);
 
   const onConfirm = async () => {
     if (!churchRegionId) return;
@@ -53,7 +70,12 @@ export const DeleteChurchRegionScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title={`${t('delete')} ${t('churchApostolicRegions')}`} scroll>
+    <ScreenContainer
+      title={`${t('delete')} ${t('churchApostolicRegions')}`}
+      scroll
+      loading={loading}
+      error={loadError}
+      onRetry={load}>
       <DeleteConfirmView
         name={name}
         onCancel={() => navigation.goBack()}

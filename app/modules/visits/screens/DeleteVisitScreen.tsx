@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
@@ -18,35 +18,46 @@ export const DeleteVisitScreen: React.FC = () => {
   const visitId: number | undefined = route.params?.visitId;
   const [visitInfo, setVisitInfo] = useState<string>('');
   const [submitting, setSubmitting] = useState(false);
+  const [loading, setLoading] = useState(!!visitId);
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   const {t} = useTranslation();
 
-  useEffect(() => {
-    let mounted = true;
-    if (visitId) {
-      getVisitById(visitId)
-        .then(res => {
-          if (!mounted) {
-            return;
-          }
-          const visit = res?.data;
-          if (visit) {
-            setVisitInfo(
-              `${t('year') || 'Year'} ${visit.year} • ${t('week') || 'Week'} ${visit.week_number}`,
-            );
-          } else {
-            setVisitInfo(t('visit') || 'this Visit');
-          }
-        })
-        .catch(() => {
-          if (mounted) {
-            setVisitInfo(t('visit') || 'this Visit');
-          }
-        });
+  // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
+  const load = useCallback(async () => {
+    if (!visitId) {
+      return;
     }
-    return () => {
-      mounted = false;
-    };
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const res = await getVisitById(visitId);
+      if (mountedRef.current) {
+        const visit = res?.data;
+        setVisitInfo(
+          visit
+            ? `${t('year') || 'Year'} ${visit.year} • ${t('week') || 'Week'} ${visit.week_number}`
+            : t('visit') || 'this Visit',
+        );
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        setLoadError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setLoading(false);
+      }
+    }
   }, [visitId, t]);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    load();
+    return () => {
+      mountedRef.current = false;
+    };
+  }, [load]);
 
   const onConfirm = async () => {
     if (!visitId) return;
@@ -66,7 +77,12 @@ export const DeleteVisitScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title={`${t('delete') || 'Delete'} ${t('visit') || 'Visit'}`} scroll>
+    <ScreenContainer
+      title={`${t('delete') || 'Delete'} ${t('visit') || 'Visit'}`}
+      scroll
+      loading={loading}
+      error={loadError}
+      onRetry={load}>
       <DeleteConfirmView
         name={visitInfo}
         onCancel={() => navigation.goBack()}

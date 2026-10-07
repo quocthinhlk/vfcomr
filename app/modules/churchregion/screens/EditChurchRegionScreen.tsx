@@ -88,32 +88,42 @@ export const EditChurchRegionScreen: React.FC = () => {
     load();
   }, [load]);
 
-  useEffect(() => {
-    let mounted = true;
-    const fetchHierarchy = async () => {
-      try {
-        const resp = await getChurchRegionHierarchy();
-        const tree = (resp?.data ?? resp) as any[];
-        const out: ElementDropdownItem[] = [];
-        const walk = (nodes: any[], depth: number) => {
-          nodes?.forEach(n => {
-            out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
-            if (n.children && n.children.length) {
-              walk(n.children, depth + 1);
-            }
-          });
-        };
-        walk(tree || [], 0);
-        if (mounted) {
-          setOptions(out);
-        }
-      } catch {}
-    };
-    fetchHierarchy();
-    return () => {
-      mounted = false;
-    };
+  // Without the parent list the saved parent shows blank and could be lost on save.
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState<unknown>(null);
+  const fetchHierarchy = useCallback(async () => {
+    setOptionsLoading(true);
+    setOptionsError(null);
+    try {
+      const resp = await getChurchRegionHierarchy();
+      const tree = (resp?.data ?? resp) as any[];
+      const out: ElementDropdownItem[] = [];
+      const walk = (nodes: any[], depth: number) => {
+        nodes?.forEach(n => {
+          out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
+          if (n.children && n.children.length) {
+            walk(n.children, depth + 1);
+          }
+        });
+      };
+      walk(tree || [], 0);
+      if (mountedRef.current) {
+        setOptions(out);
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        setOptionsError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setOptionsLoading(false);
+      }
+    }
   }, []);
+
+  useEffect(() => {
+    fetchHierarchy();
+  }, [fetchHierarchy]);
 
   const onNameChange = (value: string) => {
     setName(value);
@@ -174,9 +184,14 @@ export const EditChurchRegionScreen: React.FC = () => {
     <ScreenContainer
       title={`${t('edit')} ${t('churchApostolicRegions')}`}
       scroll
-      loading={loading}
-      error={loadError}
-      onRetry={load}>
+      loading={loading || optionsLoading}
+      error={loadError || optionsError}
+      onRetry={() =>
+        Promise.all([
+          loadError ? load() : undefined,
+          optionsError ? fetchHierarchy() : undefined,
+        ])
+      }>
       <FormField label={t('name')} required error={nameError}>
         <AppInput
           value={name}

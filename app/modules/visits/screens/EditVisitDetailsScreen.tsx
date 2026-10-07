@@ -29,6 +29,7 @@ import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
 import {listEventTypes, EventTypeItem, resolveEventMeetingType} from '../../eventTypes/services/eventType.service';
 import {useLanguage} from '../../../shared/context/LanguageContext';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {
   addWeeks,
   endOfISOWeek,
@@ -57,6 +58,8 @@ interface VisitEntry {
   churchOptions: ChurchOption[];
   allChurches: ChurchOption[];
   daysByWeek: Record<number, string>;
+  /** City / church lists for the chosen nation failed (e.g. offline). */
+  optionsError?: unknown;
 }
 
 interface EventEntry {
@@ -250,6 +253,7 @@ export const EditVisitDetailsScreen: React.FC = () => {
       updateVisitEntry(index, entry => ({
         ...entry,
         cityOptions: [],
+        optionsError: error,
       }));
     }
   };
@@ -282,6 +286,7 @@ export const EditVisitDetailsScreen: React.FC = () => {
         ...entry,
         allChurches: [],
         churchOptions: [],
+        optionsError: error,
       }));
     }
   };
@@ -295,6 +300,7 @@ export const EditVisitDetailsScreen: React.FC = () => {
       cityOptions: [],
       churchOptions: [],
       allChurches: [],
+      optionsError: undefined,
     }));
 
     if (!countryId) {
@@ -302,6 +308,25 @@ export const EditVisitDetailsScreen: React.FC = () => {
     }
 
     await Promise.all([loadVisitCities(index, countryId), loadVisitChurches(index, countryId)]);
+  };
+
+  // Reload a visit's city / church lists after a failure, keeping what was selected.
+  const retryVisitOptions = async (index: number, countryId: number) => {
+    updateVisitEntry(index, entry => ({...entry, optionsError: undefined}));
+    await Promise.all([loadVisitCities(index, countryId), loadVisitChurches(index, countryId)]);
+    updateVisitEntry(index, entry => {
+      const selectedCity = entry.cityOptions.find(option => option.value === entry.city_id);
+      const normalizedCityName = (selectedCity?.label || '').trim().toLowerCase();
+      if (!normalizedCityName) {
+        return entry;
+      }
+      return {
+        ...entry,
+        churchOptions: entry.allChurches.filter(
+          option => option.cityName.trim().toLowerCase() === normalizedCityName,
+        ),
+      };
+    });
   };
 
   const handleSelectVisitCity = (index: number, cityId: number | null) => {
@@ -701,6 +726,14 @@ export const EditVisitDetailsScreen: React.FC = () => {
                   </FormField>
                 </View>
 
+                {entry.optionsError && entry.country_id ? (
+                  <ApiErrorState
+                    compact
+                    error={entry.optionsError}
+                    onRetry={() => retryVisitOptions(index, entry.country_id as number)}
+                  />
+                ) : (
+                <>
                 <View
                   onLayout={e => setFieldPos(`visit.${index}.city_id`, e.nativeEvent.layout.y)}>
                   <FormField label={t('city') || 'City'}>
@@ -747,6 +780,8 @@ export const EditVisitDetailsScreen: React.FC = () => {
                     {renderFieldError(`visit.${index}.church_id`)}
                   </FormField>
                 </View>
+                </>
+                )}
                 <View onLayout={e => setFieldPos(`visit.${index}.weeks`, e.nativeEvent.layout.y)}>
                   {renderFieldError(`visit.${index}.weeks`)}
                 </View>

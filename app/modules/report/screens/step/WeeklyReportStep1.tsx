@@ -8,6 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../../config/api';
 import { format, parseISO } from 'date-fns';
 import { useLanguage } from '../../../../shared/context/LanguageContext';
+import ApiErrorState from '../../../../shared/components/ApiErrorState';
 
 type Props = {
   onNext: (selectedWeeks: number[]) => void;
@@ -31,7 +32,9 @@ export default function WeeklyReportStep1({ onNext }: Props) {
   const [selectedMonthIndex, setSelectedMonthIndex] = useState<IndexPath | undefined>(undefined);
   const [weeks, setWeeks] = useState<any[]>([]); // weeks là mảng object
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  // Bumped by the error state's retry to re-run the weeks fetch.
+  const [weeksRetryKey, setWeeksRetryKey] = useState(0);
   // Thêm state cho selectedWeeksIndex
   const [selectedWeeksIndex, setSelectedWeeksIndex] = useState<IndexPath[] | undefined>(undefined);
 
@@ -58,7 +61,7 @@ export default function WeeklyReportStep1({ onNext }: Props) {
           // response.data là mảng object tuần
           setWeeks(response.data || []);
         } catch (err) {
-          setError('Failed to fetch weeks');
+          setError(err);
         } finally {
           setLoading(false);
         }
@@ -68,7 +71,7 @@ export default function WeeklyReportStep1({ onNext }: Props) {
       setFieldValueRef && setFieldValueRef('selectedWeeks', []);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedMonthIndex, selectedYearIndex]);
+  }, [selectedMonthIndex, selectedYearIndex, weeksRetryKey]);
 
   // Lưu tham chiếu setFieldValue để dùng trong useEffect
   const [setFieldValueRef, setSetFieldValueRef] = useState<any>();
@@ -115,7 +118,13 @@ export default function WeeklyReportStep1({ onNext }: Props) {
             </Select>
 
             {loading && <ActivityIndicator style={{ marginTop: 8 }} />}
-            {error && <Text status="danger" style={{ marginTop: 8 }}>{error}</Text>}
+            {error && !loading ? (
+              <ApiErrorState
+                compact
+                error={error}
+                onRetry={() => setWeeksRetryKey(k => k + 1)}
+              />
+            ) : null}
 
             {/* Hiển thị CheckBox cho week nếu có dữ liệu */}
             {weeks.length > 0 && !loading && !error && (

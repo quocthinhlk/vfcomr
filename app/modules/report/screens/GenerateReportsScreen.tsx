@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useMemo, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -177,88 +177,110 @@ export const GenerateReportsScreen = () => {
     );
   }, [catalog, group]);
 
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let mounted = true;
-    api
-      .get('users/me')
-      .then(res => {
-        const data = res?.data?.data;
-        const id = Number(data?.id);
-        if (!mounted || !Number.isFinite(id)) {
-          return;
-        }
-        const name =
-          data?.name ||
-          [data?.first_name, data?.last_name].filter(Boolean).join(' ') ||
-          String(id);
-        setUser({id, label: name});
-      })
-      .catch(() => {});
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
 
-  useEffect(() => {
-    let mounted = true;
-    Promise.all([
-      api.get('geographical-regions', {params: {sort_by: 'name', sort_desc: false}}),
-      api.get('church-regions', {params: {sort_by: 'name', sort_desc: false}}),
-      api.get('language-regions', {params: {sort_by: 'name', sort_desc: false}}),
-    ])
-      .then(([geo, churchRes, language]) => {
-        if (!mounted) {
-          return;
-        }
-        setGeoRegions(flattenRegions(asRegionList(geo)));
-        setChurchRegions(flattenRegions(asRegionList(churchRes)));
-        setLanguageRegions(flattenRegions(asRegionList(language)));
-      })
-      .catch(() => {});
-    return () => {
-      mounted = false;
-    };
-  }, []);
-
-  const loadChurches = useCallback(async (search: string) => {
-    try {
-      const res = await api.get('churches', {
-        params: {
-          page: 1,
-          limit: 30,
-          search: search.trim(),
-          sort_by: 'name',
-          sort_desc: false,
-          disabled: false,
-        },
-      });
-      const items = res?.data?.data?.items ?? [];
+  const fetchChurches = useCallback(async (search: string) => {
+    const res = await api.get('churches', {
+      params: {
+        page: 1,
+        limit: 30,
+        search: search.trim(),
+        sort_by: 'name',
+        sort_desc: false,
+        disabled: false,
+      },
+    });
+    const items = res?.data?.data?.items ?? [];
+    if (mountedRef.current) {
       setChurchItems(
         items.map((item: {id: number; name: string}) => ({id: item.id, label: item.name})),
       );
-    } catch {
-      setChurchItems([]);
     }
   }, []);
 
-  const loadUserOptions = useCallback(async (search: string) => {
-    try {
-      const res = await listUsers({page: 1, limit: 30, search: search.trim()});
+  const fetchUserOptions = useCallback(async (search: string) => {
+    const res = await listUsers({page: 1, limit: 30, search: search.trim()});
+    if (mountedRef.current) {
       setUserItems(
         (res?.data?.items ?? []).map(item => ({
           id: item.id,
           label: item.name || String(item.id),
         })),
       );
-    } catch {
-      setUserItems([]);
     }
   }, []);
 
+  // Dropdown searches: a failed search keeps the current list.
+  const loadChurches = useCallback(
+    (search: string) => fetchChurches(search).catch(() => {}),
+    [fetchChurches],
+  );
+  const loadUserOptions = useCallback(
+    (search: string) => fetchUserOptions(search).catch(() => {}),
+    [fetchUserOptions],
+  );
+
+  // Regions / churches / users / default user feed the required pickers: if they
+  // fail (e.g. offline) show a retryable error instead of empty dropdowns.
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState<unknown>(null);
+
+  const loadFormOptions = useCallback(async () => {
+    setOptionsLoading(true);
+    setOptionsError(null);
+    try {
+      const loadCurrentUser = async () => {
+        const res = await api.get('users/me');
+        const data = res?.data?.data;
+        const id = Number(data?.id);
+        if (!mountedRef.current || !Number.isFinite(id)) {
+          return;
+        }
+        const name =
+          data?.name ||
+          [data?.first_name, data?.last_name].filter(Boolean).join(' ') ||
+          String(id);
+        setUser(current => current ?? {id, label: name});
+      };
+      const loadRegions = async () => {
+        const [geo, churchRes, language] = await Promise.all([
+          api.get('geographical-regions', {params: {sort_by: 'name', sort_desc: false}}),
+          api.get('church-regions', {params: {sort_by: 'name', sort_desc: false}}),
+          api.get('language-regions', {params: {sort_by: 'name', sort_desc: false}}),
+        ]);
+        if (!mountedRef.current) {
+          return;
+        }
+        setGeoRegions(flattenRegions(asRegionList(geo)));
+        setChurchRegions(flattenRegions(asRegionList(churchRes)));
+        setLanguageRegions(flattenRegions(asRegionList(language)));
+      };
+      await Promise.all([
+        loadCurrentUser(),
+        loadRegions(),
+        fetchChurches(''),
+        fetchUserOptions(''),
+      ]);
+    } catch (error) {
+      if (mountedRef.current) {
+        setOptionsError(error);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setOptionsLoading(false);
+      }
+    }
+  }, [fetchChurches, fetchUserOptions]);
+
   useEffect(() => {
-    void loadChurches('');
-    void loadUserOptions('');
-  }, [loadChurches, loadUserOptions]);
+    void loadFormOptions();
+  }, [loadFormOptions]);
 
   const groupLabel = (key: string) => {
     const translationKey = GROUP_LABEL_KEY[key as keyof typeof GROUP_LABEL_KEY];
@@ -400,10 +422,12 @@ export const GenerateReportsScreen = () => {
         style={{flex: 1}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={groupLabel(group)} />
-          {loadingCatalog ? (
+          {loadingCatalog || optionsLoading ? (
             <ActivityIndicator color={COLORS.mainColor} style={styles.loader} />
           ) : catalogError && !catalog ? (
             <ApiErrorState error={catalogError} onRetry={loadCatalog} />
+          ) : optionsError ? (
+            <ApiErrorState error={optionsError} onRetry={loadFormOptions} />
           ) : (
             <ScrollView
               keyboardShouldPersistTaps="handled"

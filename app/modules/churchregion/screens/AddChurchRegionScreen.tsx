@@ -1,4 +1,4 @@
-import React, {useState, useEffect} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {
@@ -30,32 +30,50 @@ export const AddChurchRegionScreen: React.FC = () => {
   const {t} = useTranslation();
   const {imagePath, handleImagePick, clearImage} = useImagePicker();
 
+  // Parent list failed (e.g. offline): show a retryable error, not an empty dropdown.
+  const [optionsLoading, setOptionsLoading] = useState(true);
+  const [optionsError, setOptionsError] = useState<unknown>(null);
+  const mountedRef = useRef(true);
   useEffect(() => {
-    let mounted = true;
-    const fetchHierarchy = async () => {
-      try {
-        const resp = await getChurchRegionHierarchy();
-        const tree = (resp?.data ?? resp) as any[];
-        const out: ElementDropdownItem[] = [];
-        const walk = (nodes: any[], depth: number) => {
-          nodes?.forEach(n => {
-            out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
-            if (n.children && n.children.length) {
-              walk(n.children, depth + 1);
-            }
-          });
-        };
-        walk(tree || [], 0);
-        if (mounted) {
-          setOptions(out);
-        }
-      } catch {}
-    };
-    fetchHierarchy();
+    mountedRef.current = true;
     return () => {
-      mounted = false;
+      mountedRef.current = false;
     };
   }, []);
+
+  const fetchHierarchy = useCallback(async () => {
+    setOptionsLoading(true);
+    setOptionsError(null);
+    try {
+      const resp = await getChurchRegionHierarchy();
+      const tree = (resp?.data ?? resp) as any[];
+      const out: ElementDropdownItem[] = [];
+      const walk = (nodes: any[], depth: number) => {
+        nodes?.forEach(n => {
+          out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
+          if (n.children && n.children.length) {
+            walk(n.children, depth + 1);
+          }
+        });
+      };
+      walk(tree || [], 0);
+      if (mountedRef.current) {
+        setOptions(out);
+      }
+    } catch (e) {
+      if (mountedRef.current) {
+        setOptionsError(e);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setOptionsLoading(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchHierarchy();
+  }, [fetchHierarchy]);
 
   const onNameChange = (value: string) => {
     setName(value);
@@ -102,7 +120,12 @@ export const AddChurchRegionScreen: React.FC = () => {
   };
 
   return (
-    <ScreenContainer title={`${t('addNew')} ${t('churchApostolicRegions')}`} scroll>
+    <ScreenContainer
+      title={`${t('addNew')} ${t('churchApostolicRegions')}`}
+      scroll
+      loading={optionsLoading}
+      error={optionsError}
+      onRetry={fetchHierarchy}>
       <FormField label={t('name')} required error={nameError}>
         <AppInput
           value={name}

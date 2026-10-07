@@ -57,6 +57,8 @@ export default function AddChurchScreen() {
     languageRegionOptions,
     countryOptions,
     localCurrencyOptions,
+    error: optionsError,
+    reload: reloadOptions,
   } = useFormOptions();
 
   // Church photo: enforce 16:9 crop ratio (e.g. 1600x900)
@@ -371,6 +373,12 @@ export default function AddChurchScreen() {
       }
   };
 
+  // Form options are required in both modes, the prefill only when editing.
+  // Create-mode defaults are reloaded on retry since they failed the same way.
+  const initialLoadError = optionsError || (editId ? loadError : null);
+  const retryInitialLoad = () =>
+    Promise.all([optionsError ? reloadOptions() : undefined, loadInitial()]);
+
   useEffect(() => {
     loadInitial();
     return () => {
@@ -482,8 +490,8 @@ export default function AddChurchScreen() {
           title={maybeParams?.id ? t('editChurch') : t('addNewChurch')}
           showMenu={false}
         />
-        {!!editId && loadError ? (
-          <ApiErrorState error={loadError} onRetry={loadInitial} />
+        {initialLoadError ? (
+          <ApiErrorState error={initialLoadError} onRetry={retryInitialLoad} />
         ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}

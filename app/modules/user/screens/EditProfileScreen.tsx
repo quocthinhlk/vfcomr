@@ -206,12 +206,15 @@ export default function EditProfileScreen() {
         setPrefixOptions(d?.prefixes || []);
         setCredentialOptions(d?.credentials || []);
 
-        try {
-          const lg = await api.get('/language-regions', {params: {sort_by: 'name', sort_desc: false}});
-          const arr = Array.isArray(lg.data?.data) ? lg.data.data : [];
-          const roots = arr.filter((x: any) => x.parent_id == null && !x.disabled);
-          setLanguageOptions(roots.map((x: any) => ({id: Number(x.id), name: String(x.name ?? '')})));
-        } catch {}
+        // Language is required: a failure goes to the retryable load error
+        // instead of an empty Language dropdown.
+        const lg = await api.get('/language-regions', {params: {sort_by: 'name', sort_desc: false}});
+        if (!isCurrent()) {
+          return;
+        }
+        const arr = Array.isArray(lg.data?.data) ? lg.data.data : [];
+        const roots = arr.filter((x: any) => x.parent_id == null && !x.disabled);
+        setLanguageOptions(roots.map((x: any) => ({id: Number(x.id), name: String(x.name ?? '')})));
 
         // Support both `{ data: user }` and occasional `{ data: { data: user } }` envelopes.
         let u: any = (userRes as any)?.data ?? userRes;

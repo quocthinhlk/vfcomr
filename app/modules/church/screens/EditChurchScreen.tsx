@@ -56,6 +56,8 @@ export default function EditChurchScreen() {
     languageRegionOptions,
     countryOptions,
     localCurrencyOptions,
+    error: optionsError,
+    reload: reloadOptions,
   } = useFormOptions();
 
   const {imagePath, handleImagePick, clearImage} = useImagePicker({
@@ -514,8 +516,16 @@ export default function EditChurchScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('editChurch')} showMenu={false} />
-        {loadError ? (
-          <ApiErrorState error={loadError} onRetry={loadChurch} />
+        {loadError || optionsError ? (
+          <ApiErrorState
+            error={loadError || optionsError}
+            onRetry={() =>
+              Promise.all([
+                optionsError ? reloadOptions() : undefined,
+                loadError ? loadChurch() : undefined,
+              ])
+            }
+          />
         ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}

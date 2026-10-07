@@ -57,7 +57,13 @@ export default function AddNewResourceScreen() {
   const [loading, setLoading] = useState(isEdit);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const retryLoad = () => setReloadKey(k => k + 1);
+  // Role check / parent list failures (e.g. offline) show a retryable error
+  // instead of kicking the user out or an empty Parent dropdown (which in edit
+  // mode would drop the saved parent on save).
+  const [roleError, setRoleError] = useState<unknown>(null);
+  const [roleRetryKey, setRoleRetryKey] = useState(0);
+  const [parentsLoading, setParentsLoading] = useState(true);
+  const [parentsError, setParentsError] = useState<unknown>(null);
   const [submitting, setSubmitting] = useState(false);
   const [invalidFields, setInvalidFields] = useState({
     name: false,
@@ -81,7 +87,12 @@ export default function AddNewResourceScreen() {
     let mounted = true;
     (async () => {
       try {
+        setCheckingRole(true);
+        setRoleError(null);
         const res = await api.get('/users/me');
+        if (!mounted) {
+          return;
+        }
         const roleId = resolveRoleIdFromUser(res?.data?.data);
         if (!isSuperAdmin(roleId)) {
           Alert.alert(t('error'), t('accessDenied'));
@@ -89,8 +100,9 @@ export default function AddNewResourceScreen() {
           return;
         }
       } catch (error) {
-        Alert.alert(t('error'), t('failedToVerifyPermissions'));
-        navigation.goBack();
+        if (mounted) {
+          setRoleError(error);
+        }
       } finally {
         if (mounted) {
           setCheckingRole(false);
@@ -100,10 +112,12 @@ export default function AddNewResourceScreen() {
     return () => {
       mounted = false;
     };
-  }, [navigation, selectedLanguage]);
+  }, [navigation, selectedLanguage, roleRetryKey]);
 
   const loadParents = useCallback(async () => {
     try {
+      setParentsLoading(true);
+      setParentsError(null);
       const res = await listResources();
       setParentOptions(
         (res.data ?? [])
@@ -112,8 +126,23 @@ export default function AddNewResourceScreen() {
       );
     } catch (error) {
       console.error(error);
+      setParentsError(error);
+    } finally {
+      setParentsLoading(false);
     }
   }, [resourceId]);
+
+  const retryLoad = () => {
+    if (roleError) {
+      setRoleRetryKey(k => k + 1);
+    }
+    if (loadError) {
+      setReloadKey(k => k + 1);
+    }
+    if (parentsError) {
+      loadParents();
+    }
+  };
 
   useEffect(() => {
     loadParents();
@@ -286,8 +315,8 @@ export default function AddNewResourceScreen() {
   return (
     <ScreenContainer
       title={isEdit ? t('editResource') : t('addNewResource')}
-      loading={checkingRole || loading}
-      error={loadError}
+      loading={checkingRole || loading || parentsLoading}
+      error={roleError || loadError || parentsError}
       onRetry={retryLoad}>
       <KeyboardAvoidingView
         style={{flex: 1}}

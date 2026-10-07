@@ -13,6 +13,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
+import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {
   getChurchGivingGraph,
   ChurchGivingGraphSeries,
@@ -131,6 +132,9 @@ export function ChurchAttendanceChartPanel({
   const C = useThemedColors();
   const {t, selectedLanguage} = useTranslation();
   const [loading, setLoading] = useState(true);
+  // Offline / server error must not look like "No data found".
+  const [loadError, setLoadError] = useState<unknown>(null);
+  const [retryKey, setRetryKey] = useState(0);
   const [series, setSeries] = useState<ChurchGivingGraphSeries | null>(null);
   const [dates, setDates] = useState<string[]>([]);
   const [selectedPoint, setSelectedPoint] = useState<SelectedChartPoint | null>(
@@ -143,6 +147,7 @@ export function ChurchAttendanceChartPanel({
     const load = async () => {
       try {
         setLoading(true);
+        setLoadError(null);
         const result = await getChurchGivingGraph({
           churchId,
           period,
@@ -156,6 +161,11 @@ export function ChurchAttendanceChartPanel({
           result?.data?.find(item => item.church_id !== 0) ??
           null;
         setSeries(preferred);
+      } catch (e) {
+        if (!cancelled) {
+          setSeries(null);
+          setLoadError(e);
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -168,7 +178,7 @@ export function ChurchAttendanceChartPanel({
     return () => {
       cancelled = true;
     };
-  }, [churchId, refreshKey, period]);
+  }, [churchId, refreshKey, period, retryKey]);
 
   const chartSeries = useMemo(() => {
     const totalPoints = Math.max(
@@ -314,6 +324,15 @@ export function ChurchAttendanceChartPanel({
       <View style={scrollable ? styles.loadingWrap : styles.embeddedLoading}>
         <ActivityIndicator color={COLORS.mainColor} />
       </View>
+    );
+  }
+
+  if (loadError) {
+    const retry = () => setRetryKey(k => k + 1);
+    return scrollable ? (
+      <ApiErrorState error={loadError} onRetry={retry} />
+    ) : (
+      <ApiErrorState error={loadError} onRetry={retry} compact />
     );
   }
 

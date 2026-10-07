@@ -104,6 +104,8 @@ export const AddCloneChurchScreen: React.FC = () => {
     languageRegionOptions,
     countryOptions,
     localCurrencyOptions,
+    error: optionsError,
+    reload: reloadOptions,
   } = useFormOptions();
 
   const {imagePath, handleImagePick, clearImage} = useImagePicker({
@@ -217,8 +219,16 @@ export const AddCloneChurchScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header title={t('addNewClonedChurch')} showMenu={false} />
-        {loadError ? (
-          <ApiErrorState error={loadError} onRetry={loadSource} />
+        {loadError || optionsError ? (
+          <ApiErrorState
+            error={loadError || optionsError}
+            onRetry={() =>
+              Promise.all([
+                optionsError ? reloadOptions() : undefined,
+                loadError ? loadSource() : undefined,
+              ])
+            }
+          />
         ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
