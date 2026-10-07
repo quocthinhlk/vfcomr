@@ -84,6 +84,21 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.0"
+        // Google Maps SDK key for react-native-maps (EditChurchLocationScreen).
+        // Without it the SDK throws "API key not found" and the app crashes when
+        // a MapView opens. Kept out of git: set MAPS_API_KEY in
+        // android/local.properties, ~/.gradle/gradle.properties or the env (CI).
+        def localProps = new Properties()
+        def localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            localPropsFile.withInputStream { localProps.load(it) }
+        }
+        manifestPlaceholders = [
+            MAPS_API_KEY: localProps.getProperty("MAPS_API_KEY")
+                ?: project.findProperty("MAPS_API_KEY")
+                ?: System.getenv("MAPS_API_KEY")
+                ?: ""
+        ]
     }
     signingConfigs {
         debug {

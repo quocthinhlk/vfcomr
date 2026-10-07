@@ -33,6 +33,10 @@
         android:supportsRtl="true"
         android:usesCleartextTraffic="true"
         android:networkSecurityConfig="@xml/network_security_config">
+      <!-- Required by react-native-maps on Android; value comes from build.gradle -->
+      <meta-data
+          android:name="com.google.android.geo.API_KEY"
+          android:value="${MAPS_API_KEY}" />
       <activity
           android:name=".MainActivity"
           android:label="@string/app_name"
