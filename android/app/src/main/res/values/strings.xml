@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">OMR</string>
+    <!-- Shown in system Settings > Notifications for the push channel -->
+    <string name="notification_channel_name">Notifications</string>
 </resources>

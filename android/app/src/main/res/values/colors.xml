@@ -1,0 +1,4 @@
+<resources>
+    <!-- Accent for push notifications (COLORS.mainColor) -->
+    <color name="notification_color">#2478CE</color>
+</resources>

@@ -1,6 +1,9 @@
 package com.vfcomr
 
 import android.app.Application
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.os.Build
 import com.facebook.react.PackageList
 import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
@@ -40,5 +43,31 @@ class MainApplication : Application(), ReactApplication {
       // If you opted-in for the New Architecture, we load the native entry point for this app.
       load()
     }
+    createNotificationChannel()
+  }
+
+  /**
+   * High-importance channel for FCM pushes so they pop up as heads-up banners
+   * (FCM's fallback channel only lands in the tray). The id must match
+   * `messaging_android_notification_channel_id` in firebase.json. Runs on every
+   * process start, including when FCM wakes the app for a message.
+   */
+  private fun createNotificationChannel() {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+      return
+    }
+    val channel = NotificationChannel(
+        NOTIFICATION_CHANNEL_ID,
+        getString(R.string.notification_channel_name),
+        NotificationManager.IMPORTANCE_HIGH,
+    ).apply {
+      enableVibration(true)
+      setShowBadge(true)
+    }
+    getSystemService(NotificationManager::class.java)?.createNotificationChannel(channel)
+  }
+
+  companion object {
+    const val NOTIFICATION_CHANNEL_ID = "omr_default"
   }
 }

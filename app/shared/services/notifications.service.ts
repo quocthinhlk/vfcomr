@@ -25,9 +25,26 @@ async function isImpersonating(): Promise<boolean> {
   }
 }
 
+// Logout deletes the FCM token without blocking; a login right after must wait
+// for that, or it could fetch the old token, register it, and then have it
+// invalidated (the new user would get no pushes until the next refresh).
+let pendingTokenDeletion: Promise<void> | null = null;
+
+/** Resolves once a logout's token deletion (if any) has finished. */
+export async function waitForPendingTokenDeletion(): Promise<void> {
+  if (pendingTokenDeletion) {
+    await pendingTokenDeletion;
+  }
+}
+
 export async function registerDeviceToken(deviceToken: string): Promise<void> {
   const trimmed = String(deviceToken || '').trim();
   if (!trimmed) {
+    return;
+  }
+  // Every registration path goes through here: never bind this device to an
+  // impersonated user's account.
+  if (await isImpersonating()) {
     return;
   }
 
@@ -64,6 +81,7 @@ export async function syncDeviceTokenIfPermitted(token?: string): Promise<void> 
     return;
   }
   try {
+    await waitForPendingTokenDeletion();
     const messaging = require('@react-native-firebase/messaging').default;
     const status = await m.hasPermission();
     if (
@@ -92,11 +110,21 @@ export async function deleteDeviceToken(): Promise<void> {
   if (!m) {
     return;
   }
+  const deletion = (async () => {
+    try {
+      await m.deleteToken();
+    } catch (error: any) {
+      if (__DEV__) {
+        console.warn('[notifications] deleteDeviceToken failed:', error?.message || error);
+      }
+    }
+  })();
+  pendingTokenDeletion = deletion;
   try {
-    await m.deleteToken();
-  } catch (error: any) {
-    if (__DEV__) {
-      console.warn('[notifications] deleteDeviceToken failed:', error?.message || error);
+    await deletion;
+  } finally {
+    if (pendingTokenDeletion === deletion) {
+      pendingTokenDeletion = null;
     }
   }
 }

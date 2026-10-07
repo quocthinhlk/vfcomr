@@ -324,12 +324,15 @@ async function tryGetFcmToken(): Promise<string | null> {
   try {
     // Lazy so JS bundle loads if native Firebase isn’t linked yet.
     const messaging = require('@react-native-firebase/messaging').default;
+    const {registerDeviceToken, waitForPendingTokenDeletion} =
+      require('./notifications.service') as typeof import('./notifications.service');
+    // Right after a logout → login, don't fetch the token that is being deleted.
+    await waitForPendingTokenDeletion();
     if (Platform.OS === 'ios') {
       await messaging().registerDeviceForRemoteMessages();
     }
     const token: string = await messaging().getToken();
     try {
-      const {registerDeviceToken} = require('./notifications.service') as typeof import('./notifications.service');
       if (token) {
         void registerDeviceToken(token);
       }
