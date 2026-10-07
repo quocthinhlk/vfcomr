@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text, Button} from '@ui-kitten/components';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {logout} from '../../auth/services/auth.service'; // Corrected import path
 import {AuthContext} from '../../../config/navigation';
 import {dashboardStyles} from '../styles';
@@ -57,6 +57,7 @@ const resolveRoleId = (userData: any): number | null => {
 
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute();
   const {setIsAuthenticated} = useContext(AuthContext);
   const {showAllStats, visibleStats, toggleShowAllStats, icons} =
     useDashboardStats();
@@ -341,6 +342,8 @@ export default function DashboardScreen() {
             onLogout={handleLogout}
             onChangeLanguage={handleChangeLanguage}
             selectedLanguage={selectedLanguage}
+            activeRouteName={route.name}
+            activeRouteParams={route.params as Record<string, unknown> | undefined}
           />
         </View>
       </View>

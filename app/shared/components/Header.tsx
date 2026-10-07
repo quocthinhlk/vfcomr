@@ -119,6 +119,8 @@ export const Header: React.FC<HeaderProps> = ({
         onLogout={handleLogout}
         onChangeLanguage={handleChangeLanguage}
         selectedLanguage={selectedLanguage}
+        activeRouteName={route?.name}
+        activeRouteParams={route?.params}
       />
         </>
       ) : (

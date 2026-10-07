@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
-import {useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {AuthContext} from '../../../config/navigation';
 import {logout} from '../../auth/services/auth.service';
 import {useLanguage} from '../../../shared/context/LanguageContext';
@@ -134,6 +134,7 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs = REQUEST_TIMEOUT_MS) =>
 
 export default function OverseerDashboardScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute();
   const {setIsAuthenticated} = useContext(AuthContext);
   const {selectedLanguage, setLanguage} = useLanguage();
   const {t} = useTranslation();
@@ -697,6 +698,8 @@ export default function OverseerDashboardScreen() {
             onLogout={handleLogout}
             onChangeLanguage={setLanguage}
             selectedLanguage={selectedLanguage}
+            activeRouteName={route.name}
+            activeRouteParams={route.params as Record<string, unknown> | undefined}
           />
         </View>
       </View>

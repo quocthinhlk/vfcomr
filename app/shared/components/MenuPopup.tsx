@@ -23,6 +23,35 @@ import { useThemedColors } from '../styles/theme';
 import LanguageSelectModal from './LanguageSelectModal';
 import { fs, ws, hs, ms, rs } from '../utils/scale';
 
+// Screens reached under another route name than their menu entry.
+const ACTIVE_ROUTE_ALIASES: Record<string, string> = {
+  DashboardPastorLeader: 'Dashboard',
+};
+// Params a screen assumes when opened without them (menu entries are explicit).
+const ACTIVE_ROUTE_DEFAULT_PARAMS: Record<string, Record<string, unknown>> = {
+  GenerateReports: {group: 'church'},
+};
+
+/** True when `item` is the screen currently open (route + its menu params). */
+export function isMenuItemActive(
+  item: CommonMenuItem,
+  activeRouteName?: string,
+  activeRouteParams?: Record<string, unknown>,
+): boolean {
+  if (!item.routeName || !activeRouteName) {
+    return false;
+  }
+  const current = ACTIVE_ROUTE_ALIASES[activeRouteName] ?? activeRouteName;
+  if (item.routeName !== current) {
+    return false;
+  }
+  if (!item.params) {
+    return true;
+  }
+  const params = {...ACTIVE_ROUTE_DEFAULT_PARAMS[current], ...activeRouteParams};
+  return Object.entries(item.params).every(([key, value]) => params[key] === value);
+}
+
 interface MenuPopupProps {
   visible: boolean;
   onClose: () => void;
@@ -31,6 +60,9 @@ interface MenuPopupProps {
   onLogout: () => void;
   onChangeLanguage: (lang: string) => void;
   selectedLanguage: string;
+  /** Route of the screen that opened the menu, to highlight its entry. */
+  activeRouteName?: string;
+  activeRouteParams?: Record<string, unknown>;
 }
 
 export const MenuPopup: React.FC<MenuPopupProps> = ({
@@ -41,6 +73,8 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
   onLogout,
   onChangeLanguage,
   selectedLanguage,
+  activeRouteName,
+  activeRouteParams,
 }) => {
   const { t } = useTranslation();
   const C = useThemedColors();
@@ -62,8 +96,16 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
     setExpandedIndex(prev => (prev === idx ? null : idx));
   };
 
+  const isActive = (item: CommonMenuItem) =>
+    isMenuItemActive(item, activeRouteName, activeRouteParams);
+
   useEffect(() => {
     if (visible) {
+      // Open the group that holds the current screen (first match wins).
+      const activeGroup = menuItems.findIndex(item =>
+        item.children?.some(child => isActive(child)),
+      );
+      setExpandedIndex(activeGroup === -1 ? null : activeGroup);
       setIsMounted(true);
       Animated.parallel([
         Animated.timing(slideAnim, {
@@ -188,14 +230,23 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
                   {filteredMenuItems.map((item, idx) => {
                     const hasChildren = Array.isArray(item.children) && item.children.length > 0;
                     const isOpen = expandedIndex === idx;
+                    const itemActive = !hasChildren && isActive(item);
+                    const groupActive =
+                      hasChildren && item.children!.some(child => isActive(child));
                     return (
                       <View key={idx}>
                         <TouchableOpacity
                           style={[
                             styles.menuItem,
                             hasChildren && styles.menuItemParent,
+                            itemActive && styles.menuItemActive,
                             item.disabled && styles.disabledMenuItem,
                           ]}
+                          accessibilityState={{
+                            selected: itemActive,
+                            expanded: hasChildren ? isOpen : undefined,
+                            disabled: item.disabled,
+                          }}
                           disabled={item.disabled}
                           onPress={() => {
                             if (item.disabled) return;
@@ -209,8 +260,22 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
                           {item.icon && (
                             <Image source={item.icon} style={[styles.menuIcon, item.disabled && styles.disabledIcon]} />
                           )}
-                          <Text style={[styles.menuBulletText, item.disabled && styles.disabledText]}>{'›'}</Text>
-                          <Text style={[styles.menuLabel, item.disabled && styles.disabledText]}>{item.label}</Text>
+                          <Text
+                            style={[
+                              styles.menuBulletText,
+                              (itemActive || groupActive) && styles.activeText,
+                              item.disabled && styles.disabledText,
+                            ]}>
+                            {'›'}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.menuLabel,
+                              (itemActive || groupActive) && styles.activeText,
+                              item.disabled && styles.disabledText,
+                            ]}>
+                            {item.label}
+                          </Text>
                           {hasChildren && (
                             <Text
                               style={[
@@ -225,19 +290,35 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
 
                         {hasChildren && isOpen && (
                           <View style={styles.subMenuList}>
-                            {item.children!.map((child, cIdx) => (
-                              <TouchableOpacity
-                                key={`${idx}-${cIdx}`}
-                                style={styles.subMenuItem}
-                                activeOpacity={0.75}
-                                onPress={() => onMenuItemPress(child)}>
-                                {child.icon && (
-                                  <Image source={child.icon} style={styles.subMenuIcon} />
-                                )}
-                                <Text style={styles.subMenuBulletText}>{'›'}</Text>
-                                <Text style={styles.subMenuLabel}>{child.label}</Text>
-                              </TouchableOpacity>
-                            ))}
+                            {item.children!.map((child, cIdx) => {
+                              const childActive = isActive(child);
+                              return (
+                                <TouchableOpacity
+                                  key={`${idx}-${cIdx}`}
+                                  style={[styles.subMenuItem, childActive && styles.subMenuItemActive]}
+                                  activeOpacity={0.75}
+                                  accessibilityState={{selected: childActive}}
+                                  onPress={() => onMenuItemPress(child)}>
+                                  {child.icon && (
+                                    <Image source={child.icon} style={styles.subMenuIcon} />
+                                  )}
+                                  <Text
+                                    style={[
+                                      styles.subMenuBulletText,
+                                      childActive && styles.activeText,
+                                    ]}>
+                                    {'›'}
+                                  </Text>
+                                  <Text
+                                    style={[
+                                      styles.subMenuLabel,
+                                      childActive && styles.subMenuLabelActive,
+                                    ]}>
+                                    {child.label}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
                           </View>
                         )}
                       </View>
@@ -358,6 +439,18 @@ const styles = StyleSheet.create({
   menuItemParent: {
     marginTop: 0,
   },
+  // Current screen: tinted row with a brand-coloured accent on the left.
+  menuItemActive: {
+    backgroundColor: 'rgba(36,120,206,0.22)',
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.mainColor,
+    paddingLeft: ms(8),
+    borderRadius: rs(6),
+  },
+  activeText: {
+    color: '#fff',
+    fontWeight: '700',
+  },
   menuIcon: {
     width: ws(24),
     height: hs(24),
@@ -398,6 +491,13 @@ const styles = StyleSheet.create({
     paddingRight: ms(6),
     borderBottomWidth: 0,
   },
+  subMenuItemActive: {
+    backgroundColor: 'rgba(36,120,206,0.22)',
+    borderLeftWidth: 3,
+    borderLeftColor: COLORS.mainColor,
+    paddingLeft: ms(8),
+    borderRadius: rs(6),
+  },
   subMenuIcon: {
     width: ws(18),
     height: hs(18),
@@ -414,6 +514,10 @@ const styles = StyleSheet.create({
     fontSize: fs(16),
     fontWeight: '400',
     color: 'rgba(255,255,255,0.88)',
+  },
+  subMenuLabelActive: {
+    color: '#fff',
+    fontWeight: '700',
   },
 
   logoutButton: {
