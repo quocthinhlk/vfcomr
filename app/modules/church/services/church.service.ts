@@ -92,6 +92,17 @@ export async function updateChurchLocation(
   }
 }
 
+/** Clears the church's OMR map location (coordinates). */
+export async function removeChurchLocation(id: number) {
+  try {
+    const response = await api.delete(`/churches/${id}/map-location`);
+    return response.data;
+  } catch (error) {
+    console.error('Error removing church location:', error);
+    throw error;
+  }
+}
+
 export async function getChurchDetail(id: number): Promise<any> {
   try {
     const response = await api.get(`churches/${id}`);

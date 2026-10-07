@@ -851,6 +851,10 @@ const zh = {
     omrMapLocationHelper:
       '点击地图放置标记，然后拖动标记以精确调整位置。',
     locationSaved: '位置已保存。',
+    removeLocation: '移除位置',
+    removeLocationConfirm: '要移除此教会的地图位置吗？',
+    locationRemoved: '位置已移除。',
+    removeLocationFailed: '移除位置失败。',
     pleaseEnterValidCoordinates: '请在地图上选择一个位置。',
     notifications: '通知',
     noNotifications: '目前还没有通知。',

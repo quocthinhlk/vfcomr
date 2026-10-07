@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Linking,
   ScrollView,
@@ -23,6 +24,8 @@ import {DeleteButton} from '../../../shared/components/ActionButtons';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import {removeChurchLocation} from '../services/church.service';
 
 const blankChurch = require('../../../assets/images/church.png');
 const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
@@ -41,6 +44,7 @@ export default function ChurchDetailScreen() {
   const [imageModalVisible, setImageModalVisible] = useState<boolean>(false);
   const [imageError, setImageError] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<unknown>(null);
+  const [removingLocation, setRemovingLocation] = useState(false);
 
   const fetchChurch = React.useCallback(async () => {
     if (!churchId) {
@@ -154,6 +158,31 @@ export default function ChurchDetailScreen() {
   const mapsLink = hasCoordinates
     ? `https://maps.google.com/?q=${data.latitude},${data.longitude}`
     : omrMapUrl || '';
+
+  const confirmRemoveLocation = () => {
+    if (!churchId || removingLocation) {
+      return;
+    }
+    Alert.alert(t('removeLocation'), t('removeLocationConfirm'), [
+      {text: t('cancel'), style: 'cancel'},
+      {
+        text: t('remove'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setRemovingLocation(true);
+            await removeChurchLocation(churchId);
+            Alert.alert(t('success'), t('locationRemoved'));
+            await fetchChurch();
+          } catch (e) {
+            Alert.alert(t('removeLocationFailed'), getApiErrorMessage(e, t));
+          } finally {
+            setRemovingLocation(false);
+          }
+        },
+      },
+    ]);
+  };
 
   const openLink = (url?: string) => {
     if (!url) return;
@@ -425,6 +454,23 @@ export default function ChurchDetailScreen() {
                         </Text>
                       </TouchableOpacity>
                     ) : null}
+                    {isSuperAdminUser && hasLocation ? (
+                      <TouchableOpacity
+                        style={styles.locationEditChip}
+                        disabled={removingLocation}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('removeLocation')}
+                        accessibilityState={{busy: removingLocation, disabled: removingLocation}}
+                        onPress={confirmRemoveLocation}>
+                        {removingLocation ? (
+                          <ActivityIndicator size="small" color={COLORS.dangerColor} />
+                        ) : (
+                          <Text style={[styles.locationEditChipText, styles.locationRemoveChipText]}>
+                            {t('remove')}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    ) : null}
                   </View>
                 </View>
               </View>
@@ -672,6 +718,9 @@ const styles = StyleSheet.create({
     fontSize: fs(11),
     fontWeight: '600',
     color: COLORS.mainColor,
+  },
+  locationRemoveChipText: {
+    color: COLORS.dangerColor,
   },
   attributeWrap: {
     flex: 1,

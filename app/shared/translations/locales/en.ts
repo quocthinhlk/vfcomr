@@ -859,6 +859,10 @@ const en = {
     omrMapLocationHelper:
       'Tap the map to place the pin, then drag it for precise positioning.',
     locationSaved: 'Location saved.',
+    removeLocation: 'Remove location',
+    removeLocationConfirm: 'Remove this church\'s map location?',
+    locationRemoved: 'Location removed.',
+    removeLocationFailed: 'Failed to remove location.',
     pleaseEnterValidCoordinates: 'Please select a location on the map.',
     notifications: 'Notifications',
     noNotifications: 'No notifications yet.',

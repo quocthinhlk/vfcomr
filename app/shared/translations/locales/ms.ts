@@ -867,6 +867,10 @@ const ms = {
     omrMapLocationHelper:
       'Ketik peta untuk meletakkan pin, kemudian seret pin untuk melaraskan kedudukan.',
     locationSaved: 'Lokasi berjaya disimpan.',
+    removeLocation: 'Alih keluar lokasi',
+    removeLocationConfirm: 'Alih keluar lokasi peta gereja ini?',
+    locationRemoved: 'Lokasi telah dialih keluar.',
+    removeLocationFailed: 'Gagal mengalih keluar lokasi.',
     pleaseEnterValidCoordinates: 'Sila pilih lokasi pada peta.',
     notifications: 'Pemberitahuan',
     noNotifications: 'Tiada pemberitahuan buat masa ini.',

@@ -1,5 +1,12 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Alert, Platform, StyleSheet, View} from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  Platform,
+  StyleSheet,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -19,7 +26,9 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {updateChurchLocation} from '../services/church.service';
+import {removeChurchLocation, updateChurchLocation} from '../services/church.service';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import {COLORS} from '../../../shared/constants/colors';
 import {requestLocationPermission} from '../../../shared/services/permissions.service';
 
 const DEFAULT_REGION: Region = {
@@ -46,6 +55,8 @@ export const EditChurchLocationScreen: React.FC = () => {
       : null;
   const [coordinate, setCoordinate] = useState<LatLng | null>(initialCoordinate);
   const [saving, setSaving] = useState(false);
+  const [removing, setRemoving] = useState(false);
+  const busy = saving || removing;
   const [hasCenteredOnUser, setHasCenteredOnUser] = useState(false);
   const mapRef = useRef<MapView | null>(null);
 
@@ -85,6 +96,33 @@ export const EditChurchLocationScreen: React.FC = () => {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Only offered when the church already has a saved location.
+  const onRemove = () => {
+    if (!churchId || busy) {
+      return;
+    }
+    Alert.alert(t('removeLocation'), t('removeLocationConfirm'), [
+      {text: t('cancel'), style: 'cancel'},
+      {
+        text: t('remove'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            setRemoving(true);
+            await removeChurchLocation(churchId);
+            Alert.alert(t('success'), t('locationRemoved'), [
+              {text: t('ok'), onPress: () => returnAfterEdit(navigation)},
+            ]);
+          } catch (error) {
+            Alert.alert(t('removeLocationFailed'), getApiErrorMessage(error, t));
+          } finally {
+            setRemoving(false);
+          }
+        },
+      },
+    ]);
   };
 
   const onMapPress = (event: MapPressEvent) => {
@@ -178,16 +216,30 @@ export const EditChurchLocationScreen: React.FC = () => {
                 : t('omrMapLocationMissing') ||
                   'No location selected'}
             </Text>
+            {initialCoordinate ? (
+              <TouchableOpacity
+                style={styles.removeButton}
+                onPress={onRemove}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityState={{busy: removing, disabled: busy}}>
+                {removing ? (
+                  <ActivityIndicator size="small" color={COLORS.dangerColor} />
+                ) : (
+                  <Text style={styles.removeButtonText}>{t('removeLocation')}</Text>
+                )}
+              </TouchableOpacity>
+            ) : null}
             <View style={formStyles.buttonRow}>
               <CancelButton
                 label={t('cancel')}
                 onPress={() => navigation.goBack()}
-                disabled={saving}
+                disabled={busy}
               />
               <SaveButton
                 label={saving ? t('saving') : t('save')}
                 onPress={onSave}
-                disabled={saving || !coordinate}
+                disabled={busy || !coordinate}
               />
             </View>
           </View>
@@ -246,6 +298,18 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: fs(12),
     marginBottom: ms(8),
+  },
+  removeButton: {
+    alignSelf: 'center',
+    minHeight: 44,
+    justifyContent: 'center',
+    paddingHorizontal: ms(12),
+    marginBottom: ms(4),
+  },
+  removeButtonText: {
+    color: COLORS.dangerColor,
+    fontSize: fs(13),
+    fontWeight: '600',
   },
 });
 

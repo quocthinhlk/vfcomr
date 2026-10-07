@@ -871,6 +871,10 @@ const fr = {
     omrMapLocationHelper:
       'Touchez la carte pour placer le repère, puis faites-le glisser pour ajuster sa position.',
     locationSaved: 'Localisation enregistrée.',
+    removeLocation: 'Supprimer la localisation',
+    removeLocationConfirm: 'Supprimer la localisation de cette église sur la carte ?',
+    locationRemoved: 'Localisation supprimée.',
+    removeLocationFailed: 'Impossible de supprimer la localisation.',
     pleaseEnterValidCoordinates: 'Veuillez sélectionner un emplacement sur la carte.',
     notifications: 'Notifications',
     noNotifications: 'Aucune notification pour le moment.',

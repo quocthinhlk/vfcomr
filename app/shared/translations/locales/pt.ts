@@ -867,6 +867,10 @@ const pt = {
     omrMapLocationHelper:
       'Toque no mapa para posicionar o marcador e arraste-o para ajustar a posição.',
     locationSaved: 'Localização salva.',
+    removeLocation: 'Remover localização',
+    removeLocationConfirm: 'Remover a localização no mapa desta igreja?',
+    locationRemoved: 'Localização removida.',
+    removeLocationFailed: 'Falha ao remover a localização.',
     pleaseEnterValidCoordinates: 'Selecione uma localização no mapa.',
     notifications: 'Notificações',
     noNotifications: 'Nenhuma notificação no momento.',

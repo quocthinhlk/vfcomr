@@ -866,6 +866,10 @@ const ja = {
     omrMapLocationHelper:
       '地図をタップしてピンを置き、ドラッグして位置を微調整してください。',
     locationSaved: '位置情報を保存しました。',
+    removeLocation: '位置情報を削除',
+    removeLocationConfirm: 'この教会の地図上の位置情報を削除しますか？',
+    locationRemoved: '位置情報を削除しました。',
+    removeLocationFailed: '位置情報を削除できませんでした。',
     pleaseEnterValidCoordinates: '地図上で位置を選択してください。',
     notifications: '通知',
     noNotifications: '現在表示する通知はありません。',
