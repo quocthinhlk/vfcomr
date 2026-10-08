@@ -17,6 +17,8 @@ import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {DeleteSvgIcon} from '../../../shared/components/icons';
 import {FormActions, FormField} from '../../../shared/components/crud';
+import {FAQRichTextEditor} from './FAQRichTextEditor';
+import {isAnswerEmpty} from '../utils/faqHtml';
 
 /**
  * Keyboard-avoiding scroll body for FAQ forms (the answer is a tall multiline
@@ -39,9 +41,31 @@ export const FAQFormScroll: React.FC<{children: React.ReactNode}> = ({
   </KeyboardAvoidingView>
 );
 
+/** Required fields left empty on Save (shown in red under each field). */
+export type FAQFormInvalid = {
+  questionHeader?: boolean;
+  answer?: boolean;
+  languageId?: boolean;
+};
+
+/** Same rules for Add and Edit: question, answer and language are required. */
+export const validateFAQForm = (values: {
+  questionHeader: string;
+  answer: string;
+  languageId: number | null;
+}): FAQFormInvalid => ({
+  questionHeader: !values.questionHeader.trim(),
+  answer: isAnswerEmpty(values.answer),
+  languageId: !values.languageId,
+});
+
+export const hasFAQFormErrors = (invalid: FAQFormInvalid) =>
+  Object.values(invalid).some(Boolean);
+
 type Props = {
   questionHeader: string;
   onQuestionHeaderChange: (v: string) => void;
+  /** Answer HTML. The rich editor reads it once on mount (load before rendering). */
   answer: string;
   onAnswerChange: (v: string) => void;
   languageId: number | null;
@@ -54,6 +78,9 @@ type Props = {
   submitting: boolean;
   onSave: () => void;
   onCancel: () => void;
+  invalid?: FAQFormInvalid;
+  /** Called when the user edits a field, so its error can be cleared. */
+  onClearInvalid?: (field: keyof FAQFormInvalid) => void;
 };
 
 export const FAQForm: React.FC<Props> = ({
@@ -71,41 +98,69 @@ export const FAQForm: React.FC<Props> = ({
   submitting,
   onSave,
   onCancel,
+  invalid = {},
+  onClearInvalid,
 }) => {
   const {t} = useTranslation();
   const C = useThemedColors();
+  const requiredError = (field: keyof FAQFormInvalid) =>
+    invalid[field] ? t('required') : undefined;
   return (
     <View>
-      <FormField label={t('question') || 'Question'} required>
+      <FormField
+        label={t('question') || 'Question'}
+        required
+        error={requiredError('questionHeader')}>
         <AppInput
           value={questionHeader}
-          onChangeText={onQuestionHeaderChange}
+          onChangeText={value => {
+            onQuestionHeaderChange(value);
+            onClearInvalid?.('questionHeader');
+          }}
           placeholder={t('question') || 'Question'}
+          error={!!invalid.questionHeader}
+          accessibilityLabel={`${t('question')}, ${t('required')}`}
         />
       </FormField>
 
-      <FormField label={t('answer') || 'Answer'} required>
-        <AppInput
-          value={answer}
-          onChangeText={onAnswerChange}
-          placeholder={t('answer') || 'Answer (HTML supported)'}
-          multiline
-          style={styles.answerInput}
+      <FormField
+        label={t('answer') || 'Answer'}
+        required
+        error={requiredError('answer')}>
+        <FAQRichTextEditor
+          initialHtml={answer}
+          onChange={html => {
+            onAnswerChange(html);
+            if (!isAnswerEmpty(html)) {
+              onClearInvalid?.('answer');
+            }
+          }}
+          placeholder={t('answer') || 'Answer'}
+          error={!!invalid.answer}
+          accessibilityLabel={`${t('answer')}, ${t('required')}`}
         />
       </FormField>
 
-      <FormField label={t('language') || 'Language'} required>
+      <FormField
+        label={t('language') || 'Language'}
+        required
+        error={requiredError('languageId')}>
         <ElementDropdown
           data={languageOptions}
           value={languageId as any}
           onChange={v => {
             onLanguageChange(v as number);
+            if (v != null) {
+              onClearInvalid?.('languageId');
+            }
           }}
           placeholder={t('selectOption') || 'Select Language'}
+          error={!!invalid.languageId}
           containerStyle={
             {
               backgroundColor: C.inputBg,
-              borderColor: C.inputBorder,
+              // Leave the border to ElementDropdown when showing the error.
+              ...(invalid.languageId ? null : {borderColor: C.inputBorder}),
             } as any
           }
         />
@@ -154,12 +209,6 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingTop: ms(12),
     paddingBottom: ms(32),
-  },
-  answerInput: {
-    height: undefined,
-    minHeight: hs(140),
-    textAlignVertical: 'top',
-    paddingTop: ms(8),
   },
   tagRow: {
     flexDirection: 'row',

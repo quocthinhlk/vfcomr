@@ -17,7 +17,7 @@ export function getMessaging(): any | null {
   }
 }
 
-async function isImpersonating(): Promise<boolean> {
+export async function isImpersonating(): Promise<boolean> {
   try {
     return (await AsyncStorage.getItem('switchedUser')) === '1';
   } catch {
@@ -37,7 +37,10 @@ export async function waitForPendingTokenDeletion(): Promise<void> {
   }
 }
 
-export async function registerDeviceToken(deviceToken: string): Promise<void> {
+export async function registerDeviceToken(
+  deviceToken: string,
+  options?: {throwOnError?: boolean},
+): Promise<void> {
   const trimmed = String(deviceToken || '').trim();
   if (!trimmed) {
     return;
@@ -63,7 +66,45 @@ export async function registerDeviceToken(deviceToken: string): Promise<void> {
         error?.response?.data || error?.message || String(error),
       );
     }
+    if (options?.throwOnError) {
+      throw error;
+    }
   }
+}
+
+export type PushSetupFailure = 'unavailable' | 'impersonating' | 'no_token';
+
+export class PushSetupError extends Error {
+  constructor(public reason: PushSetupFailure) {
+    super(`Push setup failed: ${reason}`);
+    this.name = 'PushSetupError';
+  }
+}
+
+/**
+ * Makes sure *this* device's FCM token is registered for the logged-in user
+ * (awaited, errors surfaced). The caller must already have notification
+ * permission. Pushes go to every token of a user, so this is what guarantees
+ * the current device is among them.
+ */
+export async function registerThisDeviceForPush(): Promise<string> {
+  const m = getMessaging();
+  if (!m) {
+    throw new PushSetupError('unavailable');
+  }
+  if (await isImpersonating()) {
+    throw new PushSetupError('impersonating');
+  }
+  await waitForPendingTokenDeletion();
+  if (Platform.OS === 'ios' && !m.isDeviceRegisteredForRemoteMessages) {
+    await m.registerDeviceForRemoteMessages();
+  }
+  const token: string = await m.getToken();
+  if (!token) {
+    throw new PushSetupError('no_token');
+  }
+  await registerDeviceToken(token, {throwOnError: true});
+  return token;
 }
 
 /**
@@ -138,12 +179,23 @@ export async function sendTestMissingReportReminder(payload: {
   return api.post('notifications/test/missing-report-reminder', payload);
 }
 
+export type SendTestNotificationResult = {
+  success_count: number;
+  failure_count: number;
+};
+
+/** Sends to every device registered for `user_id`; returns delivery counts. */
 export async function sendTestNotificationToUser(payload: {
   user_id: number;
   title: string;
   body: string;
   data?: Record<string, any>;
-}) {
-  return api.post('notifications/test/users', payload);
+}): Promise<SendTestNotificationResult> {
+  const res = await api.post('notifications/test/users', payload);
+  const data = res?.data?.data ?? {};
+  return {
+    success_count: Number(data.success_count) || 0,
+    failure_count: Number(data.failure_count) || 0,
+  };
 }
 

@@ -133,8 +133,11 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start(() => {
-        setIsMounted(false);
+      ]).start(({finished}) => {
+        // Interrupted (screen unmounting, or reopened mid-close): leave it be.
+        if (finished) {
+          setIsMounted(false);
+        }
       });
     }
   }, [visible]);

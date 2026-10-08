@@ -100,23 +100,12 @@ export const SearchFAQScreen: React.FC = () => {
     try {
       setLoading(true);
       setHasSearched(true);
-      const params: any = {};
-      if (selectedLanguageId && selectedLanguageId > 0) {
-        params.language_id = selectedLanguageId;
-      }
-      const res = await listFAQs(params);
-      const allFaqs = res?.data ?? [];
-      
-      // Filter by search query (question_header) client-side
-      const filteredFaqs = searchQuery.trim()
-        ? allFaqs.filter(faq =>
-            faq.question_header
-              ?.toLowerCase()
-              .includes(searchQuery.trim().toLowerCase())
-          )
-        : allFaqs;
-      
-      setItems(filteredFaqs);
+      const res = await listFAQs({
+        language_id:
+          selectedLanguageId && selectedLanguageId > 0 ? selectedLanguageId : undefined,
+        question_header: searchQuery,
+      });
+      setItems(res?.data ?? []);
       setLoadError(null);
     } catch (e) {
       console.error(e);

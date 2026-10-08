@@ -10,7 +10,14 @@ import {fs, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import api from '../../../config/api';
-import {sendTestNotificationToUser} from '../../../shared/services/notifications.service';
+import {
+  PushSetupError,
+  isImpersonating,
+  registerThisDeviceForPush,
+  sendTestNotificationToUser,
+} from '../../../shared/services/notifications.service';
+import {requestNotificationPermission} from '../../../shared/services/permissions.service';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {isSuperAdmin, resolveRoleIdFromUser} from '../../../shared/utils/permissions';
 
 export default function NotificationsScreen() {
@@ -18,17 +25,24 @@ export default function NotificationsScreen() {
   const {t} = useTranslation();
   const [sending, setSending] = useState(false);
   const [canSendTest, setCanSendTest] = useState(false);
+  // While switched into another user, this device is deliberately not
+  // registered for them, so a test would reach someone else's phone.
+  const [impersonating, setImpersonating] = useState(false);
 
   React.useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const me = await api.get('users/me');
+        const [me, switched] = await Promise.all([
+          api.get('users/me'),
+          isImpersonating(),
+        ]);
         const user = me?.data?.data;
         const roleId = resolveRoleIdFromUser(user);
         if (!mounted) {
           return;
         }
+        setImpersonating(switched);
         setCanSendTest(isSuperAdmin(roleId));
       } catch {
         if (mounted) {
@@ -41,29 +55,84 @@ export default function NotificationsScreen() {
     };
   }, []);
 
+  /**
+   * Sends a test push to the logged-in user and makes sure it targets this
+   * device: permission → register this device's token for the user (awaited)
+   * → send → check the server's delivery count.
+   */
   const onSendTest = async () => {
+    const title = t('notifications') || 'Notifications';
     try {
       setSending(true);
-      const me = await api.get('users/me');
-      const userId = me?.data?.data?.id;
-      if (!userId) {
-        Alert.alert('Error', 'Could not determine user id for test notification.');
+
+      // 1. Permission (shows the "open Settings" prompt if it was blocked).
+      const permission = await requestNotificationPermission({showAlertIfBlocked: true});
+      if (!permission.granted) {
+        if (!permission.blocked) {
+          Alert.alert(title, 'Notification permission is required to receive the test.');
+        }
         return;
       }
-      await sendTestNotificationToUser({
+
+      // 2. This device's token → the logged-in user (errors are not swallowed).
+      try {
+        await registerThisDeviceForPush();
+      } catch (e) {
+        if (e instanceof PushSetupError) {
+          const reasons: Record<string, string> = {
+            impersonating:
+              'You are switched into another user. Switch back to your own account to test notifications on this device.',
+            unavailable: 'Push notifications are not configured in this build (Firebase missing).',
+            no_token:
+              'This device has no push token yet. On iOS, use a real device (or a simulator that supports remote push) and try again.',
+          };
+          Alert.alert(title, reasons[e.reason]);
+        } else {
+          Alert.alert(
+            t('error') || 'Error',
+            `Could not register this device for notifications: ${getApiErrorMessage(e, t)}`,
+          );
+        }
+        return;
+      }
+
+      // 3. The logged-in user (the same account the token was just bound to).
+      const me = await api.get('users/me');
+      const user = me?.data?.data;
+      const userId = Number(user?.id);
+      if (!Number.isFinite(userId) || userId <= 0) {
+        Alert.alert(t('error') || 'Error', 'Could not determine the logged-in user.');
+        return;
+      }
+      const userName =
+        [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
+        user?.username ||
+        `#${userId}`;
+
+      // 4. Send, then report what the server actually delivered.
+      const result = await sendTestNotificationToUser({
         user_id: userId,
         title: 'Test notification',
-        body: 'FCM is working',
+        body: `Hello ${userName}, push notifications are working on this device.`,
         data: {screen: 'home'},
       });
-      Alert.alert(
-        t('notifications') || 'Notifications',
-        'Test notification sent. Check your device notification tray.',
-      );
-    } catch (e: any) {
+      if (result.success_count > 0) {
+        Alert.alert(
+          title,
+          `Sent to ${result.success_count} device(s) of ${userName}` +
+            (result.failure_count ? ` (${result.failure_count} failed)` : '') +
+            '. It should appear on this device in a few seconds.',
+        );
+      } else {
+        Alert.alert(
+          t('error') || 'Error',
+          `No device received it (${result.failure_count} failed). This device's token may be invalid; reinstall the app or log out and back in, then retry.`,
+        );
+      }
+    } catch (e) {
       Alert.alert(
         t('error') || 'Error',
-        e?.response?.data?.message || e?.message || 'Failed to send test notification.',
+        getApiErrorMessage(e, t) || 'Failed to send test notification.',
       );
     } finally {
       setSending(false);
@@ -87,11 +156,18 @@ export default function NotificationsScreen() {
             <Text style={[styles.emptyBody, {color: C.textSecondary}]}>
               {t('noNotifications') || 'No notifications yet.'}
             </Text>
-            {__DEV__ && canSendTest && (
+            {__DEV__ && canSendTest && impersonating ? (
+              <Text style={[styles.emptyBody, {color: C.textSecondary}]}>
+                Test notifications are disabled while switched into another user.
+              </Text>
+            ) : null}
+            {__DEV__ && canSendTest && !impersonating && (
               <TouchableOpacity
                 style={[styles.testButton, {borderColor: C.border}]}
                 onPress={onSendTest}
-                disabled={sending}>
+                disabled={sending}
+                accessibilityRole="button"
+                accessibilityState={{busy: sending, disabled: sending}}>
                 {sending ? (
                   <ActivityIndicator size="small" color={COLORS.mainColor} />
                 ) : (

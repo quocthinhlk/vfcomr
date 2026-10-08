@@ -1,5 +1,6 @@
 import React, {useCallback, useEffect, useState} from 'react';
-import {View, FlatList, RefreshControl, StyleSheet} from 'react-native';
+import {View, FlatList, RefreshControl, StyleSheet, Platform} from 'react-native';
+import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {listFAQs, FAQItem} from '../services/faq.service';
 import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -9,10 +10,12 @@ import ActionSheetModal, {
 import api from '../../../config/api';
 import SearchInput from '../../../shared/components/SearchInput';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {
   EntityListCard,
   ListEmptyState,
   ListLoadState,
+  ListPageBar,
   ListToolbar,
   ScreenContainer,
   StatusBadge,
@@ -24,13 +27,17 @@ export const FAQsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
+  // The FAQ API returns every match in one array (no paging), so the list is
+  // paged on the device: switching pages needs no request.
   const [items, setItems] = useState<FAQItem[]>([]);
+  const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedFAQ, setSelectedFAQ] = useState<FAQItem | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
   const [userRoleId, setUserRoleId] = useState<number | null>(null);
 
   // Fetch user role to check permissions
@@ -48,6 +55,22 @@ export const FAQsScreen: React.FC = () => {
     })();
   }, []);
 
+  const totalPages = Math.max(1, Math.ceil(items.length / DEFAULT_PAGE_LIMIT));
+  const getPageItems = useCallback(
+    (pageNumber: number) =>
+      items.slice(
+        (pageNumber - 1) * DEFAULT_PAGE_LIMIT,
+        pageNumber * DEFAULT_PAGE_LIMIT,
+      ),
+    [items],
+  );
+
+  // Search hits the API (question_header filter): wait until typing pauses.
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedQuery(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
   const fetchData = useCallback(
     async (reset = false) => {
       try {
@@ -55,19 +78,12 @@ export const FAQsScreen: React.FC = () => {
           return;
         }
         setLoading(true);
-        const res = await listFAQs({});
-        const allFaqs = res?.data ?? [];
-
-        // Filter by search query (question_header) client-side
-        const filteredFaqs = searchQuery.trim()
-          ? allFaqs.filter(faq =>
-              faq.question_header
-                ?.toLowerCase()
-                .includes(searchQuery.trim().toLowerCase())
-            )
-          : allFaqs;
-
-        setItems(filteredFaqs);
+        const res = await listFAQs({question_header: debouncedQuery});
+        const next = res?.data ?? [];
+        setItems(next);
+        // New search → first page; a reload keeps the page if it still exists.
+        const lastPage = Math.max(1, Math.ceil(next.length / DEFAULT_PAGE_LIMIT));
+        setPage(current => (reset ? 1 : Math.min(current, lastPage)));
         setLoadError(null);
       } catch (e) {
         console.error(e);
@@ -76,28 +92,36 @@ export const FAQsScreen: React.FC = () => {
         setLoading(false);
       }
     },
-    [loading, searchQuery],
+    [loading, debouncedQuery],
   );
 
-  const reload = useCallback(() => fetchData(true), [fetchData]);
+  const reload = useCallback(() => fetchData(), [fetchData]);
 
   useEffect(() => {
     fetchData(true);
-  }, [searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [debouncedQuery]);
+
+  const goToPage = (targetPage: number) => {
+    if (targetPage < 1 || targetPage > totalPages) {
+      return;
+    }
+    setPage(targetPage);
+  };
 
   useFocusEffect(
     useCallback(() => {
       const shouldReload = route.params?.reload;
       if (shouldReload) {
         navigation.setParams({reload: undefined});
-        fetchData(true);
+        fetchData();
       }
     }, [route.params?.reload, fetchData]),
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchData(true);
+    await fetchData();
     setRefreshing(false);
   };
 
@@ -152,29 +176,47 @@ export const FAQsScreen: React.FC = () => {
         placeholder={t('search') || 'Search by question...'}
       />
 
-      <FlatList
-        data={items}
-        keyExtractor={keyExtractor}
-        renderItem={renderItem}
-        style={styles.list}
-        contentContainerStyle={listContentStyle}
-        keyboardShouldPersistTaps="handled"
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          isInitialLoading || !loading ? (
-            <ListLoadState
-              loading={isInitialLoading}
-              error={loadError}
-              onRetry={reload}>
-              <ListEmptyState
-                title={t('noDataFound') || 'No data found'}
-                hint={searchQuery || !canManage ? undefined : t('emptyListHint')}
-              />
-            </ListLoadState>
-          ) : null
-        }
+      <View style={styles.list}>
+        <PaginatedListPager
+          page={page}
+          totalPages={totalPages}
+          onPageChange={goToPage}
+          pagerRemountKey={debouncedQuery}
+          renderPage={pageNumber => (
+            <FlatList
+              data={getPageItems(pageNumber)}
+              keyExtractor={keyExtractor}
+              renderItem={renderItem}
+              nestedScrollEnabled={Platform.OS === 'android'}
+              style={styles.flex}
+              contentContainerStyle={listContentStyle}
+              keyboardShouldPersistTaps="handled"
+              refreshControl={
+                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+              ListEmptyComponent={
+                isInitialLoading || !loading ? (
+                  <ListLoadState
+                    loading={isInitialLoading}
+                    error={loadError}
+                    onRetry={reload}>
+                    <ListEmptyState
+                      title={t('noDataFound') || 'No data found'}
+                      hint={searchQuery || !canManage ? undefined : t('emptyListHint')}
+                    />
+                  </ListLoadState>
+                ) : null
+              }
+            />
+          )}
+        />
+      </View>
+
+      <ListPageBar
+        page={page}
+        totalPages={totalPages}
+        loading={loading}
+        onPageChange={goToPage}
       />
 
       <ActionSheetModal
@@ -233,7 +275,11 @@ export const FAQsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   list: {
     flex: 1,
+    minHeight: 0,
     marginTop: ms(8),
+  },
+  flex: {
+    flex: 1,
   },
   tagsContainer: {
     flexDirection: 'row',

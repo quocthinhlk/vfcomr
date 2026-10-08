@@ -6,64 +6,13 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useSuperAdminGuard} from '../hooks/useSuperAdminGuard';
 import {useFaqLanguageOptions} from '../hooks/useFaqLanguageOptions';
 import {ScreenContainer} from '../../../shared/components/crud';
-import {FAQForm, FAQFormScroll} from '../components/FAQForm';
-
-// Function to convert HTML to formatted text
-const convertHtmlToText = (html: string): string => {
-  if (!html) return '';
-  
-  let text = html;
-  
-  // Replace block-level elements with newlines
-  text = text.replace(/<\/p>/gi, '\n\n');
-  text = text.replace(/<\/div>/gi, '\n');
-  text = text.replace(/<\/h[1-6]>/gi, '\n\n');
-  text = text.replace(/<br\s*\/?>/gi, '\n');
-  text = text.replace(/<\/li>/gi, '\n');
-  text = text.replace(/<\/ul>/gi, '\n');
-  text = text.replace(/<\/ol>/gi, '\n');
-  
-  // Remove all remaining HTML tags
-  text = text.replace(/<[^>]*>/g, '');
-  
-  // Decode HTML entities
-  text = text.replace(/&nbsp;/g, ' ');
-  text = text.replace(/&amp;/g, '&');
-  text = text.replace(/&lt;/g, '<');
-  text = text.replace(/&gt;/g, '>');
-  text = text.replace(/&quot;/g, '"');
-  text = text.replace(/&#39;/g, "'");
-  text = text.replace(/&apos;/g, "'");
-  text = text.replace(/&rsquo;/g, '\u2019');
-  text = text.replace(/&lsquo;/g, '\u2018');
-  text = text.replace(/&rdquo;/g, '\u201D');
-  text = text.replace(/&ldquo;/g, '\u201C');
-  text = text.replace(/&mdash;/g, '\u2014');
-  text = text.replace(/&ndash;/g, '\u2013');
-  text = text.replace(/&hellip;/g, '\u2026');
-  
-  // Decode numeric entities (decimal)
-  text = text.replace(/&#(\d+);/g, (match, dec) => {
-    return String.fromCharCode(parseInt(dec, 10));
-  });
-  
-  // Decode numeric entities (hex)
-  text = text.replace(/&#x([0-9a-fA-F]+);/g, (match, hex) => {
-    return String.fromCharCode(parseInt(hex, 16));
-  });
-  
-  // Clean up multiple newlines (more than 2 consecutive)
-  text = text.replace(/\n{3,}/g, '\n\n');
-  
-  // Clean up spaces around newlines
-  text = text.replace(/[ \t]+\n/g, '\n');
-  text = text.replace(/\n[ \t]+/g, '\n');
-  
-  // Trim and clean up
-  text = text.trim();
-  
-  return text;
-};
+import {
+  FAQForm,
+  FAQFormInvalid,
+  FAQFormScroll,
+  hasFAQFormErrors,
+  validateFAQForm,
+} from '../components/FAQForm';
 
 export const AddFAQScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -72,6 +21,9 @@ export const AddFAQScreen: React.FC = () => {
   const [languageId, setLanguageId] = useState<number | null>(null);
   const [tags, setTags] = useState<string[]>(['']);
   const [submitting, setSubmitting] = useState(false);
+  const [invalid, setInvalid] = useState<FAQFormInvalid>({});
+  const clearInvalid = (field: keyof FAQFormInvalid) =>
+    setInvalid(current => (current[field] ? {...current, [field]: false} : current));
   const {t} = useTranslation();
 
   const {isAdmin, checkingRole, roleError, checkRole} = useSuperAdminGuard(
@@ -98,16 +50,9 @@ export const AddFAQScreen: React.FC = () => {
   };
 
   const onSave = async () => {
-    if (!questionHeader.trim()) {
-      Alert.alert(t('validation') || 'Validation', t('fillRequiredFields') || 'Please fill all required fields.');
-      return;
-    }
-    if (!answer.trim()) {
-      Alert.alert(t('validation') || 'Validation', t('fillRequiredFields') || 'Please fill all required fields.');
-      return;
-    }
-    if (!languageId) {
-      Alert.alert(t('validation') || 'Validation', t('fillRequiredFields') || 'Please fill all required fields.');
+    const nextInvalid = validateFAQForm({questionHeader, answer, languageId});
+    setInvalid(nextInvalid);
+    if (hasFAQFormErrors(nextInvalid) || !languageId) {
       return;
     }
 
@@ -117,7 +62,7 @@ export const AddFAQScreen: React.FC = () => {
       setSubmitting(true);
       await createFAQ({
         question_header: questionHeader.trim(),
-        answer: answer.trim(),
+        answer,
         language_id: languageId,
         tags: validTags,
       });
@@ -166,6 +111,8 @@ export const AddFAQScreen: React.FC = () => {
           submitting={submitting}
           onSave={onSave}
           onCancel={() => navigation.goBack()}
+          invalid={invalid}
+          onClearInvalid={clearInvalid}
         />
       </FAQFormScroll>
     </ScreenContainer>

@@ -37,11 +37,18 @@
       <meta-data
           android:name="com.google.android.geo.API_KEY"
           android:value="${MAPS_API_KEY}" />
-      <!-- Push notifications (FCM): status-bar icon. Channel id / colour are set
+      <!-- Push notifications (FCM): status-bar icon. The channel id is set
            in firebase.json; the channel itself is created in MainApplication. -->
       <meta-data
           android:name="com.google.firebase.messaging.default_notification_icon"
           android:resource="@drawable/ic_notification" />
+      <!-- Colour lives here, not in firebase.json: RNFB would write it into its own
+           library manifest, where an app resource can't resolve and release
+           builds fail (verifyReleaseResources). tools:replace overrides RNFB's. -->
+      <meta-data
+          android:name="com.google.firebase.messaging.default_notification_color"
+          android:resource="@color/notification_color"
+          tools:replace="android:resource" />
       <activity
           android:name=".MainActivity"
           android:label="@string/app_name"

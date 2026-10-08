@@ -31,6 +31,8 @@ export interface GetFAQResponse {
 
 export interface ListFAQsParams {
   language_id?: number;
+  /** Server-side "contains" match on the question header. */
+  question_header?: string;
 }
 
 export async function listFAQs(params: ListFAQsParams = {}) {
@@ -40,7 +42,12 @@ export async function listFAQs(params: ListFAQsParams = {}) {
   }
 
   const response = await api.get<ListFAQsResponse>(`/faqs`, {
-    params: params.language_id ? { language_id: params.language_id } : {},
+    params: {
+      ...(params.language_id ? { language_id: params.language_id } : {}),
+      ...(params.question_header?.trim()
+        ? { question_header: params.question_header.trim() }
+        : {}),
+    },
     headers: {
       'Authorization': `Bearer ${token}`,
     },
