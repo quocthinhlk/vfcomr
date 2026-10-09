@@ -209,6 +209,10 @@ export const WorshipServicesScreen: React.FC = () => {
 
   return (
     <ScreenContainer title={t('worshipServices') || 'Worship Services'} showMenu>
+      {/* Adds to the same selectedChurchId this list shows; returns with reload. */}
+      {/* Order: Add New (top right) → church name → count. */}
+      <ListToolbar addRoute="AddWorshipService" />
+
       {churchName ? (
         <Text
           style={[styles.churchNameText, {color: C.textPrimary}]}
@@ -217,14 +221,13 @@ export const WorshipServicesScreen: React.FC = () => {
         </Text>
       ) : null}
 
-      {/* Add New is intentionally hidden (no addRoute), as before. */}
-      <ListToolbar
-        countText={
-          loadError && items.length === 0
-            ? undefined
-            : `${items.length} ${(t('worshipServices') || 'Worship Services').toLowerCase()}`
-        }
-      />
+      {loadError && items.length === 0 ? null : (
+        <Text
+          style={[styles.countText, {color: C.textSecondary}]}
+          accessibilityLiveRegion="polite">
+          {`${items.length} ${(t('worshipServices') || 'Worship Services').toLowerCase()}`}
+        </Text>
+      )}
 
       <FlatList
         data={items}
@@ -243,6 +246,7 @@ export const WorshipServicesScreen: React.FC = () => {
               onRetry={reload}>
               <ListEmptyState
                 title={t('noWorshipServicesFound') || t('noDataFound')}
+                hint={t('emptyListHint')}
               />
             </ListLoadState>
           ) : null
@@ -311,6 +315,13 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
     fontWeight: '600',
     marginTop: ms(8),
+  },
+  // Same look as ListToolbar's count, now on its own line under the name.
+  countText: {
+    marginTop: ms(4),
+    marginBottom: ms(4),
+    fontSize: fs(13),
+    fontWeight: '500',
   },
   list: {
     flex: 1,
