@@ -538,6 +538,8 @@ const ja = {
     churchEnabledSuccess: '教会が正常に有効化されました',
     churchDisabledSuccess: '教会が正常に無効化されました',
     confirmDisableChurch: '"{name}" を無効化してもよろしいですか？',
+    disabledReason: '無効化の理由',
+    disabledReasonPlaceholder: 'この教会を無効にする理由を入力してください',
     failedToEnableChurch: '教会の有効化に失敗しました',
     failedToDisableChurch: '教会の無効化に失敗しました',
     missingChurchId: '教会IDが不足しています',

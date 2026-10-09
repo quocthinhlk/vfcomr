@@ -88,6 +88,8 @@ export const UserListScreen: React.FC = () => {
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
           search: query,
+          sort_by: 'name',
+          sort_desc: false,
         };
         let res = await listUsers(params);
         // On first open the API sometimes returns pagination totals that

@@ -531,6 +531,8 @@ const pt = {
     churchEnabledSuccess: 'Igreja habilitada com sucesso',
     churchDisabledSuccess: 'Igreja desabilitada com sucesso',
     confirmDisableChurch: 'Tem certeza que deseja desabilitar "{name}"?',
+    disabledReason: 'Motivo da desativação',
+    disabledReasonPlaceholder: 'Por que esta igreja está sendo desativada?',
     failedToEnableChurch: 'Falha ao habilitar igreja',
     failedToDisableChurch: 'Falha ao desabilitar igreja',
     missingChurchId: 'ID da igreja ausente',

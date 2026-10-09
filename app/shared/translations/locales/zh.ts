@@ -529,6 +529,8 @@ const zh = {
     churchEnabledSuccess: '教会启用成功',
     churchDisabledSuccess: '教会禁用成功',
     confirmDisableChurch: '确定要禁用 "{name}" 吗？',
+    disabledReason: '停用原因',
+    disabledReasonPlaceholder: '为什么要停用此教会？',
     failedToEnableChurch: '启用教会失败',
     failedToDisableChurch: '禁用教会失败',
     missingChurchId: '缺少教会ID',

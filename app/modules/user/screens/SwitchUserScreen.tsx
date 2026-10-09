@@ -113,6 +113,8 @@ export const SwitchUserScreen = () => {
         page: targetPage,
         limit: DEFAULT_PAGE_LIMIT,
         search,
+        sort_by: 'name',
+        sort_desc: false,
       };
       let res = await listUsers(params);
       // On first open the API sometimes returns pagination totals that

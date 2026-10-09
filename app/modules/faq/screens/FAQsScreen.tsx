@@ -177,39 +177,39 @@ export const FAQsScreen: React.FC = () => {
       />
 
       <View style={styles.list}>
+        {/* Same single-child pager as the other CRUD lists: the swipeable
+            renderPage carousel wraps the list in a GestureDetector, and on
+            Android the cards' "..." button stopped opening the action sheet. */}
         <PaginatedListPager
           page={page}
           totalPages={totalPages}
-          onPageChange={goToPage}
-          pagerRemountKey={debouncedQuery}
-          renderPage={pageNumber => (
-            <FlatList
-              data={getPageItems(pageNumber)}
-              keyExtractor={keyExtractor}
-              renderItem={renderItem}
-              nestedScrollEnabled={Platform.OS === 'android'}
-              style={styles.flex}
-              contentContainerStyle={listContentStyle}
-              keyboardShouldPersistTaps="handled"
-              refreshControl={
-                <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-              }
-              ListEmptyComponent={
-                isInitialLoading || !loading ? (
-                  <ListLoadState
-                    loading={isInitialLoading}
-                    error={loadError}
-                    onRetry={reload}>
-                    <ListEmptyState
-                      title={t('noDataFound') || 'No data found'}
-                      hint={searchQuery || !canManage ? undefined : t('emptyListHint')}
-                    />
-                  </ListLoadState>
-                ) : null
-              }
-            />
-          )}
-        />
+          onPageChange={goToPage}>
+          <FlatList
+            data={getPageItems(page)}
+            keyExtractor={keyExtractor}
+            renderItem={renderItem}
+            nestedScrollEnabled={Platform.OS === 'android'}
+            style={styles.flex}
+            contentContainerStyle={listContentStyle}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={
+              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+            }
+            ListEmptyComponent={
+              isInitialLoading || !loading ? (
+                <ListLoadState
+                  loading={isInitialLoading}
+                  error={loadError}
+                  onRetry={reload}>
+                  <ListEmptyState
+                    title={t('noDataFound') || 'No data found'}
+                    hint={searchQuery || !canManage ? undefined : t('emptyListHint')}
+                  />
+                </ListLoadState>
+              ) : null
+            }
+          />
+        </PaginatedListPager>
       </View>
 
       <ListPageBar

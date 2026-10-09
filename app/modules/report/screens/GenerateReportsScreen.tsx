@@ -205,7 +205,13 @@ export const GenerateReportsScreen = () => {
   }, []);
 
   const fetchUserOptions = useCallback(async (search: string) => {
-    const res = await listUsers({page: 1, limit: 30, search: search.trim()});
+    const res = await listUsers({
+      page: 1,
+      limit: 30,
+      search: search.trim(),
+      sort_by: 'name',
+      sort_desc: false,
+    });
     if (mountedRef.current) {
       setUserItems(
         (res?.data?.items ?? []).map(item => ({

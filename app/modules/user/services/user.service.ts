@@ -120,6 +120,9 @@ export interface ListUsersParams {
   page?: number;
   limit?: number;
   search?: string;
+  /** Server-side sort column, e.g. 'name' or 'id'. Omitted → API default. */
+  sort_by?: string;
+  sort_desc?: boolean;
 }
 
 export interface ListUsersItem {
@@ -159,7 +162,13 @@ export async function listUsers(params: ListUsersParams = {}) {
 
   try {
     const response = await api.get<ListUsersResponse>(`/users`, {
-      params: { page, limit, search },
+      params: {
+        page,
+        limit,
+        search,
+        ...(params.sort_by ? { sort_by: params.sort_by } : {}),
+        ...(typeof params.sort_desc === 'boolean' ? { sort_desc: params.sort_desc } : {}),
+      },
     });
     return response.data;
   } catch (error) {

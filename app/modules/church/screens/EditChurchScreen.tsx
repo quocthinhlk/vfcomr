@@ -669,6 +669,7 @@ export default function EditChurchScreen() {
                     email_address: values.email_address,
                     website: values.website,
                     facebook: values.facebook,
+                    instagram: values.instagram,
                     twitter: values.twitter,
                     date_of_birth: values.date_of_birth
                       ? `${values.date_of_birth.getFullYear()}-${String(
@@ -677,8 +678,10 @@ export default function EditChurchScreen() {
                           values.date_of_birth.getDate(),
                         ).padStart(2, '0')}`
                       : null,
-                    service_venue: '',
-                    church_planting_projection_id: 0,
+                    // PATCH: only fields this form edits. service_venue,
+                    // mailing_address_street, property and
+                    // church_planting_projection_id have no input here, so they
+                    // are left out instead of being wiped on every save.
                     geographical_region_id: values.geographical_region_id
                       ? Number(values.geographical_region_id)
                       : 0,
@@ -686,8 +689,6 @@ export default function EditChurchScreen() {
                       ? Number(values.language_region_id)
                       : 0,
                     photo_dir: values.photo_dir,
-                    mailing_address_street: '',
-                    property: '',
                   };
                   if (uploadedPhotoPath) {
                     payload.photo = uploadedPhotoPath;

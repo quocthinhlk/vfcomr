@@ -537,6 +537,8 @@ const ms = {
     churchEnabledSuccess: 'Gereja diaktifkan dengan jayanya',
     churchDisabledSuccess: 'Gereja dilumpuhkan dengan jayanya',
     confirmDisableChurch: 'Adakah anda pasti mahu melumpuhkan "{name}"?',
+    disabledReason: 'Sebab dinyahaktifkan',
+    disabledReasonPlaceholder: 'Mengapa gereja ini dinyahaktifkan?',
     failedToEnableChurch: 'Gagal mengaktifkan gereja',
     failedToDisableChurch: 'Gagal melumpuhkan gereja',
     missingChurchId: 'ID gereja hilang',

@@ -6,7 +6,6 @@ import {Header} from '../../../shared/components/Header';
 import {BackButton} from '../../../shared/components/BackButton';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
-  disableChurch,
   enableChurch,
   getChurchDetail,
 } from '../services/church.service';
@@ -45,15 +44,15 @@ export default function ToggleChurchStatusScreen() {
 
   const toggle = async () => {
     if (!churchId || disabled === null) return;
+    if (!disabled) {
+      // Disabling needs a reason: use the screen that asks for it.
+      navigation.navigate('DisableChurch', {id: churchId});
+      return;
+    }
     try {
       setLoading(true);
-      if (!disabled) {
-        await disableChurch(churchId);
-        Alert.alert('Success', 'Church disabled successfully');
-      } else {
-        await enableChurch(churchId);
-        Alert.alert('Success', 'Church enabled successfully');
-      }
+      await enableChurch(churchId);
+      Alert.alert('Success', 'Church enabled successfully');
       returnToList(navigation);
     } catch (e: any) {
       Alert.alert('Error', e?.response?.data?.message || e?.message || 'Failed to toggle status');

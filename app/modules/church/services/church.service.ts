@@ -53,11 +53,12 @@ export async function updateChurch(id: number, payload: any) {
   }
 }
 
-export async function disableChurch(id: number) {
+export async function disableChurch(id: number, disabledReason: string) {
   try {
-    // The endpoint rejects a request with no body ("Invalid request body"),
-    // but accepts an empty JSON object.
-    const response = await api.patch(`/churches/${id}/disable`, {});
+    // Stored on the church as `disabled_reason` (shown when it is re-enabled).
+    const response = await api.patch(`/churches/${id}/disable`, {
+      disabled_reason: disabledReason.trim(),
+    });
     return response.data;
   } catch (error) {
     console.error('Error disabling church:', error);

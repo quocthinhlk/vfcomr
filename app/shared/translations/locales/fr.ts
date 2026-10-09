@@ -533,6 +533,8 @@ const fr = {
     churchEnabledSuccess: 'Église activée avec succès',
     churchDisabledSuccess: 'Église désactivée avec succès',
     confirmDisableChurch: 'Êtes-vous sûr de vouloir désactiver "{name}"?',
+    disabledReason: 'Motif de la désactivation',
+    disabledReasonPlaceholder: 'Pourquoi cette église est-elle désactivée ?',
     failedToEnableChurch: 'Échec de l\'activation de l\'église',
     failedToDisableChurch: 'Échec de la désactivation de l\'église',
     missingChurchId: 'ID d\'église manquant',

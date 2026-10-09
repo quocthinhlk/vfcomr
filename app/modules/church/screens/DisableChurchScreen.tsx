@@ -15,6 +15,8 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnToList} from '../../../shared/utils/returnToList';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import AppInput from '../../../shared/components/AppInput';
+import {FormField} from '../../../shared/components/crud';
 
 const DisableChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -24,6 +26,8 @@ const DisableChurchScreen: React.FC = () => {
   const C = useThemedColors();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [reason, setReason] = useState('');
+  const [reasonInvalid, setReasonInvalid] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
 
@@ -60,9 +64,13 @@ const DisableChurchScreen: React.FC = () => {
 
   const onDisable = async () => {
     if (!churchId) return;
+    if (!reason.trim()) {
+      setReasonInvalid(true);
+      return;
+    }
     try {
       setSubmitting(true);
-      await disableChurch(churchId);
+      await disableChurch(churchId, reason);
       Alert.alert(t('success'), t('churchDisabledSuccess'));
       returnToList(navigation);
     } catch (e: any) {
@@ -85,6 +93,28 @@ const DisableChurchScreen: React.FC = () => {
           <Text style={[styles.desc, {color: C.textSecondary}]}>
             {t('confirmDisableChurch').replace('{name}', name)}
           </Text>
+          <View style={styles.reasonField}>
+            <FormField
+              label={t('disabledReason')}
+              required
+              error={reasonInvalid ? t('required') : undefined}>
+              <AppInput
+                value={reason}
+                onChangeText={value => {
+                  setReason(value);
+                  if (reasonInvalid && value.trim()) {
+                    setReasonInvalid(false);
+                  }
+                }}
+                placeholder={t('disabledReasonPlaceholder')}
+                multiline
+                style={styles.reasonInput}
+                editable={!submitting}
+                error={reasonInvalid}
+                accessibilityLabel={`${t('disabledReason')}, ${t('required')}`}
+              />
+            </FormField>
+          </View>
           <View style={styles.row}>
             <CancelButton
               label={t('cancel')}
@@ -108,10 +138,17 @@ const styles = StyleSheet.create({
   container: {flex: 1, padding: 0},
   title: {marginTop: ms(16), marginBottom: ms(8)},
   desc: {color: '#555', fontSize: fs(14)},
+  reasonField: {marginTop: ms(16)},
+  reasonInput: {
+    height: undefined,
+    minHeight: ms(96),
+    textAlignVertical: 'top',
+    paddingTop: ms(8),
+  },
   row: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: ms(24),
+    marginTop: ms(8),
     marginHorizontal: 0,
     gap: ms(12),
   },

@@ -542,6 +542,8 @@ const en = {
     churchEnabledSuccess: 'Church enabled successfully',
     churchDisabledSuccess: 'Church disabled successfully',
     confirmDisableChurch: 'Are you sure you want to disable "{name}"?',
+    disabledReason: 'Reason for disabling',
+    disabledReasonPlaceholder: 'Why is this church being disabled?',
     failedToEnableChurch: 'Failed to enable church',
     failedToDisableChurch: 'Failed to disable church',
     missingChurchId: 'Missing church id',

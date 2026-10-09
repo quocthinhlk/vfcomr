@@ -18,6 +18,7 @@ import {AuthContext} from '../../../config/navigation';
 import {dashboardStyles} from '../styles';
 import {DashboardHeader} from '../components/DashboardHeader';
 import {DashboardStatCard} from '../components/DashboardStatCard';
+import {getChurchesList} from '../../church/services/church.service';
 import {useDashboardStats} from '../hooks/useDashboardStats';
 import {
   dashboardIcons,
@@ -54,6 +55,9 @@ const resolveRoleId = (userData: any): number | null => {
   const parsedRoleId = Number(rawRoleId);
   return Number.isFinite(parsedRoleId) ? parsedRoleId : null;
 };
+
+/** Shown for indicators that have no data source for Admin yet. */
+const NO_STAT = '–';
 
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
@@ -143,32 +147,63 @@ export default function DashboardScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Back online: refresh what's on screen.
-  useOnReconnect(() => {
-    void loadCurrentUser();
-  });
+  // Header name / role / location / photo. A failure (e.g. offline at launch)
+  // keeps what's shown; it's retried on reconnect and with "Try again".
+  const profileMountedRef = useRef(true);
+  const loadProfile = async () => {
+    try {
+      const u = await getUserProfile();
+      // getUserProfile() swallows errors and returns blanks: treat that as a
+      // failed load so a flaky reconnect doesn't wipe the name already shown.
+      if (!profileMountedRef.current || (!u.name && !u.role && !u.location)) {
+        return;
+      }
+      setProfile({
+        name: u.name,
+        role: u.role,
+        location: u.location,
+        image: u.profileImage,
+      });
+    } catch {}
+  };
 
-  // Load profile display fields
   useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        const u = await getUserProfile();
-        if (!mounted) {
-          return;
-        }
-        setProfile({
-          name: u.name,
-          role: u.role,
-          location: u.location,
-          image: u.profileImage,
-        });
-      } catch {}
-    })();
+    profileMountedRef.current = true;
+    void loadProfile();
     return () => {
-      mounted = false;
+      profileMountedRef.current = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Admin stats. Only the church total has an API today (same count as the
+  // Churches list); the other indicators have no system-wide endpoint for
+  // Admin, so they show "–" instead of the old hard-coded sample numbers.
+  const [churchesTotal, setChurchesTotal] = useState<number | null>(null);
+  const loadStats = async () => {
+    try {
+      const data = await getChurchesList({page: 1, limit: 1});
+      if (profileMountedRef.current && typeof data?.total === 'number') {
+        setChurchesTotal(data.total);
+      }
+    } catch {
+      // Keep the last value; retried on reconnect / "Try again".
+    }
+  };
+
+  useEffect(() => {
+    void loadStats();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const reloadDashboard = () => {
+    void loadCurrentUser();
+    void loadProfile();
+    void loadStats();
+  };
+
+  // Back online: refresh what's on screen (including the header name).
+  useOnReconnect(reloadDashboard);
 
   const handleLogout = async () => {
     try {
@@ -246,7 +281,7 @@ export default function DashboardScreen() {
       <SafeAreaView
         style={{flex: 1, backgroundColor: C.background}}
         edges={['top', 'bottom', 'left', 'right']}>
-        <ApiErrorState message={loadError} onRetry={() => void loadCurrentUser()} />
+        <ApiErrorState message={loadError} onRetry={reloadDashboard} />
       </SafeAreaView>
     );
   }
@@ -385,7 +420,7 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </Modal>
 
-        {/* Static stats (copied pattern from PastorLeader, no API) */}
+        {/* Churches comes from the API; the rest have no Admin endpoint yet (–). */}
         <Animated.View
           style={[
             dashboardStyles.statCardContainer,
@@ -395,81 +430,82 @@ export default function DashboardScreen() {
             [
               {
                 icon: require('../../../../app/assets/images/icon/house.png'),
-                value: '40',
+                value:
+                  churchesTotal != null ? churchesTotal.toLocaleString('en-US') : NO_STAT,
                 label: t('churches') || 'Churches',
                 helpMessage: t('indicatorInfoChurches'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/group.png'),
-                value: '500',
+                value: NO_STAT,
                 label: t('people') || 'People',
                 helpMessage: t('indicatorInfoPeople'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/growth.png'),
-                value: '5%',
+                value: NO_STAT,
                 label: t('churchesGrowing') || 'Churches Growing',
                 helpTitle: t('indicatorTitleChurchesGrowing'),
                 helpMessage: t('indicatorInfoChurchesGrowing'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/reporting.png'),
-                value: '20%',
+                value: NO_STAT,
                 label: t('churchesReporting') || 'Churches Reporting',
                 helpTitle: t('indicatorTitleChurchesReporting'),
                 helpMessage: t('indicatorInfoChurchesReporting'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/earth.png'),
-                value: '2',
+                value: NO_STAT,
                 label: t('nations') || 'Nations',
                 helpMessage: t('indicatorInfoNations'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/plant.png'),
-                value: '30%',
+                value: NO_STAT,
                 label: t('churchesPlanting') || 'Churches Planting',
                 helpTitle: t('indicatorTitleChurchesPlanting'),
                 helpMessage: t('indicatorInfoChurchesPlanting'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/cell-group.png'),
-                value: '50%',
+                value: NO_STAT,
                 label: t('churchesWithCgs') || 'Churches with CGs',
                 helpTitle: t('indicatorTitleChurchesWithCgs'),
                 helpMessage: t('indicatorInfoChurchesWithCgs'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/education.png'),
-                value: '30%',
+                value: NO_STAT,
                 label: t('churchesWithGtLiw') || 'Churches with GT/LIW',
                 helpTitle: t('indicatorTitleChurchesWithGtLiw'),
                 helpMessage: t('indicatorInfoChurchesWithGtLiw'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
-                value: '20%',
+                value: NO_STAT,
                 label: t('churchesWithMfp') || 'Churches with MFP',
                 helpTitle: t('indicatorTitleChurchesWithMfp'),
                 helpMessage: t('indicatorInfoChurchesWithMfp'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/worldwide.png'),
-                value: '30%',
+                value: NO_STAT,
                 label: t('churchesVisited') || 'Churches Visited',
                 helpTitle: t('indicatorTitleChurchesVisited'),
                 helpMessage: t('indicatorInfoChurchesVisited'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/more.png'),
-                value: '10%',
+                value: NO_STAT,
                 label: t('moreChurches') || 'More Churches',
                 helpTitle: t('indicatorTitleMoreChurches'),
                 helpMessage: t('indicatorInfoMoreChurches'),
               },
               {
                 icon: require('../../../../app/assets/images/icon/offerings.png'),
-                value: '25%',
+                value: NO_STAT,
                 label: t('churchesWithTithesOfferings') || 'Churches with Tithes & Offerings',
                 helpTitle: t('indicatorTitleChurchesWithTithesOfferings'),
                 helpMessage: t('indicatorInfoChurchesWithTithesOfferings'),
