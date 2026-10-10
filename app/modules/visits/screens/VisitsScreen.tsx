@@ -317,6 +317,21 @@ export const VisitsScreen: React.FC = () => {
               setSelectedVisit(null);
             },
           });
+          // Opens the confirmation screen; never deletes directly.
+          list.push({
+            label: t('delete') || 'Delete',
+            icon: 'delete',
+            type: 'danger',
+            onPress: () => {
+              if (selectedVisit) {
+                navigation.navigate('DeleteVisit', {
+                  visitId: selectedVisit.id,
+                });
+              }
+              setActionsVisible(false);
+              setSelectedVisit(null);
+            },
+          });
           return list;
         })()}
       />

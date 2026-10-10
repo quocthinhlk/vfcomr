@@ -29,6 +29,9 @@ import ImagePicker from 'react-native-image-crop-picker';
 import {getApiErrorMessage, parseApiError} from '../../../shared/utils/apiErrorHandler';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {InitialsAvatar} from '../../../shared/components/SelectionSheet';
+import {CheckIcon} from '../../../shared/components/icons/UiIcons';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {getUserById, updateUser} from '../../user/services/user.service';
 import {getChurchDetail, updateChurch} from '../../church/services/church.service';
 import {churchAttributeBadgeStyles} from '../../church/components/ChurchAttributeBadges';
@@ -581,6 +584,7 @@ export default function DashboardPastorLeaderScreen() {
   const tRef = useRef(t);
   tRef.current = t;
   const C = useThemedColors();
+  const T = useUiTokens();
   const { theme } = useThemeMode();
   const isDark = theme === 'dark';
   const gradientBase = isDark ? '0,0,0' : '255,255,255';
@@ -2048,28 +2052,38 @@ export default function DashboardPastorLeaderScreen() {
           </View>
         </View>
 
-        {/* Assigned Churches Modal */}
-        <Modal visible={orgModalVisible} transparent animationType="fade" onRequestClose={() => setOrgModalVisible(false)}>
+        {/* Assigned Churches Modal — same logic as before, shown as a bottom sheet like the Admin overseer picker */}
+        <Modal visible={orgModalVisible} transparent animationType="slide" onRequestClose={() => setOrgModalVisible(false)}>
           <TouchableOpacity activeOpacity={1} style={styles.modalBackdrop} onPress={() => setOrgModalVisible(false)}>
-            <View style={[styles.modalCard, { backgroundColor: C.surface }]}>
+            <TouchableOpacity activeOpacity={1} style={[styles.modalCard, { backgroundColor: C.surface }]}>
+              <View style={[styles.modalHandle, { backgroundColor: C.border }]} />
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t('yourOtherChurches')}</Text>
-                <TouchableOpacity style={styles.modalClose} onPress={() => setOrgModalVisible(false)}>
-                  <Text style={[styles.modalCloseText, { color: C.textPrimary }]}>✕</Text>
-                </TouchableOpacity>
               </View>
               <ScrollView style={styles.modalList}>
-                {sortedAssignedChurches.map((ch: any) => (
+                {sortedAssignedChurches.map((ch: any) => {
+                  const isCurrent =
+                    dashboardData?.dashboard_info?.church_id != null &&
+                    Number(ch.id) === Number(dashboardData.dashboard_info.church_id);
+                  return (
                   <TouchableOpacity
                     key={String(ch.id)}
-                    style={[styles.modalItemRow, { borderBottomColor: C.border }]}
+                    style={[styles.modalItemRow, isCurrent && { backgroundColor: T.brandTint }]}
                     onPress={() => handleSelectAssignedChurch(ch)}
                     activeOpacity={0.7}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: isCurrent }}
                   >
+                    <InitialsAvatar name={String(ch.name ?? '')} size={ws(44)} />
                     <View style={styles.modalItemContent}>
-                      <Text style={[styles.modalItemName, { color: C.textPrimary }]} numberOfLines={2}>
+                      <Text
+                        style={[styles.modalItemName, { color: isCurrent ? T.brandText : C.textPrimary }]}
+                        numberOfLines={2}>
                         {ch.name}
                       </Text>
+                      {ch.city ? (
+                        <Text style={[styles.modalItemCity, { color: C.textSecondary }]}>{ch.city}</Text>
+                      ) : null}
                       {(() => {
                         const flags = getChurchMscFlags(ch);
                         if (!flags.is_first_msc && !flags.is_msc) {
@@ -2092,11 +2106,14 @@ export default function DashboardPastorLeaderScreen() {
                         );
                       })()}
                     </View>
-                    <Text style={[styles.modalItemChevron, { color: C.textSecondary }]}>›</Text>
+                    <View style={styles.modalItemCheck}>
+                      {isCurrent ? <CheckIcon color={T.brandText} size={ws(18)} /> : null}
+                    </View>
                   </TouchableOpacity>
-                ))}
+                  );
+                })}
               </ScrollView>
-            </View>
+            </TouchableOpacity>
           </TouchableOpacity>
         </Modal>
 
@@ -2804,59 +2821,67 @@ const styles = StyleSheet.create({
     width: '100%',
     height: ws(180),
   },
+  // Assigned-churches popup: bottom sheet (slides up, rounded top corners).
   modalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.35)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
+    justifyContent: 'flex-end',
   },
   modalCard: {
-    width: '90%',
-    maxWidth: ws(420),
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    maxHeight: '70%',
-    paddingVertical: ms(8),
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: rs(12),
-    shadowOffset: { width: 0, height: 8 },
-    elevation: 8,
+    width: '100%',
+    maxHeight: '80%',
+    borderTopLeftRadius: rs(16),
+    borderTopRightRadius: rs(16),
+    paddingTop: ms(8),
+    paddingHorizontal: ms(16),
+    paddingBottom: ms(28),
+  },
+  modalHandle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: ms(12),
   },
   modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: ms(14),
-    paddingVertical: ms(10),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#e5e7eb',
+    marginBottom: ms(12),
   },
-  modalTitle: { fontSize: fs(16), fontWeight: '700', color: '#111' },
-  modalClose: { paddingHorizontal: ms(8), paddingVertical: ms(4) },
-  modalCloseText: { fontSize: fs(18), color: '#111' },
-  modalList: { paddingVertical: ms(4) },
+  modalTitle: {
+    fontSize: fs(17),
+    fontWeight: '700',
+  },
+  modalList: {
+    flexGrow: 0,
+  },
   modalItemRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: ms(14),
-    paddingVertical: ms(14),
-    borderBottomWidth: StyleSheet.hairlineWidth,
+    gap: ms(12),
+    minHeight: 64,
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(8),
+    borderRadius: rs(12),
+    marginBottom: ms(2),
   },
   modalItemContent: {
     flex: 1,
     minWidth: 0,
   },
   modalItemName: {
-    fontSize: fs(13.5),
+    fontSize: fs(15),
     fontWeight: '600',
-    marginBottom: ms(2),
+  },
+  modalItemCity: {
+    marginTop: ms(2),
+    fontSize: fs(12),
+  },
+  modalItemCheck: {
+    width: ws(24),
+    alignItems: 'center',
   },
   modalMscBadgeRow: {
     marginTop: ms(4),
   },
-  modalItemChevron: { fontSize: fs(18), marginLeft: ms(8), color: '#6b7280' },
   fullImageBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.9)',

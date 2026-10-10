@@ -19,6 +19,7 @@ import Svg, {Path, Rect, Text as SvgText} from 'react-native-svg';
 import {useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import ElementMultiSelect from '../../../shared/components/ElementMultiSelect';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
@@ -418,6 +419,31 @@ export const GenerateReportsScreen = () => {
     </View>
   );
 
+  // Region pickers for the multi-church report: the API takes id arrays.
+  const multiDropdown = (
+    label: string,
+    data: {label: string; value: string | number}[],
+    value: number[],
+    onChange: (value: number[]) => void,
+    error = false,
+  ) => (
+    <View style={[styles.field, submitting && styles.fieldDisabled]}>
+      <Text style={[formStyles.label, {color: error ? COLORS.danger : C.textSecondary}]}>
+        {label}
+      </Text>
+      <ElementMultiSelect
+        data={data}
+        value={value}
+        onChange={next => onChange(next.map(Number).filter(Number.isFinite))}
+        placeholder={t('selectOption')}
+        disabled={submitting}
+        error={error}
+        accessibilityLabel={label}
+      />
+      {error ? <RNText style={styles.errorText}>{t('required')}</RNText> : null}
+    </View>
+  );
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -556,36 +582,32 @@ export const GenerateReportsScreen = () => {
                 : null}
               {needs.regions ? (
                 <>
-                  {dropdown(
+                  {multiDropdown(
                     t('geographicalRegion'),
                     toDropdown(geoRegions),
-                    selectedGeo[0] ?? null,
+                    selectedGeo,
                     value => {
-                      setSelectedGeo(value == null || value === '' ? [] : [Number(value)]);
+                      setSelectedGeo(value);
                       clearError('regions');
                     },
                     errors.regions && selectedGeo.length === 0,
                   )}
-                  {dropdown(
+                  {multiDropdown(
                     t('churchRegion'),
                     toDropdown(churchRegions),
-                    selectedChurchRegions[0] ?? null,
+                    selectedChurchRegions,
                     value => {
-                      setSelectedChurchRegions(
-                        value == null || value === '' ? [] : [Number(value)],
-                      );
+                      setSelectedChurchRegions(value);
                       clearError('regions');
                     },
                     errors.regions && selectedChurchRegions.length === 0,
                   )}
-                  {dropdown(
+                  {multiDropdown(
                     t('languageRegion'),
                     toDropdown(languageRegions),
-                    selectedLanguageRegions[0] ?? null,
+                    selectedLanguageRegions,
                     value => {
-                      setSelectedLanguageRegions(
-                        value == null || value === '' ? [] : [Number(value)],
-                      );
+                      setSelectedLanguageRegions(value);
                       clearError('regions');
                     },
                     errors.regions && selectedLanguageRegions.length === 0,

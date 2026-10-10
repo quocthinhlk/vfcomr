@@ -116,6 +116,7 @@ export const VisitDetailScreen: React.FC = () => {
           <DetailActions
             itemName={heroTitle}
             onEdit={() => navigation.navigate('EditVisit', {visitId: visit.id})}
+            onDelete={() => navigation.navigate('DeleteVisit', {visitId: visit.id})}
           />
         </>
       )}

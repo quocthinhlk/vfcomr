@@ -81,6 +81,15 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
   const [isMounted, setIsMounted] = useState(visible);
   const slideAnim = useRef(new Animated.Value(ws(300))).current;
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+  const aliveRef = useRef(true);
+  useEffect(
+    () => () => {
+      aliveRef.current = false;
+    },
+    [],
+  );
 
   const initialIndex = Math.max(
     LANGUAGES.findIndex(l => l.code === selectedLanguage),
@@ -133,9 +142,12 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
           duration: 300,
           useNativeDriver: true,
         }),
-      ]).start(({finished}) => {
-        // Interrupted (screen unmounting, or reopened mid-close): leave it be.
-        if (finished) {
+      ]).start(() => {
+        // Unmount once closed even if the animation was cut short (e.g. a menu
+        // item navigated away mid-close) — otherwise the transparent Modal stays
+        // presented, eats taps and blocks every other Modal. Skip if it was
+        // reopened meanwhile, or if this component is gone.
+        if (aliveRef.current && !visibleRef.current) {
           setIsMounted(false);
         }
       });

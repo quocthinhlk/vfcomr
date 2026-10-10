@@ -2,13 +2,9 @@
 import React, {useContext, useState, useEffect, useRef, useMemo} from 'react';
 import {
   View,
-  ScrollView,
   TouchableOpacity,
   Image,
   StyleSheet,
-  Modal,
-  Animated,
-  Easing,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text, Button} from '@ui-kitten/components';
@@ -17,9 +13,12 @@ import {logout} from '../../auth/services/auth.service'; // Corrected import pat
 import {AuthContext} from '../../../config/navigation';
 import {dashboardStyles} from '../styles';
 import {DashboardHeader} from '../components/DashboardHeader';
-import {DashboardStatCard} from '../components/DashboardStatCard';
-import {getChurchesList} from '../../church/services/church.service';
-import {useDashboardStats} from '../hooks/useDashboardStats';
+import {AdminOverseerSection, AdminOverseerSkeleton} from '../components/AdminOverseerSection';
+import {OverseerSwitcher} from '../components/OverseerSwitcher';
+import {
+  AdminOverseerSummary,
+  getMyOverseers,
+} from '../services/adminDashboard.service';
 import {
   dashboardIcons,
   getTranslatedMenuItems,
@@ -56,15 +55,10 @@ const resolveRoleId = (userData: any): number | null => {
   return Number.isFinite(parsedRoleId) ? parsedRoleId : null;
 };
 
-/** Shown for indicators that have no data source for Admin yet. */
-const NO_STAT = '–';
-
 export default function DashboardScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute();
   const {setIsAuthenticated} = useContext(AuthContext);
-  const {showAllStats, visibleStats, toggleShowAllStats, icons} =
-    useDashboardStats();
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -82,42 +76,12 @@ export default function DashboardScreen() {
       ),
     [selectedLanguage, currentUserRoleId],
   );
-  const [showLocalAllStats, setShowLocalAllStats] = useState(false);
-  const rotation = useRef(new Animated.Value(0)).current;
-  const fade = useRef(new Animated.Value(1)).current;
-  const translateY = useRef(new Animated.Value(0)).current;
   const [profile, setProfile] = useState<{
     name: string;
     role: string;
     location: string;
     image: any;
   }>({name: '', role: '', location: '', image: BLANK_AVATAR});
-  useEffect(() => {
-    Animated.timing(rotation, {
-      toValue: showLocalAllStats ? 1 : 0,
-      duration: 250,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [showLocalAllStats]);
-  const arrowRotate = rotation.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '180deg'],
-  });
-  const toggleLocalShowAllStats = () => {
-    Animated.parallel([
-      Animated.timing(fade, { toValue: 0, duration: 130, useNativeDriver: true }),
-      Animated.timing(translateY, { toValue: 8, duration: 130, useNativeDriver: true }),
-    ]).start(() => {
-      setShowLocalAllStats(prev => !prev);
-      translateY.setValue(-8);
-      Animated.parallel([
-        Animated.timing(fade, { toValue: 1, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-        Animated.timing(translateY, { toValue: 0, duration: 220, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
-      ]).start();
-    });
-  };
-  const [orgModalVisible, setOrgModalVisible] = useState(false);
 
   const loadCurrentUser = async () => {
     setLoading(true);
@@ -176,30 +140,43 @@ export default function DashboardScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Admin stats. Only the church total has an API today (same count as the
-  // Churches list); the other indicators have no system-wide endpoint for
-  // Admin, so they show "–" instead of the old hard-coded sample numbers.
-  const [churchesTotal, setChurchesTotal] = useState<number | null>(null);
-  const loadStats = async () => {
+  // Admin indicators: one block per assigned overseer (percentages can't be
+  // summed into one figure). Loaded from the streamed my-overseers endpoint.
+  const [overseers, setOverseers] = useState<AdminOverseerSummary[]>([]);
+  const [overseersLoading, setOverseersLoading] = useState(true);
+  const [overseersError, setOverseersError] = useState<unknown>(null);
+  // One overseer at a time: the Admin picks whose profile / indicators to view.
+  const [selectedOverseerId, setSelectedOverseerId] = useState<number | null>(null);
+  const selectedOverseer =
+    overseers.find(o => o.profile.id === selectedOverseerId) ?? overseers[0] ?? null;
+  const loadOverseers = async () => {
+    setOverseersLoading(true);
+    setOverseersError(null);
     try {
-      const data = await getChurchesList({page: 1, limit: 1});
-      if (profileMountedRef.current && typeof data?.total === 'number') {
-        setChurchesTotal(data.total);
+      const list = await getMyOverseers();
+      if (profileMountedRef.current) {
+        setOverseers(list);
       }
-    } catch {
-      // Keep the last value; retried on reconnect / "Try again".
+    } catch (e) {
+      if (profileMountedRef.current) {
+        setOverseersError(e);
+      }
+    } finally {
+      if (profileMountedRef.current) {
+        setOverseersLoading(false);
+      }
     }
   };
 
   useEffect(() => {
-    void loadStats();
+    void loadOverseers();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const reloadDashboard = () => {
     void loadCurrentUser();
     void loadProfile();
-    void loadStats();
+    void loadOverseers();
   };
 
   // Back online: refresh what's on screen (including the header name).
@@ -219,8 +196,11 @@ export default function DashboardScreen() {
   const handleMenuItemPress = (item: any) => {
     if (item.routeName) {
       if (item.routeName === 'EditProfile') {
-        if (currentUserId) {
-          navigation.navigate('EditProfile', {id: currentUserId});
+        // Admin dashboard: edits the overseer picked above (falls back to the
+        // Admin only when no overseer is loaded).
+        const targetId = selectedOverseer?.profile.id ?? currentUserId;
+        if (targetId) {
+          navigation.navigate('EditProfile', {id: targetId});
         }
       } else {
         navigation.navigate(item.routeName, item.params);
@@ -251,7 +231,7 @@ export default function DashboardScreen() {
     },
     {
       icon: require('../../../../app/assets/images/icon/edit.png'),
-      label: t('editMyProfile') || 'Edit My Profile',
+      label: t('editProfile') || 'Edit Profile',
       routeName: 'EditProfile',
       disabled: !currentUserId,
     },
@@ -295,8 +275,8 @@ export default function DashboardScreen() {
           flexDirection: 'row',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: ms(10),
-          paddingTop: ms(28),
+          marginBottom: 0,
+          paddingTop: ms(16),
           paddingHorizontal: ms(16),
           backgroundColor: C.background,
         }}>
@@ -309,9 +289,9 @@ export default function DashboardScreen() {
                 : profile.image
             }
             style={{
-              width: ws(50),
-              height: ws(50),
-              borderRadius: rs(25),
+              width: ws(48),
+              height: ws(48),
+              borderRadius: ws(24),
               marginRight: ms(12),
             }}
             onError={() =>
@@ -326,43 +306,30 @@ export default function DashboardScreen() {
               }
             }}
             activeOpacity={0.7}
-            disabled={!currentUserId}>
-            <View
-              style={{flexDirection: 'row', alignItems: 'center'}}>
-              <Text
-                category="h6"
-                style={{
-                  fontWeight: 'bold',
-                  color: COLORS.mainColor,
-                  fontSize: fs(14),
-                }}>
-                {profile.name}
-              </Text>
-            </View>
+            disabled={!currentUserId}
+            accessibilityRole="button"
+            accessibilityLabel={[profile.name, profile.role, profile.location].filter(Boolean).join(', ')}>
             <Text
-              category="s2"
-              appearance="hint"
-              style={{
-                color: C.textSecondary,
-                fontSize: fs(12),
-                }}>
-              {profile.role}
+              numberOfLines={1}
+              // Brand blue: the name opens the Admin's profile.
+              style={{fontWeight: '700', color: COLORS.mainColor, fontSize: fs(18), lineHeight: fs(24)}}>
+              {profile.name}
             </Text>
+            {/* Role · location on one line under the name. */}
             <Text
-              category="s2"
-              appearance="hint"
-              style={{
-                color: C.textSecondary,
-                fontSize: fs(12),
-                }}>
-              {profile.location}
+              numberOfLines={1}
+              style={{color: C.textSecondary, fontSize: fs(13), marginTop: ms(2)}}>
+              {[profile.role, profile.location].filter(Boolean).join(' · ')}
             </Text>
           </TouchableOpacity>
         </View>
-        <View style={{flexDirection: 'row', alignItems: 'center', marginBottom: ms(18)}}>
+        <View style={{flexDirection: 'row', alignItems: 'center', gap: ms(4)}}>
           <TouchableOpacity
             style={localStyles.notificationIconWrap}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={t('notifications')}
+            hitSlop={8}
             onPress={() => navigation.navigate('Notifications' as any)}>
             <View style={localStyles.notificationIcon}>
               <BellSvgIcon width={24} height={24} color={COLORS.mainColor} />
@@ -383,168 +350,39 @@ export default function DashboardScreen() {
         </View>
       </View>
       <FlatListWithVerticalScrollbar
-        style={[dashboardStyles.container, {backgroundColor: C.background}]}
+        // Admin only: the overseer picker sits close under the header.
+        style={[dashboardStyles.container, {backgroundColor: C.background, paddingTop: ms(4)}]}
         data={DASHBOARD_SCROLL_DATA}
         keyExtractor={item => item.id}
         renderItem={() => null}
         ListHeaderComponent={
           <>
-        {/* Assigned Churches Modal (effect copied) */}
-        <Modal
-          visible={orgModalVisible}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setOrgModalVisible(false)}>
-          <TouchableOpacity
-            activeOpacity={1}
-            style={localStyles.modalBackdrop}
-            onPress={() => setOrgModalVisible(false)}>
-            <View style={localStyles.modalCard}>
-              <ScrollView>
-                {(
-                  [
-                    'Organization A',
-                    'Organization B',
-                    'Organization C',
-                  ] as string[]
-                ).map((name, idx) => (
-                  <TouchableOpacity
-                    key={String(idx)}
-                    style={localStyles.modalItem}
-                    onPress={() => setOrgModalVisible(false)}>
-                    <Text style={localStyles.modalItemText}>{name}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-
-        {/* Churches comes from the API; the rest have no Admin endpoint yet (–). */}
-        <Animated.View
-          style={[
-            dashboardStyles.statCardContainer,
-            {opacity: fade, transform: [{translateY}]},
-          ]}>
-          {(
-            [
-              {
-                icon: require('../../../../app/assets/images/icon/house.png'),
-                value:
-                  churchesTotal != null ? churchesTotal.toLocaleString('en-US') : NO_STAT,
-                label: t('churches') || 'Churches',
-                helpMessage: t('indicatorInfoChurches'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/group.png'),
-                value: NO_STAT,
-                label: t('people') || 'People',
-                helpMessage: t('indicatorInfoPeople'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/growth.png'),
-                value: NO_STAT,
-                label: t('churchesGrowing') || 'Churches Growing',
-                helpTitle: t('indicatorTitleChurchesGrowing'),
-                helpMessage: t('indicatorInfoChurchesGrowing'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/reporting.png'),
-                value: NO_STAT,
-                label: t('churchesReporting') || 'Churches Reporting',
-                helpTitle: t('indicatorTitleChurchesReporting'),
-                helpMessage: t('indicatorInfoChurchesReporting'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/earth.png'),
-                value: NO_STAT,
-                label: t('nations') || 'Nations',
-                helpMessage: t('indicatorInfoNations'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/plant.png'),
-                value: NO_STAT,
-                label: t('churchesPlanting') || 'Churches Planting',
-                helpTitle: t('indicatorTitleChurchesPlanting'),
-                helpMessage: t('indicatorInfoChurchesPlanting'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/cell-group.png'),
-                value: NO_STAT,
-                label: t('churchesWithCgs') || 'Churches with CGs',
-                helpTitle: t('indicatorTitleChurchesWithCgs'),
-                helpMessage: t('indicatorInfoChurchesWithCgs'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/education.png'),
-                value: NO_STAT,
-                label: t('churchesWithGtLiw') || 'Churches with GT/LIW',
-                helpTitle: t('indicatorTitleChurchesWithGtLiw'),
-                helpMessage: t('indicatorInfoChurchesWithGtLiw'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/worldwide-currency.png'),
-                value: NO_STAT,
-                label: t('churchesWithMfp') || 'Churches with MFP',
-                helpTitle: t('indicatorTitleChurchesWithMfp'),
-                helpMessage: t('indicatorInfoChurchesWithMfp'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/worldwide.png'),
-                value: NO_STAT,
-                label: t('churchesVisited') || 'Churches Visited',
-                helpTitle: t('indicatorTitleChurchesVisited'),
-                helpMessage: t('indicatorInfoChurchesVisited'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/more.png'),
-                value: NO_STAT,
-                label: t('moreChurches') || 'More Churches',
-                helpTitle: t('indicatorTitleMoreChurches'),
-                helpMessage: t('indicatorInfoMoreChurches'),
-              },
-              {
-                icon: require('../../../../app/assets/images/icon/offerings.png'),
-                value: NO_STAT,
-                label: t('churchesWithTithesOfferings') || 'Churches with Tithes & Offerings',
-                helpTitle: t('indicatorTitleChurchesWithTithesOfferings'),
-                helpMessage: t('indicatorInfoChurchesWithTithesOfferings'),
-              },
-            ] as Array<{
-              icon: any;
-              value: string;
-              label: string;
-              helpTitle?: string;
-              helpMessage?: string;
-            }>
-          )
-            .slice(0, showLocalAllStats ? 12 : 4)
-            .map((stat, index) => (
-              <DashboardStatCard key={index} {...stat} />
-            ))}
-        </Animated.View>
-
-        {true && (
-          <TouchableOpacity
-            onPress={toggleLocalShowAllStats}
-            style={dashboardStyles.viewMoreButton}>
-            <Text
-              style={[
-                dashboardStyles.viewMoreText,
-                {color: C.textSecondary, fontSize: fs(12)},
-              ]}>
-              {showLocalAllStats ? `${t('viewLess')} ` : `${t('viewMore')} `}
-              <Animated.Image
-                source={icons.iconDown}
-                style={{
-                  width: ws(12),
-                  height: ws(12),
-                  marginLeft: ms(4),
-                  transform: [{rotate: arrowRotate}],
-                }}
-              />
-            </Text>
-          </TouchableOpacity>
+        {/* Indicators of the overseer picked below (Admin has no system-wide figures). */}
+        {overseersLoading && overseers.length === 0 ? (
+          <AdminOverseerSkeleton />
+        ) : overseersError && overseers.length === 0 ? (
+          <ApiErrorState compact error={overseersError} onRetry={loadOverseers} />
+        ) : overseers.length === 0 ? (
+          <Text style={{color: C.textSecondary, fontSize: fs(13), marginVertical: ms(12)}}>
+            {t('noDataFound')}
+          </Text>
+        ) : (
+          <>
+            {selectedOverseer ? (
+              <>
+                <OverseerSwitcher
+                  overseers={overseers}
+                  selected={selectedOverseer}
+                  onSelect={setSelectedOverseerId}
+                />
+                {/* Keyed so "View more" resets when switching overseer. */}
+                <AdminOverseerSection
+                  key={selectedOverseer.profile.id}
+                  overseer={selectedOverseer}
+                />
+              </>
+            ) : null}
+          </>
         )}
 
         <View style={{marginTop: ms(8)}}>
@@ -599,43 +437,20 @@ export default function DashboardScreen() {
 }
 
 const localStyles = StyleSheet.create({
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: ms(16),
-  },
-  modalCard: {
-    width: '100%',
-    maxWidth: 420,
-    backgroundColor: '#fff',
-    borderRadius: rs(12),
-    paddingVertical: ms(8),
-    paddingHorizontal: ms(8),
-  },
-  modalItem: {
-    paddingVertical: ms(12),
-    paddingHorizontal: ms(12),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#eee',
-  },
   menuArrow: {
     width: ws(15),
     height: ws(15),
     transform: [{ rotate: '-90deg' }],
   },
+  // 44pt target around the 24pt bell.
   notificationIconWrap: {
-    paddingHorizontal: ms(6),
-    paddingVertical: ms(4),
-    marginRight: ms(4),
+    width: 44,
+    height: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   notificationIcon: {
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  modalItemText: {
-    fontSize: fs(14),
-    color: '#111',
   },
 });
