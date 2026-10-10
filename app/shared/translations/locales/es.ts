@@ -425,6 +425,7 @@ const es = {
   assignedTo: 'Asignado a',
   tryDifferentSearchKeyword: 'Prueba otra palabra clave',
   yourOtherChurches: 'Tus otras iglesias',
+  noImage: 'Sin imagen',
   emailAddress: 'Dirección de E-mail',
   infoEmailAddress:
     'Esto es necesario para poder recuperar el acceso a OMR si se olvida la contraseña',

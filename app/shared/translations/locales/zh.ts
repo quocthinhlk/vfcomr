@@ -386,6 +386,7 @@ const zh = {
     assignedTo: '分配给',
     tryDifferentSearchKeyword: '请尝试其他搜索关键词',
     yourOtherChurches: '你的其他教会',
+    noImage: '无图片',
     emailAddress: '电子邮件地址',
     infoEmailAddress: '如果忘记密码，需要此电子邮件地址才能找回对 OMR 的访问权限',
     mobilePhone: '手机号码',

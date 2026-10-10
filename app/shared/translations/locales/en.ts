@@ -400,6 +400,7 @@ const en = {
     assignedTo: 'Assigned To',
     tryDifferentSearchKeyword: 'Try a different search keyword',
     yourOtherChurches: 'Your Other Churches',
+    noImage: 'No image',
     emailAddress: 'E-mail Address',
     infoEmailAddress: 'This is needed to be able to retrieve access to OMR if the password is forgotten',
     mobilePhone: 'Mobile Phone',

@@ -398,6 +398,7 @@ const ja = {
     assignedTo: '担当者',
     tryDifferentSearchKeyword: '別の検索キーワードを試してください',
     yourOtherChurches: 'あなたの他の教会',
+    noImage: '画像なし',
     emailAddress: 'Eメールアドレス',
     infoEmailAddress: 'パスワードを忘れた場合に OMR へのアクセスを復旧するために、このメールアドレスが必要になります',
     mobilePhone: '携帯電話',

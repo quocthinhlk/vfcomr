@@ -29,7 +29,6 @@ import ImagePicker from 'react-native-image-crop-picker';
 import {getApiErrorMessage, parseApiError} from '../../../shared/utils/apiErrorHandler';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
-import {InitialsAvatar} from '../../../shared/components/SelectionSheet';
 import {CheckIcon} from '../../../shared/components/icons/UiIcons';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {getUserById, updateUser} from '../../user/services/user.service';
@@ -134,6 +133,41 @@ const getAxiosDataPayload = (res: any): any => {
 };
 
 const USERS_ME_INCLUDE_PASTOR = {params: {include_pastor_churches: 'true'}};
+
+/**
+ * Church photo thumbnail for the church picker. `uri`: undefined = still
+ * loading (empty box), null = church has no photo ("No image"), string = photo.
+ */
+const ChurchThumb: React.FC<{uri?: string | null}> = ({uri}) => {
+  const C = useThemedColors();
+  const {t} = useTranslation();
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [uri]);
+  if (uri === undefined) {
+    return (
+      <View style={[styles.modalItemThumb, {backgroundColor: C.inputBg}]} />
+    );
+  }
+  if (!uri || failed) {
+    return (
+      <View
+        style={[styles.modalItemThumb, styles.modalItemNoImage, {backgroundColor: C.inputBg, borderColor: C.border}]}>
+        <RNText style={[styles.modalItemNoImageText, {color: C.textSecondary}]} numberOfLines={2}>
+          {t('noImage')}
+        </RNText>
+      </View>
+    );
+  }
+  return (
+    <Image
+      source={{uri}}
+      onError={() => setFailed(true)}
+      style={styles.modalItemThumb}
+      resizeMode="cover"
+      accessibilityIgnoresInvertColors
+    />
+  );
+};
 
 /**
  * Churches for the org picker modal: Pastor Leader reads `from_churches` on `users/me`;
@@ -637,6 +671,37 @@ export default function DashboardPastorLeaderScreen() {
     () => sortChurchesForAssignedList(dashboardData?.assigned_churches || []),
     [dashboardData?.assigned_churches],
   );
+
+  // Church photos for the picker: the list rows carry no photo, so load each
+  // church's photo_url once (in parallel) when the popup opens; cached by id.
+  // null = loaded, no photo (shows the blank cover).
+  const [churchPhotoById, setChurchPhotoById] = useState<Record<number, string | null>>({});
+  const churchPhotoRequestedRef = useRef<Set<number>>(new Set());
+  useEffect(() => {
+    if (!orgModalVisible) {
+      return;
+    }
+    const currentId = Number(dashboardData?.dashboard_info?.church_id);
+    const currentPhoto = dashboardData?.dashboard_info?.photo_url;
+    if (Number.isFinite(currentId) && currentPhoto && !churchPhotoRequestedRef.current.has(currentId)) {
+      churchPhotoRequestedRef.current.add(currentId);
+      setChurchPhotoById(prev => ({...prev, [currentId]: String(currentPhoto)}));
+    }
+    const missing = sortedAssignedChurches
+      .map((ch: any) => Number(ch.id))
+      .filter((id: number) => Number.isFinite(id) && !churchPhotoRequestedRef.current.has(id));
+    missing.forEach((id: number) => churchPhotoRequestedRef.current.add(id));
+    missing.forEach((id: number) => {
+      getChurchDetail(id)
+        .then((d: any) => {
+          setChurchPhotoById(prev => ({...prev, [id]: d?.photo_url ? String(d.photo_url) : null}));
+        })
+        .catch(() => {
+          // Retry next time the popup opens; blank cover meanwhile.
+          churchPhotoRequestedRef.current.delete(id);
+        });
+    });
+  }, [orgModalVisible, sortedAssignedChurches, dashboardData?.dashboard_info?.church_id, dashboardData?.dashboard_info?.photo_url]);
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
@@ -2074,7 +2139,7 @@ export default function DashboardPastorLeaderScreen() {
                     accessibilityRole="button"
                     accessibilityState={{ selected: isCurrent }}
                   >
-                    <InitialsAvatar name={String(ch.name ?? '')} size={ws(44)} />
+                    <ChurchThumb uri={churchPhotoById[Number(ch.id)]} />
                     <View style={styles.modalItemContent}>
                       <Text
                         style={[styles.modalItemName, { color: isCurrent ? T.brandText : C.textPrimary }]}
@@ -2873,6 +2938,23 @@ const styles = StyleSheet.create({
   modalItemContent: {
     flex: 1,
     minWidth: 0,
+  },
+  // 16:10 thumbnail: church photos are landscape, a small circle would crop them away.
+  modalItemThumb: {
+    width: ws(64),
+    height: ws(40),
+    borderRadius: rs(8),
+  },
+  modalItemNoImage: {
+    borderWidth: StyleSheet.hairlineWidth,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: ms(4),
+  },
+  modalItemNoImageText: {
+    fontSize: fs(10),
+    fontWeight: '500',
+    textAlign: 'center',
   },
   modalItemName: {
     fontSize: fs(15),

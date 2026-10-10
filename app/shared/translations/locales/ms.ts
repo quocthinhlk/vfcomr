@@ -397,6 +397,7 @@ const ms = {
     assignedTo: 'Ditugaskan kepada',
     tryDifferentSearchKeyword: 'Cuba kata kunci carian yang lain',
     yourOtherChurches: 'Gereja Anda Yang Lain',
+    noImage: 'Tiada gambar',
     emailAddress: 'Alamat E-mail',
     infoEmailAddress: 'Alamat ini diperlukan untuk mendapatkan kembali akses ke OMR jika kata sandi terlupakan',
     mobilePhone: 'Telefon Bimbit',

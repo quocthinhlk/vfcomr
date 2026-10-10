@@ -398,6 +398,7 @@ const fr = {
     assignedTo: 'Attribué à',
     tryDifferentSearchKeyword: 'Essayez un autre mot-clé de recherche',
     yourOtherChurches: 'Vos Autres Églises',
+    noImage: 'Pas d\'image',
     emailAddress: 'Adresse E-mail',
     infoEmailAddress: "Ceci est nécessaire pour pouvoir récupérer l'accès à OMR si le mot de passe est oublié",
     mobilePhone: 'Téléphone Portable',
