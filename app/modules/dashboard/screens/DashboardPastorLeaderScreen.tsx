@@ -1,5 +1,6 @@
 import React, { useCallback, useMemo, useState, useContext, useEffect, useRef } from 'react';
 import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
 import {useNavigation, useRoute, useIsFocused} from '@react-navigation/native';
@@ -1796,6 +1797,11 @@ export default function DashboardPastorLeaderScreen() {
     if (!nextExpanded || churchPicturesLoading) {
       return;
     }
+    await loadChurchPictures();
+  };
+
+  // Fetch the current church's pictures (used by expand and by "Try again").
+  const loadChurchPictures = async () => {
     try {
       setChurchPicturesLoading(true);
       setChurchPicturesError(null);
@@ -2452,7 +2458,13 @@ export default function DashboardPastorLeaderScreen() {
                       activeOpacity={0.7}
                     >
                       <Image source={require('../../../../app/assets/images/icon/image.png')} style={styles.menuIcon} />
-                      <Text style={[styles.menuLabel, { color: C.textPrimary }]}>{t('churchPicture')}</Text>
+                      <Text style={[styles.menuLabel, { color: C.textPrimary }]}>
+                        {t('churchPicture')}
+                      </Text>
+                      {/* Refreshing while photos are already shown: small inline spinner, no content swap. */}
+                      {churchPicturesLoading && churchPicturesForDisplay.length > 0 ? (
+                        <ActivityIndicator size="small" color={C.textSecondary} style={{ marginRight: ms(8) }} />
+                      ) : null}
                       <Image
                         source={require('../../../../app/assets/images/icon-down.png')}
                         style={[styles.menuArrow, churchPictureExpanded ? styles.menuArrowExpanded : null]}
@@ -2460,10 +2472,20 @@ export default function DashboardPastorLeaderScreen() {
                     </TouchableOpacity>
                     {churchPictureExpanded ? (
                       <View style={styles.churchPicturesContainer}>
-                        {churchPicturesLoading ? (
+                        {churchPicturesLoading && churchPicturesForDisplay.length === 0 ? (
                           <ActivityIndicator size="small" color={C.textSecondary} style={{ marginVertical: ms(12) }} />
-                        ) : churchPicturesError ? (
-                          <Text style={[styles.churchPictureStatusText, { color: C.error || '#ff4444' }]}>{churchPicturesError}</Text>
+                        ) : churchPicturesError && churchPicturesForDisplay.length === 0 ? (
+                          <View style={styles.churchPictureErrorRow}>
+                            <Text style={[styles.churchPictureStatusText, { color: C.error || '#ff4444' }]}>{churchPicturesError}</Text>
+                            <TouchableOpacity
+                              onPress={() => {
+                                void loadChurchPictures();
+                              }}
+                              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                              accessibilityRole="button">
+                              <Text style={[styles.churchPictureRetry, { color: COLORS.mainColor }]}>{t('tryAgain')}</Text>
+                            </TouchableOpacity>
+                          </View>
                         ) : (
                           <View style={styles.churchPicturesList}>
                             {churchPicturesForDisplay.map((url, pictureIndex, arr) => (
@@ -2489,12 +2511,14 @@ export default function DashboardPastorLeaderScreen() {
                           </View>
                         )}
                       </View>
-                    ) : churchPicturesLoading ? (
+                    ) : churchPicturesLoading && churchPicturesForDisplay.length === 0 ? (
                       <ActivityIndicator size="small" color={C.textSecondary} style={{ marginVertical: ms(10) }} />
                     ) : (
                       <TouchableOpacity
                         activeOpacity={0.88}
                         style={styles.churchPicturePeek}
+                        accessibilityRole="button"
+                        accessibilityLabel={`${t('churchPicture')}${displayChurchPictures.length ? `, ${displayChurchPictures.length}` : ''}`}
                         onPress={() => {
                           void handleToggleChurchPictures();
                         }}
@@ -2509,27 +2533,13 @@ export default function DashboardPastorLeaderScreen() {
                             style={styles.churchPicturePeekImg}
                             resizeMode="cover"
                           />
-                          {/* 25 lát mỏng không chồng, opacity theo easing cubic – mượt tối đa */}
-                          {Array.from({ length: 25 }, (_, i) => {
-                            const t = i / 24;
-                            const opacity = Math.pow(1 - t, 2);
-                            return (
-                              <View
-                                key={i}
-                                pointerEvents="none"
-                                style={{
-                                  position: 'absolute',
-                                  bottom: ms(18 + i * 3),
-                                  left: 0,
-                                  right: 0,
-                                  height: ms(3),
-                                  backgroundColor: `rgba(${gradientBase},${opacity.toFixed(3)})`,
-                                }}
-                              />
-                            );
-                          })}
-                          {/* solid đáy */}
-                          <View pointerEvents="none" style={{ position: 'absolute', bottom: 0, left: 0, right: 0, height: ms(20), backgroundColor: `rgba(${gradientBase},1)` }} />
+                          {/* One smooth gradient (was 25 stacked strips → visible banding). */}
+                          <LinearGradient
+                            pointerEvents="none"
+                            colors={[`rgba(${gradientBase},0)`, `rgba(${gradientBase},0.85)`, `rgba(${gradientBase},1)`]}
+                            locations={[0, 0.7, 1]}
+                            style={StyleSheet.absoluteFill}
+                          />
                         </View>
                       </TouchableOpacity>
                     )}
@@ -2861,11 +2871,22 @@ const styles = StyleSheet.create({
     fontSize: fs(12),
     marginTop: ms(4),
   },
+  // 16:9 like the photos themselves (was a fixed 180pt crop).
   churchPictureThumb: {
     width: '100%',
-    height: ws(180),
-    borderRadius: 8,
+    aspectRatio: 16 / 9,
+    borderRadius: rs(12),
     backgroundColor: 'transparent',
+  },
+  churchPictureErrorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: ms(12),
+  },
+  churchPictureRetry: {
+    fontSize: fs(13),
+    fontWeight: '600',
   },
   churchPicturePeek: {
     paddingTop: ms(4),
@@ -2873,8 +2894,8 @@ const styles = StyleSheet.create({
   },
   churchPicturePeekFrame: {
     width: '100%',
-    height: ms(60),
-    borderRadius: 8,
+    height: ms(72),
+    borderRadius: rs(12),
     overflow: 'hidden',
     position: 'relative',
   },
