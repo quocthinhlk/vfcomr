@@ -2822,9 +2822,10 @@ const styles = StyleSheet.create({
     height: ws(180),
   },
   // Assigned-churches popup: bottom sheet (slides up, rounded top corners).
+  // No dim overlay above the sheet; tapping that area still closes it.
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.35)',
+    backgroundColor: 'transparent',
     justifyContent: 'flex-end',
   },
   modalCard: {
@@ -2835,6 +2836,12 @@ const styles = StyleSheet.create({
     paddingTop: ms(8),
     paddingHorizontal: ms(16),
     paddingBottom: ms(28),
+    // Without the overlay, a soft upward shadow separates the sheet from the page.
+    shadowColor: '#000',
+    shadowOpacity: 0.18,
+    shadowRadius: 16,
+    shadowOffset: {width: 0, height: -4},
+    elevation: 16,
   },
   modalHandle: {
     alignSelf: 'center',
