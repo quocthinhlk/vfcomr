@@ -373,6 +373,7 @@ const fr = {
     logout: 'Déconnexion',
     // User Module
     changePassword: 'Changer le Mot de Passe',
+    changePasswordHint: "Modifiez le mot de passe utilisé pour vous connecter.",
     editProfile: 'Modifier le Profil',
     editUser: 'Modifier Utilisateur',
     loading: 'Chargement',
@@ -454,6 +455,7 @@ const fr = {
     passwordsDoNotMatch: 'Nouveau mot de passe et répéter mot de passe ne correspondent pas',
     passwordChangedSuccess: 'Mot de passe changé avec succès!',
     failedToChangePassword: 'Échec du changement de mot de passe',
+    oldPasswordIncorrect: "L’ancien mot de passe est incorrect.",
     fillRequiredFields: 'Veuillez remplir tous les champs requis.',
     profileUpdatedSuccess: 'Profil mis à jour avec succès!',
     couldNotUpdateUser: 'Impossible de mettre à jour l\'utilisateur.',

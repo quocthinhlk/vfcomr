@@ -375,6 +375,7 @@ const en = {
     logout: 'Logout',
     // User Module
     changePassword: 'Change Password',
+    changePasswordHint: "Update the password used to sign in.",
     editProfile: 'Edit Profile',
     editUser: 'Edit User',
     loading: 'Loading',
@@ -459,6 +460,7 @@ const en = {
     passwordsDoNotMatch: 'New password and repeat password do not match',
     passwordChangedSuccess: 'Password changed successfully!',
     failedToChangePassword: 'Failed to change password',
+    oldPasswordIncorrect: "Old password is incorrect.",
     fillRequiredFields: 'Please fill all required fields.',
     profileUpdatedSuccess: 'Profile updated successfully!',
     couldNotUpdateUser: 'Could not update user.',

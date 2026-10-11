@@ -400,6 +400,7 @@ const es = {
   logout: 'Cerrar sesión',
   // User Module
   changePassword: 'Cambiar contraseña',
+  changePasswordHint: "Actualice la contraseña con la que inicia sesión.",
   editProfile: 'Editar perfil',
   editUser: 'Editar usuario',
   loading: 'Cargando',
@@ -485,6 +486,7 @@ const es = {
   passwordsDoNotMatch: 'Las contraseñas no coinciden',
   passwordChangedSuccess: '¡Contraseña cambiada correctamente!',
   failedToChangePassword: 'No se pudo cambiar la contraseña',
+  oldPasswordIncorrect: "La contraseña anterior es incorrecta.",
   fillRequiredFields: 'Por favor completa los campos obligatorios.',
   profileUpdatedSuccess: '¡Perfil actualizado correctamente!',
   couldNotUpdateUser: 'No se pudo actualizar el usuario.',

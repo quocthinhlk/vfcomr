@@ -265,3 +265,17 @@ export async function deleteUser(id: number) {
     throw error;
   }
 } 
+export interface ChangeMyPasswordPayload {
+  old_password: string;
+  new_password: string;
+  repeat_new_password: string;
+}
+
+/**
+ * The logged-in user changes their own password.
+ * Fails with 400 "Old password is incorrect" or 422 `errors.<field>`.
+ */
+export async function changeMyPassword(payload: ChangeMyPasswordPayload) {
+  const response = await api.post('users/me/password', payload);
+  return response.data as {success: boolean; message: string};
+}

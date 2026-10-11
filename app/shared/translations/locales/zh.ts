@@ -361,6 +361,7 @@ const zh = {
     logout: '退出登录',
     // User Module
     changePassword: '更改密码',
+    changePasswordHint: "更新用于登录的密码。",
     editProfile: '编辑个人资料',
     editUser: '编辑用户',
     loading: '加载中',
@@ -445,6 +446,7 @@ const zh = {
     passwordsDoNotMatch: '新密码和重复密码不匹配',
     passwordChangedSuccess: '密码更改成功！',
     failedToChangePassword: '更改密码失败',
+    oldPasswordIncorrect: "旧密码不正确。",
     fillRequiredFields: '请填写所有必填字段。',
     profileUpdatedSuccess: '个人资料更新成功！',
     couldNotUpdateUser: '无法更新用户。',

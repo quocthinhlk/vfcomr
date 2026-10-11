@@ -367,6 +367,7 @@ const pt = {
     logout: 'Sair',
     // User Module
     changePassword: 'Alterar Senha',
+    changePasswordHint: "Atualize a senha usada para entrar.",
     editProfile: 'Editar Perfil',
     editUser: 'Editar Usuário',
     loading: 'Carregando',
@@ -451,6 +452,7 @@ const pt = {
     passwordsDoNotMatch: 'Nova senha e repetir senha não coincidem',
     passwordChangedSuccess: 'Senha alterada com sucesso!',
     failedToChangePassword: 'Falha ao alterar senha',
+    oldPasswordIncorrect: "A senha antiga está incorreta.",
     fillRequiredFields: 'Por favor, preencha todos os campos obrigatórios.',
     profileUpdatedSuccess: 'Perfil atualizado com sucesso!',
     couldNotUpdateUser: 'Não foi possível atualizar usuário.',

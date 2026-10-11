@@ -9,6 +9,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  Pressable,
+  StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
@@ -29,13 +31,13 @@ import {Formik} from 'formik';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {COLORS} from '../../../shared/constants/colors';
-import {fs, ms, rs, hs} from '../../../shared/utils/scale';
+import {fs, ms, rs, hs, ws} from '../../../shared/utils/scale';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
+import {LockIcon, ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 
 /** Coerce API ids (number | string) to number for dropdown value matching. */
 function parseNullableId(v: unknown): number | null {
@@ -64,6 +66,7 @@ const countryCodeToFlag = (code: string) => {
 export default function EditProfileScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
+  const T = useUiTokens();
   const userId = Number(route.params?.id);
   const {t} = useTranslation();
   const C = useThemedColors();
@@ -558,17 +561,32 @@ export default function EditProfileScreen() {
               {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
                 <View style={{gap: ms(12)}}>
 
-                  {/* Change Password Button */}
-                  <View style={{flexDirection: 'row', justifyContent: 'flex-end'}}>
-                  <AddNewHeaderButton
-                    name="ChangePasswordForOtherUser"
-                    params={{id: userId}}
-                    text={t('changePassword')}
-                    prefix=""
-                    style={{backgroundColor: 'white', borderWidth: 1, borderColor: COLORS.mainColor}}
-                    textStyle={{color: COLORS.mainColor}}
-                  />
-                  </View>
+                  {/* Change Password: a full-width row at the top, apart from the form fields. */}
+                  <Pressable
+                    onPress={() => navigation.navigate('ChangePasswordForOtherUser', {id: userId})}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('changePassword')}
+                    accessibilityHint={t('changePasswordHint')}
+                    style={({pressed}) => [
+                      styles.passwordRow,
+                      {
+                        backgroundColor: pressed ? T.pressedBg : C.surface,
+                        borderColor: C.surfaceBorder,
+                      },
+                    ]}>
+                    <View style={[styles.passwordIcon, {backgroundColor: T.brandTint}]}>
+                      <LockIcon color={T.brandText} size={ws(18)} />
+                    </View>
+                    <View style={styles.passwordText}>
+                      <Text style={[styles.passwordTitle, {color: C.textPrimary}]}>
+                        {t('changePassword')}
+                      </Text>
+                      <Text style={[styles.passwordHint, {color: C.textSecondary}]}>
+                        {t('changePasswordHint')}
+                      </Text>
+                    </View>
+                    <ChevronRightIcon color={C.textSecondary} size={ws(16)} />
+                  </Pressable>
 
                   {/* Prefix */}
                   <View onLayout={e => setFieldPos('prefix', e.nativeEvent.layout.y)}>
@@ -1012,3 +1030,36 @@ export default function EditProfileScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  passwordRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(12),
+    minHeight: 64,
+    paddingVertical: ms(12),
+    paddingHorizontal: ms(14),
+    borderRadius: rs(12),
+    borderWidth: 1,
+  },
+  passwordIcon: {
+    width: ws(36),
+    height: ws(36),
+    borderRadius: ws(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  passwordText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  passwordTitle: {
+    fontSize: fs(15),
+    fontWeight: '600',
+  },
+  passwordHint: {
+    marginTop: ms(2),
+    fontSize: fs(12),
+    lineHeight: fs(17),
+  },
+});

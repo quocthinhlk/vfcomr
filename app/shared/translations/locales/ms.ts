@@ -372,6 +372,7 @@ const ms = {
     logout: 'Log Keluar',
     // User Module
     changePassword: 'Tukar Kata Laluan',
+    changePasswordHint: "Kemas kini kata laluan yang digunakan untuk log masuk.",
     editProfile: 'Edit Profil',
     editUser: 'Edit Pengguna',
     loading: 'Memuatkan',
@@ -453,6 +454,7 @@ const ms = {
     passwordsDoNotMatch: 'Kata laluan baru dan ulang kata laluan tidak sepadan',
     passwordChangedSuccess: 'Kata laluan berjaya ditukar!',
     failedToChangePassword: 'Gagal menukar kata laluan',
+    oldPasswordIncorrect: "Kata laluan lama tidak betul.",
     fillRequiredFields: 'Sila isi semua medan yang diperlukan.',
     profileUpdatedSuccess: 'Profil berjaya dikemas kini!',
     couldNotUpdateUser: 'Tidak dapat mengemas kini pengguna.',

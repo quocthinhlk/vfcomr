@@ -373,6 +373,7 @@ const ja = {
     logout: 'ログアウト',
     // User Module
     changePassword: 'パスワード変更',
+    changePasswordHint: "サインインに使うパスワードを変更します。",
     editProfile: 'プロフィール編集',
     editUser: 'ユーザー編集',
     loading: '読み込み中',
@@ -454,6 +455,7 @@ const ja = {
     passwordsDoNotMatch: '新しいパスワードと再入力パスワードが一致しません',
     passwordChangedSuccess: 'パスワードが正常に変更されました！',
     failedToChangePassword: 'パスワードの変更に失敗しました',
+    oldPasswordIncorrect: "現在のパスワードが正しくありません。",
     fillRequiredFields: 'すべての必須フィールドを入力してください。',
     profileUpdatedSuccess: 'プロフィールが正常に更新されました！',
     couldNotUpdateUser: 'ユーザーを更新できませんでした。',

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
+import { View, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Layout, Text } from '@ui-kitten/components';
 import { globalStyles } from '../../../shared/styles/global';
@@ -15,7 +15,8 @@ import { useThemedColors } from '../../../shared/styles/theme';
 import { Col, Row, Grid } from 'react-native-easy-grid';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
-import { ms, hs } from '../../../shared/utils/scale';
+import { ms, hs, fs } from '../../../shared/utils/scale';
+import { changeMyPassword } from '../services/user.service';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 export default function ChangePasswordForOtherUserScreen() {
@@ -26,18 +27,21 @@ export default function ChangePasswordForOtherUserScreen() {
   const C = useThemedColors();
   
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   // Validation + scroll
   const scrollRef = useRef<ScrollView>(null);
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
-  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  // Inline message per field (client validation or the API's answer).
+  const [errors, setErrors] = useState<Record<string, string>>({});
   const setFieldPos = (key: string, y: number) =>
     setFieldY(prev => (prev[key] === y ? prev : { ...prev, [key]: y }));
   const scrollToField = (key: string) => {
     const y = fieldY[key] ?? 0;
     scrollRef.current?.scrollTo({ y: Math.max(0, y - ms(20)), animated: true });
   };
-  const clearInvalid = (key: string) => setInvalid(prev => ({ ...prev, [key]: false }));
+  const clearError = (key: string) =>
+    setErrors(prev => (prev[key] ? { ...prev, [key]: '' } : prev));
 
   // users/me decides whether "old password" is required; if it fails, show a
   // retryable error rather than guessing the wrong form.
@@ -51,6 +55,8 @@ export default function ChangePasswordForOtherUserScreen() {
       }
       const r = res?.data?.data?.role?.id;
       if (typeof r === 'number') setCurrentUserRoleId(r);
+      const meId = Number(res?.data?.data?.id);
+      if (Number.isFinite(meId)) setCurrentUserId(meId);
       setLoadError(null);
     } catch (e) {
       if (mountedRef.current) {
@@ -69,6 +75,10 @@ export default function ChangePasswordForOtherUserScreen() {
   }, [loadCurrentUser]);
 
   const isSuperAdminUser = isSuperAdmin(currentUserRoleId || undefined);
+  // Own password → users/me/password (always asks for the old one).
+  // Someone else's → users/{id}/password, unchanged.
+  const isSelf = userId == null || (currentUserId != null && Number(userId) === currentUserId);
+  const needsOldPassword = isSelf || !isSuperAdminUser;
 
   if (loading) {
     return (
@@ -116,47 +126,49 @@ export default function ChangePasswordForOtherUserScreen() {
                 repeat_new_password: '',
               }}
               onSubmit={async (values) => {
+                // Client validation: show the reason under each field.
+                const nextErrors: Record<string, string> = {};
+                if (needsOldPassword && !values.old_password) {
+                  nextErrors.old_password = t('oldPasswordRequired');
+                }
+                if (!values.new_password) {
+                  nextErrors.new_password = t('newPasswordRequired');
+                }
+                if (!values.repeat_new_password) {
+                  nextErrors.repeat_new_password = t('repeatPasswordRequired');
+                } else if (values.new_password && values.new_password !== values.repeat_new_password) {
+                  nextErrors.repeat_new_password = t('passwordsDoNotMatch');
+                }
+                setErrors(nextErrors);
+                const orderedKeys = ['old_password', 'new_password', 'repeat_new_password'];
+                const firstInvalidKey = orderedKeys.find(k => nextErrors[k]);
+                if (firstInvalidKey) {
+                  scrollToField(firstInvalidKey);
+                  return;
+                }
+
                 try {
-                  if (!userId) {
-                    Alert.alert(t('error'), t('userIDMissing'));
-                    return;
+                  if (isSelf) {
+                    await changeMyPassword({
+                      old_password: values.old_password,
+                      new_password: values.new_password,
+                      repeat_new_password: values.repeat_new_password,
+                    });
+                  } else {
+                    if (!userId) {
+                      Alert.alert(t('error'), t('userIDMissing'));
+                      return;
+                    }
+                    const payload: any = {
+                      new_password: values.new_password,
+                      repeat_new_password: values.repeat_new_password,
+                    };
+                    // Only include old_password if not super admin
+                    if (!isSuperAdminUser) {
+                      payload.old_password = values.old_password;
+                    }
+                    await api.post(`users/${userId}/password`, payload);
                   }
-
-                  // Validation + mark invalid fields
-                  const newInvalid: Record<string, boolean> = {};
-                  if (!isSuperAdminUser) {
-                    newInvalid.old_password = !values.old_password;
-                  }
-                  newInvalid.new_password = !values.new_password;
-                  newInvalid.repeat_new_password = !values.repeat_new_password;
-                  if (values.new_password && values.repeat_new_password && values.new_password !== values.repeat_new_password) {
-                    newInvalid.new_password = true;
-                    newInvalid.repeat_new_password = true;
-                  }
-                  setInvalid(newInvalid);
-                  const orderedKeys = [
-                    ...(isSuperAdminUser ? [] : ['old_password']),
-                    'new_password',
-                    'repeat_new_password',
-                  ];
-                  const firstInvalidKey = orderedKeys.find(k => newInvalid[k]);
-                  if (firstInvalidKey) {
-                    scrollToField(firstInvalidKey);
-                    Alert.alert(t('validation'), t('fillRequiredFields'));
-                    return;
-                  }
-
-                  const payload: any = {
-                    new_password: values.new_password,
-                    repeat_new_password: values.repeat_new_password,
-                  };
-                  
-                  // Only include old_password if not super admin
-                  if (!isSuperAdminUser) {
-                    payload.old_password = values.old_password;
-                  }
-
-                  await api.post(`users/${userId}/password`, payload);
                   Alert.alert(t('success'), t('passwordChangedSuccess'));
 
                   const routes = navigation.getState()?.routes ?? [];
@@ -164,7 +176,7 @@ export default function ChangePasswordForOtherUserScreen() {
                     .slice(0, -1)
                     .some((routeEntry: {name?: string}) => routeEntry.name === 'User');
 
-                  if (cameFromUser && typeof navigation.popTo === 'function') {
+                  if (cameFromUser && userId && typeof navigation.popTo === 'function') {
                     navigation.popTo('User', {
                       userId,
                       refetchKey: Date.now(),
@@ -175,14 +187,37 @@ export default function ChangePasswordForOtherUserScreen() {
                     navigation.navigate('User', {userId});
                   }
                 } catch (e: any) {
-                  const msg = e?.response?.data?.message || e?.message || t('failedToChangePassword');
-                  Alert.alert(t('error'), msg);
+                  const data = e?.response?.data;
+                  const message: string = data?.message || e?.message || t('failedToChangePassword');
+                  // 422 {errors: {repeat_new_password: "..."}} → under the matching field.
+                  const apiErrors = data?.errors && typeof data.errors === 'object' ? data.errors : null;
+                  const fieldErrors: Record<string, string> = {};
+                  if (apiErrors) {
+                    for (const key of orderedKeys) {
+                      if (apiErrors[key]) {
+                        fieldErrors[key] =
+                          key === 'repeat_new_password' && /equal/i.test(String(apiErrors[key]))
+                            ? t('passwordsDoNotMatch')
+                            : String(apiErrors[key]);
+                      }
+                    }
+                  } else if (/old password/i.test(message)) {
+                    // 400 "Old password is incorrect"
+                    fieldErrors.old_password = t('oldPasswordIncorrect');
+                  }
+                  const firstApiKey = orderedKeys.find(k => fieldErrors[k]);
+                  if (firstApiKey) {
+                    setErrors(fieldErrors);
+                    scrollToField(firstApiKey);
+                    return;
+                  }
+                  Alert.alert(t('error'), message);
                 }
               }}
             >
-              {({ values, handleChange, handleBlur, handleSubmit, setFieldValue }) => (
+              {({ values, handleBlur, handleSubmit, setFieldValue }) => (
                 <Grid>
-                  {!isSuperAdminUser && (
+                  {needsOldPassword && (
                     <Row>
                       <Col>
                         <View onLayout={e => setFieldPos('old_password', e.nativeEvent.layout.y)}>
@@ -191,12 +226,16 @@ export default function ChangePasswordForOtherUserScreen() {
                           </Text>
                           <AppInput
                             value={values.old_password}
-                            onChangeText={t => { setFieldValue('old_password', t); clearInvalid('old_password'); }}
+                            onChangeText={text => { setFieldValue('old_password', text); clearError('old_password'); }}
                             onBlur={handleBlur('old_password')}
                             secureTextEntry
                             autoCapitalize="none"
-                            error={!!invalid.old_password}
+                            error={!!errors.old_password}
+                            textContentType="password"
                           />
+                          {errors.old_password ? (
+                            <Text style={[styles.fieldError, { color: C.error || '#d92d20' }]}>{errors.old_password}</Text>
+                          ) : null}
                         </View>
                       </Col>
                     </Row>
@@ -210,12 +249,16 @@ export default function ChangePasswordForOtherUserScreen() {
                         </Text>
                         <AppInput
                           value={values.new_password}
-                          onChangeText={t => { setFieldValue('new_password', t); clearInvalid('new_password'); }}
+                          onChangeText={text => { setFieldValue('new_password', text); clearError('new_password'); }}
                           onBlur={handleBlur('new_password')}
                           secureTextEntry
                           autoCapitalize="none"
-                          error={!!invalid.new_password}
+                          error={!!errors.new_password}
+                          textContentType="newPassword"
                         />
+                        {errors.new_password ? (
+                          <Text style={[styles.fieldError, { color: C.error || '#d92d20' }]}>{errors.new_password}</Text>
+                        ) : null}
                       </View>
                     </Col>
                   </Row>
@@ -228,12 +271,16 @@ export default function ChangePasswordForOtherUserScreen() {
                         </Text>
                         <AppInput
                           value={values.repeat_new_password}
-                          onChangeText={t => { setFieldValue('repeat_new_password', t); clearInvalid('repeat_new_password'); }}
+                          onChangeText={text => { setFieldValue('repeat_new_password', text); clearError('repeat_new_password'); }}
                           onBlur={handleBlur('repeat_new_password')}
                           secureTextEntry
                           autoCapitalize="none"
-                          error={!!invalid.repeat_new_password}
+                          error={!!errors.repeat_new_password}
+                          textContentType="newPassword"
                         />
+                        {errors.repeat_new_password ? (
+                          <Text style={[styles.fieldError, { color: C.error || '#d92d20' }]}>{errors.repeat_new_password}</Text>
+                        ) : null}
                       </View>
                     </Col>
                   </Row>
@@ -259,3 +306,10 @@ export default function ChangePasswordForOtherUserScreen() {
   );
 }
 
+const styles = StyleSheet.create({
+  fieldError: {
+    marginTop: ms(4),
+    fontSize: fs(12),
+    lineHeight: fs(16),
+  },
+});
