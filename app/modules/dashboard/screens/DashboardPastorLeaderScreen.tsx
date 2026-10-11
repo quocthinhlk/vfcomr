@@ -30,7 +30,7 @@ import ImagePicker from 'react-native-image-crop-picker';
 import {getApiErrorMessage, parseApiError} from '../../../shared/utils/apiErrorHandler';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
-import {CheckIcon} from '../../../shared/components/icons/UiIcons';
+import {CheckIcon, ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {getUserById, updateUser} from '../../user/services/user.service';
 import {getChurchDetail, updateChurch} from '../../church/services/church.service';
@@ -1891,15 +1891,17 @@ export default function DashboardPastorLeaderScreen() {
     }
   }, []);
 
+  // Round chevron badge sits right after the last line of the church name.
+  const orgChevronSize = ws(20);
   const orgChevronLeft = orgLastLineInfo != null
     ? Math.min(
-        orgLastLineInfo.width + ms(4),
-        Math.max(0, organizationRowWidthRef.current - ws(10)),
+        orgLastLineInfo.width + ms(6),
+        Math.max(0, organizationRowWidthRef.current - orgChevronSize),
       )
     : null;
   const orgChevronTop = orgLastLineInfo != null
-    ? orgLastLineInfo.y + Math.max(0, (fs(22) - hs(10)) / 2)
-    : ms(7);
+    ? orgLastLineInfo.y + Math.max(0, (fs(22) - orgChevronSize) / 2)
+    : ms(1);
 
   const handleDownloadImage = async () => {
     if (!selectedImage) return;
@@ -2040,22 +2042,25 @@ export default function DashboardPastorLeaderScreen() {
             }}
             onLayout={(event) => { organizationRowWidthRef.current = event.nativeEvent.layout.width; }}
           >
-            <RNText style={[styles.organizationText, { color: C.textPrimary }]} onTextLayout={handleOrganizationTextLayout}>
+            <RNText style={[styles.organizationText, { color: C.textPrimary }, !isOverseerUser && { paddingRight: orgChevronSize + ms(6) }]} onTextLayout={handleOrganizationTextLayout}>
               {userProfile.organization}
             </RNText>
             {!isOverseerUser && (
-              <Image
-                source={require('../../../../app/assets/images/icon/arrow-down-bold.png')}
+              <View
+                pointerEvents="none"
                 style={[
                   styles.dropdownIcon,
                   {
-                    tintColor: C.textPrimary,
+                    backgroundColor: T.brandTint,
                     left: orgChevronLeft ?? 0,
                     top: orgChevronTop,
                     opacity: orgChevronLeft == null ? 0 : 1,
                   },
-                ]}
-              />
+                ]}>
+                <View style={styles.dropdownChevron}>
+                  <ChevronRightIcon color={T.brandText} size={ws(12)} />
+                </View>
+              </View>
             )}
           </TouchableOpacity>
 
@@ -2067,9 +2072,7 @@ export default function DashboardPastorLeaderScreen() {
                 dashboardData.dashboard_info.is_verified ? (
                   <RNText
                     style={[styles.verificationText, { color: '#1e7e34' }]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit
-                    minimumFontScale={0.85}>
+                    numberOfLines={2}>
                     {'\u2714\uFE0E'} {t('visited')} {formatVisitedMonthYear(dashboardData.dashboard_info.verified_date || '')} by {dashboardData.dashboard_info.verified_by_user_name || ''}
                   </RNText>
                 ) : (
@@ -2611,8 +2614,8 @@ const styles = StyleSheet.create({
     height: HEADER_LOGO_SIZE,
   },
   verificationText: {
-    fontSize: fs(11),
-    lineHeight: fs(20),
+    fontSize: fs(12),
+    lineHeight: fs(18),
     textAlign: 'right',
     fontWeight: '600',
     marginTop: ms(3),
@@ -2696,11 +2699,15 @@ const styles = StyleSheet.create({
     lineHeight: fs(22),
   },
   dropdownIcon: {
-    width: ws(12),
-    height: hs(12),
+    width: ws(20),
+    height: ws(20),
+    borderRadius: ws(10),
     position: 'absolute',
-    top: ms(7),
-    tintColor: '#000',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  dropdownChevron: {
+    transform: [{rotate: '90deg'}],
   },
   locationRow: {
     flexDirection: 'row',
