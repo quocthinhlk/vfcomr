@@ -1,5 +1,5 @@
 import React, { useCallback, useMemo, useState, useContext, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS, Dimensions } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
@@ -643,6 +643,19 @@ export default function DashboardPastorLeaderScreen() {
   const fade = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const [orgModalVisible, setOrgModalVisible] = useState(false);
+  const orgSheetSlide = useRef(new Animated.Value(Dimensions.get('window').height)).current;
+  useEffect(() => {
+    if (!orgModalVisible) {
+      return;
+    }
+    orgSheetSlide.setValue(Dimensions.get('window').height);
+    Animated.timing(orgSheetSlide, {
+      toValue: 0,
+      duration: 260,
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: true,
+    }).start();
+  }, [orgModalVisible, orgSheetSlide]);
   const userMeRef = useRef<any>(null);
   const refreshAssignedChurchesFromUserMe = useCallback(() => {
     const userData = userMeRef.current;
@@ -2124,9 +2137,17 @@ export default function DashboardPastorLeaderScreen() {
         </View>
 
         {/* Assigned Churches Modal — same logic as before, shown as a bottom sheet like the Admin overseer picker */}
-        <Modal visible={orgModalVisible} transparent animationType="slide" onRequestClose={() => setOrgModalVisible(false)}>
-          <TouchableOpacity activeOpacity={1} style={styles.modalBackdrop} onPress={() => setOrgModalVisible(false)}>
-            <TouchableOpacity activeOpacity={1} style={[styles.modalCard, { backgroundColor: C.surface }]}>
+        {/* Backdrop fades in like the list action sheets; only the card slides up. */}
+        <Modal visible={orgModalVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setOrgModalVisible(false)}>
+          <View style={styles.modalBackdrop}>
+            <TouchableOpacity
+              activeOpacity={1}
+              style={[StyleSheet.absoluteFill, { backgroundColor: `rgba(0,0,0,${T.backdropOpacity})` }]}
+              onPress={() => setOrgModalVisible(false)}
+              accessibilityRole="button"
+              accessibilityLabel={t('cancel')}
+            />
+            <Animated.View style={[styles.modalCard, { backgroundColor: C.surface, transform: [{ translateY: orgSheetSlide }] }]}>
               <View style={[styles.modalHandle, { backgroundColor: C.border }]} />
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t('yourOtherChurches')}</Text>
@@ -2184,8 +2205,8 @@ export default function DashboardPastorLeaderScreen() {
                   );
                 })}
               </ScrollView>
-            </TouchableOpacity>
-          </TouchableOpacity>
+            </Animated.View>
+          </View>
         </Modal>
 
 
