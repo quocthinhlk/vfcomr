@@ -19,6 +19,7 @@ import {fs, ms} from '../../../shared/utils/scale';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
+import {useVisitorOptions} from '../hooks/useVisitorOptions';
 import {addWeeks, startOfISOWeek} from 'date-fns';
 import {getVisitById, listVisits, VisitItem} from '../services/visit.service';
 import {useLanguage} from '../../../shared/context/LanguageContext';
@@ -39,9 +40,14 @@ export const EditVisitScreen: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<number | null>(null);
-  const [visitorOptions, setVisitorOptions] = useState<
-    Array<{label: string; value: number; name: string; role: string}>
-  >([]);
+  type VisitorOption = {label: string; value: number; name: string; role: string};
+  const visitors = useVisitorOptions<VisitorOption>(item => ({
+    label: buildVisitorLabel(item),
+    value: item.id,
+    name: item.name || '',
+    role: resolveRoleName(item),
+  }));
+  const visitorOptions = visitors.options;
   const [visitorName, setVisitorName] = useState('');
   const [visitorRole, setVisitorRole] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -144,17 +150,10 @@ export const EditVisitScreen: React.FC = () => {
     (async () => {
       setLoading(true);
       try {
-        const [meRes, visitorsRes, visitRes] = await Promise.all([
+        // Visitors: first page by name; typing in the picker searches the server.
+        const [meRes, , visitRes] = await Promise.all([
           api.get('users/me'),
-          api.get('users', {
-            params: {
-              page: 1,
-              limit: 10,
-              sort_desc: true,
-              search: 'vietnam',
-              sort_by: 'city',
-            },
-          }),
+          visitors.loadInitial(),
           visitId ? getVisitById(visitId) : Promise.resolve(null as any),
         ]);
 
@@ -162,32 +161,29 @@ export const EditVisitScreen: React.FC = () => {
 
         const me = meRes?.data?.data;
         const meId = typeof me?.id === 'number' ? me.id : null;
-        const visitorItems = (visitorsRes?.data?.data?.items ?? []) as any[];
-
-        const mappedVisitors = visitorItems.map(item => ({
-          label: buildVisitorLabel(item),
-          value: item.id,
-          name: item.name || '',
-          role: resolveRoleName(item),
-        }));
-
-        if (meId && !mappedVisitors.some(option => option.value === meId)) {
-          mappedVisitors.unshift({
-            label: buildVisitorLabel(me),
-            value: meId,
-            name: me?.name || '',
-            role: resolveRoleName(me),
-          });
-        }
-
-        setVisitorOptions(mappedVisitors);
+        const meOption: VisitorOption | null = meId
+          ? {label: buildVisitorLabel(me), value: meId, name: me?.name || '', role: resolveRoleName(me)}
+          : null;
+        visitors.pin(meOption);
 
         const visitData: VisitItem | null = visitRes?.data ?? null;
         setPrefillVisit(visitData);
 
+        // The visit's own visitor may not be on the first page: keep it selectable.
+        const visitOption: VisitorOption | null =
+          visitData?.user_id && visitData.user_id !== meId
+            ? {
+                label: visitData.user_name || `#${visitData.user_id}`,
+                value: visitData.user_id,
+                name: visitData.user_name || '',
+                role: '',
+              }
+            : null;
+        visitors.pin(visitOption);
+
         // Default selection: visit.user_id if editing from list, else logged-in user.
-        const defaultUserId = visitData?.user_id ?? meId ?? (mappedVisitors[0]?.value ?? null);
-        const defaultVisitor = mappedVisitors.find(v => v.value === defaultUserId) || mappedVisitors[0] || null;
+        const defaultUserId = visitData?.user_id ?? meId ?? null;
+        const defaultVisitor = visitOption ?? (defaultUserId === meId ? meOption : null);
 
         setUserId(defaultUserId);
         setVisitorName(defaultVisitor?.name || '');
@@ -363,6 +359,8 @@ export const EditVisitScreen: React.FC = () => {
                     const selectedVisitor = visitorOptions.find(
                       option => option.value === (value as number),
                     );
+                    // Keep the choice visible even after the search text changes.
+                    visitors.pin(selectedVisitor);
                     setUserId((value as number) || null);
                     setVisitorName(selectedVisitor?.name || '');
                     setVisitorRole(selectedVisitor?.role || '');
@@ -370,6 +368,8 @@ export const EditVisitScreen: React.FC = () => {
                     clearFieldError('user_id');
                   }}
                   placeholder={t('visitor') || 'Visitor'}
+                  onSearchText={visitors.onSearchText}
+                  onEndReached={visitors.onEndReached}
                   containerStyle={{
                     backgroundColor: C.inputBg,
                     borderColor: invalid.user_id ? C.error || '#ff4444' : C.inputBorder,

@@ -19,6 +19,7 @@ import {fs, ms, rs} from '../../../shared/utils/scale';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
+import {useVisitorOptions} from '../hooks/useVisitorOptions';
 import {useLanguage} from '../../../shared/context/LanguageContext';
 
 const MONTHS = [
@@ -81,7 +82,15 @@ export const AddVisitsScreen: React.FC = () => {
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<number | null>(null);
-  const [visitorOptions, setVisitorOptions] = useState<VisitorOption[]>([]);
+  const visitors = useVisitorOptions<VisitorOption>(item => ({
+    label: buildVisitorLabel(item),
+    value: item.id,
+    name: item.name || '',
+    role: resolveRoleName(item),
+    title: item.title || '',
+  }));
+  const visitorOptions = visitors.options;
+  const {loadInitial: loadInitialVisitors, pin: pinVisitor} = visitors;
   const [visitorName, setVisitorName] = useState('');
   const [visitorRole, setVisitorRole] = useState('');
   const [selectedMonth, setSelectedMonth] = useState<number | null>(new Date().getMonth() + 1);
@@ -120,18 +129,8 @@ export const AddVisitsScreen: React.FC = () => {
     (async () => {
       setLoading(true);
       try {
-        const [meRes, visitorsRes] = await Promise.all([
-          api.get('users/me'),
-          api.get('users', {
-            params: {
-              page: 1,
-              limit: 10,
-              sort_desc: true,
-              search: 'vietnam',
-              sort_by: 'city',
-            },
-          }),
-        ]);
+        // Visitors: first page by name; typing in the picker searches the server.
+        const [meRes] = await Promise.all([api.get('users/me'), loadInitialVisitors()]);
 
         if (!mounted) {
           return;
@@ -145,33 +144,21 @@ export const AddVisitsScreen: React.FC = () => {
           '';
         const meTitle = (me?.title && String(me.title).trim()) || '';
         const meCityName = (me?.city_name && String(me.city_name).trim()) || '';
-        const visitorItems = (visitorsRes?.data?.data?.items ?? []) as any[];
+        const meOption: VisitorOption | null = meId
+          ? {
+              label: buildVisitorLabel({name: meName, title: meTitle, city_name: meCityName}),
+              value: meId,
+              name: meName,
+              role: resolveRoleName(me),
+              title: meTitle,
+            }
+          : null;
+        // The logged-in user is the default visitor and always stays selectable.
+        pinVisitor(meOption);
 
-        const mappedVisitors: VisitorOption[] = visitorItems.map(item => ({
-          label: buildVisitorLabel(item),
-          value: item.id,
-          name: item.name || '',
-          role: resolveRoleName(item),
-          title: item.title || '',
-        }));
-
-        if (meId && !mappedVisitors.some(option => option.value === meId)) {
-          mappedVisitors.unshift({
-            label: buildVisitorLabel({name: meName, title: meTitle, city_name: meCityName}),
-            value: meId,
-            name: meName,
-            role: resolveRoleName(me),
-            title: meTitle,
-          });
-        }
-
-        const selectedVisitor =
-          mappedVisitors.find(option => option.value === meId) || mappedVisitors[0] || null;
-
-        setVisitorOptions(mappedVisitors);
-        setUserId(selectedVisitor?.value ?? meId);
-        setVisitorName(selectedVisitor?.name || '');
-        setVisitorRole(selectedVisitor?.role || '');
+        setUserId(meOption?.value ?? null);
+        setVisitorName(meOption?.name || '');
+        setVisitorRole(meOption?.role || '');
         setLoadError(null);
       } catch (error) {
         console.error('Failed to load visit/event setup:', error);
@@ -189,7 +176,7 @@ export const AddVisitsScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [reloadKey]);
+  }, [reloadKey, loadInitialVisitors, pinVisitor]);
 
   const clearInvalid = (key: string) => {
     setInvalid(prev => ({...prev, [key]: false}));
@@ -342,6 +329,8 @@ export const AddVisitsScreen: React.FC = () => {
                     const selectedVisitor = visitorOptions.find(
                       option => option.value === (value as number),
                     );
+                    // Keep the choice visible even after the search text changes.
+                    visitors.pin(selectedVisitor);
                     setUserId((value as number) || null);
                     setVisitorName(selectedVisitor?.name || '');
                     setVisitorRole(selectedVisitor?.role || '');
@@ -349,6 +338,8 @@ export const AddVisitsScreen: React.FC = () => {
                     clearFieldError('user_id');
                   }}
                   placeholder={t('visitor') || 'Visitor'}
+                  onSearchText={visitors.onSearchText}
+                  onEndReached={visitors.onEndReached}
                   containerStyle={{
                     backgroundColor: C.inputBg,
                     borderColor: invalid.user_id ? C.error || '#ff4444' : C.inputBorder,
