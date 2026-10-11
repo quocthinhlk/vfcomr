@@ -18,38 +18,24 @@ import {
 } from '../../../shared/services/notifications.service';
 import {requestNotificationPermission} from '../../../shared/services/permissions.service';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
-import {isSuperAdmin, resolveRoleIdFromUser} from '../../../shared/utils/permissions';
 
 export default function NotificationsScreen() {
   const C = useThemedColors();
   const {t} = useTranslation();
   const [sending, setSending] = useState(false);
-  const [canSendTest, setCanSendTest] = useState(false);
   // While switched into another user, this device is deliberately not
   // registered for them, so a test would reach someone else's phone.
   const [impersonating, setImpersonating] = useState(false);
 
   React.useEffect(() => {
     let mounted = true;
-    (async () => {
-      try {
-        const [me, switched] = await Promise.all([
-          api.get('users/me'),
-          isImpersonating(),
-        ]);
-        const user = me?.data?.data;
-        const roleId = resolveRoleIdFromUser(user);
-        if (!mounted) {
-          return;
-        }
-        setImpersonating(switched);
-        setCanSendTest(isSuperAdmin(roleId));
-      } catch {
+    isImpersonating()
+      .then(switched => {
         if (mounted) {
-          setCanSendTest(false);
+          setImpersonating(switched);
         }
-      }
-    })();
+      })
+      .catch(() => {});
     return () => {
       mounted = false;
     };
@@ -61,7 +47,7 @@ export default function NotificationsScreen() {
    * → send → check the server's delivery count.
    */
   const onSendTest = async () => {
-    const title = t('notifications') || 'Notifications';
+    const title = t('testNotificationTitle');
     try {
       setSending(true);
 
@@ -69,7 +55,7 @@ export default function NotificationsScreen() {
       const permission = await requestNotificationPermission({showAlertIfBlocked: true});
       if (!permission.granted) {
         if (!permission.blocked) {
-          Alert.alert(title, 'Notification permission is required to receive the test.');
+          Alert.alert(title, t('testNotificationPermissionRequired'));
         }
         return;
       }
@@ -80,17 +66,15 @@ export default function NotificationsScreen() {
       } catch (e) {
         if (e instanceof PushSetupError) {
           const reasons: Record<string, string> = {
-            impersonating:
-              'You are switched into another user. Switch back to your own account to test notifications on this device.',
-            unavailable: 'Push notifications are not configured in this build (Firebase missing).',
-            no_token:
-              'This device has no push token yet. On iOS, use a real device (or a simulator that supports remote push) and try again.',
+            impersonating: t('testNotificationImpersonating'),
+            unavailable: t('testNotificationUnavailable'),
+            no_token: t('testNotificationNoToken'),
           };
           Alert.alert(title, reasons[e.reason]);
         } else {
           Alert.alert(
-            t('error') || 'Error',
-            `Could not register this device for notifications: ${getApiErrorMessage(e, t)}`,
+            title,
+            `${t('testNotificationRegisterFailed')} ${getApiErrorMessage(e, t)}`,
           );
         }
         return;
@@ -101,38 +85,29 @@ export default function NotificationsScreen() {
       const user = me?.data?.data;
       const userId = Number(user?.id);
       if (!Number.isFinite(userId) || userId <= 0) {
-        Alert.alert(t('error') || 'Error', 'Could not determine the logged-in user.');
+        Alert.alert(title, t('testNotificationNoUser'));
         return;
       }
-      const userName =
-        [user?.first_name, user?.last_name].filter(Boolean).join(' ') ||
-        user?.username ||
-        `#${userId}`;
 
       // 4. Send, then report what the server actually delivered.
       const result = await sendTestNotificationToUser({
         user_id: userId,
-        title: 'Test notification',
-        body: `Hello ${userName}, push notifications are working on this device.`,
+        title: t('testNotificationTitle'),
+        body: t('testNotificationBody'),
         data: {screen: 'home'},
       });
       if (result.success_count > 0) {
         Alert.alert(
           title,
-          `Sent to ${result.success_count} device(s) of ${userName}` +
-            (result.failure_count ? ` (${result.failure_count} failed)` : '') +
-            '. It should appear on this device in a few seconds.',
+          t('testNotificationSent').replace('{count}', String(result.success_count)),
         );
       } else {
-        Alert.alert(
-          t('error') || 'Error',
-          `No device received it (${result.failure_count} failed). This device's token may be invalid; reinstall the app or log out and back in, then retry.`,
-        );
+        Alert.alert(title, t('testNotificationNotDelivered'));
       }
     } catch (e) {
       Alert.alert(
-        t('error') || 'Error',
-        getApiErrorMessage(e, t) || 'Failed to send test notification.',
+        title,
+        getApiErrorMessage(e, t) || t('testNotificationNotDelivered'),
       );
     } finally {
       setSending(false);
@@ -156,27 +131,37 @@ export default function NotificationsScreen() {
             <Text style={[styles.emptyBody, {color: C.textSecondary}]}>
               {t('noNotifications') || 'No notifications yet.'}
             </Text>
-            {__DEV__ && canSendTest && impersonating ? (
-              <Text style={[styles.emptyBody, {color: C.textSecondary}]}>
-                Test notifications are disabled while switched into another user.
-              </Text>
-            ) : null}
-            {__DEV__ && canSendTest && !impersonating && (
-              <TouchableOpacity
-                style={[styles.testButton, {borderColor: C.border}]}
-                onPress={onSendTest}
-                disabled={sending}
-                accessibilityRole="button"
-                accessibilityState={{busy: sending, disabled: sending}}>
-                {sending ? (
-                  <ActivityIndicator size="small" color={COLORS.mainColor} />
-                ) : (
-                  <Text style={[styles.testButtonText, {color: COLORS.mainColor}]}>
-                    Send test notification
-                  </Text>
-                )}
-              </TouchableOpacity>
-            )}
+          </View>
+
+          {/* Self-test: sends a push to the logged-in account on this device. */}
+          <View style={[styles.testCard, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+            <Text style={[styles.testTitle, {color: C.textPrimary}]}>
+              {t('testNotificationTitle')}
+            </Text>
+            <Text style={[styles.testHint, {color: C.textSecondary}]}>
+              {impersonating ? t('testNotificationImpersonating') : t('testNotificationHint')}
+            </Text>
+            <TouchableOpacity
+              style={[
+                styles.testButton,
+                {backgroundColor: COLORS.mainColor},
+                (sending || impersonating) && styles.testButtonDisabled,
+              ]}
+              onPress={onSendTest}
+              disabled={sending || impersonating}
+              activeOpacity={0.8}
+              accessibilityRole="button"
+              accessibilityLabel={t('sendTestNotification')}
+              accessibilityState={{busy: sending, disabled: sending || impersonating}}>
+              {sending ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <BellSvgIcon width={16} height={16} color="#fff" />
+                  <Text style={styles.testButtonText}>{t('sendTestNotification')}</Text>
+                </>
+              )}
+            </TouchableOpacity>
           </View>
         </View>
       </Layout>
@@ -218,15 +203,38 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginBottom: ms(12),
   },
-  testButton: {
-    marginTop: ms(4),
-    paddingHorizontal: ms(14),
-    paddingVertical: ms(8),
-    borderRadius: rs(20),
+  testCard: {
+    marginTop: ms(12),
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(16),
+    borderRadius: rs(12),
     borderWidth: 1,
   },
-  testButtonText: {
+  testTitle: {
+    fontSize: fs(15),
+    fontWeight: '700',
+  },
+  testHint: {
+    marginTop: ms(4),
     fontSize: fs(13),
+    lineHeight: fs(19),
+  },
+  testButton: {
+    marginTop: ms(12),
+    minHeight: 44,
+    borderRadius: rs(10),
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: ms(8),
+    paddingHorizontal: ms(16),
+  },
+  testButtonDisabled: {
+    opacity: 0.5,
+  },
+  testButtonText: {
+    color: '#fff',
+    fontSize: fs(14),
     fontWeight: '600',
   },
 });

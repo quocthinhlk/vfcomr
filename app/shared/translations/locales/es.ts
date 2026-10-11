@@ -934,6 +934,18 @@ const es = {
   pleaseEnterValidCoordinates: 'Selecciona una ubicación en el mapa.',
   notifications: 'Notificaciones',
   noNotifications: 'No hay notificaciones todavía.',
+  testNotificationTitle: "Notificación de prueba",
+  testNotificationHint: "Envíese una notificación de prueba para comprobar que este dispositivo la recibe.",
+  sendTestNotification: "Enviar notificación de prueba",
+  testNotificationImpersonating: "Las notificaciones de prueba están desactivadas mientras ve como otro usuario. Vuelva primero a su propia cuenta.",
+  testNotificationPermissionRequired: "Permita las notificaciones de esta app para recibir la prueba.",
+  testNotificationUnavailable: "Las notificaciones push no están configuradas en esta versión.",
+  testNotificationNoToken: "Este dispositivo aún no tiene token push. Use un dispositivo real e inténtelo de nuevo.",
+  testNotificationRegisterFailed: "No se pudo registrar este dispositivo para notificaciones.",
+  testNotificationNoUser: "No se pudo identificar su cuenta.",
+  testNotificationSent: "Enviada a {count} dispositivo(s). Debería aparecer en este dispositivo en unos segundos.",
+  testNotificationNotDelivered: "Ningún dispositivo la recibió. Cierre sesión, vuelva a entrar e inténtelo de nuevo.",
+  testNotificationBody: "Las notificaciones push funcionan en este dispositivo.",
 } as const;
 
 export default es;

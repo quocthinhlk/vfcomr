@@ -883,6 +883,18 @@ const pt = {
     pleaseEnterValidCoordinates: 'Selecione uma localização no mapa.',
     notifications: 'Notificações',
     noNotifications: 'Nenhuma notificação no momento.',
+    testNotificationTitle: "Notificação de teste",
+    testNotificationHint: "Envie uma notificação de teste para você mesmo e verifique se este dispositivo a recebe.",
+    sendTestNotification: "Enviar notificação de teste",
+    testNotificationImpersonating: "As notificações de teste ficam desativadas enquanto você visualiza como outro usuário. Volte primeiro para sua conta.",
+    testNotificationPermissionRequired: "Permita as notificações deste app para receber o teste.",
+    testNotificationUnavailable: "As notificações push não estão configuradas nesta versão.",
+    testNotificationNoToken: "Este dispositivo ainda não tem token push. Use um dispositivo real e tente novamente.",
+    testNotificationRegisterFailed: "Não foi possível registrar este dispositivo para notificações.",
+    testNotificationNoUser: "Não foi possível identificar sua conta.",
+    testNotificationSent: "Enviada para {count} dispositivo(s). Deve aparecer neste dispositivo em alguns segundos.",
+    testNotificationNotDelivered: "Nenhum dispositivo recebeu. Saia, entre novamente e tente outra vez.",
+    testNotificationBody: "As notificações push estão funcionando neste dispositivo.",
 } satisfies TranslationDictionary;
 
 export default pt;

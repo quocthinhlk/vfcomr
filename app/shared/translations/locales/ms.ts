@@ -883,6 +883,18 @@ const ms = {
     pleaseEnterValidCoordinates: 'Sila pilih lokasi pada peta.',
     notifications: 'Pemberitahuan',
     noNotifications: 'Tiada pemberitahuan buat masa ini.',
+    testNotificationTitle: "Pemberitahuan ujian",
+    testNotificationHint: "Hantar pemberitahuan ujian kepada diri sendiri untuk menyemak sama ada peranti ini menerimanya.",
+    sendTestNotification: "Hantar pemberitahuan ujian",
+    testNotificationImpersonating: "Pemberitahuan ujian dimatikan semasa anda melihat sebagai pengguna lain. Kembali ke akaun anda dahulu.",
+    testNotificationPermissionRequired: "Benarkan pemberitahuan untuk aplikasi ini bagi menerima ujian.",
+    testNotificationUnavailable: "Pemberitahuan tolak tidak disediakan dalam binaan ini.",
+    testNotificationNoToken: "Peranti ini belum mempunyai token tolak. Gunakan peranti sebenar dan cuba lagi.",
+    testNotificationRegisterFailed: "Tidak dapat mendaftarkan peranti ini untuk pemberitahuan.",
+    testNotificationNoUser: "Tidak dapat mengenal pasti akaun anda.",
+    testNotificationSent: "Dihantar ke {count} peranti. Ia sepatutnya muncul pada peranti ini dalam beberapa saat.",
+    testNotificationNotDelivered: "Tiada peranti yang menerimanya. Log keluar dan masuk semula, kemudian cuba lagi.",
+    testNotificationBody: "Pemberitahuan tolak berfungsi pada peranti ini.",
 } satisfies TranslationDictionary;
 
 export default ms;

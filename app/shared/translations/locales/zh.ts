@@ -867,6 +867,18 @@ const zh = {
     pleaseEnterValidCoordinates: '请在地图上选择一个位置。',
     notifications: '通知',
     noNotifications: '目前还没有通知。',
+    testNotificationTitle: "测试通知",
+    testNotificationHint: "给自己发送一条测试通知，检查此设备能否收到。",
+    sendTestNotification: "发送测试通知",
+    testNotificationImpersonating: "以其他用户身份查看时无法发送测试通知。请先切换回您自己的账户。",
+    testNotificationPermissionRequired: "请允许此应用的通知以接收测试。",
+    testNotificationUnavailable: "此版本未配置推送通知。",
+    testNotificationNoToken: "此设备尚无推送令牌。请使用真机后重试。",
+    testNotificationRegisterFailed: "无法为此设备注册通知。",
+    testNotificationNoUser: "无法识别您的账户。",
+    testNotificationSent: "已发送到 {count} 台设备。几秒内应会出现在此设备上。",
+    testNotificationNotDelivered: "没有设备收到。请退出登录后重新登录，再试一次。",
+    testNotificationBody: "此设备的推送通知工作正常。",
 } satisfies TranslationDictionary;
 
 export default zh;

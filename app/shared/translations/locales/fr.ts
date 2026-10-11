@@ -887,6 +887,18 @@ const fr = {
     pleaseEnterValidCoordinates: 'Veuillez sélectionner un emplacement sur la carte.',
     notifications: 'Notifications',
     noNotifications: 'Aucune notification pour le moment.',
+    testNotificationTitle: "Notification de test",
+    testNotificationHint: "Envoyez-vous une notification de test pour vérifier que cet appareil la reçoit.",
+    sendTestNotification: "Envoyer une notification de test",
+    testNotificationImpersonating: "Les notifications de test sont désactivées lorsque vous consultez en tant qu’un autre utilisateur. Revenez d’abord à votre compte.",
+    testNotificationPermissionRequired: "Autorisez les notifications de cette app pour recevoir le test.",
+    testNotificationUnavailable: "Les notifications push ne sont pas configurées dans cette version.",
+    testNotificationNoToken: "Cet appareil n’a pas encore de jeton push. Utilisez un appareil réel et réessayez.",
+    testNotificationRegisterFailed: "Impossible d’enregistrer cet appareil pour les notifications.",
+    testNotificationNoUser: "Impossible d’identifier votre compte.",
+    testNotificationSent: "Envoyée à {count} appareil(s). Elle devrait apparaître sur cet appareil dans quelques secondes.",
+    testNotificationNotDelivered: "Aucun appareil ne l’a reçue. Déconnectez-vous puis reconnectez-vous, et réessayez.",
+    testNotificationBody: "Les notifications push fonctionnent sur cet appareil.",
 } satisfies TranslationDictionary;
 
 export default fr;

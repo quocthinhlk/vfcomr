@@ -882,6 +882,18 @@ const ja = {
     pleaseEnterValidCoordinates: '地図上で位置を選択してください。',
     notifications: '通知',
     noNotifications: '現在表示する通知はありません。',
+    testNotificationTitle: "テスト通知",
+    testNotificationHint: "自分にテスト通知を送り、この端末で受信できるか確認します。",
+    sendTestNotification: "テスト通知を送信",
+    testNotificationImpersonating: "他のユーザーとして表示中はテスト通知を使えません。先に自分のアカウントに戻ってください。",
+    testNotificationPermissionRequired: "テストを受け取るには、このアプリの通知を許可してください。",
+    testNotificationUnavailable: "このビルドではプッシュ通知が設定されていません。",
+    testNotificationNoToken: "この端末にはまだプッシュトークンがありません。実機で再度お試しください。",
+    testNotificationRegisterFailed: "この端末を通知に登録できませんでした。",
+    testNotificationNoUser: "アカウントを特定できませんでした。",
+    testNotificationSent: "{count} 台の端末に送信しました。数秒以内にこの端末に表示されます。",
+    testNotificationNotDelivered: "どの端末にも届きませんでした。ログアウトして再ログインし、もう一度お試しください。",
+    testNotificationBody: "この端末でプッシュ通知が正常に動作しています。",
 } satisfies TranslationDictionary;
 
 export default ja;

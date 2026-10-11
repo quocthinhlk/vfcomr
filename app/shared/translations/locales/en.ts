@@ -875,6 +875,18 @@ const en = {
     pleaseEnterValidCoordinates: 'Please select a location on the map.',
     notifications: 'Notifications',
     noNotifications: 'No notifications yet.',
+    testNotificationTitle: "Test notification",
+    testNotificationHint: "Send a test notification to yourself to check that this device receives it.",
+    sendTestNotification: "Send test notification",
+    testNotificationImpersonating: "Test notifications are off while you are viewing as another user. Switch back to your own account first.",
+    testNotificationPermissionRequired: "Allow notifications for this app to receive the test.",
+    testNotificationUnavailable: "Push notifications are not set up in this build.",
+    testNotificationNoToken: "This device has no push token yet. Use a real device and try again.",
+    testNotificationRegisterFailed: "Could not register this device for notifications.",
+    testNotificationNoUser: "Could not identify your account.",
+    testNotificationSent: "Sent to {count} device(s). It should appear on this device in a few seconds.",
+    testNotificationNotDelivered: "No device received it. Log out and back in, then try again.",
+    testNotificationBody: "Push notifications are working on this device.",
 } as const;
 
 export default en;
