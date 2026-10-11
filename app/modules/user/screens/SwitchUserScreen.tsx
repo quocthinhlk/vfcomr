@@ -3,12 +3,11 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
-  Image,
   KeyboardAvoidingView,
   Platform,
+  Pressable,
   RefreshControl,
   StyleSheet,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -25,8 +24,9 @@ import {
 } from '../../../shared/components/crud';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
+import {InitialsAvatar} from '../../../shared/components/SelectionSheet';
+import {EyeIcon} from '../../../shared/components/icons/UiIcons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
@@ -34,29 +34,10 @@ import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {listUsers, ListUsersItem} from '../services/user.service';
 import {switchToUser} from '../../auth/services/auth.service';
 
-const blankAvatar = require('../../../assets/icons/avatar_blank.png');
-const BASE_URL = 'https://tintran.cloud-ip.cc/storage';
-
-const UserAvatar = ({uri}: {uri: string | null}) => {
-  const [failed, setFailed] = useState(false);
-  const remote = uri?.trim() ? encodeURI(uri.trim()) : '';
-
-  useEffect(() => {
-    setFailed(false);
-  }, [remote]);
-
-  return (
-    <View style={styles.avatarWrap}>
-      <Image
-        source={!failed && remote ? {uri: remote} : blankAvatar}
-        defaultSource={blankAvatar}
-        style={styles.avatar}
-        resizeMode="cover"
-        onError={() => setFailed(true)}
-      />
-    </View>
-  );
-};
+// API values often carry stray spaces (" Bonyoko  Fred", "Pastor  ").
+const tidy = (value?: string | null) => (value ?? '').replace(/\s+/g, ' ').trim();
+const joinTidy = (parts: Array<string | null | undefined>, sep: string) =>
+  parts.map(tidy).filter(Boolean).join(sep);
 
 const formatPhoneDisplay = (value?: string | null) => {
   if (!value) {
@@ -68,14 +49,15 @@ const formatPhoneDisplay = (value?: string | null) => {
   return hasPlus ? `+${grouped}` : grouped;
 };
 
+const BASE_URL = 'https://tintran.cloud-ip.cc/storage';
+
 export const SwitchUserScreen = () => {
   const navigation = useNavigation<any>();
   const {t} = useTranslation();
   const tRef = useRef(t);
   tRef.current = t;
   const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const listStyles = getListStyles(C, theme);
+  const T = useUiTokens();
 
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<ListUsersItem[]>([]);
@@ -205,80 +187,62 @@ export const SwitchUserScreen = () => {
   };
 
   const renderItem = ({item}: {item: ListUsersItem}) => {
-    const displayName = [item.prefix, item.name].filter(Boolean).join(' ');
+    const displayName = joinTidy([item.prefix, item.name], ' ') || '—';
     const rawPhoto = item.photo_url || (item as {user_photo?: string}).user_photo || '';
     const photoUri = rawPhoto
-      ? rawPhoto.startsWith('http')
-        ? rawPhoto
-        : `${BASE_URL}/${rawPhoto.replace(/^\//, '')}`
-      : null;
-    const locationParts = [item.city, item.country_name].filter(Boolean);
+      ? encodeURI(
+          rawPhoto.startsWith('http') ? rawPhoto : `${BASE_URL}/${rawPhoto.replace(/^\//, '')}`,
+        )
+      : undefined;
+    const roleLine = joinTidy([item.title, item.role_name], ' · ');
+    const church = tidy(item.pastor_of);
+    const location = joinTidy([item.city, item.country_name], ', ');
+    const phone = formatPhoneDisplay(tidy(item.mobile_phone));
+    const email = tidy(item.email);
     const isSelf = item.id === currentUserId;
     const busy = switchingId === item.id;
 
     return (
-      <View style={listStyles.itemCard as any}>
-        <View style={styles.itemRow}>
-          <UserAvatar uri={photoUri} />
-          <View style={styles.itemCol}>
-            <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={1}>
-              {displayName || '—'}
-            </Text>
-            {(!!item.role_name || !!item.title) && (
-              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
-                {[item.title, item.role_name ? `[${item.role_name}]` : '']
-                  .filter(Boolean)
-                  .join('   ')}
-              </Text>
-            )}
-            {!!item.pastor_of && (
-              <Text
-                style={[styles.meta, {color: C.textSecondary, fontWeight: '600'}]}
-                numberOfLines={1}>
-                {item.pastor_of}
-              </Text>
-            )}
-            {locationParts.length > 0 && (
-              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
-                {locationParts.join(', ')}
-              </Text>
-            )}
-            {!!item.mobile_phone && (
-              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
-                {`m: ${formatPhoneDisplay(item.mobile_phone)}`}
-              </Text>
-            )}
-            {!!item.email ? (
-              <View style={styles.emailRow}>
-                <Text
-                  style={[styles.meta, {color: C.textSecondary, flex: 1}]}
-                  numberOfLines={1}>
-                  {`e: ${item.email}`}
-                </Text>
-                <Text style={[styles.userId, {color: C.textSecondary}]}>{`#${item.id}`}</Text>
-              </View>
+      <Pressable
+        onPress={isSelf ? undefined : () => confirmSwitch(item)}
+        disabled={isSelf || switchingId != null}
+        accessibilityRole="button"
+        accessibilityLabel={`${displayName}${roleLine ? `, ${roleLine}` : ''}`}
+        accessibilityHint={isSelf ? undefined : t('switchHere')}
+        style={({pressed}) => [styles.row, pressed && {backgroundColor: T.pressedBg}]}>
+        <InitialsAvatar name={displayName} uri={photoUri} size={ws(44)} />
+        <View style={styles.rowText}>
+          {/* Everything wraps: no field is cut off with an ellipsis. */}
+          <Text style={[styles.name, {color: C.textPrimary}]}>
+            {displayName}
+            <Text style={[styles.userId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
+          </Text>
+          {!!roleLine && (
+            <Text style={[styles.meta, {color: C.textSecondary}]}>{roleLine}</Text>
+          )}
+          {!!church && (
+            <Text style={[styles.meta, styles.church, {color: C.textPrimary}]}>{church}</Text>
+          )}
+          {!!location && (
+            <Text style={[styles.meta, {color: C.textSecondary}]}>{location}</Text>
+          )}
+          {!!phone && <Text style={[styles.meta, {color: C.textSecondary}]}>{phone}</Text>}
+          {!!email && <Text style={[styles.meta, {color: C.textSecondary}]}>{email}</Text>}
+        </View>
+        {isSelf ? (
+          <View style={[styles.youBadge, {backgroundColor: T.neutralTint}]}>
+            <Text style={[styles.youText, {color: T.neutralText}]}>{t('you')}</Text>
+          </View>
+        ) : (
+          <View style={[styles.switchPill, {backgroundColor: T.brandTint}]}>
+            {busy ? (
+              <ActivityIndicator color={T.brandText} size="small" />
             ) : (
-              <Text style={[styles.userId, {color: C.textSecondary, textAlign: 'right'}]}>
-                {`#${item.id}`}
-              </Text>
+              <Text style={[styles.switchText, {color: T.brandText}]}>{t('switchHere')}</Text>
             )}
           </View>
-          {isSelf ? null : (
-            <TouchableOpacity
-              style={styles.switchBtn}
-              disabled={switchingId != null}
-              onPress={() => confirmSwitch(item)}
-              accessibilityRole="button"
-              accessibilityLabel={t('switchHere')}>
-              {busy ? (
-                <ActivityIndicator color={COLORS.mainColor} size="small" />
-              ) : (
-                <Text style={styles.switchText}>{t('switchHere')}</Text>
-              )}
-            </TouchableOpacity>
-          )}
-        </View>
-      </View>
+        )}
+      </Pressable>
     );
   };
 
@@ -292,9 +256,20 @@ export const SwitchUserScreen = () => {
         style={{flex: 1}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={t('switchUser')} />
-          <Text style={[styles.notice, {color: C.textSecondary}]}>
-            {t('switchUserViewOnly')}
-          </Text>
+          <View
+            style={[styles.notice, {backgroundColor: T.warningTint}]}
+            accessible
+            accessibilityRole="alert">
+            <EyeIcon color={T.warningText} size={ws(18)} />
+            <View style={styles.noticeTextWrap}>
+              <Text style={[styles.noticeTitle, {color: T.warningText}]}>
+                {t('switchUserViewOnlyTitle')}
+              </Text>
+              <Text style={[styles.noticeBody, {color: C.textSecondary}]}>
+                {t('switchUserViewOnlyBody')}
+              </Text>
+            </View>
+          </View>
           <ListToolbar
             countText={
               loadError && !total ? undefined : `${total} ${t('users').toLowerCase()}`
@@ -315,6 +290,9 @@ export const SwitchUserScreen = () => {
                   data={items}
                   keyExtractor={item => String(item.id)}
                   renderItem={renderItem}
+                  ItemSeparatorComponent={() => (
+                    <View style={[styles.separator, {backgroundColor: C.border}]} />
+                  )}
                   keyboardShouldPersistTaps="handled"
                   automaticallyAdjustKeyboardInsets
                   contentInsetAdjustmentBehavior="always"
@@ -358,56 +336,81 @@ const styles = StyleSheet.create({
     paddingHorizontal: ms(16),
   },
   notice: {
-    fontSize: fs(12),
-    lineHeight: fs(16),
-    marginBottom: ms(8),
-  },
-  itemRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
+    gap: ms(10),
+    borderRadius: rs(10),
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(12),
+    marginBottom: ms(8),
   },
-  avatarWrap: {
-    width: ws(52),
-    height: ws(52),
-    marginRight: ms(12),
-    borderRadius: rs(26),
-    overflow: 'hidden',
-    backgroundColor: '#E4E7EC',
-  },
-  avatar: {
-    width: ws(52),
-    height: ws(52),
-  },
-  itemCol: {
+  noticeTextWrap: {
     flex: 1,
   },
-  name: {
-    fontSize: fs(14),
-    fontWeight: '700',
-    marginBottom: ms(2),
-  },
-  meta: {
-    fontSize: fs(12),
-    marginBottom: ms(1),
-  },
-  emailRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  userId: {
-    fontSize: fs(11),
-    fontWeight: '500',
-    marginLeft: ms(4),
-  },
-  switchBtn: {
-    marginLeft: ms(8),
-    paddingVertical: ms(4),
-    alignSelf: 'center',
-  },
-  switchText: {
-    color: COLORS.mainColor,
+  noticeTitle: {
     fontSize: fs(13),
     fontWeight: '700',
+    lineHeight: fs(18),
+  },
+  noticeBody: {
+    fontSize: fs(12),
+    lineHeight: fs(17),
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ms(12),
+    minHeight: 64,
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(4),
+  },
+  rowText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
+    fontSize: fs(15),
+    fontWeight: '600',
+  },
+  userId: {
+    fontSize: fs(12),
+    fontWeight: '500',
+  },
+  church: {
+    fontWeight: '500',
+  },
+  meta: {
+    marginTop: ms(2),
+    fontSize: fs(13),
+    lineHeight: fs(18),
+  },
+  // Visual pill only: the whole row is the tap target.
+  switchPill: {
+    alignSelf: 'center',
+    minWidth: ws(64),
+    height: 32,
+    paddingHorizontal: ms(12),
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  switchText: {
+    fontSize: fs(13),
+    fontWeight: '600',
+  },
+  youBadge: {
+    alignSelf: 'center',
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(4),
+    borderRadius: 12,
+  },
+  youText: {
+    fontSize: fs(12),
+    fontWeight: '600',
+  },
+  separator: {
+    height: StyleSheet.hairlineWidth,
+    marginLeft: ws(44) + ms(16),
   },
   loader: {
     marginTop: ms(24),

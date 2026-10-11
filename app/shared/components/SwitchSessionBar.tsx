@@ -45,6 +45,22 @@ export const SwitchSessionBar = () => {
     return () => subscription.remove();
   }, [refresh]);
 
+  // Ask first: the bar sits at the bottom edge, where it is easy to tap by mistake.
+  const confirmSwitchBack = () => {
+    if (busy) {
+      return;
+    }
+    Alert.alert(t('switchBack'), t('switchBackConfirm'), [
+      {text: t('cancel'), style: 'cancel'},
+      {
+        text: t('switchBack'),
+        onPress: () => {
+          void onSwitchBack();
+        },
+      },
+    ]);
+  };
+
   const onSwitchBack = async () => {
     if (busy) {
       return;
@@ -77,7 +93,7 @@ export const SwitchSessionBar = () => {
           {t('viewingAs')} {name}
         </Text>
         <TouchableOpacity
-          onPress={onSwitchBack}
+          onPress={confirmSwitchBack}
           disabled={busy}
           accessibilityRole="button"
           accessibilityLabel={t('switchBack')}>
