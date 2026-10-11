@@ -27,7 +27,7 @@ import {getUserById, updateUser} from '../services/user.service';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
-import {Formik} from 'formik';
+import {Formik, FormikProps} from 'formik';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -36,7 +36,7 @@ import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
-import {LockIcon, ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
+import {LockIcon, MailIcon, ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
 
 /** Coerce API ids (number | string) to number for dropdown value matching. */
@@ -67,6 +67,15 @@ export default function EditProfileScreen() {
   const route = useRoute<any>();
   const navigation = useNavigation<any>();
   const T = useUiTokens();
+  // After ChangeEmail succeeds it returns here with the new address: show it
+  // in the email field without resetting the user's other unsaved edits.
+  const formikRef = useRef<FormikProps<any>>(null);
+  const emailChangedTo: string | undefined = route.params?.emailChangedTo;
+  useEffect(() => {
+    if (emailChangedTo) {
+      formikRef.current?.setFieldValue('email_address', emailChangedTo);
+    }
+  }, [emailChangedTo]);
   const userId = Number(route.params?.id);
   const {t} = useTranslation();
   const C = useThemedColors();
@@ -80,6 +89,7 @@ export default function EditProfileScreen() {
 
   const [loading, setLoading] = useState(true);
   const [initial, setInitial] = useState<any | null>(null);
+  const emailLocked = !!String(initial?.email_address ?? '').trim();
 
   const [prefixOptions, setPrefixOptions] = useState<string[]>([]);
   const [roleOptions, setRoleOptions] = useState<{id: number; name: string}[]>([]);
@@ -407,6 +417,7 @@ export default function EditProfileScreen() {
             contentInsetAdjustmentBehavior="always"
             contentContainerStyle={{paddingBottom: 24}}>
             <Formik
+              innerRef={formikRef}
               enableReinitialize
               initialValues={initial}
               onSubmit={async values => {
@@ -561,32 +572,47 @@ export default function EditProfileScreen() {
               {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
                 <View style={{gap: ms(12)}}>
 
-                  {/* Change Password: a full-width row at the top, apart from the form fields. */}
-                  <Pressable
-                    onPress={() => navigation.navigate('ChangePasswordForOtherUser', {id: userId})}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('changePassword')}
-                    accessibilityHint={t('changePasswordHint')}
-                    style={({pressed}) => [
-                      styles.passwordRow,
+                  {/* Sign-in settings: full-width rows at the top, apart from the form fields. */}
+                  <View style={[styles.accountCard, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+                    {[
                       {
-                        backgroundColor: pressed ? T.pressedBg : C.surface,
-                        borderColor: C.surfaceBorder,
+                        key: 'password',
+                        Icon: LockIcon,
+                        title: t('changePassword'),
+                        hint: t('changePasswordHint'),
+                        onPress: () => navigation.navigate('ChangePasswordForOtherUser', {id: userId}),
                       },
-                    ]}>
-                    <View style={[styles.passwordIcon, {backgroundColor: T.brandTint}]}>
-                      <LockIcon color={T.brandText} size={ws(18)} />
-                    </View>
-                    <View style={styles.passwordText}>
-                      <Text style={[styles.passwordTitle, {color: C.textPrimary}]}>
-                        {t('changePassword')}
-                      </Text>
-                      <Text style={[styles.passwordHint, {color: C.textSecondary}]}>
-                        {t('changePasswordHint')}
-                      </Text>
-                    </View>
-                    <ChevronRightIcon color={C.textSecondary} size={ws(16)} />
-                  </Pressable>
+                      {
+                        key: 'email',
+                        Icon: MailIcon,
+                        title: t('changeEmail'),
+                        hint: values.email_address || t('changeEmailHint'),
+                        onPress: () =>
+                          navigation.navigate('ChangeEmail', {id: userId, email: values.email_address}),
+                      },
+                    ].map((item, index) => (
+                      <Pressable
+                        key={item.key}
+                        onPress={item.onPress}
+                        accessibilityRole="button"
+                        accessibilityLabel={item.title}
+                        accessibilityHint={item.hint}
+                        style={({pressed}) => [
+                          styles.accountRow,
+                          index > 0 && {borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border},
+                          pressed && {backgroundColor: T.pressedBg},
+                        ]}>
+                        <View style={[styles.accountIcon, {backgroundColor: T.brandTint}]}>
+                          <item.Icon color={T.brandText} size={ws(18)} />
+                        </View>
+                        <View style={styles.accountText}>
+                          <Text style={[styles.accountTitle, {color: C.textPrimary}]}>{item.title}</Text>
+                          <Text style={[styles.accountHint, {color: C.textSecondary}]}>{item.hint}</Text>
+                        </View>
+                        <ChevronRightIcon color={C.textSecondary} size={ws(16)} />
+                      </Pressable>
+                    ))}
+                  </View>
 
                   {/* Prefix */}
                   <View onLayout={e => setFieldPos('prefix', e.nativeEvent.layout.y)}>
@@ -862,11 +888,36 @@ export default function EditProfileScreen() {
                         {!values.sensitive_nation ? <Text style={{color: '#c00000'}}>*</Text> : null}
                       </Text>
                       <HelpIcon title={t('emailAddress')} message={t('infoEmailAddress')} size={16} offsetY={-2} />
+                      {/* Shortcut to the verified email change (current email + password). */}
+                      <Pressable
+                        onPress={() =>
+                          navigation.navigate('ChangeEmail', {id: userId, email: values.email_address})
+                        }
+                        hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('changeEmail')}
+                        style={({pressed}) => [
+                          styles.emailChangeButton,
+                          {backgroundColor: pressed ? T.pressedBg : T.brandTint},
+                        ]}>
+                        <MailIcon color={T.brandText} size={ws(14)} />
+                        <Text style={[styles.emailChangeText, {color: T.brandText}]}>
+                          {t('changeEmail')}
+                        </Text>
+                      </Pressable>
                     </View>
+                    {/* Locked once the profile has an email: it changes only through
+                        Change Email (current email + password). An empty one stays
+                        editable so a required email can still be filled in. */}
                     <AppInput
                       value={values.email_address}
                       keyboardType="email-address"
                       autoCapitalize="none"
+                      editable={!emailLocked}
+                      selectTextOnFocus={false}
+                      accessibilityState={{disabled: emailLocked}}
+                      containerStyle={emailLocked ? {backgroundColor: T.neutralTint} : undefined}
+                      style={emailLocked ? {color: C.textSecondary} : undefined}
                       onChangeText={v => {
                         setFieldValue('email_address', v);
                         clearInvalid('email_address');
@@ -1032,32 +1083,49 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  passwordRow: {
+  emailChangeButton: {
+    marginLeft: 'auto',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(6),
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(4),
+    borderRadius: 14,
+    marginBottom: ms(4),
+  },
+  emailChangeText: {
+    fontSize: fs(12),
+    fontWeight: '600',
+  },
+  accountCard: {
+    borderRadius: rs(12),
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  accountRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: ms(12),
     minHeight: 64,
     paddingVertical: ms(12),
     paddingHorizontal: ms(14),
-    borderRadius: rs(12),
-    borderWidth: 1,
   },
-  passwordIcon: {
+  accountIcon: {
     width: ws(36),
     height: ws(36),
     borderRadius: ws(18),
     alignItems: 'center',
     justifyContent: 'center',
   },
-  passwordText: {
+  accountText: {
     flex: 1,
     minWidth: 0,
   },
-  passwordTitle: {
+  accountTitle: {
     fontSize: fs(15),
     fontWeight: '600',
   },
-  passwordHint: {
+  accountHint: {
     marginTop: ms(2),
     fontSize: fs(12),
     lineHeight: fs(17),

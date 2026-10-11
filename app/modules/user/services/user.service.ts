@@ -279,3 +279,18 @@ export async function changeMyPassword(payload: ChangeMyPasswordPayload) {
   const response = await api.post('users/me/password', payload);
   return response.data as {success: boolean; message: string};
 }
+
+export interface ChangeEmailPayload {
+  old_email: string;
+  new_email: string;
+  password: string;
+}
+
+/**
+ * Changes the sign-in email after checking the current email + password.
+ * Fails with "Invalid email or password" when they don't match.
+ */
+export async function changeEmail(payload: ChangeEmailPayload) {
+  const response = await api.post('users/change-email', payload);
+  return response.data as {success: boolean; message: string};
+}

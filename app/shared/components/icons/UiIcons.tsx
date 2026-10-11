@@ -138,3 +138,10 @@ export const CheckIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
     <Path d="M5 12.5l4.5 4.5L19 7.5" {...stroke(color)} />
   </Svg>
 );
+
+export const MailIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Rect x={3} y={5} width={18} height={14} rx={2} {...stroke(color)} />
+    <Path d="M3 7l9 6 9-6" {...stroke(color)} />
+  </Svg>
+);
