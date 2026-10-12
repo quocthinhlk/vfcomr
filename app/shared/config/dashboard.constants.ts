@@ -113,6 +113,13 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('disabledChurches'), routeName: 'DisableChurches'},
     ],
   },
+  {
+    label: t('churchPlantingProjections'),
+    children: [
+      {label: t('addProjections'), routeName: 'AddChurchPlantingProjection'},
+      {label: t('viewProjections'), routeName: 'ChurchPlantingProjections'},
+    ],
+  },
   getReportMenuItem(t),
   {
     label: t('relating'),
@@ -142,7 +149,6 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
     ],
   },
   {label: t('omrSupport'), routeName: 'OmrSupport'},
-  {label: t('aboutOmr'), routeName: 'AboutOmr'},
 ];
 
 const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
@@ -203,6 +209,13 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
     children: [
       {label: t('list'), routeName: 'ChurchRegions'},
       {label: t('addNew'), routeName: 'AddChurchRegion'},
+    ],
+  },
+  {
+    label: t('geographicalRegions'),
+    children: [
+      {label: t('list'), routeName: 'GeographicalRegions'},
+      {label: t('addNew'), routeName: 'AddGeographicalRegion'},
     ],
   },
   {

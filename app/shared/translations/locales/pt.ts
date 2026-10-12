@@ -576,6 +576,7 @@ const pt = {
     churchNetwork: 'Rede da Igreja',
     churchRegion: 'Região da Igreja',
     geographicalRegion: 'Região Geográfica',
+    parentRegion: 'Região Superior',
     languageRegion: 'Região de Idioma',
     pastorLeader: 'Pastor / Líder',
     churchCreatedSuccess: 'Igreja criada com sucesso!',

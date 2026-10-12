@@ -587,6 +587,7 @@ const en = {
     churchNetwork: 'Church Network',
     churchRegion: 'Church Region',
     geographicalRegion: 'Geographical Region',
+    parentRegion: 'Parent Region',
     languageRegion: 'Language Region',
     pastorLeader: 'Pastor / Leader',
     churchCreatedSuccess: 'Church created successfully!',

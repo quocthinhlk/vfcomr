@@ -582,6 +582,7 @@ const ms = {
     churchNetwork: 'Rangkaian Gereja',
     churchRegion: 'Wilayah Gereja',
     geographicalRegion: 'Wilayah Geografi',
+    parentRegion: 'Wilayah Induk',
     languageRegion: 'Wilayah Bahasa',
     pastorLeader: 'Pastor / Pemimpin',
     churchCreatedSuccess: 'Gereja dicipta dengan jayanya!',

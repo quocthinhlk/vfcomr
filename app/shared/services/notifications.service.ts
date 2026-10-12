@@ -170,15 +170,6 @@ export async function deleteDeviceToken(): Promise<void> {
   }
 }
 
-export async function sendTestMissingReportReminder(payload: {
-  user_id: number;
-  title: string;
-  body: string;
-  data?: Record<string, any>;
-}) {
-  return api.post('notifications/test/missing-report-reminder', payload);
-}
-
 export type SendTestNotificationResult = {
   success_count: number;
   failure_count: number;

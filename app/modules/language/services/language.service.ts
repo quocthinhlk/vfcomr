@@ -34,7 +34,7 @@ export async function listLanguages(params: ListLanguagesParams = {}) {
 
   const page = params.page ?? 1;
   const limit = params.limit ?? DEFAULT_PAGE_LIMIT;
-  const name = params.name ?? '';
+  const name = params.search ?? '';
 
   const response = await api.get<ListLanguagesResponse>(`/languages`, {
     params: { page, limit, name },

@@ -606,6 +606,7 @@ const es = {
   churchNetwork: 'Red de iglesia',
   churchRegion: 'Región de iglesia',
   geographicalRegion: 'Región geográfica',
+  parentRegion: 'Región principal',
   languageRegion: 'Región de idioma',
   pastorLeader: 'Pastor / Líder',
   churchCreatedSuccess: '¡Iglesia creada correctamente!',

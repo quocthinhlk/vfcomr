@@ -583,6 +583,7 @@ const ja = {
     churchNetwork: '教会ネットワーク',
     churchRegion: '教会地域',
     geographicalRegion: '地理的地域',
+    parentRegion: '親地域',
     languageRegion: '言語地域',
     pastorLeader: '牧師／リーダー',
     churchCreatedSuccess: '教会が正常に作成されました！',

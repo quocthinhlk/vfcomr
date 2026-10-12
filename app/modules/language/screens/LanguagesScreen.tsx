@@ -41,27 +41,15 @@ export const LanguagesScreen: React.FC = () => {
           return;
         }
         setLoading(true);
-        const res = await listLanguages({search: query});
-        const full = res?.data?.items ?? [];
-        const filtered = query
-          ? full.filter(i =>
-              i.name?.toLowerCase().includes(query.trim().toLowerCase()),
-            )
-          : full;
-        const total = filtered.length;
-        const totalPages = Math.max(
-          1,
-          Math.ceil(total / DEFAULT_PAGE_LIMIT),
-        );
-        const validPage = Math.min(Math.max(1, targetPage), totalPages);
-        const start = (validPage - 1) * DEFAULT_PAGE_LIMIT;
-        const end = start + DEFAULT_PAGE_LIMIT;
-        const pageSlice = filtered.slice(start, end);
-
-        setTotalPages(totalPages);
-        setTotal(total);
-        setPage(validPage);
-        setItems(pageSlice);
+        const res = await listLanguages({
+          page: targetPage,
+          limit: DEFAULT_PAGE_LIMIT,
+          search: query.trim(),
+        });
+        setTotalPages(res?.data?.total_pages ?? 1);
+        setTotal(res?.data?.total ?? 0);
+        setPage(res?.data?.page ?? targetPage);
+        setItems(res?.data?.items ?? []);
         setLoadError(null);
       } catch (e) {
         console.error(e);

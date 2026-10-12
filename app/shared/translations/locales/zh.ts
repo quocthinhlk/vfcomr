@@ -574,6 +574,7 @@ const zh = {
     churchNetwork: '教会网络',
     churchRegion: '教会区域',
     geographicalRegion: '地理区域',
+    parentRegion: '上级区域',
     languageRegion: '语言区域',
     pastorLeader: '牧者 / 领袖',
     churchCreatedSuccess: '教会创建成功！',

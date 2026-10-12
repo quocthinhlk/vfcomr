@@ -578,6 +578,7 @@ const fr = {
     churchNetwork: 'Réseau de l\'Église',
     churchRegion: 'Région de l\'Église',
     geographicalRegion: 'Région Géographique',
+    parentRegion: 'Région Parente',
     languageRegion: 'Région de Langue',
     pastorLeader: 'Pasteur / Responsable',
     churchCreatedSuccess: 'Église créée avec succès!',

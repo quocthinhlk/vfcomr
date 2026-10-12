@@ -34,7 +34,7 @@ export async function listCountries(params: ListCountriesParams = {}) {
 
   const page = params.page ?? 1;
   const limit = params.limit ?? DEFAULT_PAGE_LIMIT;
-  const name = params.name ?? '';
+  const name = params.search ?? '';
 
   const response = await api.get<ListCountriesResponse>(`/countries`, {
     params: { page, limit, name },

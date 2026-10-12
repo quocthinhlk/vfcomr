@@ -123,6 +123,8 @@ export type RootStackParamList = {
   AddChurchRegion: undefined;
   EditChurchRegion: { churchRegionId: number } | undefined;
   DeleteChurchRegion: { churchRegionId: number } | undefined;
+  GeographicalRegions: { reload?: boolean } | undefined;
+  AddGeographicalRegion: { parentId?: number } | undefined;
   ChurchPlantingProjections: undefined;
   ChurchPlantingProjectionDetail: { projectionId: number } | undefined;
   AddChurchPlantingProjection: undefined;
@@ -220,6 +222,8 @@ import ChurchRegionsScreen from '../modules/churchregion/screens/ChurchRegionsSc
 import AddChurchRegionScreen from '../modules/churchregion/screens/AddChurchRegionScreen';
 import EditChurchRegionScreen from '../modules/churchregion/screens/EditChurchRegionScreen';
 import DeleteChurchRegionScreen from '../modules/churchregion/screens/DeleteChurchRegionScreen';
+import GeographicalRegionsScreen from '../modules/geographicalregion/screens/GeographicalRegionsScreen';
+import AddGeographicalRegionScreen from '../modules/geographicalregion/screens/AddGeographicalRegionScreen';
 import ChurchTypesScreen from '../modules/churchtype/screens/ChurchTypesScreen';
 import AddChurchTypeScreen from '../modules/churchtype/screens/AddChurchTypeScreen';
 import EditChurchTypeScreen from '../modules/churchtype/screens/EditChurchTypeScreen';
@@ -451,6 +455,8 @@ export default function Navigation() {
       <Stack.Screen name="AddChurchRegion" component={AddChurchRegionScreen} />
       <Stack.Screen name="EditChurchRegion" component={EditChurchRegionScreen} />
       <Stack.Screen name="DeleteChurchRegion" component={DeleteChurchRegionScreen} />
+              <Stack.Screen name="GeographicalRegions" component={GeographicalRegionsScreen} />
+              <Stack.Screen name="AddGeographicalRegion" component={AddGeographicalRegionScreen} />
               <Stack.Screen name="AddChurchNetwork" component={AddChurchNetworkScreen} />
               <Stack.Screen name="EditChurchNetwork" component={EditChurchNetworkScreen} />
               <Stack.Screen name="DeleteChurchNetwork" component={DeleteChurchNetworkScreen} />
