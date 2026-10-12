@@ -13,7 +13,16 @@ export type AdminOverseerProfile = {
 export type AdminOverseerSummary = {
   index: number;
   profile: AdminOverseerProfile;
+  /** Same payload as dashboard/overseer-indicators, incl. the three chart graphs. */
   indicators: OverseerIndicatorValues;
+  /** allowedIds lists (regions, networks…), used for the chart header. */
+  permissions?: {allowedIds?: Record<string, Array<{id: number; name: string}>>};
+  /**
+   * Visits and planted graphs come at the item's top level; the copies inside
+   * overseer_indicators are empty (data: null). Attendance is only inside it.
+   */
+  pastoralVisitsGraph?: unknown;
+  churchPlantedGraph?: unknown;
 };
 
 type StreamLine = {
@@ -26,6 +35,9 @@ type StreamLine = {
     item?: {
       overseer_profile?: AdminOverseerProfile;
       overseer_indicators?: OverseerIndicatorValues;
+      overseer_permissions?: AdminOverseerSummary['permissions'];
+      pastoral_visits_graph?: unknown;
+      church_planted_graph?: unknown;
     };
   };
 };
@@ -67,6 +79,44 @@ export async function getMyOverseers(): Promise<AdminOverseerSummary[]> {
       index: Number(line.data?.index ?? 0),
       profile: line.data!.item!.overseer_profile!,
       indicators: line.data?.item?.overseer_indicators ?? {},
+      permissions: line.data?.item?.overseer_permissions,
+      pastoralVisitsGraph: line.data?.item?.pastoral_visits_graph,
+      churchPlantedGraph: line.data?.item?.church_planted_graph,
     }))
     .sort((a, b) => a.index - b.index);
+}
+
+const hasGraphData = (g: any) => Array.isArray(g?.data) && g.data.length > 0;
+
+const firstAllowedName = (items: unknown) =>
+  Array.isArray(items)
+    ? items.map((i: any) => String(i?.name ?? '').trim()).find(Boolean) ?? ''
+    : '';
+
+/**
+ * Chart payload for one overseer, shaped like dashboard/overseer-indicators:
+ * attendance from overseer_indicators, visits/planted from the item's top
+ * level (their copies inside overseer_indicators are empty).
+ */
+export function buildOverseerChartData(overseer: AdminOverseerSummary) {
+  const indicators: any = overseer.indicators ?? {};
+  const allowed = overseer.permissions?.allowedIds ?? {};
+  return {
+    indicators: {
+      ...indicators,
+      pastoral_visits_graph: hasGraphData(overseer.pastoralVisitsGraph)
+        ? overseer.pastoralVisitsGraph
+        : indicators.pastoral_visits_graph,
+      church_planted_graph: hasGraphData(overseer.churchPlantedGraph)
+        ? overseer.churchPlantedGraph
+        : indicators.church_planted_graph,
+    },
+    header: {
+      pastorName: overseer.profile.name,
+      regionNation:
+        firstAllowedName(allowed.geographicalRegionIds) ||
+        firstAllowedName(allowed.churchRegionIds) ||
+        String(overseer.profile.title || '').trim(),
+    },
+  };
 }

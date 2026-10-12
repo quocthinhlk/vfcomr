@@ -74,7 +74,7 @@ export type OverseerChartHeaderInfo = {
   regionNation: string;
 };
 
-const firstNamed = (items: unknown): string => {
+export const firstNamed = (items: unknown): string => {
   if (!Array.isArray(items)) {
     return '';
   }
@@ -84,7 +84,52 @@ const firstNamed = (items: unknown): string => {
     .join(', ');
 };
 
-export async function getOverseerChartHeaderInfo(): Promise<OverseerChartHeaderInfo> {
+/*
+ * The Admin dashboard already has every overseer's indicators (with the three
+ * chart graphs) from my-overseers. It hands them over here so the chart screens
+ * can show that overseer instead of the logged-in user (route param overseerId).
+ */
+const providedCharts = new Map<
+  number,
+  {indicators: OverseerIndicatorsPayload; header: OverseerChartHeaderInfo}
+>();
+
+export function provideOverseerChartData(
+  overseerId: number,
+  indicators: OverseerIndicatorsPayload,
+  header: OverseerChartHeaderInfo,
+) {
+  providedCharts.set(overseerId, {indicators, header});
+}
+
+const providedFor = async (overseerId?: number) => {
+  if (overseerId == null) {
+    return null;
+  }
+  const cached = providedCharts.get(overseerId);
+  if (cached) {
+    return cached;
+  }
+  // Nothing handed over (e.g. the app reloaded on a chart screen): load it again.
+  // Required lazily: adminDashboard.service imports types from this area.
+  const {getMyOverseers, buildOverseerChartData} = require('./adminDashboard.service');
+  const overseers = await getMyOverseers();
+  const match = overseers.find((o: any) => o.profile?.id === overseerId);
+  if (!match) {
+    throw new Error('This overseer is no longer assigned to you.');
+  }
+  const built = buildOverseerChartData(match);
+  providedCharts.set(overseerId, built);
+  return built;
+};
+
+export async function getOverseerChartHeaderInfo(
+  overseerId?: number,
+): Promise<OverseerChartHeaderInfo> {
+  const provided = await providedFor(overseerId);
+  if (provided) {
+    return provided.header;
+  }
   const [dashRes, meRes] = await Promise.all([api.get('dashboard'), api.get('users/me')]);
   const dash = dashRes?.data?.data ?? {};
   const me = meRes?.data?.data ?? {};
@@ -100,7 +145,13 @@ export async function getOverseerChartHeaderInfo(): Promise<OverseerChartHeaderI
   return {pastorName, regionNation};
 }
 
-export async function getOverseerIndicators(): Promise<OverseerIndicatorsPayload | undefined> {
+export async function getOverseerIndicators(
+  overseerId?: number,
+): Promise<OverseerIndicatorsPayload | undefined> {
+  const provided = await providedFor(overseerId);
+  if (provided) {
+    return provided.indicators;
+  }
   const res = await api.get('dashboard/overseer-indicators');
   const payload = res?.data?.data;
   if (payload != null && typeof payload === 'object') {

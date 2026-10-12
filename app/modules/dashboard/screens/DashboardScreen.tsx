@@ -17,8 +17,10 @@ import {AdminOverseerSection, AdminOverseerSkeleton} from '../components/AdminOv
 import {OverseerSwitcher} from '../components/OverseerSwitcher';
 import {
   AdminOverseerSummary,
+  buildOverseerChartData,
   getMyOverseers,
 } from '../services/adminDashboard.service';
+import {provideOverseerChartData} from '../services/overseerIndicators.service';
 import {
   dashboardIcons,
   getTranslatedMenuItems,
@@ -202,6 +204,14 @@ export default function DashboardScreen() {
         if (targetId) {
           navigation.navigate('EditProfile', {id: targetId});
         }
+      } else if (item.chartFor) {
+        // Charts of the overseer picked above: hand over their indicators
+        // (already loaded from my-overseers) and open the shared chart screen.
+        if (selectedOverseer) {
+          const {indicators, header} = buildOverseerChartData(selectedOverseer);
+          provideOverseerChartData(selectedOverseer.profile.id, indicators as any, header);
+          navigation.navigate(item.routeName, {overseerId: selectedOverseer.profile.id});
+        }
       } else {
         navigation.navigate(item.routeName, item.params);
       }
@@ -249,6 +259,28 @@ export default function DashboardScreen() {
       icon: require('../../../../app/assets/images/icon/home.png'),
       label: t('addNewChurch') || 'New Church',
       routeName: 'AddChurch',
+    },
+    // Charts of the selected overseer (same screens as the Overseer dashboard).
+    {
+      icon: require('../../../../app/assets/images/icon/line-chart.png'),
+      label: t('attendanceChart') || 'Attendance Chart',
+      routeName: 'OverseerChurchAttendanceChart',
+      chartFor: true,
+      disabled: !selectedOverseer,
+    },
+    {
+      icon: require('../../../../app/assets/images/icon/visit.png'),
+      label: t('pastoralVisits') || 'Church Visits Chart',
+      routeName: 'PastoralVisitsChart',
+      chartFor: true,
+      disabled: !selectedOverseer,
+    },
+    {
+      icon: require('../../../../app/assets/images/icon/replay-10.png'),
+      label: t('churchesPlantedLast10Years') || 'Churches Planted last 10 years',
+      routeName: 'OverseerChurchesPlantedLast10Years',
+      chartFor: true,
+      disabled: !selectedOverseer,
     },
   ];
 

@@ -18,7 +18,7 @@ import Svg, {
   Rect,
   Text as SvgText,
 } from 'react-native-svg';
-import {useFocusEffect} from '@react-navigation/native';
+import {useFocusEffect, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {globalStyles} from '../../../shared/styles/global';
@@ -139,11 +139,15 @@ export default function OverseerChurchAttendanceChartScreen() {
   const [reportDate, setReportDate] = useState('');
   const [reportingPeriod, setReportingPeriod] = useState('');
 
+  // Set when opened from the Admin dashboard for a chosen overseer.
+  const route = useRoute<any>();
+  const overseerId: number | undefined = route.params?.overseerId;
+
   const load = useCallback(async () => {
     try {
       setLoading(true);
       setLoadError(null);
-      const data = await getOverseerIndicators();
+      const data = await getOverseerIndicators(overseerId);
       const graph = data?.attendance_graph;
       const list = graph?.data;
       const raw = Array.isArray(list) ? [...list] : [];
@@ -174,13 +178,13 @@ export default function OverseerChurchAttendanceChartScreen() {
     }
 
     try {
-      const header = await getOverseerChartHeaderInfo();
+      const header = await getOverseerChartHeaderInfo(overseerId);
       setPastorName(prev => prev || header.pastorName);
       setRegionNation(prev => prev || header.regionNation);
     } catch {
       // Chart can render without header metadata.
     }
-  }, []);
+  }, [overseerId]);
 
   useFocusEffect(
     useCallback(() => {
