@@ -4,7 +4,7 @@ import {
   Animated,
   Easing,
   FlatList,
-  KeyboardAvoidingView,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -74,6 +74,23 @@ export const MultiSelectSheet: React.FC<Props> = ({
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const slide = useRef(new Animated.Value(screenH)).current;
+  const [keyboardH, setKeyboardH] = useState(0);
+
+  // Track the keyboard ourselves so the sheet shrinks instead of being pushed off the top.
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+    const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    const showSub = Keyboard.addListener(showEvt, e => setKeyboardH(e?.endCoordinates?.height ?? 0));
+    const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardH(0));
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+      setKeyboardH(0);
+    };
+  }, [visible]);
 
   const fetchOptions = useCallback(
     async (search: string) => {
@@ -205,9 +222,7 @@ export const MultiSelectSheet: React.FC<Props> = ({
 
   return (
     <Modal visible={visible} transparent animationType="fade" statusBarTranslucent onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.modal}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <View style={[styles.modal, Platform.OS === 'ios' && {paddingBottom: keyboardH}]}>
         <Pressable
           style={[StyleSheet.absoluteFill, {backgroundColor: `rgba(0,0,0,${T.backdropOpacity})`}]}
           onPress={saving ? undefined : onClose}
@@ -220,8 +235,10 @@ export const MultiSelectSheet: React.FC<Props> = ({
             styles.sheet,
             {
               backgroundColor: T.sheetBg,
-              height: Math.round(screenH * 0.82),
-              paddingBottom: Math.max(insets.bottom, ms(12)),
+              height: Math.round(
+                Math.min(screenH * 0.82, screenH - keyboardH - insets.top - ms(12)),
+              ),
+              paddingBottom: keyboardH ? ms(12) : Math.max(insets.bottom, ms(12)),
               transform: [{translateY: slide}],
             },
           ]}>
@@ -295,7 +312,7 @@ export const MultiSelectSheet: React.FC<Props> = ({
             </Pressable>
           </View>
         </Animated.View>
-      </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 };
