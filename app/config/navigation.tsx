@@ -106,6 +106,7 @@ export type RootStackParamList = {
   AddCountry: undefined;
   ChangePasswordForOtherUser: { id: number } | undefined;
   ChangeEmail: { id?: number; email?: string } | undefined;
+  OverseerAssignments: { userId: number; name?: string };
   DashboardPastorLeader: {
     church_id: number;
     church_name?: string;
@@ -199,6 +200,7 @@ import { UserRolesScreen } from '../modules/user/screens/UserRolesScreen';
 import { ChurchesListScreen } from '../modules/church/screens/ListChurchScreen';
 import ChangePasswordForOtherUserScreen from '../modules/user/screens/ChangePasswordForOtherUserScreen';
 import ChangeEmailScreen from '../modules/user/screens/ChangeEmailScreen';
+import OverseerAssignmentsScreen from '../modules/user/screens/OverseerAssignmentsScreen';
 import DashboardPastorLeaderScreen from '../modules/dashboard/screens/DashboardPastorLeaderScreen';
 import ChurchAttendanceChartScreen from '../modules/dashboard/screens/ChurchAttendanceChartScreen';
 import OverseerChurchAttendanceChartScreen from '../modules/dashboard/screens/OverseerChurchAttendanceChartScreen';
@@ -516,6 +518,7 @@ export default function Navigation() {
               <Stack.Screen name="DeleteUser" component={DeleteUserScreen} />
               <Stack.Screen name="ChangePasswordForOtherUser" component={ChangePasswordForOtherUserScreen} />
               <Stack.Screen name="ChangeEmail" component={ChangeEmailScreen} />
+              <Stack.Screen name="OverseerAssignments" component={OverseerAssignmentsScreen} />
               <Stack.Screen name="DashboardPastorLeader" component={DashboardPastorLeaderScreen} />
               <Stack.Screen name="ChurchAttendanceChart" component={ChurchAttendanceChartScreen} />
               <Stack.Screen

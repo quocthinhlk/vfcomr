@@ -36,7 +36,7 @@ import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
-import {LockIcon, MailIcon, ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
+import {LockIcon, MailIcon} from '../../../shared/components/icons/UiIcons';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
 
 /** Coerce API ids (number | string) to number for dropdown value matching. */
@@ -572,44 +572,40 @@ export default function EditProfileScreen() {
               {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
                 <View style={{gap: ms(12)}}>
 
-                  {/* Sign-in settings: full-width rows at the top, apart from the form fields. */}
-                  <View style={[styles.accountCard, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+                  {/* Sign-in settings: two compact buttons side by side, above the form fields. */}
+                  <View style={styles.accountRow}>
                     {[
                       {
                         key: 'password',
                         Icon: LockIcon,
-                        title: t('changePassword'),
-                        hint: t('changePasswordHint'),
+                        label: t('changePassword'),
                         onPress: () => navigation.navigate('ChangePasswordForOtherUser', {id: userId}),
                       },
                       {
                         key: 'email',
                         Icon: MailIcon,
-                        title: t('changeEmail'),
-                        hint: values.email_address || t('changeEmailHint'),
+                        label: t('changeEmail'),
                         onPress: () =>
                           navigation.navigate('ChangeEmail', {id: userId, email: values.email_address}),
                       },
-                    ].map((item, index) => (
+                    ].map(item => (
                       <Pressable
                         key={item.key}
                         onPress={item.onPress}
                         accessibilityRole="button"
-                        accessibilityLabel={item.title}
-                        accessibilityHint={item.hint}
+                        accessibilityLabel={item.label}
                         style={({pressed}) => [
-                          styles.accountRow,
-                          index > 0 && {borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border},
-                          pressed && {backgroundColor: T.pressedBg},
+                          styles.accountButton,
+                          {backgroundColor: pressed ? T.pressedBg : T.brandTint},
                         ]}>
-                        <View style={[styles.accountIcon, {backgroundColor: T.brandTint}]}>
-                          <item.Icon color={T.brandText} size={ws(18)} />
-                        </View>
-                        <View style={styles.accountText}>
-                          <Text style={[styles.accountTitle, {color: C.textPrimary}]}>{item.title}</Text>
-                          <Text style={[styles.accountHint, {color: C.textSecondary}]}>{item.hint}</Text>
-                        </View>
-                        <ChevronRightIcon color={C.textSecondary} size={ws(16)} />
+                        <item.Icon color={T.brandText} size={ws(16)} />
+                        <Text
+                          style={[styles.accountButtonText, {color: T.brandText}]}
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                          minimumFontScale={0.85}>
+                          {item.label}
+                        </Text>
                       </Pressable>
                     ))}
                   </View>
@@ -888,23 +884,6 @@ export default function EditProfileScreen() {
                         {!values.sensitive_nation ? <Text style={{color: '#c00000'}}>*</Text> : null}
                       </Text>
                       <HelpIcon title={t('emailAddress')} message={t('infoEmailAddress')} size={16} offsetY={-2} />
-                      {/* Shortcut to the verified email change (current email + password). */}
-                      <Pressable
-                        onPress={() =>
-                          navigation.navigate('ChangeEmail', {id: userId, email: values.email_address})
-                        }
-                        hitSlop={{top: 10, bottom: 10, left: 10, right: 10}}
-                        accessibilityRole="button"
-                        accessibilityLabel={t('changeEmail')}
-                        style={({pressed}) => [
-                          styles.emailChangeButton,
-                          {backgroundColor: pressed ? T.pressedBg : T.brandTint},
-                        ]}>
-                        <MailIcon color={T.brandText} size={ws(14)} />
-                        <Text style={[styles.emailChangeText, {color: T.brandText}]}>
-                          {t('changeEmail')}
-                        </Text>
-                      </Pressable>
                     </View>
                     {/* Locked once the profile has an email: it changes only through
                         Change Email (current email + password). An empty one stays
@@ -1092,51 +1071,23 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  emailChangeButton: {
-    marginLeft: 'auto',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(6),
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(4),
-    borderRadius: 14,
-    marginBottom: ms(4),
-  },
-  emailChangeText: {
-    fontSize: fs(12),
-    fontWeight: '600',
-  },
-  accountCard: {
-    borderRadius: rs(12),
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
   accountRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(12),
-    minHeight: 64,
-    paddingVertical: ms(12),
-    paddingHorizontal: ms(14),
+    gap: ms(8),
   },
-  accountIcon: {
-    width: ws(36),
-    height: ws(36),
-    borderRadius: ws(18),
+  accountButton: {
+    flex: 1,
+    minHeight: 40,
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: ms(6),
+    paddingHorizontal: ms(8),
+    borderRadius: rs(10),
   },
-  accountText: {
-    flex: 1,
-    minWidth: 0,
-  },
-  accountTitle: {
-    fontSize: fs(15),
+  accountButtonText: {
+    flexShrink: 1,
+    fontSize: fs(13),
     fontWeight: '600',
-  },
-  accountHint: {
-    marginTop: ms(2),
-    fontSize: fs(12),
-    lineHeight: fs(17),
   },
 });

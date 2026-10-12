@@ -17,6 +17,7 @@ import {
   PencilIcon,
   TrashIcon,
   UiIconProps,
+  UserCheckIcon,
 } from './icons/UiIcons';
 
 export type ActionIcon =
@@ -27,7 +28,8 @@ export type ActionIcon =
   | 'moveDown'
   | 'password'
   | 'email'
-  | 'copy';
+  | 'copy'
+  | 'assign';
 
 export type ActionItem = {
   label: string;
@@ -54,6 +56,7 @@ const ICONS: Record<ActionIcon, React.FC<UiIconProps>> = {
   password: LockIcon,
   email: MailIcon,
   copy: CopyIcon,
+  assign: UserCheckIcon,
 };
 
 /* ------------------------------------------------------------------ */

@@ -327,6 +327,20 @@ export const ListOverseerScreen: React.FC = () => {
                 },
               },
               {
+                label: t('assignOversight'),
+                icon: 'assign',
+                onPress: () => {
+                  if (selectedUser) {
+                    navigation.navigate('OverseerAssignments', {
+                      userId: selectedUser.id,
+                      name: selectedUser.name,
+                    });
+                  }
+                  setActionsVisible(false);
+                  setSelectedUser(null);
+                },
+              },
+              {
                 label: t('editUser'),
                 icon: 'edit',
                 onPress: () => {

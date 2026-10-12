@@ -170,3 +170,45 @@ export const CopyIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
     <Path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" {...stroke(color)} />
   </Svg>
 );
+
+/** Person with a check: assigning oversight. */
+export const UserCheckIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx={9} cy={8} r={4} {...stroke(color)} />
+    <Path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6" {...stroke(color)} />
+    <Path d="M16 11l2 2 4-4" {...stroke(color)} />
+  </Svg>
+);
+
+export const PlusIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M12 5v14M5 12h14" {...stroke(color)} />
+  </Svg>
+);
+
+export const CloseIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M6 6l12 12M18 6L6 18" {...stroke(color)} />
+  </Svg>
+);
+
+export const GlobeIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx={12} cy={12} r={9} {...stroke(color)} />
+    <Path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z" {...stroke(color)} />
+  </Svg>
+);
+
+export const ChatIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M4 5h16v11H9l-5 4V5z" {...stroke(color)} />
+  </Svg>
+);
+
+export const UsersIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Circle cx={9} cy={8} r={3.5} {...stroke(color)} />
+    <Path d="M2.5 20c0-3.3 2.9-6 6.5-6s6.5 2.7 6.5 6" {...stroke(color)} />
+    <Path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.3c2.1.8 3.5 2.9 3.5 5.7" {...stroke(color)} />
+  </Svg>
+);
