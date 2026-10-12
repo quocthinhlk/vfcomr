@@ -623,6 +623,7 @@ const es = {
   cloneChurchSuccess: '¡Iglesia clonada correctamente!',
   failedToCloneChurch: 'No se pudo clonar la iglesia.',
   disableThisChurch: 'Deshabilitar esta iglesia',
+  cloneThisChurch: "Clonar esta iglesia",
   saveAndContinuePastorDetails:
     'Guardar y continuar con los detalles del pastor',
   cancel: 'Cancelar',

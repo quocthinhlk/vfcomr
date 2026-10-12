@@ -591,6 +591,7 @@ const zh = {
     cloneChurchSuccess: '教会克隆成功！',
     failedToCloneChurch: '克隆教会失败。',
     disableThisChurch: '禁用此教会',
+    cloneThisChurch: "复制此教会",
     saveAndContinuePastorDetails: '保存并继续填写牧者详情',
     cancel: '取消',
     // Help texts (to be localized)

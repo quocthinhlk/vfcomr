@@ -17,6 +17,7 @@ import {listUsers, ListUsersItem} from '../services/user.service';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
+import {MoreIcon} from '../../../shared/components/icons/UiIcons';
 import {COLORS} from '../../../shared/constants/colors';
 import {globalStyles} from '../../../shared/styles/global';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -197,7 +198,8 @@ export const UserListScreen: React.FC = () => {
           {/* Content */}
           <View style={styles.itemCol}>
             {/* Name */}
-            <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={1}>
+            {/* Right padding keeps the name clear of the floating "…" button. */}
+            <Text style={[styles.name, styles.nameWithMore, {color: C.textPrimary}]} numberOfLines={1}>
               {displayName}
             </Text>
 
@@ -212,7 +214,7 @@ export const UserListScreen: React.FC = () => {
 
             {/* Pastor of */}
             {!!item.pastor_of && (
-              <Text style={[styles.meta, {color: C.textSecondary, fontWeight: '600'}]} numberOfLines={1}>
+              <Text style={[styles.meta, {color: C.textSecondary, fontWeight: '600'}]}>
                 {item.pastor_of}
               </Text>
             )}
@@ -248,6 +250,16 @@ export const UserListScreen: React.FC = () => {
               </Text>
             )}
           </View>
+
+          {/* "…" shows the row has actions (same as the other lists); long-press still works. */}
+          <TouchableOpacity
+            onPress={() => openActions(item)}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            style={styles.moreButton}
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName}: ${t('editUser')}, ${t('changePassword')}`}>
+            <MoreIcon color={C.textSecondary} />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -344,10 +356,24 @@ export const UserListScreen: React.FC = () => {
               });
               list.push({
                 label: t('changePassword'),
+                icon: 'password',
                 onPress: () => {
                   if (selectedUser) {
                     navigation.navigate('ChangePasswordForOtherUser', {
                       id: selectedUser.id,
+                    });
+                  }
+                  closeActions();
+                },
+              });
+              list.push({
+                label: t('changeEmail'),
+                icon: 'email',
+                onPress: () => {
+                  if (selectedUser) {
+                    navigation.navigate('ChangeEmail', {
+                      id: selectedUser.id,
+                      email: selectedUser.email || '',
                     });
                   }
                   closeActions();
@@ -415,6 +441,19 @@ const styles = StyleSheet.create({
   },
   itemCol: {
     flex: 1,
+  },
+  // Floats over the top-right corner so the content (and #id) spans the full width.
+  moreButton: {
+    position: 'absolute',
+    top: -ms(8),
+    right: -ms(8),
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nameWithMore: {
+    paddingRight: 32,
   },
   name: {
     fontSize: fs(14),

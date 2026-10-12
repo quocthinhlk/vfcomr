@@ -3,12 +3,10 @@ import {
   View,
   RefreshControl,
   FlatList,
-  TouchableOpacity,
   StyleSheet,
   Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
 import {COLORS} from '../../../shared/constants/colors';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
@@ -16,18 +14,10 @@ import {useNavigation} from '@react-navigation/native';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
 import {
   getChurchesList,
   ChurchListItem,
 } from '../services/church.service';
-import {
-  EditSvgIcon,
-  DisabledSvgIcon,
-  EnabledSvgIcon,
-  CopySvgIcon,
-} from '../../../shared/components/icons';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {
@@ -37,13 +27,13 @@ import {
   ListToolbar,
 } from '../../../shared/components/crud';
 import {ChurchIcon} from '../../../shared/components/icons/UiIcons';
+import {ChurchListCard} from '../components/ChurchListCard';
+import ActionSheetModal from '../../../shared/components/ActionSheetModal';
 import SearchInput from '../../../shared/components/SearchInput';
 
 export const CloneChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const listStyles = getListStyles(C, theme);
   const {t} = useTranslation();
   const [items, setItems] = useState<ChurchListItem[]>([]);
   const [page, setPage] = useState(1);
@@ -53,6 +43,8 @@ export const CloneChurchScreen: React.FC = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
+  // Church whose "…" menu is open.
+  const [selectedChurch, setSelectedChurch] = useState<ChurchListItem | null>(null);
 
   const fetchData = useCallback(
     async (targetPage: number, reset = false) => {
@@ -121,75 +113,14 @@ export const CloneChurchScreen: React.FC = () => {
     fetchData(targetPage, true);
   };
 
-  const renderItem = ({item}: {item: ChurchListItem}) => {
-    const name = item.name || '';
-    const initials =
-      name
-        .split(' ')
-        .filter(Boolean)
-        .slice(0, 2)
-        .map(s => s[0]?.toUpperCase())
-        .join('') || 'C';
-    const isMother = (item as any)?.is_mother_church;
-    const isMsc = (item as any)?.is_msc;
-    return (
-      <TouchableOpacity
-        style={listStyles.itemCard as any}
-        onPress={() => navigation.navigate('AddCloneChurch', {id: item.id})}>
-        <View style={listStyles.itemRow as any}>
-          <View style={listStyles.avatarWrap as any}>
-            <View style={listStyles.avatar as any}>
-              <Text style={listStyles.avatarText as any}>{initials}</Text>
-            </View>
-          </View>
-          <View style={styles.itemCol}>
-            <Text
-              style={[styles.name, {color: C.textPrimary}]}
-              numberOfLines={2}>
-              {name}
-              <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
-            </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: ms(6),
-                marginTop: ms(2),
-              }}>
-              {isMother ? (
-                <View style={[styles.badge, styles.badgePrimary]}>
-                  <Text style={styles.badgeTextPrimary}>
-                    {t('motherChurch') || 'Mother'}
-                  </Text>
-                </View>
-              ) : null}
-              {isMsc ? (
-                <View style={[styles.badge, styles.badgeInfo]}>
-                  <Text style={styles.badgeTextInfo}>{t('msc')}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text
-              style={[styles.meta, {color: C.textSecondary}]}
-              numberOfLines={1}>
-              {item.city} · {item.country_name}
-            </Text>
-          </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.copyBtn]}
-                onPress={() =>
-                  navigation.navigate('AddCloneChurch', {id: item.id})
-                }>
-                <CopySvgIcon width={ws(15)} height={hs(15)} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderItem = ({item}: {item: ChurchListItem}) => (
+    <ChurchListCard
+      item={item}
+      onPress={() => navigation.navigate('AddCloneChurch', {id: item.id})}
+      onMorePress={() => setSelectedChurch(item)}
+      moreAccessibilityLabel={`${item.name}: ${t('cloneChurch')}, ${t('churchDetail')}`}
+    />
+  );
 
   const keyExtractor = (item: ChurchListItem) => String(item.id);
 
@@ -255,11 +186,44 @@ export const CloneChurchScreen: React.FC = () => {
           onPageChange={goToPage}
         />
       </View>
+      <ActionSheetModal
+        visible={!!selectedChurch}
+        title={selectedChurch?.name || t('cloneChurch')}
+        onRequestClose={() => setSelectedChurch(null)}
+        actions={[
+          {
+            label: t('cloneChurch'),
+            icon: 'copy',
+            onPress: () => {
+              if (selectedChurch) {
+                navigation.navigate('AddCloneChurch', {id: selectedChurch.id});
+              }
+              setSelectedChurch(null);
+            },
+          },
+          {
+            label: t('churchDetail'),
+            icon: 'view',
+            onPress: () => {
+              if (selectedChurch) {
+                navigation.navigate('ChurchDetail', {id: selectedChurch.id, fromClone: true});
+              }
+              setSelectedChurch(null);
+            },
+          },
+        ]}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  moreButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Record id after the title, like the shared list cards.
   listId: {
     fontSize: fs(12),
@@ -319,7 +283,7 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   badgeTextInfo: {color: '#fff', fontSize: fs(11), fontWeight: '700'},
-  actionRow: {flexDirection: 'row', gap: ms(6)},
+  actionRow: {flexDirection: 'row', alignItems: 'center', gap: ms(6)},
   actionBtn: {
     width: ws(25),
     height: ws(25),

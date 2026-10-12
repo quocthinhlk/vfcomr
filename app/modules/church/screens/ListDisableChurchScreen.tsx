@@ -1,23 +1,18 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
-  Image,
   RefreshControl,
-  TouchableOpacity,
   StyleSheet,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {Text} from '@ui-kitten/components';
 import {COLORS} from '../../../shared/constants/colors';
 import {Header} from '../../../shared/components/Header';
 import {globalStyles} from '../../../shared/styles/global';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
@@ -25,12 +20,7 @@ import {
   getChurchesList,
   ChurchListItem,
 } from '../services/church.service';
-import {
-  EditSvgIcon,
-  DisabledSvgIcon,
-  EnabledSvgIcon,
-  CopySvgIcon,
-} from '../../../shared/components/icons';
+import {ChurchListCard} from '../components/ChurchListCard';
 import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
@@ -43,44 +33,11 @@ import {
 import {ChurchIcon} from '../../../shared/components/icons/UiIcons';
 import SearchInput from '../../../shared/components/SearchInput';
 
-const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
-
-type ListStyles = ReturnType<typeof getListStyles>;
-
-const ChurchListRowThumb: React.FC<{item: ChurchListItem; listStyles: ListStyles}> = ({
-  item,
-  listStyles,
-}) => {
-  const [imageFailed, setImageFailed] = useState(false);
-  const uri = String(item.photo_url ?? '').trim();
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [uri]);
-
-  const useRemote = uri.length > 0 && !imageFailed;
-
-  return (
-    <View style={listStyles.avatarWrap as any}>
-      <View style={listStyles.avatarPhotoWrap as any}>
-        <Image
-          source={useRemote ? {uri} : DEFAULT_CHURCH_LIST_PHOTO}
-          style={listStyles.avatarPhoto as any}
-          resizeMode="cover"
-          onError={() => setImageFailed(true)}
-        />
-      </View>
-    </View>
-  );
-};
-
 export const ChurchesListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const listStyles = getListStyles(C, theme);
   const [items, setItems] = useState<ChurchListItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -191,65 +148,17 @@ export const ChurchesListScreen: React.FC = () => {
     fetchData(targetPage);
   };
 
-  const renderItem = ({item}: {item: ChurchListItem}) => {
-    const name = item.name || '';
-    const isMother = (item as any)?.is_mother_church;
-    const isMsc = (item as any)?.is_msc;
-    return (
-      <TouchableOpacity
-        style={listStyles.itemCard as any}
-        onPress={() => navigation.navigate('ChurchDetail', { id: item.id })}
-        onLongPress={() => { setSelectedChurch(item); setActionsVisible(true); }}
-        delayLongPress={300}
-      >
-        <View style={listStyles.itemRow as any}>
-          <ChurchListRowThumb item={item} listStyles={listStyles} />
-          <View style={styles.itemCol}>
-            <Text
-              style={[styles.name, {color: C.textPrimary}]}
-              numberOfLines={2}>
-              {name}
-              <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
-            </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                gap: ms(6),
-                marginTop: ms(2),
-              }}>
-              {isMother ? (
-                <View style={[styles.badge, styles.badgePrimary]}>
-                  <Text style={styles.badgeTextPrimary}>
-                    {t('motherChurch') || 'Mother'}
-                  </Text>
-                </View>
-              ) : null}
-              {isMsc ? (
-                <View style={[styles.badge, styles.badgeInfo]}>
-                  <Text style={styles.badgeTextInfo}>{t('msc')}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text
-              style={[styles.meta, {color: C.textSecondary}]}
-              numberOfLines={1}>
-              {item.city} · {item.country_name}
-            </Text>
-          </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.deleteBtn]}
-                onPress={() => navigation.navigate('EnableChurch', { id: item.id })}>
-                <EnabledSvgIcon width={ws(15)} height={hs(15)} />
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
+  const renderItem = ({item}: {item: ChurchListItem}) => (
+    <ChurchListCard
+      item={item}
+      onPress={() => navigation.navigate('ChurchDetail', {id: item.id})}
+      onMorePress={() => {
+        setSelectedChurch(item);
+        setActionsVisible(true);
+      }}
+      moreAccessibilityLabel={`${item.name}: ${t('churchDetail')}, ${t('editChurch')}, ${t('enableChurch')}`}
+    />
+  );
 
   const keyExtractor = (item: ChurchListItem) => String(item.id);
 
@@ -336,6 +245,12 @@ export const ChurchesListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  moreButton: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Record id after the title, like the shared list cards.
   listId: {
     fontSize: fs(12),
@@ -399,7 +314,7 @@ const styles = StyleSheet.create({
   },
   name: {fontSize: fs(14), fontWeight: '600', marginBottom: ms(2)},
   meta: {fontSize: fs(12)},
-  actionRow: {flexDirection: 'row', gap: ms(6)},
+  actionRow: {flexDirection: 'row', alignItems: 'center', gap: ms(6)},
   actionBtn: {
     width: ws(25),
     height: ws(25),

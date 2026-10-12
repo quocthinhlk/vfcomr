@@ -595,6 +595,7 @@ const fr = {
     cloneChurchSuccess: 'Église clonée avec succès!',
     failedToCloneChurch: 'Échec du clonage de l\'église.',
     disableThisChurch: 'Désactiver cette église',
+    cloneThisChurch: "Cloner cette église",
     saveAndContinuePastorDetails: 'Enregistrer et continuer avec les détails du Pasteur',
     cancel: 'Annuler',
     // Help texts (to be localized)

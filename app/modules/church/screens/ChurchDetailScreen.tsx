@@ -36,6 +36,8 @@ export default function ChurchDetailScreen() {
   const route = useRoute<any>();
   const churchId: number | null = route?.params?.id ?? null;
   const refetchKey: number | undefined = route?.params?.refetchKey;
+  // Opened from the Clone Church list: the bottom action clones instead of disabling.
+  const fromClone: boolean = route?.params?.fromClone === true;
   const {t} = useTranslation();
   const C = useThemedColors();
   const [data, setData] = useState<any | null>(null);
@@ -475,7 +477,19 @@ export default function ChurchDetailScreen() {
                 </View>
               </View>
 
-              {isSuperAdminUser ? (
+              {fromClone ? (
+                <View style={styles.fullWidthActionWrap}>
+                  <AppButton
+                    variant="primary"
+                    onPress={() =>
+                      navigation.navigate('AddCloneChurch' as any, {
+                        id: churchId,
+                      })
+                    }>
+                    {t('cloneThisChurch')}
+                  </AppButton>
+                </View>
+              ) : isSuperAdminUser ? (
                 <View style={styles.fullWidthActionWrap}>
                   {data.disabled ? (
                     <AppButton

@@ -5,6 +5,7 @@ import {
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
+  Image,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -16,7 +17,7 @@ import {Header} from '../../../shared/components/Header';
 import {BackButton} from '../../../shared/components/BackButton';
 import {COLORS} from '../../../shared/constants/colors';
 import {globalStyles} from '../../../shared/styles/global';
-import {EditSvgIcon, DeleteSvgIcon} from '../../../shared/components/icons';
+import {MoreIcon} from '../../../shared/components/icons/UiIcons';
 import ActionSheetModal from '../../../shared/components/ActionSheetModal';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -45,6 +46,25 @@ type OverseerItem = {
   church_regions?: string | null;
   church_networks?: string | null;
   assignment?: string | null;
+  // Same optional fields as the Users list, shown when the API sends them.
+  prefix?: string | null;
+  photo_url?: string | null;
+  city?: string | null;
+  pastor_of?: string | null;
+  mobile_phone?: string | null;
+  email?: string | null;
+};
+
+const blankAvatar = require('../../../assets/icons/avatar_blank.png');
+
+const formatPhoneDisplay = (value?: string | null) => {
+  if (!value) {
+    return '';
+  }
+  const hasPlus = /^\+/.test(String(value));
+  const digits = String(value).replace(/\D/g, '');
+  const grouped = digits.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
+  return hasPlus ? `+${grouped}` : grouped;
 };
 
 export const ListOverseerScreen: React.FC = () => {
@@ -140,62 +160,87 @@ export const ListOverseerScreen: React.FC = () => {
     fetchData(targetPage, true);
   };
 
-  const handleEdit = (user: OverseerItem) => {
-    navigation.navigate('EditProfile', {id: user.id});
+  const openActions = (item: OverseerItem) => {
+    setSelectedUser(item);
+    setActionsVisible(true);
   };
 
+  // Same card as the Users list: photo, name, title [role], details, #id, "…".
   const renderItem = ({item}: {item: OverseerItem}) => {
-    const name = item.name || '';
-    const initials = name
-      .split(' ')
-      .filter(Boolean)
-      .slice(0, 2)
-      .map(s => s[0]?.toUpperCase())
-      .join('') || 'U';
+    const displayName = [item.prefix, item.name].filter(Boolean).join(' ') || '—';
+    const photoUri = String(item.photo_url ?? '').trim() || null;
+    const locationParts = [item.city, item.country_name].filter(Boolean);
+
     return (
       <TouchableOpacity
         style={listStyles.itemCard as any}
         onPress={() => navigation.navigate('User', {userId: item.id})}
-        onLongPress={() => {
-          setSelectedUser(item);
-          setActionsVisible(true);
-        }}
+        onLongPress={() => openActions(item)}
         delayLongPress={300}>
-        <View style={listStyles.itemRow as any}>
-          <View style={listStyles.avatarWrap as any}>
-            <View style={listStyles.avatar as any}>
-              <Text style={listStyles.avatarText as any}>{initials}</Text>
-            </View>
+        <View style={styles.itemRow}>
+          <View style={styles.avatarWrap}>
+            <Image
+              source={photoUri ? {uri: photoUri} : blankAvatar}
+              style={styles.avatar}
+              resizeMode="cover"
+            />
           </View>
+
           <View style={styles.itemCol}>
-            <Text
-              style={[styles.name, {color: C.textPrimary}]}
-              numberOfLines={2}>
-              {name}
-              <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
+            {/* Right padding keeps the name clear of the floating "…" button. */}
+            <Text style={[styles.name, styles.nameWithMore, {color: C.textPrimary}]} numberOfLines={1}>
+              {displayName}
             </Text>
-            <Text
-              style={[styles.meta, {color: C.textSecondary}]}
-              numberOfLines={1}>
-              {(item.role_name || '') + (item.country_name ? ` · ${item.country_name}` : '')}
-            </Text>
-            {item.assignment ? (
-              <Text
-                style={[styles.meta, {color: C.textSecondary}]}
-                numberOfLines={1}>
+            {(!!item.role_name || !!item.title) && (
+              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+                {[item.title, item.role_name ? `[${item.role_name}]` : '']
+                  .filter(Boolean)
+                  .join('   ')}
+              </Text>
+            )}
+            {!!item.pastor_of && (
+              <Text style={[styles.meta, {color: C.textSecondary, fontWeight: '600'}]}>
+                {item.pastor_of}
+              </Text>
+            )}
+            {!!item.assignment && (
+              <Text style={[styles.meta, {color: C.textSecondary, fontWeight: '600'}]}>
                 {item.assignment}
               </Text>
-            ) : null}
+            )}
+            {locationParts.length > 0 && (
+              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+                {locationParts.join(', ')}
+              </Text>
+            )}
+            {!!item.mobile_phone && (
+              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
+                {`m: ${formatPhoneDisplay(item.mobile_phone)}`}
+              </Text>
+            )}
+            {item.email ? (
+              <View style={styles.emailRow}>
+                <Text style={[styles.meta, {color: C.textSecondary, flex: 1}]} numberOfLines={1}>
+                  {`e: ${item.email}`}
+                </Text>
+                <Text style={[styles.userId, {color: C.textSecondary}]}>{`#${item.id}`}</Text>
+              </View>
+            ) : (
+              <Text style={[styles.userId, {color: C.textSecondary, textAlign: 'right'}]}>
+                {`#${item.id}`}
+              </Text>
+            )}
           </View>
-          <View style={styles.itemColRight}>
-            <View style={styles.actionRow}>
-              <TouchableOpacity
-                style={[styles.actionBtn, styles.editBtn]}
-                onPress={() => handleEdit(item)}>
-                <EditSvgIcon width={ws(15)} height={ws(15)} />
-              </TouchableOpacity>
-            </View>
-          </View>
+
+          {/* "…" shows the row has actions (same as the other lists); long-press still works. */}
+          <TouchableOpacity
+            onPress={() => openActions(item)}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            style={styles.moreButton}
+            accessibilityRole="button"
+            accessibilityLabel={`${displayName}: ${t('editUser')}, ${t('changePassword')}`}>
+            <MoreIcon color={C.textSecondary} />
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -293,6 +338,31 @@ export const ListOverseerScreen: React.FC = () => {
                 },
               },
               {
+                label: t('changePassword'),
+                icon: 'password',
+                onPress: () => {
+                  if (selectedUser) {
+                    navigation.navigate('ChangePasswordForOtherUser', {id: selectedUser.id});
+                  }
+                  setActionsVisible(false);
+                  setSelectedUser(null);
+                },
+              },
+              {
+                label: t('changeEmail'),
+                icon: 'email',
+                onPress: () => {
+                  if (selectedUser) {
+                    navigation.navigate('ChangeEmail', {
+                      id: selectedUser.id,
+                      email: selectedUser.email || '',
+                    });
+                  }
+                  setActionsVisible(false);
+                  setSelectedUser(null);
+                },
+              },
+              {
                 label: t('deleteUser'),
                 icon: 'delete',
                 type: 'danger',
@@ -316,6 +386,40 @@ export const ListOverseerScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  itemRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  avatarWrap: {
+    marginRight: ms(12),
+  },
+  avatar: {
+    width: ws(52),
+    height: ws(52),
+    borderRadius: rs(26),
+  },
+  nameWithMore: {
+    paddingRight: 32,
+  },
+  emailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  userId: {
+    fontSize: fs(11),
+    fontWeight: '500',
+    marginLeft: ms(4),
+  },
+  // Floats over the top-right corner so the content (and #id) spans the full width.
+  moreButton: {
+    position: 'absolute',
+    top: -ms(8),
+    right: -ms(8),
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   // Record id after the title, like the shared list cards.
   listId: {
     fontSize: fs(12),
@@ -344,46 +448,17 @@ const styles = StyleSheet.create({
     marginBottom: ms(10),
     marginTop: ms(6),
   },
-  itemRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: ms(10),
-    borderBottomWidth: StyleSheet.hairlineWidth,
-  },
   itemCol: {
     flex: 1,
-    paddingRight: ms(8),
-  },
-  itemColRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'center',
-    paddingLeft: ms(8),
-    width: ws(72),
   },
   name: {
-    fontSize: fs(16),
-    fontWeight: '600',
+    fontSize: fs(14),
+    fontWeight: '700',
     marginBottom: ms(2),
   },
   meta: {
     fontSize: fs(12),
-  },
-  actionRow: {
-    flexDirection: 'row',
-    gap: ms(6),
-  },
-  actionBtn: {
-    width: ws(25),
-    height: ws(25),
-    borderRadius: rs(3),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  editBtn: {
-    backgroundColor: COLORS.successColor,
-  },
-  deleteBtn: {
-    backgroundColor: COLORS.dangerColor,
+    marginBottom: ms(1),
   },
   pageNumbersContainer: {
     flexDirection: 'row',

@@ -604,6 +604,7 @@ const en = {
     cloneChurchSuccess: 'Church cloned successfully!',
     failedToCloneChurch: 'Failed to clone church.',
     disableThisChurch: 'Disable this church',
+    cloneThisChurch: "Clone this church",
     saveAndContinuePastorDetails: 'Save & Continue with the Pastor’s Details',
     cancel: 'Cancel',
     back: 'Back',

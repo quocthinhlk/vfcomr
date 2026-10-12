@@ -593,6 +593,7 @@ const pt = {
     cloneChurchSuccess: 'Igreja clonada com sucesso!',
     failedToCloneChurch: 'Falha ao clonar igreja.',
     disableThisChurch: 'Desabilitar esta igreja',
+    cloneThisChurch: "Clonar esta igreja",
     saveAndContinuePastorDetails: 'Salvar e continuar com os detalhes do Pastor',
     cancel: 'Cancelar',
     // Help texts (to be localized)

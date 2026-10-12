@@ -600,6 +600,7 @@ const ja = {
     cloneChurchSuccess: '教会が正常にクローンされました！',
     failedToCloneChurch: '教会のクローンに失敗しました。',
     disableThisChurch: 'この教会を無効化',
+    cloneThisChurch: "この教会を複製",
     saveAndContinuePastorDetails: '保存して牧師の詳細入力に進む',
     cancel: 'キャンセル',
     // Help texts (to be localized)

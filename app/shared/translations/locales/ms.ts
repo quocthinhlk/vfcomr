@@ -599,6 +599,7 @@ const ms = {
     cloneChurchSuccess: 'Gereja diklon dengan jayanya!',
     failedToCloneChurch: 'Gagal mengklon gereja.',
     disableThisChurch: 'Lumpuhkan gereja ini',
+    cloneThisChurch: "Klon gereja ini",
     saveAndContinuePastorDetails: 'Simpan & teruskan dengan butiran Pastor',
     cancel: 'Batal',
     // Help texts (to be localized)

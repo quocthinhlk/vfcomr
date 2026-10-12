@@ -1,7 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
-  Image,
   RefreshControl,
   TouchableOpacity,
   StyleSheet,
@@ -24,9 +23,9 @@ import {
   ChurchListItem,
 } from '../services/church.service';
 import {
-  ChurchAttributeBadges,
   churchAttributeBadgeStyles,
 } from '../components/ChurchAttributeBadges';
+import {ChurchListCard} from '../components/ChurchListCard';
 import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
 import {
   isOverseer,
@@ -36,8 +35,6 @@ import {
 } from '../../../shared/utils/permissions';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {useThemeMode} from '../../../shared/context/ThemeContext';
-import {getListStyles} from '../../../shared/styles/list';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 import SearchInput from '../../../shared/components/SearchInput';
@@ -46,37 +43,6 @@ import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatList
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {ListEmptyState, ListLoadState} from '../../../shared/components/crud';
 import {ChurchIcon} from '../../../shared/components/icons/UiIcons';
-
-const DEFAULT_CHURCH_LIST_PHOTO = require('../../../assets/images/group-user.jpg');
-
-type ListStyles = ReturnType<typeof getListStyles>;
-
-const ChurchListRowThumb: React.FC<{item: ChurchListItem; listStyles: ListStyles}> = ({
-  item,
-  listStyles,
-}) => {
-  const [imageFailed, setImageFailed] = useState(false);
-  const uri = String(item.photo_url ?? '').trim();
-
-  useEffect(() => {
-    setImageFailed(false);
-  }, [uri]);
-
-  const useRemote = uri.length > 0 && !imageFailed;
-
-  return (
-    <View style={listStyles.avatarWrap as any}>
-      <View style={listStyles.avatarPhotoWrap as any}>
-        <Image
-          source={useRemote ? {uri} : DEFAULT_CHURCH_LIST_PHOTO}
-          style={listStyles.avatarPhoto as any}
-          resizeMode="cover"
-          onError={() => setImageFailed(true)}
-        />
-      </View>
-    </View>
-  );
-};
 
 // ─── Skeleton card ───────────────────────────────────────────────────────────
 const SkeletonCard: React.FC<{anim: Animated.Value; C: any}> = ({anim, C}) => {
@@ -113,8 +79,6 @@ export const ChurchesListScreen: React.FC = () => {
   const route = useRoute<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
-  const {theme} = useThemeMode();
-  const listStyles = getListStyles(C, theme);
 
   // Per-page cache so adjacent pages are real, pre-rendered instances (no remount on swipe).
   const [pages, setPages] = useState<Record<number, ChurchListItem[]>>({});
@@ -299,14 +263,15 @@ export const ChurchesListScreen: React.FC = () => {
   // ─── Item renderer ────────────────────────────────────────────────────────
   const renderItem = ({item}: {item: ChurchListItem}) => {
     const name = item.name || '';
-    const metaParts = [item.city, item.country_name].filter(Boolean);
-
+    const openActions = () => {
+      setSelectedChurch(item);
+      setActionsVisible(true);
+    };
     return (
-      <Pressable
-        style={({pressed}) => [
-          listStyles.itemCard as any,
-          pressed && {opacity: 0.75},
-        ]}
+      <ChurchListCard
+        item={item}
+        onMorePress={openActions}
+        moreAccessibilityLabel={`${name}: ${t('churchDetail')}, ${t('editChurch')}`}
         onPress={() => {
           const usePastorLeaderDashboard =
             route?.params?.openChurchInPastorDashboard === true ||
@@ -338,51 +303,7 @@ export const ChurchesListScreen: React.FC = () => {
           }
           navigation.navigate('ChurchDetail', {id: item.id});
         }}
-        onLongPress={() => {setSelectedChurch(item); setActionsVisible(true);}}
-        delayLongPress={280}
-        android_ripple={{color: C.inputBorder, borderless: false}}>
-        <View style={listStyles.itemRow as any}>
-          <ChurchListRowThumb item={item} listStyles={listStyles} />
-
-          {/* Content */}
-          <View style={styles.itemCol}>
-            <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={2}>
-              {name}
-              <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
-            </Text>
-            {metaParts.length > 0 && (
-              <Text style={[styles.meta, {color: C.textSecondary}]} numberOfLines={1}>
-                {metaParts.join(', ')}
-              </Text>
-            )}
-            {!!item.pastor_name && (
-              <Text style={[styles.pastor, {color: C.textSecondary}]} numberOfLines={1}>
-                {item.pastor_name}
-              </Text>
-            )}
-            {/* Badges row + ID at right */}
-            <View style={styles.badgeIdRow}>
-              <ChurchAttributeBadges
-                church={{
-                  is_mother_church: item.is_mother_church,
-                  is_msc: (item as any)?.is_msc,
-                  is_first_msc: (item as any)?.is_first_msc,
-                  omr_map_location: (item as any)?.omr_map_location,
-                  omr_map_url: (item as any)?.omr_map_url,
-                }}
-                style={styles.badgeRowFlex}
-              />
-              <Text
-                style={[
-                  styles.churchId,
-                  {color: C.textSecondary, marginLeft: 'auto'},
-                ]}>
-                #{item.id}
-              </Text>
-            </View>
-          </View>
-        </View>
-      </Pressable>
+      />
     );
   };
 
@@ -597,10 +518,18 @@ export const ChurchesListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
-  // Record id after the title, like the shared list cards.
-  listId: {
-    fontSize: fs(12),
-    fontWeight: '500',
+  // Floats over the card's top-right corner; content keeps its full width.
+  moreButton: {
+    position: 'absolute',
+    top: -ms(8),
+    right: -ms(8),
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  nameWithMore: {
+    paddingRight: 32,
   },
   container: {
     flex: 1,

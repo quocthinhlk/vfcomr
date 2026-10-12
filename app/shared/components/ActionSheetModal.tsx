@@ -10,13 +10,24 @@ import {fs, ms, rs, ws} from '../utils/scale';
 import {
   ArrowDownIcon,
   ArrowUpIcon,
+  CopyIcon,
   EyeIcon,
+  LockIcon,
+  MailIcon,
   PencilIcon,
   TrashIcon,
   UiIconProps,
 } from './icons/UiIcons';
 
-export type ActionIcon = 'view' | 'edit' | 'delete' | 'moveUp' | 'moveDown';
+export type ActionIcon =
+  | 'view'
+  | 'edit'
+  | 'delete'
+  | 'moveUp'
+  | 'moveDown'
+  | 'password'
+  | 'email'
+  | 'copy';
 
 export type ActionItem = {
   label: string;
@@ -40,6 +51,9 @@ const ICONS: Record<ActionIcon, React.FC<UiIconProps>> = {
   delete: TrashIcon,
   moveUp: ArrowUpIcon,
   moveDown: ArrowDownIcon,
+  password: LockIcon,
+  email: MailIcon,
+  copy: CopyIcon,
 };
 
 /* ------------------------------------------------------------------ */
