@@ -102,6 +102,7 @@ export const EventTypesScreen: React.FC = () => {
   const renderItem = ({item}: {item: EventTypeItem}) => (
     <EntityListCard
       title={item.name}
+      trailingText={`#${item.id}`}
       onPress={() => handleView(item)}
       onMorePress={() => openActions(item)}>
       <View style={styles.metaRow}>

@@ -3,8 +3,8 @@ import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {
   createGeographicalRegion,
+  flattenGeographicalRegionTree,
   getGeographicalRegionTree,
-  GeographicalRegionTreeNode,
 } from '../services/geographicalregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
@@ -46,17 +46,7 @@ export const AddGeographicalRegionScreen: React.FC = () => {
     setOptionsLoading(true);
     setOptionsError(null);
     try {
-      const tree = await getGeographicalRegionTree();
-      const out: ElementDropdownItem[] = [];
-      const walk = (nodes: GeographicalRegionTreeNode[], depth: number) => {
-        nodes?.forEach(n => {
-          out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
-          if (n.children && n.children.length) {
-            walk(n.children, depth + 1);
-          }
-        });
-      };
-      walk(tree, 0);
+      const out = flattenGeographicalRegionTree(await getGeographicalRegionTree());
       if (mountedRef.current) {
         setOptions(out);
       }

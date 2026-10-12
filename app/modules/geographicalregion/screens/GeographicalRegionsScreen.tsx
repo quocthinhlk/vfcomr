@@ -1,58 +1,92 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
-import {
-  BackHandler,
-  FlatList,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TouchableOpacity,
-  View,
-} from 'react-native';
+import {FlatList, Platform, Pressable, RefreshControl, StyleSheet, View} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
 import {
   GeographicalRegionItem,
-  hasChildRegions,
-  listGeographicalRegionChildren,
-  listGeographicalRegionRoots,
+  GeographicalRegionTreeNode,
+  getGeographicalRegionTree,
 } from '../services/geographicalregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {COLORS} from '../../../shared/constants/colors';
-import {fs, ms} from '../../../shared/utils/scale';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
+import {fs, ms, ws} from '../../../shared/utils/scale';
 import SearchInput from '../../../shared/components/SearchInput';
+import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
+import {SelectionSheet} from '../../../shared/components/SelectionSheet';
+import {ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
+import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
+import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {
   EntityListCard,
   ListEmptyState,
   ListLoadState,
+  ListPageBar,
   ListToolbar,
   ScreenContainer,
   listContentStyle,
 } from '../../../shared/components/crud';
 
-/** Browses the region tree one level at a time: roots first, tap to drill in. */
+/** One region below the chosen top-level region, with the names above it. */
+type RegionRow = {
+  node: GeographicalRegionTreeNode;
+  /** Ancestors from the top-level region down, e.g. "Worldwide › South East Asia". */
+  path: string;
+  searchText: string;
+};
+
+/** Route params carry the plain record, not its (possibly huge) subtree. */
+const toParam = (node: GeographicalRegionTreeNode): GeographicalRegionItem => ({
+  id: node.id,
+  parent_id: node.parent_id,
+  left: node.left,
+  right: node.right,
+  name: node.name,
+});
+
+/** Every region under `root`, parents before children (same order as the web list). */
+const flattenUnder = (root: GeographicalRegionTreeNode): RegionRow[] => {
+  const rows: RegionRow[] = [];
+  const walk = (nodes: GeographicalRegionTreeNode[] | undefined, names: string[]) => {
+    nodes?.forEach(node => {
+      const path = names.join(' › ');
+      rows.push({node, path, searchText: `${path} ${node.name}`.toLowerCase()});
+      walk(node.children, [...names, node.name]);
+    });
+  };
+  walk(root.children, [root.name]);
+  return rows;
+};
+
+const countUnder = (node: GeographicalRegionTreeNode): number =>
+  (node.children ?? []).reduce((sum, child) => sum + 1 + countUnder(child), 0);
+
+/**
+ * Mirrors the web list "Geographical Regions under: WORLDWIDE": one flat list
+ * of every region below a top-level region, each with its full path and ID.
+ * Data: GET geographical-regions (the whole tree in `data.items`).
+ */
 export const GeographicalRegionsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
-  // Regions opened so far, root first; empty = showing the roots.
-  const [path, setPath] = useState<GeographicalRegionItem[]>([]);
-  const [items, setItems] = useState<GeographicalRegionItem[]>([]);
+  const T = useUiTokens();
+
+  const [tree, setTree] = useState<GeographicalRegionTreeNode[]>([]);
+  const [rootId, setRootId] = useState<number | null>(null);
+  const [rootPickerOpen, setRootPickerOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
-
-  const current = path.length ? path[path.length - 1] : null;
+  const [selected, setSelected] = useState<GeographicalRegionTreeNode | null>(null);
+  const [page, setPage] = useState(1);
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      const res = current
-        ? await listGeographicalRegionChildren(current.id)
-        : await listGeographicalRegionRoots();
-      setItems(res);
+      setTree(await getGeographicalRegionTree());
       setLoadError(null);
     } catch (e) {
       console.error(e);
@@ -61,11 +95,9 @@ export const GeographicalRegionsScreen: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [current]);
+  }, []);
 
   useEffect(() => {
-    setItems([]);
-    setQuery('');
     fetchData();
   }, [fetchData]);
 
@@ -75,23 +107,54 @@ export const GeographicalRegionsScreen: React.FC = () => {
         navigation.setParams({reload: undefined});
         fetchData();
       }
-    }, [route.params?.reload, fetchData]),
+    }, [route.params?.reload, fetchData, navigation]),
   );
 
-  const goUp = useCallback(() => {
-    if (!path.length) {
-      return false;
+  // Default to "Worldwide" (what the web shows); keep the choice across reloads.
+  const root = useMemo(() => {
+    if (!tree.length) {
+      return null;
     }
-    setPath(prev => prev.slice(0, -1));
-    return true;
-  }, [path.length]);
+    return (
+      tree.find(n => n.id === rootId) ??
+      tree.find(n => n.name?.trim().toLowerCase() === 'worldwide') ??
+      tree[0]
+    );
+  }, [tree, rootId]);
 
-  // Android back steps up one level before leaving the screen.
-  useFocusEffect(
-    useCallback(() => {
-      const sub = BackHandler.addEventListener('hardwareBackPress', goUp);
-      return () => sub.remove();
-    }, [goUp]),
+  const allRows = useMemo(() => (root ? flattenUnder(root) : []), [root]);
+
+  const q = query.trim().toLowerCase();
+  const rows = useMemo(
+    () => (q ? allRows.filter(r => r.searchText.includes(q)) : allRows),
+    [allRows, q],
+  );
+
+  // The whole tree is already loaded, so pages are cut on the device.
+  const totalPages = Math.max(1, Math.ceil(rows.length / DEFAULT_PAGE_LIMIT));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = useMemo(
+    () => rows.slice((currentPage - 1) * DEFAULT_PAGE_LIMIT, currentPage * DEFAULT_PAGE_LIMIT),
+    [rows, currentPage],
+  );
+  // A new search or another top-level region starts again at page 1.
+  useEffect(() => {
+    setPage(1);
+  }, [q, root?.id]);
+  const goToPage = (target: number) => {
+    if (target >= 1 && target <= totalPages) {
+      setPage(target);
+    }
+  };
+
+  const rootItems = useMemo(
+    () =>
+      tree.map(n => ({
+        key: n.id,
+        title: n.name,
+        subtitle: `${countUnder(n)} ${t('geographicalRegions').toLowerCase()}`,
+      })),
+    [tree, t],
   );
 
   const onRefresh = async () => {
@@ -100,99 +163,123 @@ export const GeographicalRegionsScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const visibleItems = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? items.filter(i => i.name?.toLowerCase().includes(q)) : items;
-  }, [items, query]);
+  const renderItem = ({item}: {item: RegionRow}) => (
+    <EntityListCard
+      title={item.node.name}
+      trailingText={`#${item.node.id}`}
+      onPress={() => navigation.navigate('EditGeographicalRegion', {region: toParam(item.node)})}
+      onMorePress={() => setSelected(item.node)}>
+      {item.path ? (
+        <Text style={[styles.path, {color: C.textSecondary}]}>{item.path}</Text>
+      ) : null}
+    </EntityListCard>
+  );
 
-  const renderItem = ({item}: {item: GeographicalRegionItem}) => {
-    const expandable = hasChildRegions(item);
-    return (
-      <EntityListCard
-        title={item.name}
-        trailingText={expandable ? '›' : undefined}
-        onPress={expandable ? () => setPath(prev => [...prev, item]) : undefined}
-      />
-    );
-  };
-
-  const isInitialLoading = loading && items.length === 0 && !refreshing;
+  const isInitialLoading = loading && tree.length === 0 && !refreshing;
   const title = t('geographicalRegions');
+  const canSwitchRoot = tree.length > 1;
 
   return (
-    <ScreenContainer
-      title={current?.name || title}
-      showMenu={!current}
-      onBackPress={current ? goUp : undefined}>
+    <ScreenContainer title={title} showMenu>
       <ListToolbar
-        countText={
-          loadError && !items.length
-            ? undefined
-            : `${visibleItems.length} ${title.toLowerCase()}`
-        }
+        countText={loadError && !tree.length ? undefined : `${rows.length} ${title.toLowerCase()}`}
         addRoute="AddGeographicalRegion"
-        addParams={current ? {parentId: current.id} : undefined}
+        addParams={root ? {parentId: root.id} : undefined}
       />
 
-      {!!current && (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.breadcrumb}>
-          {[null, ...path].map((node, index) => {
-            const isLast = index === path.length;
-            return (
-              <View key={node?.id ?? 'root'} style={styles.crumbRow}>
-                {index > 0 && (
-                  <Text style={[styles.crumbSep, {color: C.textSecondary}]}>›</Text>
-                )}
-                <TouchableOpacity
-                  disabled={isLast}
-                  onPress={() => setPath(prev => prev.slice(0, index))}
-                  accessibilityRole="button">
-                  <Text
-                    style={[
-                      styles.crumb,
-                      {color: isLast ? C.textPrimary : COLORS.mainColor},
-                    ]}>
-                    {node?.name ?? title}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            );
-          })}
-        </ScrollView>
-      )}
+      {root ? (
+        // "Under: Worldwide" — tap to list another top-level region.
+        <Pressable
+          onPress={canSwitchRoot ? () => setRootPickerOpen(true) : undefined}
+          disabled={!canSwitchRoot}
+          accessibilityRole={canSwitchRoot ? 'button' : 'text'}
+          accessibilityLabel={`${t('geoRegionsUnder')}: ${root.name}`}
+          accessibilityHint={canSwitchRoot ? t('geoRegionChooseRoot') : undefined}
+          style={({pressed}) => [
+            styles.rootRow,
+            {backgroundColor: pressed ? T.pressedBg : T.brandTint},
+          ]}>
+          <Text style={[styles.rootLabel, {color: C.textSecondary}]}>{t('geoRegionsUnder')}</Text>
+          <Text style={[styles.rootName, {color: T.brandText}]} numberOfLines={1}>
+            {root.name}
+          </Text>
+          {canSwitchRoot ? (
+            <View style={styles.chevronDown}>
+              <ChevronRightIcon color={T.brandText} size={ws(12)} />
+            </View>
+          ) : null}
+        </Pressable>
+      ) : null}
 
-      <SearchInput
-        value={query}
-        onChangeText={setQuery}
-        placeholder={t('search')}
+      <SearchInput value={query} onChangeText={setQuery} placeholder={t('search')} />
+
+      <View style={styles.listArea}>
+        <PaginatedListPager page={currentPage} totalPages={totalPages} onPageChange={goToPage}>
+          <FlatList
+            data={pageRows}
+            keyExtractor={item => String(item.node.id)}
+            renderItem={renderItem}
+            style={styles.flex}
+            contentContainerStyle={listContentStyle}
+            nestedScrollEnabled={Platform.OS === 'android'}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            ListEmptyComponent={
+              // Pull-to-refresh with no items: show nothing until it settles.
+              isInitialLoading || !loading ? (
+                <ListLoadState loading={isInitialLoading} error={loadError} onRetry={fetchData}>
+                  <ListEmptyState
+                    title={t('noDataFound')}
+                    hint={query ? undefined : t('emptyListHint')}
+                  />
+                </ListLoadState>
+              ) : null
+            }
+          />
+        </PaginatedListPager>
+      </View>
+
+      <ListPageBar
+        page={currentPage}
+        totalPages={totalPages}
+        loading={loading}
+        onPageChange={goToPage}
       />
 
-      <FlatList
-        data={visibleItems}
-        keyExtractor={item => String(item.id)}
-        renderItem={renderItem}
-        style={styles.flex}
-        contentContainerStyle={listContentStyle}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
-        ListEmptyComponent={
-          // Pull-to-refresh with no items: show nothing until it settles.
-          isInitialLoading || !loading ? (
-            <ListLoadState
-              loading={isInitialLoading}
-              error={loadError}
-              onRetry={fetchData}>
-              <ListEmptyState
-                title={t('noDataFound')}
-                hint={query ? undefined : t('emptyListHint')}
-              />
-            </ListLoadState>
-          ) : null
-        }
+      <SelectionSheet
+        visible={rootPickerOpen}
+        title={t('geoRegionChooseRoot')}
+        items={rootItems}
+        selectedKey={root?.id}
+        onSelect={key => {
+          setRootId(Number(key));
+          setQuery('');
+        }}
+        onClose={() => setRootPickerOpen(false)}
+      />
+
+      <ActionSheetModal
+        visible={!!selected}
+        title={selected?.name || title}
+        onRequestClose={() => setSelected(null)}
+        actions={((): ActionItem[] => {
+          const go = (routeName: string) => () => {
+            if (selected) {
+              navigation.navigate(routeName, {region: toParam(selected)});
+            }
+            setSelected(null);
+          };
+          // Delete opens a confirmation screen, never deletes directly.
+          return [
+            {label: t('edit'), icon: 'edit', onPress: go('EditGeographicalRegion')},
+            {
+              label: t('delete'),
+              icon: 'delete',
+              type: 'danger',
+              onPress: go('DeleteGeographicalRegion'),
+            },
+          ];
+        })()}
       />
     </ScreenContainer>
   );
@@ -200,21 +287,33 @@ export const GeographicalRegionsScreen: React.FC = () => {
 
 const styles = StyleSheet.create({
   flex: {flex: 1},
-  breadcrumb: {
-    alignItems: 'center',
-    paddingBottom: ms(8),
-  },
-  crumbRow: {
+  listArea: {flex: 1, minHeight: 0},
+  rootRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+    gap: ms(6),
+    minHeight: 36,
+    paddingHorizontal: ms(12),
+    borderRadius: 18,
+    marginBottom: ms(8),
   },
-  crumbSep: {
-    fontSize: fs(14),
-    marginHorizontal: ms(6),
+  rootLabel: {
+    fontSize: fs(13),
   },
-  crumb: {
+  rootName: {
     fontSize: fs(14),
-    fontWeight: '600',
+    fontWeight: '700',
+    flexShrink: 1,
+  },
+  chevronDown: {
+    transform: [{rotate: '90deg'}],
+  },
+  path: {
+    marginTop: ms(2),
+    fontSize: fs(12),
+    lineHeight: fs(17),
   },
 });
 

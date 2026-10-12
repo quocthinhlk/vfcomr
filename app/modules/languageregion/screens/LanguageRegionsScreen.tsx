@@ -127,6 +127,7 @@ export const LanguageRegionsScreen: React.FC = () => {
   const renderItem = ({item}: {item: LanguageRegionItem}) => (
     <EntityListCard
       title={item.name}
+      trailingText={`#${item.id}`}
       onPress={() => handleEdit(item)}
       onMorePress={() => openActions(item)}>
       {item.disabled ? (

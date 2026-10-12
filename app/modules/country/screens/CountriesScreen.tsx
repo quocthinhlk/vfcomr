@@ -112,6 +112,7 @@ export const CountriesScreen: React.FC = () => {
   const renderItem = ({item}: {item: CountryItem}) => (
     <EntityListCard
       title={item.name}
+      trailingText={`#${item.id}`}
       onPress={() => handleEdit(item)}
       onMorePress={() => openActions(item)}
     />

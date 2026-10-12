@@ -145,6 +145,7 @@ const WatchListPanel: React.FC<{
         <HeartIcon color="#e2557b" size={ms(18)} />
         <Text style={[styles.panelTitle, {color: C.textPrimary}]} numberOfLines={2}>
           {t('watchList')}: {item.name}
+          <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
         </Text>
         <TouchableOpacity
           onPress={onEdit}
@@ -385,6 +386,11 @@ export const WatchListScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  // Record id after the title, like the shared list cards.
+  listId: {
+    fontSize: fs(12),
+    fontWeight: '500',
+  },
   panel: {
     borderWidth: StyleSheet.hairlineWidth,
     borderRadius: rs(12),

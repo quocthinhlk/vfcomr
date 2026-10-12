@@ -8,20 +8,22 @@ import {useUiTokens} from '../styles/uiTokens';
 import {useTranslation} from '../hooks/useTranslation';
 import {fs, ms, rs, ws} from '../utils/scale';
 import {
+  ArrowDownIcon,
+  ArrowUpIcon,
   EyeIcon,
   PencilIcon,
   TrashIcon,
   UiIconProps,
 } from './icons/UiIcons';
 
-export type ActionIcon = 'view' | 'edit' | 'delete';
+export type ActionIcon = 'view' | 'edit' | 'delete' | 'moveUp' | 'moveDown';
 
 export type ActionItem = {
   label: string;
   onPress: () => void;
   type?: 'default' | 'danger';
   disabled?: boolean;
-  /** Optional leading icon; also sets the button colour (view = blue, edit = green, delete = red). */
+  /** Optional leading icon. Buttons are brand blue; delete/danger is red. */
   icon?: ActionIcon;
 };
 
@@ -36,6 +38,8 @@ const ICONS: Record<ActionIcon, React.FC<UiIconProps>> = {
   view: EyeIcon,
   edit: PencilIcon,
   delete: TrashIcon,
+  moveUp: ArrowUpIcon,
+  moveDown: ArrowDownIcon,
 };
 
 /* ------------------------------------------------------------------ */
@@ -53,15 +57,12 @@ export default function ActionSheetModal({
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
 
-  const colorsFor = (a: ActionItem) => {
-    if (a.type === 'danger' || a.icon === 'delete') {
-      return {text: T.dangerText, tint: T.dangerTint};
-    }
-    if (a.icon === 'edit') {
-      return {text: T.successText, tint: T.successTint};
-    }
-    return {text: T.brandText, tint: T.brandTint};
-  };
+  // App palette: brand blue for every action, red only for destructive ones.
+  // Soft tinted fill, no coloured outline; tokens cover light and dark mode.
+  const colorsFor = (a: ActionItem) =>
+    a.type === 'danger' || a.icon === 'delete'
+      ? {text: T.dangerText, tint: T.dangerTint}
+      : {text: T.brandText, tint: T.brandTint};
 
   return (
     <Modal
@@ -110,7 +111,7 @@ export default function ActionSheetModal({
                   accessibilityState={{disabled: !!a.disabled}}
                   style={({pressed}) => [
                     styles.button,
-                    {borderColor: text, backgroundColor: tint},
+                    {borderColor: 'transparent', backgroundColor: tint},
                     pressed && styles.buttonPressed,
                     a.disabled && styles.buttonDisabled,
                   ]}>

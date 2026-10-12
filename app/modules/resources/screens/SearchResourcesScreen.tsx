@@ -229,6 +229,7 @@ export default function SearchResourcesScreen() {
         <View style={styles.itemBody}>
           <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={2}>
             {item.name}
+            <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
           </Text>
           {description ? (
             <Text
@@ -304,6 +305,11 @@ export default function SearchResourcesScreen() {
 }
 
 const styles = StyleSheet.create({
+  // Record id after the title, like the shared list cards.
+  listId: {
+    fontSize: fs(12),
+    fontWeight: '500',
+  },
   card: {
     flexDirection: 'row',
     alignItems: 'center',

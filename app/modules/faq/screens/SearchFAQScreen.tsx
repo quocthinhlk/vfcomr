@@ -167,6 +167,7 @@ export const SearchFAQScreen: React.FC = () => {
     return (
       <EntityListCard
         title={item.question_header}
+        trailingText={`#${item.id}`}
         onPress={() => handleView(item)}
         // Edit / delete are super-admin only, so the sheet is too.
         onMorePress={canManage ? () => openActions(item) : undefined}>

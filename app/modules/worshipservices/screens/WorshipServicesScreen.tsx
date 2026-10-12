@@ -138,6 +138,7 @@ export const WorshipServicesScreen: React.FC = () => {
   const renderItem = ({item}: {item: WorshipServiceItem}) => (
     <EntityListCard
       title={item.name}
+      trailingText={`#${item.id}`}
       onPress={() => handleView(item)}
       onMorePress={() => openActions(item)}>
       <CardMeta>

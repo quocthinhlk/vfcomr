@@ -270,6 +270,7 @@ export const WatchListDetailScreen: React.FC = () => {
                   ]}>
                   <Text style={[styles.churchName, {color: C.textPrimary}]}>
                     {church.church_name}
+                    <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${church.church_id}`}</Text>
                   </Text>
                   <TouchableOpacity
                     onPress={() =>
@@ -307,6 +308,11 @@ export const WatchListDetailScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  // Record id after the title, like the shared list cards.
+  listId: {
+    fontSize: fs(12),
+    fontWeight: '500',
+  },
   container: {flex: 1, paddingHorizontal: ms(16)},
   summary: {
     borderWidth: StyleSheet.hairlineWidth,

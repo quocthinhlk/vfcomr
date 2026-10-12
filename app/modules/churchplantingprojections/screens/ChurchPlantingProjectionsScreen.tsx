@@ -143,6 +143,7 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
   const renderItem = ({item}: {item: ChurchPlantingProjectionItem}) => (
     <EntityListCard
       title={item.proposed_church_name}
+      trailingText={`#${item.id}`}
       onPress={() => handleView(item)}
       onMorePress={() => openActions(item)}>
       <CardMeta>

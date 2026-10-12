@@ -151,8 +151,9 @@ export const RoleChangeRequestsScreen: React.FC = () => {
         onPress={() => navigation.navigate('RoleChangeRequestDetail', {id: item.id})}
         style={listStyles.itemCard as any}>
         <View style={styles.titleRow}>
-          <Text style={[styles.title, {color: C.textPrimary}]} numberOfLines={1}>
+          <Text style={[styles.title, {color: C.textPrimary}]} numberOfLines={2}>
             {item.user_name}
+            <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
           </Text>
           <View style={styles.badge}>
             <Text style={styles.badgeText}>{t('statusPending')}</Text>
@@ -234,6 +235,11 @@ export const RoleChangeRequestsScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  // Record id after the title, like the shared list cards.
+  listId: {
+    fontSize: fs(12),
+    fontWeight: '500',
+  },
   listContent: {flexGrow: 1, paddingBottom: ms(24)},
   toolbarWrap: {
     marginBottom: ms(12),

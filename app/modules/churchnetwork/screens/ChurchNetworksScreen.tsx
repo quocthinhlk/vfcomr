@@ -122,6 +122,7 @@ export const ChurchNetworksScreen: React.FC = () => {
   const renderItem = ({item}: {item: ChurchNetworkItem}) => (
     <EntityListCard
       title={item.name}
+      trailingText={`#${item.id}`}
       onPress={() => handleEdit(item)}
       onMorePress={() => openActions(item)}>
       <CredentialBadge locked={!!item.pastor_credential_locked} />

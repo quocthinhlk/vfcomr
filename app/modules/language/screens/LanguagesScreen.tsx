@@ -110,6 +110,7 @@ export const LanguagesScreen: React.FC = () => {
   const renderItem = ({item}: {item: LanguageItem}) => (
     <EntityListCard
       title={item.name}
+      trailingText={`#${item.id}`}
       onPress={() => handleEdit(item)}
       onMorePress={() => openActions(item)}
     />

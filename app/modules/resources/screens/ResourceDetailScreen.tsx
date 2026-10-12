@@ -1,10 +1,12 @@
 import React, {useCallback, useEffect, useMemo, useState} from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Image,
   KeyboardAvoidingView,
   Modal,
   Platform,
+  Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
@@ -29,7 +31,13 @@ import {
   SaveButton,
 } from '../../../shared/components/ActionButtons';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
-import {EditSvgIcon, DeleteSvgIcon} from '../../../shared/components/icons';
+import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
+import {
+  ChevronRightIcon,
+  FolderIcon,
+  MoreIcon,
+} from '../../../shared/components/icons/UiIcons';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {
   ListEmptyState,
   ScreenContainer,
@@ -45,7 +53,6 @@ import {
 } from '../../../shared/utils/permissions';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {returnToList} from '../../../shared/utils/returnToList';
-import AddNewHeaderButton from '../../../shared/components/AddNewHeaderButton';
 import api from '../../../config/api';
 import type {TranslationKey} from '../../../shared/translations/types';
 import {
@@ -123,12 +130,16 @@ export function resourceLanguageLabel(
 
 type FileModalMode = 'upload' | 'edit';
 
+// Longer descriptions start collapsed to 4 lines with a Show more toggle.
+const DESCRIPTION_PREVIEW_CHARS = 220;
+
 export default function ResourceDetailScreen() {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const resourceId: number | undefined = route.params?.resourceId;
   const {t} = useTranslation();
   const C = useThemedColors();
+  const T = useUiTokens();
 
   const [resource, setResource] = useState<ResourceDetailItem | null>(null);
   const [formats, setFormats] = useState<ResourceFileFormatItem[]>([]);
@@ -138,6 +149,14 @@ export default function ResourceDetailScreen() {
   const [userRoleId, setUserRoleId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [openingFileId, setOpeningFileId] = useState<number | null>(null);
+  const [descriptionExpanded, setDescriptionExpanded] = useState(false);
+  // Which "…" menu is open: the resource itself, one file, or one child resource.
+  const [menu, setMenu] = useState<
+    | {kind: 'resource'}
+    | {kind: 'file'; index: number; file: ResourceFileItem}
+    | {kind: 'child'; index: number; child: ResourceListItem}
+    | null
+  >(null);
 
   const [fileModalVisible, setFileModalVisible] = useState(false);
   const [fileModalMode, setFileModalMode] = useState<FileModalMode>('upload');
@@ -468,171 +487,174 @@ export default function ResourceDetailScreen() {
     ]);
   };
 
+  // One row per file: tap opens it; admins get Move / Edit / Delete in "…".
   const renderFileRow = (file: ResourceFileItem, index: number) => {
     const fileUrl = file.url || resolveResourceMediaUrl(file.path);
-    const fileTag =
-      formatNameById.get(file.format_id || 0) || getFileExtension(file.filename);
+    const formatName = formatNameById.get(file.format_id || 0);
     const isOpenable = Boolean(fileUrl);
+    const isOpening = openingFileId === file.id;
+    const meta = [formatName, resourceLanguageLabel(file.lang, t), `${t('resourcePartNumber')} ${file.part_no}`]
+      .filter(Boolean)
+      .join(' · ');
 
     return (
-      <View
+      <Pressable
         key={file.id}
-        style={[
-          styles.itemCard,
-          {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+        disabled={!isOpenable || openingFileId != null}
+        onPress={() => handleOpenFile(file, fileUrl)}
+        accessibilityRole="button"
+        accessibilityLabel={`${file.filename}, ${meta}`}
+        accessibilityHint={isOpenable ? t('open') : undefined}
+        style={({pressed}) => [
+          styles.row,
+          index > 0 && {borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border},
+          pressed && {backgroundColor: T.pressedBg},
         ]}>
-        <TouchableOpacity
-          style={styles.listRowMain}
-          activeOpacity={isOpenable ? 0.75 : 1}
-          disabled={!isOpenable || openingFileId != null}
-          onPress={() => handleOpenFile(file, fileUrl)}>
-          <View style={[styles.fileBadge, {backgroundColor: C.bgSelectedOption}]}>
-            <Text style={[styles.fileBadgeText, {color: COLORS.mainColor}]} numberOfLines={1}>
-              {fileTag}
-            </Text>
-          </View>
-          <View style={styles.listRowBody}>
-            <Text style={[styles.fileName, {color: C.textPrimary}]} numberOfLines={2}>
-              {file.filename}
-            </Text>
-            <Text style={[styles.fileMeta, {color: C.textSecondary}]}>
-              {resourceLanguageLabel(file.lang, t)} · {t('resourcePartNumber')} {file.part_no}
-            </Text>
-          </View>
-          <Text
-            style={[
-              styles.openHint,
-              {color: isOpenable ? COLORS.mainColor : C.textSecondary},
-            ]}>
-            {openingFileId === file.id
-              ? `${t('loading')}...`
-              : isOpenable
-                ? `${t('open')}  ›`
-                : ''}
+        <View style={[styles.rowTile, {backgroundColor: T.brandTint}]}>
+          <Text style={[styles.rowTileText, {color: T.brandText}]} numberOfLines={1}>
+            {getFileExtension(file.filename)}
           </Text>
-        </TouchableOpacity>
-        {canManage ? (
-          <View style={[styles.itemActions, {borderTopColor: C.inputBorder}]}>
-            <View style={styles.reorderActions}>
-              <TouchableOpacity
-                style={styles.reorderButton}
-                onPress={() => moveFile(index, -1)}
-                disabled={busy || index === 0}>
-                <Text
-                  style={[
-                    styles.reorderGlyph,
-                    {color: index === 0 ? C.textSecondary : COLORS.mainColor},
-                  ]}>
-                  ↑
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.reorderButton}
-                onPress={() => moveFile(index, 1)}
-                disabled={busy || index === files.length - 1}>
-                <Text
-                  style={[
-                    styles.reorderGlyph,
-                    {
-                      color:
-                        index === files.length - 1
-                          ? C.textSecondary
-                          : COLORS.mainColor,
-                    },
-                  ]}>
-                  ↓
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View style={styles.editActions}>
-              <TouchableOpacity
-                style={styles.simpleIconButton}
-                activeOpacity={0.6}
-                accessibilityRole="button"
-                accessibilityLabel={t('edit')}
-                onPress={() => openEditFileModal(file)}>
-                <EditSvgIcon
-                  width={fs(17)}
-                  height={fs(17)}
-                  color={COLORS.mainColor}
-                />
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.simpleIconButton}
-                activeOpacity={0.6}
-                accessibilityRole="button"
-                accessibilityLabel={t('delete')}
-                onPress={() => confirmDeleteFile(file)}>
-                <DeleteSvgIcon
-                  width={fs(17)}
-                  height={fs(17)}
-                  color={COLORS.dangerColor}
-                />
-              </TouchableOpacity>
-            </View>
-          </View>
+        </View>
+        <View style={styles.rowBody}>
+          <Text style={[styles.rowTitle, {color: C.textPrimary}]} numberOfLines={2}>
+            {file.filename}
+          </Text>
+          <Text style={[styles.rowMeta, {color: C.textSecondary}]}>{meta}</Text>
+        </View>
+        {isOpening ? (
+          <ActivityIndicator size="small" color={T.brandText} />
+        ) : isOpenable && !canManage ? (
+          <ChevronRightIcon color={C.textSecondary} size={ws(16)} />
         ) : null}
-      </View>
+        {canManage ? (
+          <TouchableOpacity
+            onPress={() => setMenu({kind: 'file', index, file})}
+            hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+            style={styles.moreButton}
+            accessibilityRole="button"
+            accessibilityLabel={`${file.filename}: ${t('edit')}, ${t('delete')}`}>
+            <MoreIcon color={C.textSecondary} />
+          </TouchableOpacity>
+        ) : null}
+      </Pressable>
     );
   };
 
   const renderChildRow = (child: ResourceListItem, index: number) => (
-    <View
+    <Pressable
       key={child.id}
-      style={[
-        styles.itemCard,
-        {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+      onPress={() => navigation.push('ResourceDetail', {resourceId: child.id})}
+      accessibilityRole="button"
+      accessibilityLabel={child.name}
+      style={({pressed}) => [
+        styles.row,
+        index > 0 && {borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border},
+        pressed && {backgroundColor: T.pressedBg},
       ]}>
-      <TouchableOpacity
-        style={styles.listRowMain}
-        activeOpacity={0.75}
-        onPress={() =>
-          navigation.push('ResourceDetail', {resourceId: child.id})
-        }>
-        <View style={styles.listRowBody}>
-          <Text style={[styles.childName, {color: C.textPrimary}]} numberOfLines={2}>
-            {child.name}
-          </Text>
-        </View>
-        <Text style={[styles.chevron, {color: C.textSecondary}]}>›</Text>
-      </TouchableOpacity>
-      {canManage ? (
-        <View style={[styles.itemActions, {borderTopColor: C.inputBorder}]}>
-          <View style={styles.reorderActions}>
-            <TouchableOpacity
-              style={styles.reorderButton}
-              onPress={() => moveChild(index, -1)}
-              disabled={busy || index === 0}>
-              <Text
-                style={[
-                  styles.reorderGlyph,
-                  {color: index === 0 ? C.textSecondary : COLORS.mainColor},
-                ]}>
-                ↑
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.reorderButton}
-              onPress={() => moveChild(index, 1)}
-              disabled={busy || index === children.length - 1}>
-              <Text
-                style={[
-                  styles.reorderGlyph,
-                  {
-                    color:
-                      index === children.length - 1
-                        ? C.textSecondary
-                        : COLORS.mainColor,
-                  },
-                ]}>
-                ↓
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+      <View style={[styles.rowTile, {backgroundColor: T.brandTint}]}>
+        <FolderIcon color={T.brandText} size={ws(18)} />
+      </View>
+      <View style={styles.rowBody}>
+        <Text style={[styles.rowTitle, {color: C.textPrimary}]} numberOfLines={2}>
+          {child.name}
+        </Text>
+      </View>
+      <ChevronRightIcon color={C.textSecondary} size={ws(16)} />
+      {canManage && children.length > 1 ? (
+        <TouchableOpacity
+          onPress={() => setMenu({kind: 'child', index, child})}
+          hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+          style={styles.moreButton}
+          accessibilityRole="button"
+          accessibilityLabel={`${child.name}: ${t('moveUp')}, ${t('moveDown')}`}>
+          <MoreIcon color={C.textSecondary} />
+        </TouchableOpacity>
       ) : null}
+    </Pressable>
+  );
+
+  const renderSection = (
+    title: string,
+    count: number,
+    action: {label: string; onPress: () => void} | null,
+    body: React.ReactNode,
+    emptyText: string,
+  ) => (
+    <View style={[styles.sectionCard, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+      <View style={styles.sectionHeader}>
+        <Text style={[styles.sectionTitle, {color: C.textPrimary}]} accessibilityRole="header">
+          {title}
+          {count > 0 ? (
+            <Text style={[styles.sectionCount, {color: C.textSecondary}]}>{`  ·  ${count}`}</Text>
+          ) : null}
+        </Text>
+        {action ? (
+          <Pressable
+            onPress={action.onPress}
+            disabled={busy}
+            accessibilityRole="button"
+            accessibilityLabel={action.label}
+            style={({pressed}) => [
+              styles.sectionAction,
+              {backgroundColor: pressed ? T.pressedBg : T.brandTint},
+              busy && styles.disabled,
+            ]}>
+            <Text style={[styles.sectionActionText, {color: T.brandText}]}>{`+  ${action.label}`}</Text>
+          </Pressable>
+        ) : null}
+      </View>
+      {count === 0 ? (
+        <Text style={[styles.emptyText, {color: C.textSecondary}]}>{emptyText}</Text>
+      ) : (
+        <View style={[styles.sectionList, {borderTopColor: C.border}]}>{body}</View>
+      )}
     </View>
   );
+
+  // Actions for the "…" menus (resource, a file, a child resource).
+  const menuActions = ((): ActionItem[] => {
+    if (!menu) {
+      return [];
+    }
+    const run = (fn: () => void) => () => {
+      setMenu(null);
+      fn();
+    };
+    if (menu.kind === 'resource') {
+      return [
+        {
+          label: t('edit'),
+          icon: 'edit',
+          onPress: run(() => navigation.navigate('EditResource', {resourceId: resource?.id})),
+        },
+        {label: t('delete'), icon: 'delete', type: 'danger', onPress: run(confirmDeleteResource)},
+      ];
+    }
+    const list = menu.kind === 'file' ? files : children;
+    const move = menu.kind === 'file' ? moveFile : moveChild;
+    const items: ActionItem[] = [];
+    if (menu.index > 0) {
+      items.push({label: t('moveUp'), icon: 'moveUp', onPress: run(() => move(menu.index, -1))});
+    }
+    if (menu.index < list.length - 1) {
+      items.push({label: t('moveDown'), icon: 'moveDown', onPress: run(() => move(menu.index, 1))});
+    }
+    if (menu.kind === 'file') {
+      const file = menu.file;
+      items.push(
+        {label: t('edit'), icon: 'edit', onPress: run(() => openEditFileModal(file))},
+        {label: t('delete'), icon: 'delete', type: 'danger', onPress: run(() => confirmDeleteFile(file))},
+      );
+    }
+    return items;
+  })();
+
+  const menuTitle =
+    menu?.kind === 'file'
+      ? menu.file.filename
+      : menu?.kind === 'child'
+        ? menu.child.name
+        : resource?.name;
 
   if (loading && !refreshing) {
     return <ScreenContainer title={t('resourceDetailTitle')} loading />;
@@ -650,159 +672,105 @@ export default function ResourceDetailScreen() {
     );
   }
 
+  const languages = resource.available_languages ?? [];
+  const longDescription = description.length > DESCRIPTION_PREVIEW_CHARS;
+
   return (
     <ScreenContainer title={t('resourceDetailTitle')}>
-        <ScrollView
-          contentContainerStyle={styles.scrollContent}
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }>
-          <View
-            style={[
-              styles.heroCard,
-              {backgroundColor: C.surface, borderColor: C.surfaceBorder},
-            ]}>
-            {graphicUrl ? (
-              <Image
-                source={{uri: graphicUrl}}
-                style={styles.heroImage}
-                resizeMode="cover"
-              />
-            ) : null}
-            <View style={styles.heroBody}>
-              <View style={styles.summaryRow}>
-                <View style={styles.summaryText}>
-                  <Text style={[styles.resourceTitle, {color: C.textPrimary}]}>
-                    {resource.name}
-                  </Text>
-                  {resource.available_languages?.length ? (
-                    <View style={styles.metaWrap}>
-                      {resource.available_languages.map(code => (
-                        <View
-                          key={code}
-                          style={[
-                            styles.metaChip,
-                            {backgroundColor: C.bgSelectedOption},
-                          ]}>
-                          <Text
-                            style={[
-                              styles.metaChipText,
-                              {color: C.textSecondary},
-                            ]}>
-                            {resourceLanguageLabel(code, t)}
-                          </Text>
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-                </View>
-              </View>
-
-              {description ? (
-                <Text style={[styles.descriptionText, {color: C.textSecondary}]}>
-                  {description}
-                </Text>
-              ) : null}
-
-              {canManage ? (
-                <View style={styles.primaryActions}>
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    style={styles.heroIconButton}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('edit')}
-                    onPress={() =>
-                      navigation.navigate('EditResource', {
-                        resourceId: resource.id,
-                      })
-                    }>
-                    <EditSvgIcon
-                      width={fs(19)}
-                      height={fs(19)}
-                      color={COLORS.mainColor}
-                    />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    activeOpacity={0.75}
-                    style={styles.heroIconButton}
-                    accessibilityRole="button"
-                    accessibilityLabel={t('delete')}
-                    onPress={confirmDeleteResource}
-                    disabled={busy}>
-                    <DeleteSvgIcon
-                      width={fs(19)}
-                      height={fs(19)}
-                      color={COLORS.dangerColor}
-                    />
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </View>
-          </View>
-
-          <View
-            style={[
-              styles.sectionCard,
-              {backgroundColor: C.surface, borderColor: C.surfaceBorder},
-            ]}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                {t('resourceFiles')}
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+        {/* Summary: cover, name, languages, description; admin actions in "…". */}
+        <View style={[styles.heroCard, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
+          {graphicUrl ? (
+            <Image
+              source={{uri: graphicUrl}}
+              style={styles.heroImage}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          ) : null}
+          <View style={styles.heroBody}>
+            <View style={styles.heroTitleRow}>
+              <Text style={[styles.resourceTitle, {color: C.textPrimary}]} accessibilityRole="header">
+                {resource.name}
               </Text>
               {canManage ? (
                 <TouchableOpacity
-                  style={styles.sectionAction}
-                  onPress={openUploadModal}
-                  disabled={busy}>
-                  <Text style={styles.sectionActionText}>
-                    +{' '}
-                    {t('resourceUploadFile')}
-                  </Text>
+                  onPress={() => setMenu({kind: 'resource'})}
+                  disabled={busy}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                  style={[styles.heroMore, {backgroundColor: T.neutralTint}]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${resource.name}: ${t('edit')}, ${t('delete')}`}>
+                  <MoreIcon color={C.textPrimary} />
                 </TouchableOpacity>
               ) : null}
             </View>
-            {files.length === 0 ? (
-              <Text style={[styles.emptyText, {color: C.textSecondary}]}>
-                {t('resourceNoFiles')}
-              </Text>
-            ) : (
-              files.map(renderFileRow)
-            )}
-          </View>
 
-          <View
-            style={[
-              styles.sectionCard,
-              {backgroundColor: C.surface, borderColor: C.surfaceBorder},
-            ]}>
-            <View style={styles.sectionHeader}>
-              <Text style={[styles.sectionTitle, {color: C.textPrimary}]}>
-                {t('resourceChildren')}
-              </Text>
-              {canManage ? (
-                <AddNewHeaderButton
-                  name="AddNewResource"
-                  params={{parentId: resource.id}}
-                  text={t('addNew')}
-                  style={{
-                    backgroundColor: C.surface,
-                    borderWidth: 1,
-                    borderColor: COLORS.mainColor,
-                    marginTop: 0,
-                  }}
-                  textStyle={{color: COLORS.mainColor}}
-                />
-              ) : null}
-            </View>
-            {children.length === 0 ? (
-              <Text style={[styles.emptyText, {color: C.textSecondary}]}>
-                {t('resourceNoChildren')}
-              </Text>
-            ) : (
-              children.map(renderChildRow)
-            )}
+            {languages.length ? (
+              <View style={styles.chips}>
+                {languages.map(code => (
+                  <View key={code} style={[styles.chip, {backgroundColor: T.neutralTint}]}>
+                    <Text style={[styles.chipText, {color: T.neutralText}]}>
+                      {resourceLanguageLabel(code, t)}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            ) : null}
+
+            {description ? (
+              <>
+                <Text
+                  style={[styles.descriptionText, {color: C.textSecondary}]}
+                  numberOfLines={longDescription && !descriptionExpanded ? 4 : undefined}>
+                  {description}
+                </Text>
+                {longDescription ? (
+                  <TouchableOpacity
+                    onPress={() => setDescriptionExpanded(v => !v)}
+                    hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                    accessibilityRole="button"
+                    accessibilityState={{expanded: descriptionExpanded}}>
+                    <Text style={[styles.moreText, {color: T.brandText}]}>
+                      {descriptionExpanded ? t('showLess') : t('showMore')}
+                    </Text>
+                  </TouchableOpacity>
+                ) : null}
+              </>
+            ) : null}
           </View>
-        </ScrollView>
+        </View>
+
+        {renderSection(
+          t('resourceFiles'),
+          files.length,
+          canManage ? {label: t('resourceUploadFile'), onPress: openUploadModal} : null,
+          files.map(renderFileRow),
+          t('resourceNoFiles'),
+        )}
+
+        {renderSection(
+          t('resourceChildren'),
+          children.length,
+          canManage
+            ? {
+                label: t('addNew'),
+                onPress: () => navigation.navigate('AddNewResource', {parentId: resource.id}),
+              }
+            : null,
+          children.map(renderChildRow),
+          t('resourceNoChildren'),
+        )}
+      </ScrollView>
+
+      <ActionSheetModal
+        visible={!!menu}
+        title={menuTitle}
+        actions={menuActions}
+        onRequestClose={() => setMenu(null)}
+      />
 
       <Modal
         visible={fileModalVisible}
@@ -922,179 +890,142 @@ const styles = StyleSheet.create({
   },
   heroCard: {
     borderWidth: 1,
-    borderRadius: rs(12),
+    borderRadius: rs(14),
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOpacity: 0.05,
-    shadowRadius: rs(6),
-    shadowOffset: {width: 0, height: 2},
-    elevation: 2,
   },
   heroImage: {
     width: '100%',
-    height: ws(170),
+    aspectRatio: 16 / 9,
   },
   heroBody: {
     padding: ms(16),
+    gap: ms(10),
   },
-  summaryRow: {
+  heroTitleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-  },
-  summaryText: {
-    flex: 1,
-    minWidth: 0,
+    gap: ms(12),
   },
   resourceTitle: {
-    fontSize: fs(19),
+    flex: 1,
+    fontSize: fs(20),
     fontWeight: '700',
-    lineHeight: fs(25),
+    lineHeight: fs(27),
+  },
+  heroMore: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  chips: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ms(6),
+  },
+  chip: {
+    borderRadius: 12,
+    paddingHorizontal: ms(10),
+    paddingVertical: ms(4),
+  },
+  chipText: {
+    fontSize: fs(12),
+    fontWeight: '600',
   },
   descriptionText: {
     fontSize: fs(14),
     lineHeight: fs(21),
-    marginTop: ms(12),
   },
-  metaWrap: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: ms(6),
-    marginTop: ms(6),
-  },
-  metaChip: {
-    borderRadius: rs(12),
-    paddingHorizontal: ms(9),
-    paddingVertical: ms(3),
-  },
-  metaChipText: {
-    fontSize: fs(11),
+  moreText: {
+    fontSize: fs(13),
     fontWeight: '600',
-  },
-  primaryActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    gap: ms(6),
-    marginTop: ms(16),
-  },
-  heroIconButton: {
-    width: ws(34),
-    height: ws(34),
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   sectionCard: {
     borderWidth: 1,
-    borderRadius: rs(12),
+    borderRadius: rs(14),
     overflow: 'hidden',
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: ms(14),
+    gap: ms(12),
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(12),
   },
   sectionTitle: {
+    flexShrink: 1,
     fontSize: fs(16),
     fontWeight: '700',
   },
+  sectionCount: {
+    fontSize: fs(14),
+    fontWeight: '500',
+  },
   sectionAction: {
-    borderWidth: 1,
-    borderColor: COLORS.mainColor,
-    borderRadius: rs(6),
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(6),
+    minHeight: 36,
+    borderRadius: 18,
+    paddingHorizontal: ms(14),
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   sectionActionText: {
-    color: COLORS.mainColor,
-    fontSize: fs(12),
+    fontSize: fs(13),
     fontWeight: '600',
   },
-  itemCard: {
-    borderWidth: 0,
-    borderTopWidth: 1,
-    borderRadius: 0,
-    marginBottom: 0,
+  disabled: {
+    opacity: 0.5,
   },
-  listRowMain: {
+  sectionList: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  // Shared file / child row: tile, text, trailing control; >= 64pt tall.
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: ms(12),
+    gap: ms(12),
+    minHeight: 64,
+    paddingVertical: ms(10),
+    paddingLeft: ms(16),
+    paddingRight: ms(8),
   },
-  listRowBody: {
+  rowTile: {
+    width: ws(42),
+    height: ws(42),
+    borderRadius: rs(10),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rowTileText: {
+    fontSize: fs(10),
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
+  rowBody: {
     flex: 1,
     minWidth: 0,
   },
-  fileBadge: {
-    borderRadius: rs(6),
-    paddingHorizontal: ms(8),
-    paddingVertical: ms(5),
-    marginRight: ms(10),
-    maxWidth: ws(82),
-  },
-  fileBadgeText: {
-    fontSize: fs(10),
-    fontWeight: '700',
-  },
-  fileName: {
-    fontSize: fs(13),
-    fontWeight: '600',
-    lineHeight: fs(18),
-  },
-  fileMeta: {
-    fontSize: fs(11),
-    marginTop: ms(2),
-  },
-  openHint: {
-    fontSize: fs(12),
-    fontWeight: '600',
-    marginLeft: ms(8),
-  },
-  chevron: {
-    fontSize: fs(22),
-    lineHeight: fs(22),
-    marginLeft: ms(8),
-  },
-  childName: {
+  rowTitle: {
     fontSize: fs(14),
     fontWeight: '600',
+    lineHeight: fs(19),
   },
-  itemActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderTopWidth: StyleSheet.hairlineWidth,
-    paddingHorizontal: ms(10),
-    paddingVertical: ms(4),
+  rowMeta: {
+    marginTop: ms(2),
+    fontSize: fs(12),
+    lineHeight: fs(17),
   },
-  reorderActions: {
-    flexDirection: 'row',
-    gap: ms(6),
-  },
-  editActions: {
-    flexDirection: 'row',
-    gap: ms(4),
-  },
-  simpleIconButton: {
-    width: ws(30),
-    height: ws(30),
+  moreButton: {
+    width: 40,
+    height: 40,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  reorderButton: {
-    width: ws(30),
-    height: ws(30),
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  reorderGlyph: {
-    fontSize: fs(17),
-    fontWeight: '700',
   },
   emptyText: {
     fontSize: fs(13),
-    paddingVertical: ms(16),
-    textAlign: 'center',
+    paddingHorizontal: ms(16),
+    paddingBottom: ms(16),
   },
   modalKeyboardAvoider: {
     flex: 1,

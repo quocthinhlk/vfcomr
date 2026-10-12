@@ -145,8 +145,9 @@ export const CloneChurchScreen: React.FC = () => {
           <View style={styles.itemCol}>
             <Text
               style={[styles.name, {color: C.textPrimary}]}
-              numberOfLines={1}>
+              numberOfLines={2}>
               {name}
+              <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
             </Text>
             <View
               style={{
@@ -259,6 +260,11 @@ export const CloneChurchScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  // Record id after the title, like the shared list cards.
+  listId: {
+    fontSize: fs(12),
+    fontWeight: '500',
+  },
   container: {
     flex: 1,
     paddingTop: 0,

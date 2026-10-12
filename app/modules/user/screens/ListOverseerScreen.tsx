@@ -170,8 +170,9 @@ export const ListOverseerScreen: React.FC = () => {
           <View style={styles.itemCol}>
             <Text
               style={[styles.name, {color: C.textPrimary}]}
-              numberOfLines={1}>
+              numberOfLines={2}>
               {name}
+              <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
             </Text>
             <Text
               style={[styles.meta, {color: C.textSecondary}]}
@@ -315,6 +316,11 @@ export const ListOverseerScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  // Record id after the title, like the shared list cards.
+  listId: {
+    fontSize: fs(12),
+    fontWeight: '500',
+  },
   listContent: {flexGrow: 1, paddingBottom: ms(24)},
   container: {
     flex: 1,

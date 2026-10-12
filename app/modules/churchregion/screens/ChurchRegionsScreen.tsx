@@ -126,6 +126,7 @@ export const ChurchRegionsScreen: React.FC = () => {
   const renderItem = ({item}: {item: ChurchRegionItem}) => (
     <EntityListCard
       title={item.name}
+      trailingText={`#${item.id}`}
       onPress={() => handleEdit(item)}
       onMorePress={() => openActions(item)}
     />

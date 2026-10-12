@@ -145,3 +145,21 @@ export const MailIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
     <Path d="M3 7l9 6 9-6" {...stroke(color)} />
   </Svg>
 );
+
+export const ArrowUpIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M12 19V5M6 11l6-6 6 6" {...stroke(color)} />
+  </Svg>
+);
+
+export const ArrowDownIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M12 5v14M6 13l6 6 6-6" {...stroke(color)} />
+  </Svg>
+);
+
+export const FolderIcon: React.FC<UiIconProps> = ({size = MD, color}) => (
+  <Svg width={size} height={size} viewBox="0 0 24 24" fill="none">
+    <Path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7z" {...stroke(color)} />
+  </Svg>
+);
