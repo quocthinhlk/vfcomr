@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
@@ -891,16 +892,25 @@ export default function AddUserScreen() {
                         borderColor: invalid.mobile_phone ? '#db2d2d' : C.inputBorder,
                         backgroundColor: C.inputBg,
                       }}>
+                      {/* Flag + calling code are one button: most people tap the code. */}
                       <TouchableOpacity
                         onPress={() => setShowCountryPicker(true)}
-                        style={{flexDirection: 'row', alignItems: 'center'}}>
-                        <Text style={{fontSize: fs(18), marginRight: ms(4)}}>
-                          {countryCodeToFlag(countryCode)}
-                        </Text>
+                        activeOpacity={0.6}
+                        accessibilityRole="button"
+                        accessibilityLabel={`+${callingCode}`}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'center',
+                          alignSelf: 'stretch',
+                          gap: ms(6),
+                          paddingRight: ms(10),
+                          borderRightWidth: StyleSheet.hairlineWidth,
+                          borderRightColor: C.inputBorder,
+                        }}>
+                        <Text style={{fontSize: fs(18)}}>{countryCodeToFlag(countryCode)}</Text>
+                        <Text style={{fontSize: fs(14), color: C.textPrimary}}>+{callingCode}</Text>
+                        <Text style={{fontSize: fs(10), color: C.textSecondary}}>▼</Text>
                       </TouchableOpacity>
-                      <Text style={{marginLeft: ms(8), fontSize: fs(14), color: C.textPrimary}}>
-                        +{callingCode}
-                      </Text>
                       <TextInput
                         allowFontScaling={false}
                         style={{

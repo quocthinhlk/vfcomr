@@ -1,19 +1,23 @@
-import React from 'react';
+import React, {useEffect, useRef} from 'react';
 import {
-  Modal,
-  TouchableWithoutFeedback,
-  View,
-  StyleSheet,
-  TouchableOpacity,
+  Animated,
+  Easing,
   Image,
+  Modal,
+  Pressable,
   ScrollView,
+  StyleSheet,
+  View,
+  useWindowDimensions,
 } from 'react-native';
 import {Text} from '@ui-kitten/components';
+import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {LANGUAGES} from '../../config/languages';
 import {useTranslation} from '../hooks/useTranslation';
 import {useThemedColors} from '../styles/theme';
-import {COLORS} from '../constants/colors';
-import {fs, ws, hs, ms, rs} from '../utils/scale';
+import {useUiTokens} from '../styles/uiTokens';
+import {CheckIcon} from './icons/UiIcons';
+import {fs, ms, rs, ws} from '../utils/scale';
 
 type Props = {
   visible: boolean;
@@ -22,6 +26,10 @@ type Props = {
   onSelectLanguage: (code: string) => void;
 };
 
+/**
+ * Language picker as a bottom sheet, like the app's other pickers: the
+ * backdrop fades in, the sheet slides up; tap outside or Android back closes.
+ */
 export default function LanguageSelectModal({
   visible,
   selectedLanguageCode,
@@ -30,163 +38,139 @@ export default function LanguageSelectModal({
 }: Props) {
   const {t} = useTranslation();
   const C = useThemedColors();
-  const selectedIndex = Math.max(
-    LANGUAGES.findIndex(l => l.code === selectedLanguageCode),
-    0,
-  );
+  const T = useUiTokens();
+  const insets = useSafeAreaInsets();
+  const {height: screenH} = useWindowDimensions();
+
+  const slide = useRef(new Animated.Value(screenH)).current;
+  useEffect(() => {
+    if (visible) {
+      slide.setValue(screenH);
+      Animated.timing(slide, {
+        toValue: 0,
+        duration: 260,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [visible, screenH, slide]);
 
   return (
     <Modal
       transparent
       visible={visible}
       animationType="fade"
+      statusBarTranslucent
       onRequestClose={onRequestClose}>
-      <TouchableWithoutFeedback onPress={onRequestClose}>
-        <View
-          style={[styles.dropdownOverlay, {backgroundColor: C.overlay}]}>
-          <View
-            style={[
-              styles.dropdownContainer,
-              {
-                backgroundColor: C.surface,
-                borderColor: C.surfaceBorder,
-                borderWidth: StyleSheet.hairlineWidth,
-              },
-            ]}>
-            <View
-              style={[
-                styles.dropdownHeader,
-                {borderBottomColor: C.surfaceBorder},
-              ]}>
-              <Text style={[styles.dropdownTitle, {color: C.textPrimary}]}>
-                {t('language')}
-              </Text>
-              <TouchableOpacity
-                style={styles.dropdownClose}
-                onPress={onRequestClose}
-                hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}>
-                <Text
-                  style={[styles.dropdownCloseText, {color: C.textSecondary}]}>
-                  ✕
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              style={styles.dropdownList}
->
-              {LANGUAGES.map((lang, idx) => (
-                <TouchableOpacity
+      <View style={styles.modal}>
+        <Pressable
+          style={[StyleSheet.absoluteFill, {backgroundColor: `rgba(0,0,0,${T.backdropOpacity})`}]}
+          onPress={onRequestClose}
+          accessibilityRole="button"
+          accessibilityLabel={t('cancel')}
+        />
+        <Animated.View
+          accessibilityViewIsModal
+          style={[
+            styles.sheet,
+            {
+              backgroundColor: T.sheetBg,
+              paddingBottom: Math.max(insets.bottom, ms(12)),
+              transform: [{translateY: slide}],
+            },
+          ]}>
+          <View style={[styles.handle, {backgroundColor: C.border}]} />
+          <Text style={[styles.title, {color: C.textPrimary}]} accessibilityRole="header">
+            {t('language')}
+          </Text>
+          <ScrollView style={styles.list} bounces={false}>
+            {LANGUAGES.map(lang => {
+              const active = lang.code === selectedLanguageCode;
+              return (
+                <Pressable
                   key={lang.code}
-                  style={[
-                    styles.dropdownItem,
-                    selectedIndex === idx && styles.dropdownItemActive,
-                  ]}
-                  activeOpacity={0.7}
-                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
-                  onPress={() => {
-                    onSelectLanguage(lang.code);
-                  }}
-                >
-                  <Image source={lang.flag} style={styles.flagIcon} />
+                  onPress={() => onSelectLanguage(lang.code)}
+                  accessibilityRole="button"
+                  accessibilityLabel={lang.label}
+                  accessibilityState={{selected: active}}
+                  style={({pressed}) => [
+                    styles.row,
+                    (active || pressed) && {backgroundColor: T.brandTint},
+                  ]}>
+                  <Image source={lang.flag} style={styles.flag} accessibilityIgnoresInvertColors />
                   <Text
                     style={[
-                      styles.languageOptionText,
-                      {color: C.textPrimary},
-                      selectedIndex === idx &&
-                        styles.languageOptionTextActive,
+                      styles.label,
+                      {color: active ? T.brandText : C.textPrimary},
+                      active && styles.labelActive,
                     ]}>
                     {lang.label}
                   </Text>
-                  {selectedIndex === idx ? (
-                    <Text style={styles.checkIcon}>✓</Text>
-                  ) : (
-                    <View style={styles.checkIconPlaceholder} />
-                  )}
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      </TouchableWithoutFeedback>
+                  <View style={styles.check}>
+                    {active ? <CheckIcon color={T.brandText} size={ws(18)} /> : null}
+                  </View>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+        </Animated.View>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  dropdownOverlay: {
+  modal: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
   },
-  dropdownContainer: {
-    borderRadius: rs(12),
-    paddingVertical: ms(8),
-    paddingHorizontal: ms(8),
-    minWidth: ws(220),
-    maxWidth: ws(320),
-    maxHeight: hs(320),
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: rs(12),
-    shadowOffset: {width: 0, height: hs(6)},
+  sheet: {
+    borderTopLeftRadius: rs(16),
+    borderTopRightRadius: rs(16),
+    paddingTop: ms(8),
+    paddingHorizontal: ms(16),
+    maxHeight: '80%',
   },
-  dropdownHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: ms(8),
-    paddingVertical: ms(8),
-    borderBottomWidth: StyleSheet.hairlineWidth,
+  handle: {
+    alignSelf: 'center',
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    marginBottom: ms(12),
   },
-  dropdownTitle: {
-    fontSize: fs(16),
+  title: {
+    fontSize: fs(17),
     fontWeight: '700',
+    marginBottom: ms(8),
   },
-  dropdownClose: {
-    paddingHorizontal: ms(8),
-    paddingVertical: ms(4),
+  list: {
+    flexGrow: 0,
   },
-  dropdownCloseText: {
-    fontSize: fs(16),
-  },
-  dropdownList: {
-    paddingVertical: ms(4),
-  },
-  dropdownItem: {
+  row: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: ms(12),
+    minHeight: 52,
     paddingVertical: ms(10),
     paddingHorizontal: ms(10),
-    width: '100%',
-    borderRadius: rs(8),
+    borderRadius: rs(12),
+    marginBottom: ms(2),
   },
-  dropdownItemActive: {
-    backgroundColor: 'rgba(53,99,233,0.08)',
-  },
-  flagIcon: {
+  flag: {
     width: ws(28),
-    height: hs(18),
-    marginRight: ms(10),
+    height: ws(20),
+    borderRadius: 3,
     resizeMode: 'contain',
   },
-  languageOptionText: {
+  label: {
+    flex: 1,
     fontSize: fs(15),
   },
-  languageOptionTextActive: {
+  labelActive: {
     fontWeight: '700',
   },
-  checkIcon: {
-    marginLeft: 'auto',
-    fontSize: fs(14),
-    color: COLORS.successColor,
-    paddingHorizontal: ms(4),
-  },
-  checkIconPlaceholder: {
-    marginLeft: 'auto',
-    width: ws(16),
-    height: hs(16),
+  check: {
+    width: ws(24),
+    alignItems: 'center',
   },
 });
-
-
