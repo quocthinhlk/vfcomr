@@ -645,6 +645,48 @@ export default function EditProfileScreen() {
                     {renderFieldError('first_name')}
                   </View>
 
+                  {/* Last Name */}
+                  <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
+                    <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                      {t('lastName')} <Text style={{color: '#c00000'}}>*</Text>
+                    </Text>
+                    <AppInput
+                      value={values.last_name}
+                      autoCapitalize="words"
+                      onChangeText={v => {
+                        setFieldValue('last_name', v);
+                        clearInvalid('last_name');
+                        clearFieldError('last_name');
+                      }}
+                      onBlur={handleBlur('last_name')}
+                      error={!!invalid.last_name}
+                    />
+                    {renderFieldError('last_name')}
+                  </View>
+
+                  {/* Username (read-only) */}
+                  <View onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
+                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
+                      <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                        {t('username')} <Text style={{color: '#c00000'}}>*</Text>
+                      </Text>
+                      <HelpIcon title={t('username')} message={t('usernameHelp')} size={16} offsetY={-2} />
+                    </View>
+                    <AppInput
+                      value={values.username}
+                      autoCapitalize="none"
+                      editable={false}
+                      onChangeText={v => {
+                        setFieldValue('username', v);
+                        clearInvalid('username');
+                        clearFieldError('username');
+                      }}
+                      onBlur={handleBlur('username')}
+                      error={!!invalid.username}
+                    />
+                    {renderFieldError('username')}
+                  </View>
+
                   {/* Ministry Title */}
                   <View onLayout={e => setFieldPos('title', e.nativeEvent.layout.y)}>
                     <View style={{flexDirection: 'row', alignItems: 'center'}}>
@@ -694,48 +736,6 @@ export default function EditProfileScreen() {
                       error={!!invalid.role_id}
                     />
                     {renderFieldError('role_id')}
-                  </View>
-
-                  {/* Last Name */}
-                  <View onLayout={e => setFieldPos('last_name', e.nativeEvent.layout.y)}>
-                    <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                      {t('lastName')} <Text style={{color: '#c00000'}}>*</Text>
-                    </Text>
-                    <AppInput
-                      value={values.last_name}
-                      autoCapitalize="words"
-                      onChangeText={v => {
-                        setFieldValue('last_name', v);
-                        clearInvalid('last_name');
-                        clearFieldError('last_name');
-                      }}
-                      onBlur={handleBlur('last_name')}
-                      error={!!invalid.last_name}
-                    />
-                    {renderFieldError('last_name')}
-                  </View>
-
-                  {/* Username (read-only) */}
-                  <View onLayout={e => setFieldPos('username', e.nativeEvent.layout.y)}>
-                    <View style={{flexDirection: 'row', alignItems: 'center'}}>
-                      <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                        {t('username')} <Text style={{color: '#c00000'}}>*</Text>
-                      </Text>
-                      <HelpIcon title={t('username')} message={t('usernameHelp')} size={16} offsetY={-2} />
-                    </View>
-                    <AppInput
-                      value={values.username}
-                      autoCapitalize="none"
-                      editable={false}
-                      onChangeText={v => {
-                        setFieldValue('username', v);
-                        clearInvalid('username');
-                        clearFieldError('username');
-                      }}
-                      onBlur={handleBlur('username')}
-                      error={!!invalid.username}
-                    />
-                    {renderFieldError('username')}
                   </View>
 
                   {/* User Photo */}
