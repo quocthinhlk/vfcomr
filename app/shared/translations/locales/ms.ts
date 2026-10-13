@@ -911,6 +911,8 @@ const ms = {
     deleteFailed: 'Gagal memadam.',
     omrMapLocationMissing: 'Gereja ini belum mempunyai lokasi peta.',
     addLocation: 'Tambah lokasi',
+    mapLocation: 'Lokasi peta',
+    editLocation: 'Edit lokasi',
     omrMapLocationHelper:
       'Ketik peta untuk meletakkan pin, kemudian seret pin untuk melaraskan kedudukan.',
     locationSaved: 'Lokasi berjaya disimpan.',
@@ -933,6 +935,9 @@ const ms = {
     testNotificationSent: "Dihantar ke {count} peranti. Ia sepatutnya muncul pada peranti ini dalam beberapa saat.",
     testNotificationNotDelivered: "Tiada peranti yang menerimanya. Log keluar dan masuk semula, kemudian cuba lagi.",
     testNotificationBody: "Pemberitahuan tolak berfungsi pada peranti ini.",
+    testNotificationTargetNote: "Menghantar contoh peringatan laporan kepada akaun ujian {user} (ID {id}). Log masuk sebagai {user} pada peranti untuk menerimanya.",
+    testNotificationSentToTarget: "Dihantar ke {count} peranti milik {user}.",
+    testNotificationTargetNotDelivered: "Tiada peranti {user} yang menerimanya. Log masuk sebagai {user} pada peranti yang membenarkan pemberitahuan, kemudian cuba lagi.",
 } satisfies TranslationDictionary;
 
 export default ms;

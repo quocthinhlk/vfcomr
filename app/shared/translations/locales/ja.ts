@@ -910,6 +910,8 @@ const ja = {
     deleteFailed: '削除できませんでした。',
     omrMapLocationMissing: 'この教会にはまだ地図上の位置情報が設定されていません。',
     addLocation: '位置情報を追加',
+    mapLocation: '地図上の位置',
+    editLocation: '位置情報を編集',
     omrMapLocationHelper:
       '地図をタップしてピンを置き、ドラッグして位置を微調整してください。',
     locationSaved: '位置情報を保存しました。',
@@ -932,6 +934,9 @@ const ja = {
     testNotificationSent: "{count} 台の端末に送信しました。数秒以内にこの端末に表示されます。",
     testNotificationNotDelivered: "どの端末にも届きませんでした。ログアウトして再ログインし、もう一度お試しください。",
     testNotificationBody: "この端末でプッシュ通知が正常に動作しています。",
+    testNotificationTargetNote: "テストアカウント {user}（ID {id}）にサンプルの報告リマインダーを送信します。受信するには端末で {user} としてログインしてください。",
+    testNotificationSentToTarget: "{user} の {count} 台の端末に送信しました。",
+    testNotificationTargetNotDelivered: "{user} の端末で受信されませんでした。通知を許可した端末で {user} としてログインしてから、もう一度お試しください。",
 } satisfies TranslationDictionary;
 
 export default ja;

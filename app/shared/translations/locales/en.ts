@@ -903,6 +903,8 @@ const en = {
     deleteFailed: 'Failed to delete.',
     omrMapLocationMissing: 'This church does not have a map location yet.',
     addLocation: 'Add location',
+    mapLocation: 'Map location',
+    editLocation: 'Edit location',
     omrMapLocationHelper:
       'Tap the map to place the pin, then drag it for precise positioning.',
     locationSaved: 'Location saved.',
@@ -925,6 +927,9 @@ const en = {
     testNotificationSent: "Sent to {count} device(s). It should appear on this device in a few seconds.",
     testNotificationNotDelivered: "No device received it. Log out and back in, then try again.",
     testNotificationBody: "Push notifications are working on this device.",
+    testNotificationTargetNote: "Sends a sample report reminder to the test account {user} (ID {id}). Log in as {user} on a device to receive it.",
+    testNotificationSentToTarget: "Sent to {count} device(s) of {user}.",
+    testNotificationTargetNotDelivered: "No device of {user} received it. Log in as {user} on a device with notifications allowed, then try again.",
 } as const;
 
 export default en;

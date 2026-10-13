@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   ScrollView,
   View,
@@ -395,6 +396,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                     Object.entries(raw).filter(([_, v]) => v !== undefined),
                   );
                   const res = await addChurch(payload);
+                  markDataChanged('churches');
                   Alert.alert(t('success'), 'Church cloned successfully');
                   navigation.navigate('Churches');
                 } catch (e: any) {

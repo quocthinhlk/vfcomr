@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {SafeAreaView, View, Alert} from 'react-native';
 import {Layout, Text} from '@ui-kitten/components';
 import {globalStyles} from '../../../shared/styles/global';
@@ -52,6 +53,7 @@ export default function ToggleChurchStatusScreen() {
     try {
       setLoading(true);
       await enableChurch(churchId);
+      markDataChanged('churches');
       Alert.alert('Success', 'Church enabled successfully');
       returnToList(navigation);
     } catch (e: any) {

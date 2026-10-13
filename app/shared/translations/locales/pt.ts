@@ -911,6 +911,8 @@ const pt = {
     deleteFailed: 'Não foi possível excluir.',
     omrMapLocationMissing: 'Esta igreja ainda não tem uma localização no mapa.',
     addLocation: 'Adicionar localização',
+    mapLocation: 'Localização no mapa',
+    editLocation: 'Editar localização',
     omrMapLocationHelper:
       'Toque no mapa para posicionar o marcador e arraste-o para ajustar a posição.',
     locationSaved: 'Localização salva.',
@@ -933,6 +935,9 @@ const pt = {
     testNotificationSent: "Enviada para {count} dispositivo(s). Deve aparecer neste dispositivo em alguns segundos.",
     testNotificationNotDelivered: "Nenhum dispositivo recebeu. Saia, entre novamente e tente outra vez.",
     testNotificationBody: "As notificações push estão funcionando neste dispositivo.",
+    testNotificationTargetNote: "Envia um lembrete de relatório de exemplo para a conta de teste {user} (ID {id}). Entre como {user} em um dispositivo para recebê-lo.",
+    testNotificationSentToTarget: "Enviada para {count} dispositivo(s) de {user}.",
+    testNotificationTargetNotDelivered: "Nenhum dispositivo de {user} recebeu. Entre como {user} em um dispositivo com notificações permitidas e tente novamente.",
 } satisfies TranslationDictionary;
 
 export default pt;

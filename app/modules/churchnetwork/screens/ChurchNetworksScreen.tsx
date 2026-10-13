@@ -5,7 +5,8 @@ import {
   listChurchNetworks,
   ChurchNetworkItem,
 } from '../services/churchnetwork.service';
-import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
@@ -26,6 +27,7 @@ import {CredentialBadge} from '../components/ChurchNetworkUI';
 
 export const ChurchNetworksScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const {t} = useTranslation();
   const [items, setItems] = useState<ChurchNetworkItem[]>([]);
   const [page, setPage] = useState(1);
@@ -82,11 +84,11 @@ export const ChurchNetworksScreen: React.FC = () => {
     fetchData(1, true);
   }, [query, fetchData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      fetchData(pageRef.current, true);
-    }, [fetchData]),
-  );
+  // Add / Edit / Delete come back with `reload`; a plain Back keeps the list.
+  useReloadOnReturn(() => fetchData(pageRef.current, true), {
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);

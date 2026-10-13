@@ -18,6 +18,7 @@ import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, hs, ms, rs} from '../../../shared/utils/scale';
 import api from '../../../config/api';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {isSuperAdmin, resolveRoleIdFromUser} from '../../../shared/utils/permissions';
 import {
   getRoleChangeRequest,
@@ -155,6 +156,7 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
             try {
               setActioning(status);
               await updateRoleChangeRequestStatus(request.id, status);
+              markDataChanged('roleChangeRequests');
               Alert.alert(
                 t('success'),
                 status === 'approved'

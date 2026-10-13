@@ -12,6 +12,7 @@ import {
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {
@@ -293,10 +294,12 @@ export default function AddNewResourceScreen() {
 
       if (isEdit && resourceId) {
         await updateResource(resourceId, payload);
+        markDataChanged('resources');
         Alert.alert(t('success'), t('resourceUpdated'));
         returnAfterEdit(navigation);
       } else {
         const created = await createResource(payload);
+        markDataChanged('resources');
         const newId = created?.data?.resource_id;
         Alert.alert(t('success'), t('resourceCreated'));
         if (typeof newId === 'number') {

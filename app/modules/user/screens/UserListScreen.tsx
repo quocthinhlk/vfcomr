@@ -1,4 +1,5 @@
 import React, {useEffect, useState, useCallback, useRef} from 'react';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {
   View,
   FlatList,
@@ -133,13 +134,19 @@ export const UserListScreen: React.FC = () => {
     fetchData(1, true);
   }, [query]);
 
-  useEffect(() => {
-    if (route?.params?.refresh || route?.params?.reload) {
+  // Reload when coming back after a user was added / edited / deleted (a
+  // `reload` param or markDataChanged('users')); a plain Back keeps the list.
+  useReloadOnReturn(
+    () => {
       setItems([]);
       fetchData(1, true);
-      navigation.setParams({refresh: false, reload: undefined});
-    }
-  }, [route?.params?.refresh, route?.params?.reload]);
+    },
+    {
+      dataKey: 'users',
+      reload: route?.params?.refresh || route?.params?.reload,
+      clearReload: () => navigation.setParams({refresh: false, reload: undefined}),
+    },
+  );
 
   const onRefresh = async () => {
     setRefreshing(true);

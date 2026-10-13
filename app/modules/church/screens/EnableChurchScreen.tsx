@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {View, StyleSheet, Alert} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
@@ -63,6 +64,7 @@ const EnableChurchScreen: React.FC = () => {
     try {
       setSubmitting(true);
       await enableChurch(churchId);
+      markDataChanged('churches');
       Alert.alert(t('success'), t('churchEnabledSuccess'));
       returnToList(navigation);
     } catch (e: any) {

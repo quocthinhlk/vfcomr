@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   View,
   ScrollView,
@@ -525,6 +526,7 @@ export default function EditProfileScreen() {
 
                 try {
                   const response = await updateUser(userId, payload);
+                  markDataChanged('users');
                   console.log('Update user response:', response);
                   const warning =
                     typeof response?.warning === 'string'

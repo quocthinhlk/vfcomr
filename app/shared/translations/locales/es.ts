@@ -962,6 +962,8 @@ const es = {
   deleteFailed: 'No se pudo eliminar.',
   omrMapLocationMissing: 'Esta iglesia aún no tiene ubicación en el mapa.',
   addLocation: 'Agregar ubicación',
+  mapLocation: 'Ubicación en el mapa',
+  editLocation: 'Editar ubicación',
   omrMapLocationHelper:
     'Toca el mapa para colocar el marcador y arrástralo para ajustar la posición.',
   locationSaved: 'Ubicación guardada.',
@@ -984,6 +986,9 @@ const es = {
   testNotificationSent: "Enviada a {count} dispositivo(s). Debería aparecer en este dispositivo en unos segundos.",
   testNotificationNotDelivered: "Ningún dispositivo la recibió. Cierre sesión, vuelva a entrar e inténtelo de nuevo.",
   testNotificationBody: "Las notificaciones push funcionan en este dispositivo.",
+  testNotificationTargetNote: "Envía un recordatorio de informe de ejemplo a la cuenta de prueba {user} (ID {id}). Inicie sesión como {user} en un dispositivo para recibirlo.",
+  testNotificationSentToTarget: "Enviada a {count} dispositivo(s) de {user}.",
+  testNotificationTargetNotDelivered: "Ningún dispositivo de {user} la recibió. Inicie sesión como {user} en un dispositivo con notificaciones permitidas e inténtelo de nuevo.",
 } as const;
 
 export default es;

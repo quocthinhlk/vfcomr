@@ -1,4 +1,5 @@
 import React, {useEffect, useMemo, useRef, useState, useCallback} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   ScrollView,
   View,
@@ -451,6 +452,7 @@ export default function AddUserScreen() {
 
                 try {
                   const saveResponse = await addUser(payload);
+                  markDataChanged('users');
                   console.log('[AddUserScreen] save response:', saveResponse);
                   const warning =
                     typeof saveResponse?.warning === 'string'

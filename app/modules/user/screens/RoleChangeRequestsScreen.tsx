@@ -29,7 +29,8 @@ import {
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {resolveRoleIdFromUser, isSuperAdmin} from '../../../shared/utils/permissions';
 import api from '../../../config/api';
-import {useNavigation, useFocusEffect} from '@react-navigation/native';
+import {useNavigation} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {COLORS} from '../../../shared/constants/colors';
 
 const PENDING_COLOR = '#d99400';
@@ -122,12 +123,13 @@ export const RoleChangeRequestsScreen: React.FC = () => {
     },
     [],
   );
-  useFocusEffect(
-    useCallback(() => {
-      setItems([]);
-      fetchData(1, true);
-    }, [fetchData]),
-  );
+  useEffect(() => {
+    setItems([]);
+    fetchData(1, true);
+  }, [fetchData]);
+
+  // Reload only after a request was approved / rejected.
+  useReloadOnReturn(() => fetchData(1, true), {dataKey: 'roleChangeRequests'});
 
   const onRefresh = async () => {
     setRefreshing(true);

@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {
   View,
   RefreshControl,
@@ -236,13 +237,13 @@ export const ChurchesListScreen: React.FC = () => {
     if (page - 1 >= 1) {fetchPage(page - 1);}
   }, [page, totalPages, fetchPage]);
 
-  // Reload after a church is disabled or enabled and the flow returns here.
-  useEffect(() => {
-    if (route?.params?.refresh || route?.params?.reload) {
-      resetAndLoad();
-      navigation.setParams({refresh: false, reload: undefined});
-    }
-  }, [route?.params?.refresh, route?.params?.reload]);
+  // Reload when coming back after a church was added / edited / enabled /
+  // disabled (a `reload` param or markDataChanged('churches')); a plain Back keeps the list.
+  useReloadOnReturn(resetAndLoad, {
+    dataKey: 'churches',
+    reload: route?.params?.refresh || route?.params?.reload,
+    clearReload: () => navigation.setParams({refresh: false, reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);

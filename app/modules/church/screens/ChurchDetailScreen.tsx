@@ -1,4 +1,5 @@
 import React, {useEffect, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   ActivityIndicator,
   Alert,
@@ -174,6 +175,7 @@ export default function ChurchDetailScreen() {
           try {
             setRemovingLocation(true);
             await removeChurchLocation(churchId);
+            markDataChanged('churches');
             Alert.alert(t('success'), t('locationRemoved'));
             await fetchChurch();
           } catch (e) {

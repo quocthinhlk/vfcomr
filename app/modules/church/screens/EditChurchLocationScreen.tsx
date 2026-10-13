@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   ActivityIndicator,
   Alert,
@@ -59,10 +60,25 @@ export const EditChurchLocationScreen: React.FC = () => {
   const busy = saving || removing;
   const [hasCenteredOnUser, setHasCenteredOnUser] = useState(false);
   const mapRef = useRef<MapView | null>(null);
+  // Android only turns on the "my location" layer if permission is already
+  // granted when showsUserLocation becomes true, so wait for the grant.
+  const [locationGranted, setLocationGranted] = useState(false);
+  // Keeps Google's map controls (my-location button) below the helper card.
+  const [helperHeight, setHelperHeight] = useState(0);
 
   useEffect(() => {
+    let active = true;
     // Ask for location so we can show user's position on the map.
-    requestLocationPermission({showAlertIfBlocked: true}).catch(() => {});
+    requestLocationPermission({showAlertIfBlocked: true})
+      .then(result => {
+        if (active) {
+          setLocationGranted(result.granted);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
   }, []);
 
   const onSave = async () => {
@@ -82,6 +98,7 @@ export const EditChurchLocationScreen: React.FC = () => {
         coordinate.latitude,
         coordinate.longitude,
       );
+      markDataChanged('churches');
       Alert.alert(t('success'), t('locationSaved') || 'Location saved.', [
         {
           text: t('ok'),
@@ -112,6 +129,7 @@ export const EditChurchLocationScreen: React.FC = () => {
           try {
             setRemoving(true);
             await removeChurchLocation(churchId);
+            markDataChanged('churches');
             Alert.alert(t('success'), t('locationRemoved'), [
               {text: t('ok'), onPress: () => returnAfterEdit(navigation)},
             ]);
@@ -174,9 +192,10 @@ export const EditChurchLocationScreen: React.FC = () => {
             initialRegion={initialRegion}
             onPress={onMapPress}
             userInterfaceStyle={theme}
-            showsUserLocation
+            showsUserLocation={locationGranted}
             onUserLocationChange={onUserLocationChange}
-            showsMyLocationButton={Platform.OS === 'android'}
+            showsMyLocationButton={locationGranted && Platform.OS === 'android'}
+            mapPadding={{top: helperHeight ? helperHeight + ms(12) : 0, right: 0, bottom: 0, left: 0}}
             showsCompass
             showsScale>
             {coordinate ? (
@@ -192,6 +211,7 @@ export const EditChurchLocationScreen: React.FC = () => {
 
           <View
             pointerEvents="none"
+            onLayout={e => setHelperHeight(e.nativeEvent.layout.height)}
             style={[
               styles.helperCard,
               {backgroundColor: C.surface, borderColor: C.surfaceBorder},

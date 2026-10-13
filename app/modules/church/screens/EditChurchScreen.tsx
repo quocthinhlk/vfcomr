@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   ScrollView,
   View,
@@ -7,12 +8,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
 import {globalStyles} from '../../../shared/styles/global';
 import {churchStyles} from '../styles';
-import {formStyles} from '../../../shared/styles/form';
+import {FORM_INPUT_HEIGHT, formStyles} from '../../../shared/styles/form';
 import {Header} from '../../../shared/components/Header';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
@@ -35,7 +37,7 @@ import {ms, hs, fs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {getLanguageById} from '../../language/services/language.service';
-import {isPastorLeader} from '../../../shared/utils/permissions';
+import {isPastorLeader, isSuperAdmin} from '../../../shared/utils/permissions';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 
 export default function EditChurchScreen() {
@@ -141,6 +143,36 @@ export default function EditChurchScreen() {
     };
   }, []);
   const motherChurchDisabled = isPastorLeader(currentUserRoleId);
+  // Map pin is edited on its own screen (saved immediately), like on Church Detail.
+  const canEditLocation = isSuperAdmin(currentUserRoleId || undefined);
+  const [location, setLocation] = useState<{latitude: number; longitude: number} | null>(null);
+  const applyLocation = (d: any) => {
+    const lat = d?.latitude;
+    const lng = d?.longitude;
+    setLocation(
+      lat != null && lng != null && Number.isFinite(Number(lat)) && Number.isFinite(Number(lng))
+        ? {latitude: Number(lat), longitude: Number(lng)}
+        : null,
+    );
+  };
+
+  // Back from Edit Location (returnAfterEdit sets refetchKey): refresh only the
+  // pin so unsaved changes in this form are kept.
+  const refetchKey = route?.params?.refetchKey;
+  useEffect(() => {
+    if (!refetchKey || !editId) {
+      return;
+    }
+    navigation.setParams({refetchKey: undefined, reload: undefined, refresh: undefined});
+    getChurchDetail(editId)
+      .then(d => {
+        if (mountedRef.current) {
+          applyLocation(d);
+        }
+      })
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [refetchKey]);
 
   const setFieldPos = (key: string, y: number) =>
     setFieldY(prev => (prev[key] === y ? prev : {...prev, [key]: y}));
@@ -337,6 +369,7 @@ export default function EditChurchScreen() {
             return;
           }
           setLoadError(null);
+          applyLocation(d);
           setInitialFormValues({
             name: d.name || '',
             short_name: d.short_name || '',
@@ -695,6 +728,7 @@ export default function EditChurchScreen() {
                   }
 
                   await updateChurch(editId, payload as any);
+                  markDataChanged('churches');
                   Alert.alert('Success', 'Church updated successfully!');
                   returnAfterEdit(navigation);
                 } catch (e: any) {
@@ -1450,6 +1484,43 @@ export default function EditChurchScreen() {
                       </View>
                     </View>
 
+                    {/* Map Location: opens the map picker (saved there, not with this form) */}
+                    {canEditLocation && editId ? (
+                      <View>
+                        <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
+                          {t('mapLocation')}
+                        </Text>
+                        <TouchableOpacity
+                          onPress={() =>
+                            navigation.navigate('EditChurchLocation', {
+                              id: editId,
+                              latitude: location?.latitude,
+                              longitude: location?.longitude,
+                            })
+                          }
+                          accessibilityRole="button"
+                          accessibilityLabel={location ? t('editLocation') : t('addLocation')}
+                          style={[
+                            styles.locationField,
+                            {backgroundColor: C.inputBg, borderColor: C.inputBorder},
+                          ]}>
+                          <Text
+                            style={[
+                              styles.locationValue,
+                              {color: location ? C.textPrimary : C.textSecondary},
+                            ]}
+                            numberOfLines={1}>
+                            {location
+                              ? `📍 ${location.latitude.toFixed(5)}, ${location.longitude.toFixed(5)}`
+                              : t('omrMapLocationMissing')}
+                          </Text>
+                          <Text style={[styles.locationAction, {color: COLORS.mainColor}]}>
+                            {location ? t('editLocation') : t('addLocation')}
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    ) : null}
+
                     {/* Email Address */}
                     <View onLayout={e => setFieldPos('email_address', e.nativeEvent.layout.y)}>
                       <View>
@@ -1595,3 +1666,23 @@ export default function EditChurchScreen() {
     </SafeAreaView>
   );
 }
+
+const styles = StyleSheet.create({
+  locationField: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: FORM_INPUT_HEIGHT,
+    borderWidth: 1,
+    borderRadius: 3,
+    paddingHorizontal: ms(12),
+    gap: ms(8),
+  },
+  locationValue: {
+    flex: 1,
+    fontSize: fs(14),
+  },
+  locationAction: {
+    fontSize: fs(14),
+    fontWeight: '600',
+  },
+});

@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {View, StyleSheet, Alert} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
@@ -62,6 +63,7 @@ export const DeleteUserScreen: React.FC = () => {
     try {
       setSubmitting(true);
       await deleteUser(userId);
+      markDataChanged('users');
       Alert.alert(t('success'), t('userHasBeenDeleted'));
       returnToList(navigation);
     } catch (e) {

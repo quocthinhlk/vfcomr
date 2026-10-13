@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   ScrollView,
   View,
@@ -644,9 +645,11 @@ export default function AddChurchScreen() {
                 };
                 if (editId) {
                   await updateChurch(editId, payload as any);
+                  markDataChanged('churches');
                   Alert.alert('Success', 'Church updated successfully!');
                 } else {
                   await addChurch(payload as any);
+                  markDataChanged('churches');
                   Alert.alert('Success', 'Church added successfully!');
                 }
                 navigation.navigate('Churches');

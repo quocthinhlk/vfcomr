@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   Alert,
   StyleSheet,
@@ -105,6 +106,7 @@ export const WatchListFormScreen: React.FC = () => {
       const response = watchListId
         ? await updateWatchList(watchListId, payload)
         : await createWatchList(payload);
+      markDataChanged('watchLists');
       Alert.alert(t('success'), response.message, [
         {text: t('done'), onPress: () => navigation.goBack()},
       ]);

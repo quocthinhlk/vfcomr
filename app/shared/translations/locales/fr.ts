@@ -915,6 +915,8 @@ const fr = {
     deleteFailed: 'Impossible de supprimer.',
     omrMapLocationMissing: 'Cette église n’a pas encore de position sur la carte.',
     addLocation: 'Ajouter une localisation',
+    mapLocation: 'Localisation sur la carte',
+    editLocation: 'Modifier la localisation',
     omrMapLocationHelper:
       'Touchez la carte pour placer le repère, puis faites-le glisser pour ajuster sa position.',
     locationSaved: 'Localisation enregistrée.',
@@ -937,6 +939,9 @@ const fr = {
     testNotificationSent: "Envoyée à {count} appareil(s). Elle devrait apparaître sur cet appareil dans quelques secondes.",
     testNotificationNotDelivered: "Aucun appareil ne l’a reçue. Déconnectez-vous puis reconnectez-vous, et réessayez.",
     testNotificationBody: "Les notifications push fonctionnent sur cet appareil.",
+    testNotificationTargetNote: "Envoie un rappel de rapport d'exemple au compte de test {user} (ID {id}). Connectez-vous en tant que {user} sur un appareil pour le recevoir.",
+    testNotificationSentToTarget: "Envoyée à {count} appareil(s) de {user}.",
+    testNotificationTargetNotDelivered: "Aucun appareil de {user} ne l'a reçue. Connectez-vous en tant que {user} sur un appareil avec les notifications autorisées, puis réessayez.",
 } satisfies TranslationDictionary;
 
 export default fr;

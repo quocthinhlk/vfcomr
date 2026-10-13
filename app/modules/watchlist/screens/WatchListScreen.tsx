@@ -1,4 +1,4 @@
-import React, {useCallback, useMemo, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Alert,
   RefreshControl,
@@ -8,7 +8,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {useFocusEffect, useNavigation} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Svg, {Path} from 'react-native-svg';
 import SearchInput from '../../../shared/components/SearchInput';
@@ -231,6 +232,7 @@ const WatchListPanel: React.FC<{
 
 export const WatchListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const {t} = useTranslation();
   const tRef = useRef(t);
   tRef.current = t;
@@ -279,11 +281,15 @@ export const WatchListScreen: React.FC = () => {
     }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      load();
-    }, [load]),
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  useReloadOnReturn(load, {
+    dataKey: 'watchLists',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const confirmDelete = (item: WatchListView) => {
     Alert.alert(

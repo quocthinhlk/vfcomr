@@ -14,7 +14,8 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {Text} from '@ui-kitten/components';
 import * as RNFS from 'react-native-fs';
 import FileViewer from 'react-native-file-viewer';
@@ -26,6 +27,8 @@ import {
 } from '@react-native-documents/picker';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
+import DraggableList from '../../../shared/components/DraggableList';
+import FileTypeIcon from '../../../shared/components/icons/FileTypeIcon';
 import {
   CancelButton,
   SaveButton,
@@ -87,13 +90,6 @@ function stripHtml(value?: string | null): string {
     .trim();
 }
 
-function getFileExtension(filename?: string) {
-  if (!filename || !filename.includes('.')) {
-    return 'FILE';
-  }
-  return filename.split('.').pop()?.toUpperCase() || 'FILE';
-}
-
 const LANGUAGE_NAME_KEYS: Record<string, TranslationKey> = {
   en: 'langEnglish',
   es: 'langSpanish',
@@ -149,6 +145,8 @@ export default function ResourceDetailScreen() {
   const [userRoleId, setUserRoleId] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [openingFileId, setOpeningFileId] = useState<number | null>(null);
+  // True while a file/folder row is being dragged; freezes the page scroll.
+  const [reordering, setReordering] = useState(false);
   const [descriptionExpanded, setDescriptionExpanded] = useState(false);
   // Which "…" menu is open: the resource itself, one file, or one child resource.
   const [menu, setMenu] = useState<
@@ -214,12 +212,16 @@ export default function ResourceDetailScreen() {
       setLoading(false);
     }
   }, [resourceId]);
-  useFocusEffect(
-    useCallback(() => {
-      // Always refresh when the screen comes into focus so edits are reflected.
-      load();
-    }, [load]),
-  );
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  // Back from a sub-folder keeps this screen as is; reload only after an edit / add.
+  useReloadOnReturn(load, {
+    dataKey: 'resources',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -303,9 +305,8 @@ export default function ResourceDetailScreen() {
     ]);
   };
 
-  const moveFile = async (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= files.length || !resourceId) {
+  const moveFile = async (index: number, target: number) => {
+    if (target === index || target < 0 || target >= files.length || !resourceId) {
       return;
     }
     const previousFiles = [...files];
@@ -339,9 +340,8 @@ export default function ResourceDetailScreen() {
     }
   };
 
-  const moveChild = async (index: number, direction: -1 | 1) => {
-    const target = index + direction;
-    if (target < 0 || target >= children.length || !resourceId) {
+  const moveChild = async (index: number, target: number) => {
+    if (target === index || target < 0 || target >= children.length || !resourceId) {
       return;
     }
     const previousChildren = [...children];
@@ -487,6 +487,9 @@ export default function ResourceDetailScreen() {
     ]);
   };
 
+  const fileKey = useCallback((file: ResourceFileItem) => String(file.id), []);
+  const childKey = useCallback((child: ResourceListItem) => String(child.id), []);
+
   // One row per file: tap opens it; admins get Move / Edit / Delete in "…".
   const renderFileRow = (file: ResourceFileItem, index: number) => {
     const fileUrl = file.url || resolveResourceMediaUrl(file.path);
@@ -510,11 +513,7 @@ export default function ResourceDetailScreen() {
           index > 0 && {borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border},
           pressed && {backgroundColor: T.pressedBg},
         ]}>
-        <View style={[styles.rowTile, {backgroundColor: T.brandTint}]}>
-          <Text style={[styles.rowTileText, {color: T.brandText}]} numberOfLines={1}>
-            {getFileExtension(file.filename)}
-          </Text>
-        </View>
+        <FileTypeIcon filename={file.filename} size={ws(42)} />
         <View style={styles.rowBody}>
           <Text style={[styles.rowTitle, {color: C.textPrimary}]} numberOfLines={2}>
             {file.filename}
@@ -559,7 +558,6 @@ export default function ResourceDetailScreen() {
           {child.name}
         </Text>
       </View>
-      <ChevronRightIcon color={C.textSecondary} size={ws(16)} />
       {canManage && children.length > 1 ? (
         <TouchableOpacity
           onPress={() => setMenu({kind: 'child', index, child})}
@@ -634,10 +632,10 @@ export default function ResourceDetailScreen() {
     const move = menu.kind === 'file' ? moveFile : moveChild;
     const items: ActionItem[] = [];
     if (menu.index > 0) {
-      items.push({label: t('moveUp'), icon: 'moveUp', onPress: run(() => move(menu.index, -1))});
+      items.push({label: t('moveUp'), icon: 'moveUp', onPress: run(() => move(menu.index, menu.index - 1))});
     }
     if (menu.index < list.length - 1) {
-      items.push({label: t('moveDown'), icon: 'moveDown', onPress: run(() => move(menu.index, 1))});
+      items.push({label: t('moveDown'), icon: 'moveDown', onPress: run(() => move(menu.index, menu.index + 1))});
     }
     if (menu.kind === 'file') {
       const file = menu.file;
@@ -678,6 +676,7 @@ export default function ResourceDetailScreen() {
   return (
     <ScreenContainer title={t('resourceDetailTitle')}>
       <ScrollView
+        scrollEnabled={!reordering}
         contentContainerStyle={styles.scrollContent}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {/* Summary: cover, name, languages, description; admin actions in "…". */}
@@ -747,7 +746,15 @@ export default function ResourceDetailScreen() {
           t('resourceFiles'),
           files.length,
           canManage ? {label: t('resourceUploadFile'), onPress: openUploadModal} : null,
-          files.map(renderFileRow),
+          <DraggableList
+            items={files}
+            keyExtractor={fileKey}
+            renderItem={renderFileRow}
+            onReorder={moveFile}
+            enabled={canManage && !busy}
+            onDragStateChange={setReordering}
+            draggingStyle={{backgroundColor: C.surface}}
+          />,
           t('resourceNoFiles'),
         )}
 
@@ -760,7 +767,15 @@ export default function ResourceDetailScreen() {
                 onPress: () => navigation.navigate('AddNewResource', {parentId: resource.id}),
               }
             : null,
-          children.map(renderChildRow),
+          <DraggableList
+            items={children}
+            keyExtractor={childKey}
+            renderItem={renderChildRow}
+            onReorder={moveChild}
+            enabled={canManage && !busy}
+            onDragStateChange={setReordering}
+            draggingStyle={{backgroundColor: C.surface}}
+          />,
           t('resourceNoChildren'),
         )}
       </ScrollView>
@@ -996,11 +1011,6 @@ const styles = StyleSheet.create({
     borderRadius: rs(10),
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  rowTileText: {
-    fontSize: fs(10),
-    fontWeight: '800',
-    letterSpacing: 0.3,
   },
   rowBody: {
     flex: 1,

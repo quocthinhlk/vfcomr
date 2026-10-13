@@ -1,4 +1,5 @@
 import React, {useRef, useState} from 'react';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -95,6 +96,7 @@ export default function ChangeEmailScreen() {
     setSubmitting(true);
     try {
       await changeEmail({old_email: oldEmail, new_email: newEmail, password: values.password});
+      markDataChanged('users');
       Alert.alert(t('success'), t('emailChangedSuccess'));
       // Back to the profile with the new email so its field updates in place.
       const routes = navigation.getState()?.routes ?? [];

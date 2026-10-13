@@ -895,6 +895,8 @@ const zh = {
     deleteFailed: '删除失败。',
     omrMapLocationMissing: '此教会尚未设置地图位置。',
     addLocation: '添加位置',
+    mapLocation: '地图位置',
+    editLocation: '编辑位置',
     omrMapLocationHelper:
       '点击地图放置标记，然后拖动标记以精确调整位置。',
     locationSaved: '位置已保存。',
@@ -917,6 +919,9 @@ const zh = {
     testNotificationSent: "已发送到 {count} 台设备。几秒内应会出现在此设备上。",
     testNotificationNotDelivered: "没有设备收到。请退出登录后重新登录，再试一次。",
     testNotificationBody: "此设备的推送通知工作正常。",
+    testNotificationTargetNote: "向测试账号 {user}（ID {id}）发送一条示例报告提醒。请在设备上以 {user} 登录以接收。",
+    testNotificationSentToTarget: "已发送到 {user} 的 {count} 台设备。",
+    testNotificationTargetNotDelivered: "{user} 的设备均未收到。请在已允许通知的设备上以 {user} 登录后重试。",
 } satisfies TranslationDictionary;
 
 export default zh;

@@ -9,7 +9,8 @@ import {
   View,
 } from 'react-native';
 import {Text} from '@ui-kitten/components';
-import {useFocusEffect, useNavigation, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import SearchInput from '../../../shared/components/SearchInput';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import ActionSheetModal, {
@@ -108,14 +109,16 @@ export default function SearchResourcesScreen() {
     }
   }, [query]);
 
-  useFocusEffect(
-    useCallback(() => {
-      if (route.params?.reload) {
-        navigation.setParams({reload: undefined});
-      }
-      fetchData();
-    }, [fetchData, navigation, route.params?.reload]),
-  );
+  useEffect(() => {
+    fetchData();
+  }, [fetchData]);
+
+  // Back from detail keeps the list as is; reload only after a change.
+  useReloadOnReturn(() => fetchData(false), {
+    dataKey: 'resources',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
