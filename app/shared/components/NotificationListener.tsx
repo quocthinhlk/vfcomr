@@ -6,6 +6,8 @@ import {getMessaging, syncDeviceTokenIfPermitted} from '../services/notification
 /** Backend `data.screen` aliases → stack route names. */
 const SCREEN_ALIASES: Record<string, string> = {
   home: 'Dashboard',
+  // Report reminders: open the monthly data (report) entry flow.
+  monthly_data: 'MonthlyDataSelect',
 };
 
 function parseParams(raw: unknown): Record<string, any> | undefined {
@@ -23,7 +25,11 @@ function parseParams(raw: unknown): Record<string, any> | undefined {
   }
 }
 
-/** Opens `data.screen` when it is a known route, otherwise the Notifications screen. */
+/**
+ * Opens the tapped notification so it can be read (title, body, time). When
+ * `data.screen` is a known route, the detail screen offers an "Open" button
+ * that goes there.
+ */
 function openFromNotification(remoteMessage: any, attempt = 0) {
   if (!remoteMessage) {
     return;
@@ -39,11 +45,17 @@ function openFromNotification(remoteMessage: any, attempt = 0) {
   const requested = String(data.screen || '');
   const route = SCREEN_ALIASES[requested] || requested;
   const routeNames: string[] = navigationRef.getRootState()?.routeNames || [];
-  if (route && routeNames.includes(route)) {
-    (navigationRef as any).navigate(route, parseParams(data.params));
-  } else {
-    (navigationRef as any).navigate('Notifications');
-  }
+  const target =
+    route && routeNames.includes(route)
+      ? {route, params: parseParams(data.params)}
+      : undefined;
+  const sentTime = Number(remoteMessage.sentTime);
+  (navigationRef as any).navigate('NotificationDetail', {
+    title: remoteMessage.notification?.title || data.title || '',
+    body: remoteMessage.notification?.body || data.body || '',
+    sentTime: Number.isFinite(sentTime) && sentTime > 0 ? sentTime : undefined,
+    target,
+  });
 }
 
 /** Mounted only while authenticated (see Navigation). */

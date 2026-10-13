@@ -35,7 +35,7 @@ const TEST_PAYLOAD = {
   user_id: TEST_TARGET_USER_ID,
   title: 'A friendly report reminder',
   body: "It looks like you haven't submitted a report for VFC Vietnam in the past three months. Please submit it when you have a moment.",
-  data: {screen: 'home'},
+  data: {screen: 'monthly_data'},
 };
 
 export default function NotificationsScreen() {

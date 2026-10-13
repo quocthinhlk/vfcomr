@@ -33,6 +33,7 @@ export type RootStackParamList = {
   EnterVisits: undefined;
   NewPastorAndChurch: undefined;
   Notifications: undefined;
+  NotificationDetail: import('../modules/notifications/screens/NotificationDetailScreen').NotificationDetailParams;
   User: { userId?: number } | undefined;
   UserRoles: undefined;
   Churches: { refresh?: boolean; openChurchInPastorDashboard?: boolean } | undefined;
@@ -272,6 +273,7 @@ import RationalisingScreen from '../modules/setting/screens/RationalisingScreen'
 import { ProfileScreen } from '../modules/user/screens/ProfileScreen';
 import { SwitchUserScreen } from '../modules/user/screens/SwitchUserScreen';
 import NotificationsScreen from '../modules/notifications/screens/NotificationsScreen';
+import NotificationDetailScreen from '../modules/notifications/screens/NotificationDetailScreen';
 import { SupportScreen } from '../modules/dashboard/screens/SupportScreen';
 import { OmrSupportScreen } from '../modules/omrsupport/screens/OmrSupportScreen';
 import { AboutOmrScreen } from '../modules/aboutomr/screens/AboutOmrScreen';
@@ -427,6 +429,7 @@ export default function Navigation() {
               <Stack.Screen name="DeleteVisit" component={DeleteVisitScreen} />
               <Stack.Screen name="NewPastorAndChurch" component={NewPastorAndChurchScreen} />
               <Stack.Screen name="Notifications" component={NotificationsScreen} />
+              <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
               {/* New screens */}
               <Stack.Screen name="User" component={UserScreen} />
               <Stack.Screen name="UserRoles" component={UserRolesScreen} />
