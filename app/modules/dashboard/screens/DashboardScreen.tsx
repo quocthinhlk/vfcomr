@@ -282,6 +282,14 @@ export default function DashboardScreen() {
       chartFor: true,
       disabled: !selectedOverseer,
     },
+    // TEMPORARY – testing only, remove later: opens the push-notification test
+    // screen (the dashboard bell was removed). English-only on purpose.
+    {
+      icon: null,
+      bellIcon: true,
+      label: 'Test notifications (testing only)',
+      routeName: 'Notifications',
+    },
   ];
 
   if (loading) {
@@ -356,17 +364,6 @@ export default function DashboardScreen() {
           </TouchableOpacity>
         </View>
         <View style={{flexDirection: 'row', alignItems: 'center', gap: ms(4)}}>
-          <TouchableOpacity
-            style={localStyles.notificationIconWrap}
-            activeOpacity={0.7}
-            accessibilityRole="button"
-            accessibilityLabel={t('notifications')}
-            hitSlop={8}
-            onPress={() => navigation.navigate('Notifications' as any)}>
-            <View style={localStyles.notificationIcon}>
-              <BellSvgIcon width={24} height={24} color={COLORS.mainColor} />
-            </View>
-          </TouchableOpacity>
           <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
           <MenuPopup
             visible={menuVisible}
@@ -441,15 +438,21 @@ export default function DashboardScreen() {
               }}
               disabled={!!item?.disabled}
               activeOpacity={item?.disabled ? 1 : 0.7}>
-              <Image
-                source={item.icon}
-                style={{
-                  width: ws(23),
-                  height: hs(23),
-                  marginRight: ms(12),
-                  resizeMode: 'contain',
-                }}
-              />
+              {item.bellIcon ? (
+                <View style={{width: ws(23), height: hs(23), marginRight: ms(12), alignItems: 'center', justifyContent: 'center'}}>
+                  <BellSvgIcon width={ws(20)} height={ws(20)} color={COLORS.mainColor} />
+                </View>
+              ) : (
+                <Image
+                  source={item.icon}
+                  style={{
+                    width: ws(23),
+                    height: hs(23),
+                    marginRight: ms(12),
+                    resizeMode: 'contain',
+                  }}
+                />
+              )}
               <Text style={[{flex: 1}, {color: C.textPrimary, fontSize: fs(14)}]}>
                 {item.label}
               </Text>
@@ -475,14 +478,4 @@ const localStyles = StyleSheet.create({
     transform: [{ rotate: '-90deg' }],
   },
   // 44pt target around the 24pt bell.
-  notificationIconWrap: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationIcon: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
 });

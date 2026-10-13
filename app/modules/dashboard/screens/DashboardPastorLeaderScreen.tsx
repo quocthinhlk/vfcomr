@@ -28,7 +28,6 @@ import IosActionSheet from '../../../shared/components/IosActionSheet';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import ImagePicker from 'react-native-image-crop-picker';
 import {getApiErrorMessage, parseApiError} from '../../../shared/utils/apiErrorHandler';
-import {BellSvgIcon} from '../../../shared/components/icons';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {CheckIcon, ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
@@ -739,7 +738,6 @@ export default function DashboardPastorLeaderScreen() {
   const [hasMapLocation, setHasMapLocation] = useState<boolean | null>(null);
   const [mapChurchDisabled, setMapChurchDisabled] = useState(false);
   const isFocused = useIsFocused();
-  const [unreadNotifications] = useState<number>(0);
 
   /** After initial bootstrap, `church_id` in route params is handled by the param effect (same screen, new selection). */
   const bootstrapDoneRef = useRef(false);
@@ -1968,21 +1966,6 @@ export default function DashboardPastorLeaderScreen() {
             )}
           </View>
         </View>
-        <TouchableOpacity
-          style={styles.notificationIconWrap}
-          activeOpacity={0.7}
-          onPress={() => navigation.navigate('Notifications' as any)}>
-          <View style={styles.notificationIcon}>
-            <BellSvgIcon width={24} height={24} color={COLORS.mainColor} />
-            {unreadNotifications > 0 ? (
-              <View style={styles.notificationBadge}>
-                <RNText style={styles.notificationBadgeText}>
-                  {unreadNotifications > 9 ? '9+' : String(unreadNotifications)}
-                </RNText>
-              </View>
-            ) : null}
-          </View>
-        </TouchableOpacity>
         <HamburgerMenuIcon onPress={() => setMenuVisible(true)} />
         <MenuPopup
           visible={menuVisible}
@@ -2738,36 +2721,6 @@ const styles = StyleSheet.create({
   lastRecordDateValue: {
     fontSize: fs(12),
     color: COLORS.mainColor,
-    fontWeight: '700',
-  },
-  notificationIconWrap: {
-    paddingHorizontal: ms(6),
-    paddingVertical: ms(4),
-    marginRight: ms(4),
-  },
-  notificationIcon: {
-    position: 'relative',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationIconText: {
-    fontSize: fs(17),
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: -ms(3),
-    right: -ms(5),
-    minWidth: ms(18),
-    height: ms(18),
-    borderRadius: ms(9),
-    paddingHorizontal: ms(4),
-    backgroundColor: '#E53935',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  notificationBadgeText: {
-    color: '#fff',
-    fontSize: fs(10),
     fontWeight: '700',
   },
   locationWarningBanner: {
