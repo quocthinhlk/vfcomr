@@ -79,7 +79,10 @@ type CardProps = {
   accessibilityLabel?: string;
 };
 
-/** Tap the card = primary action (usually View); ⋯ / long-press = action sheet. */
+/**
+ * Tap the card = primary action (usually View); ⋯ / long-press = action sheet.
+ * Same layout as ChurchListCard: ⋯ floats top-right, `#id` sits bottom-right.
+ */
 export const EntityListCard = React.memo(function EntityListCard({
   title,
   children,
@@ -108,22 +111,29 @@ export const EntityListCard = React.memo(function EntityListCard({
           backgroundColor: C.surface,
           borderColor: C.surfaceBorder,
           shadowOpacity: T.shadowOpacity,
-          paddingRight: onMorePress ? ms(4) : ms(16),
         },
       ]}>
       <View style={styles.cardBody}>
         <Text
-          style={[styles.cardTitle, {color: C.textPrimary}]}
+          style={[
+            styles.cardTitle,
+            {color: C.textPrimary},
+            !!onMorePress && styles.cardTitleWithMore,
+          ]}
           numberOfLines={titleLines}>
           {title}
         </Text>
-        {children}
+        {(!!children || !!trailingText) && (
+          <View style={styles.cardBottom}>
+            <View style={styles.cardChildren}>{children}</View>
+            {!!trailingText && (
+              <Text style={[styles.trailing, {color: C.textSecondary}]}>
+                {trailingText}
+              </Text>
+            )}
+          </View>
+        )}
       </View>
-      {!!trailingText && (
-        <Text style={[styles.trailing, {color: C.textSecondary}]}>
-          {trailingText}
-        </Text>
-      )}
       {!!onMorePress && (
         <TouchableOpacity
           onPress={onMorePress}
@@ -286,7 +296,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: ms(12),
     paddingVertical: ms(12),
-    paddingLeft: ms(16),
+    paddingHorizontal: ms(16),
     marginBottom: ms(10),
     borderRadius: rs(12),
     borderWidth: StyleSheet.hairlineWidth,
@@ -308,10 +318,30 @@ const styles = StyleSheet.create({
     fontSize: fs(13),
     lineHeight: fs(18),
   },
+  // Children on the left, #id pinned to the bottom-right.
+  cardBottom: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: ms(8),
+  },
+  cardChildren: {
+    flex: 1,
+    minWidth: 0,
+    gap: ms(6),
+  },
   trailing: {
     fontSize: fs(12),
+    fontWeight: '500',
   },
+  // Keeps the title clear of the floating ⋯ button.
+  cardTitleWithMore: {
+    paddingRight: 32,
+  },
+  // Floats over the card's top-right corner; content keeps its full width.
   moreBtn: {
+    position: 'absolute',
+    top: ms(2),
+    right: ms(2),
     width: 44,
     height: 44,
     alignItems: 'center',

@@ -213,7 +213,6 @@ export default function SearchResourcesScreen() {
             backgroundColor: C.surface,
             borderColor: C.surfaceBorder,
             shadowOpacity: T.shadowOpacity,
-            paddingRight: canManage ? ms(4) : ms(16),
           },
         ]}>
         {imageUrl ? (
@@ -230,17 +229,24 @@ export default function SearchResourcesScreen() {
           </View>
         )}
         <View style={styles.itemBody}>
-          <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={2}>
+          <Text
+            style={[styles.name, {color: C.textPrimary}, canManage && styles.nameWithMore]}
+            numberOfLines={2}>
             {item.name}
-            <Text style={[styles.listId, {color: C.textSecondary}]}>{`  #${item.id}`}</Text>
           </Text>
-          {description ? (
-            <Text
-              style={[styles.description, {color: C.textSecondary}]}
-              numberOfLines={3}>
-              {description}
-            </Text>
-          ) : null}
+          {/* Description on the left, #id pinned bottom-right (like the other lists). */}
+          <View style={styles.bottomRow}>
+            <View style={styles.bottomText}>
+              {description ? (
+                <Text
+                  style={[styles.description, {color: C.textSecondary}]}
+                  numberOfLines={3}>
+                  {description}
+                </Text>
+              ) : null}
+            </View>
+            <Text style={[styles.listId, {color: C.textSecondary}]}>{`#${item.id}`}</Text>
+          </View>
         </View>
         {canManage ? (
           <TouchableOpacity
@@ -318,7 +324,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: ms(12),
     paddingVertical: ms(12),
-    paddingLeft: ms(16),
+    paddingHorizontal: ms(16),
     marginBottom: ms(10),
     borderRadius: rs(12),
     borderWidth: StyleSheet.hairlineWidth,
@@ -359,7 +365,23 @@ const styles = StyleSheet.create({
     fontSize: fs(13),
     lineHeight: fs(18),
   },
+  nameWithMore: {
+    paddingRight: 32,
+  },
+  bottomRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: ms(8),
+  },
+  bottomText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  // Floats over the card's top-right corner, like ChurchListCard.
   moreBtn: {
+    position: 'absolute',
+    top: ms(2),
+    right: ms(2),
     width: 44,
     height: 44,
     alignItems: 'center',

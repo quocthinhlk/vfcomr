@@ -6,6 +6,7 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
 import {
   CardMeta,
   CenteredLoader,
@@ -34,6 +35,8 @@ export const OverseerGoalsScreen = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
   const [loadError, setLoadError] = useState<unknown>(null);
+  // Row "…" menu: same actions as the detail screen.
+  const [selectedGoal, setSelectedGoal] = useState<OverseerGoalPeriodItem | null>(null);
 
   const getSafeText = (value?: string | null) => {
     if (typeof value !== 'string') {
@@ -109,7 +112,8 @@ export const OverseerGoalsScreen = () => {
         trailingText={`#${item.id}`}
         onPress={() =>
           navigation.navigate('OverseerGoalDetail', {goalPeriodId: item.id})
-        }>
+        }
+        onMorePress={() => setSelectedGoal(item)}>
         <CardMeta lines={1}>{churchName}</CardMeta>
         <CardMeta>
           {nationName} · {periodText}
@@ -179,6 +183,33 @@ export const OverseerGoalsScreen = () => {
         totalPages={totalPages}
         loading={loading}
         onPageChange={goToPage}
+      />
+
+      <ActionSheetModal
+        visible={!!selectedGoal}
+        title={getSafeText(selectedGoal?.user_name) || t('overseerGoals')}
+        onRequestClose={() => setSelectedGoal(null)}
+        actions={((): ActionItem[] => {
+          if (!selectedGoal) {
+            return [];
+          }
+          const goalPeriodId = selectedGoal.id;
+          const go = (routeName: string) => () => {
+            setSelectedGoal(null);
+            navigation.navigate(routeName, {goalPeriodId});
+          };
+          return [
+            {label: t('view'), icon: 'view', onPress: go('OverseerGoalDetail')},
+            {label: t('editGoals'), icon: 'edit', onPress: go('EditOverseerGoals')},
+            {label: t('editParameters'), icon: 'edit', onPress: go('EditOverseerGoalDefaults')},
+            {
+              label: t('delete'),
+              icon: 'delete',
+              type: 'danger',
+              onPress: go('DeleteOverseerGoalPeriod'),
+            },
+          ];
+        })()}
       />
     </ScreenContainer>
   );
