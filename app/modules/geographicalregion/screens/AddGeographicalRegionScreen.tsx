@@ -11,6 +11,8 @@ import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ElementDropdown, {
   ElementDropdownItem,
 } from '../../../shared/components/ElementDropdown';
+import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
+import {useThemedColors} from '../../../shared/styles/theme';
 import AppInput from '../../../shared/components/AppInput';
 import {
   FormActions,
@@ -22,6 +24,7 @@ export const AddGeographicalRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
+  const C = useThemedColors();
   const [name, setName] = useState('');
   // Opened from a sub-level of the list: that region is the default parent.
   const [parentId, setParentId] = useState<number | null>(
@@ -120,6 +123,7 @@ export const AddGeographicalRegionScreen: React.FC = () => {
             setParentId((typeof v === 'number' ? v : Number(v)) || null)
           }
           placeholder={t('parentRegion')}
+          renderItem={createHierarchyDropdownRenderItem(C) as any}
           search
         />
       </FormField>

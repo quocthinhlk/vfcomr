@@ -9,7 +9,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NetworkReloadListener } from '../shared/components/NetworkReloadListener';
 import { SwitchSessionBar } from '../shared/components/SwitchSessionBar';
 import NotificationListener from '../shared/components/NotificationListener';
-import { isBiometricLoginEnabled } from '../shared/services/biometrics.service';
 import { setUnauthorizedHandler } from './api';
 
 export type RootStackParamList = {
@@ -360,16 +359,10 @@ export default function Navigation() {
         return;
       }
 
-      const biometricEnabled = await isBiometricLoginEnabled();
-      if (biometricEnabled) {
-        // Keep the stored session, but require biometric unlock on the Login
-        // screen (button + auto-prompt). Do not change behaviour for users
-        // who never enabled biometrics.
-        setIsAuthenticated(false);
-        return;
-      }
-
-      // Existing behaviour, unchanged for users who never enabled biometrics.
+      // A stored session always resumes straight into the app, with or without
+      // biometric login enabled. Only an explicit Logout (or a 401 from the API)
+      // removes the token and shows Login; biometrics are then offered there as
+      // a password replacement.
       setIsAuthenticated(true);
     } catch (error) {
       console.error('Error checking auth status:', error);

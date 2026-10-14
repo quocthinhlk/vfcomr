@@ -2,7 +2,6 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
   Platform,
   ScrollView,
   StyleSheet,
@@ -20,6 +19,7 @@ import AppInput from '../../../shared/components/AppInput';
 import api from '../../../config/api';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
@@ -48,6 +48,25 @@ const shouldShowEditEmailButton = (error: any): boolean => {
 export default function RelatingSearchScreen() {
   const navigation = useNavigation<any>();
   const C = useThemedColors();
+  const T = useUiTokens();
+  const scrollRef = useRef<ScrollView>(null);
+  // Contact form: scroll to it after a search, and chain the keyboard "next" key.
+  const resultYRef = useRef(0);
+  const emailRef = useRef<any>(null);
+  const subjectRef = useRef<any>(null);
+  const messageRef = useRef<any>(null);
+  // y of each contact field inside the result card, to lift it above the keyboard.
+  const fieldYRef = useRef<Record<string, number>>({});
+  const trackField = (key: string) => (e: any) => {
+    fieldYRef.current[key] = e.nativeEvent.layout.y;
+  };
+  const scrollFieldIntoView = (key: string) => {
+    // Wait for the keyboard to finish opening (and the scroll inset to apply).
+    setTimeout(() => {
+      const y = resultYRef.current + (fieldYRef.current[key] ?? 0);
+      scrollRef.current?.scrollTo({y: Math.max(0, y - ms(8)), animated: true});
+    }, Platform.OS === 'ios' ? 300 : 150);
+  };
   const {t} = useTranslation();
   const [countries, setCountries] = useState<RelatingCountryItem[]>([]);
   const [selectedCountry, setSelectedCountry] = useState<RelatingCountryItem | null>(null);
@@ -266,6 +285,10 @@ export default function RelatingSearchScreen() {
         city_id: cityId,
       });
       setResult(data);
+      // Bring the result + contact form into view once it has laid out.
+      setTimeout(() => {
+        scrollRef.current?.scrollTo({y: Math.max(0, resultYRef.current - ms(8)), animated: true});
+      }, 250);
     } catch (error) {
       Alert.alert(t('error'), getApiErrorMessage(error, t));
     } finally {
@@ -363,15 +386,17 @@ export default function RelatingSearchScreen() {
         {countriesLoadError && countries.length === 0 && !selectedCountry ? (
           <ApiErrorState error={countriesLoadError} onRetry={retryLoadCountries} />
         ) : (
-        <KeyboardAvoidingView
-          style={styles.keyboardWrap}
-          behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={styles.keyboardWrap}>
+          {/* iOS: the scroll view insets itself by the keyboard height so every
+              field can scroll above it; Android resizes the window (adjustResize). */}
           <ScrollView
+            ref={scrollRef}
             style={styles.scroll}
             contentContainerStyle={styles.scrollContent}
             keyboardShouldPersistTaps="handled"
->
-          <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
+            keyboardDismissMode="interactive"
+            automaticallyAdjustKeyboardInsets>
+          <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
             <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
               {t('search')}
             </Text>
@@ -381,7 +406,7 @@ export default function RelatingSearchScreen() {
 
             <View style={styles.fieldGroup}>
               <Text style={[styles.label, {color: C.textSecondary}]}>
-                {t('country')}
+                {t('country')} <Text style={styles.required}>*</Text>
               </Text>
               <ElementDropdown
                 data={countryOptions}
@@ -416,7 +441,7 @@ export default function RelatingSearchScreen() {
             {selectedCountryId ? (
               <View style={styles.fieldGroup}>
                 <Text style={[styles.label, {color: C.textSecondary}]}>
-                  {t('city')}
+                  {t('city')} <Text style={styles.required}>*</Text>
                 </Text>
                 {citiesLoadError && !loadingCities ? (
                   <ApiErrorState
@@ -475,19 +500,28 @@ export default function RelatingSearchScreen() {
           ) : null}
 
           {result ? (
-            <View style={[styles.card, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
+            <View
+              onLayout={e => {
+                resultYRef.current = e.nativeEvent.layout.y;
+              }}
+              style={[styles.card, {backgroundColor: C.surface, borderColor: C.surfaceBorder}]}>
               <Text style={[styles.cardTitle, {color: C.textPrimary}]}>
                 {t('searchResult')}
               </Text>
-              <Text style={[styles.resultText, {color: C.textPrimary}]}>
-                {result.message || '-'}
-              </Text>
+              {/* Server message (e.g. "we will respond to your email…") as an info box. */}
+              <View style={[styles.resultBox, {backgroundColor: T.brandTint, borderLeftColor: T.brandText}]}>
+                <Text style={[styles.resultText, {color: C.textPrimary}]}>
+                  {result.message || '-'}
+                </Text>
+              </View>
+              <View style={[styles.divider, {backgroundColor: C.border}]} />
 
-              <View style={styles.fieldGroup}>
+              <View style={styles.fieldGroup} onLayout={trackField('name')}>
                 <Text style={[styles.label, {color: C.textSecondary}]}>
-                  {t('name')}
+                  {t('name')} <Text style={styles.required}>*</Text>
                 </Text>
                 <AppInput
+                  onFocus={() => scrollFieldIntoView('name')}
                   value={name}
                   onChangeText={value => {
                     setName(value);
@@ -501,6 +535,8 @@ export default function RelatingSearchScreen() {
                   autoCapitalize="words"
                   autoCorrect={false}
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => emailRef.current?.focus()}
                   error={!!fieldErrors.name}
                   containerStyle={styles.input}
                 />
@@ -509,11 +545,13 @@ export default function RelatingSearchScreen() {
                 ) : null}
               </View>
 
-              <View style={styles.fieldGroup}>
+              <View style={styles.fieldGroup} onLayout={trackField('email')}>
                 <Text style={[styles.label, {color: C.textSecondary}]}>
-                  {t('email')}
+                  {t('email')} <Text style={styles.required}>*</Text>
                 </Text>
                 <AppInput
+                  ref={emailRef}
+                  onFocus={() => scrollFieldIntoView('email')}
                   value={email}
                   onChangeText={value => {
                     setEmail(value);
@@ -529,6 +567,8 @@ export default function RelatingSearchScreen() {
                   autoCorrect={false}
                   keyboardType="email-address"
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => subjectRef.current?.focus()}
                   error={!!fieldErrors.email}
                   containerStyle={styles.input}
                 />
@@ -571,11 +611,13 @@ export default function RelatingSearchScreen() {
                 ) : null}
               </View>
 
-              <View style={styles.fieldGroup}>
+              <View style={styles.fieldGroup} onLayout={trackField('subject')}>
                 <Text style={[styles.label, {color: C.textSecondary}]}>
-                  {t('omrSupportSubjectLabel')}
+                  {t('omrSupportSubjectLabel')} <Text style={styles.required}>*</Text>
                 </Text>
                 <AppInput
+                  ref={subjectRef}
+                  onFocus={() => scrollFieldIntoView('subject')}
                   value={subject}
                   onChangeText={value => {
                     setSubject(value);
@@ -589,6 +631,8 @@ export default function RelatingSearchScreen() {
                   autoCapitalize="sentences"
                   autoCorrect={false}
                   returnKeyType="next"
+                  blurOnSubmit={false}
+                  onSubmitEditing={() => messageRef.current?.focus()}
                   error={!!fieldErrors.subject}
                   containerStyle={styles.input}
                 />
@@ -597,11 +641,13 @@ export default function RelatingSearchScreen() {
                 ) : null}
               </View>
 
-              <View style={styles.fieldGroup}>
+              <View style={styles.fieldGroup} onLayout={trackField('message')}>
                 <Text style={[styles.label, {color: C.textSecondary}]}>
-                  {t('omrSupportMessageLabel')}
+                  {t('omrSupportMessageLabel')} <Text style={styles.required}>*</Text>
                 </Text>
                 <AppInput
+                  ref={messageRef}
+                  onFocus={() => scrollFieldIntoView('message')}
                   value={message}
                   onChangeText={value => {
                     setMessage(value);
@@ -624,19 +670,21 @@ export default function RelatingSearchScreen() {
                 ) : null}
               </View>
 
+              {submitError ? (
+                <Text style={[styles.errorText, styles.submitError, {color: C.error || '#ff4444'}]}>
+                  {submitError}
+                </Text>
+              ) : null}
               <SaveButton
                 label={sendingRequest ? t('sendingRequest') : t('sendRequest')}
                 onPress={onSubmitRequest}
                 disabled={sendingRequest}
                 style={styles.searchButton}
               />
-              {submitError ? (
-                <Text style={[styles.errorText, {color: C.error || '#ff4444'}]}>{submitError}</Text>
-              ) : null}
             </View>
           ) : null}
           </ScrollView>
-        </KeyboardAvoidingView>
+        </View>
         )}
       </View>
     </SafeAreaView>
@@ -646,7 +694,7 @@ export default function RelatingSearchScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    paddingHorizontal: ms(12),
+    paddingHorizontal: ms(16),
   },
   scroll: {
     flex: 1,
@@ -655,33 +703,50 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingTop: ms(8),
-    paddingBottom: ms(20),
+    paddingTop: ms(12),
+    paddingBottom: ms(32),
   },
   card: {
-    borderWidth: 1,
-    borderRadius: rs(10),
-    paddingHorizontal: ms(12),
-    paddingVertical: ms(12),
-    marginBottom: ms(12),
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: rs(12),
+    padding: ms(16),
+    marginBottom: ms(16),
   },
   cardTitle: {
-    fontSize: fs(14),
+    fontSize: fs(16),
     fontWeight: '700',
-    marginBottom: ms(6),
+    marginBottom: ms(4),
   },
   subtitle: {
-    fontSize: fs(12),
-    lineHeight: fs(16),
-    marginBottom: ms(12),
+    fontSize: fs(13),
+    lineHeight: fs(19),
+    marginBottom: ms(16),
   },
   fieldGroup: {
-    marginBottom: ms(12),
+    marginBottom: ms(14),
   },
   label: {
     fontSize: fs(13),
     fontWeight: '600',
-    marginBottom: ms(8),
+    marginBottom: ms(6),
+  },
+  required: {
+    color: '#c00000',
+  },
+  resultBox: {
+    marginTop: ms(8),
+    paddingVertical: ms(10),
+    paddingHorizontal: ms(12),
+    borderRadius: rs(8),
+    borderLeftWidth: 3,
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginVertical: ms(16),
+  },
+  submitError: {
+    marginTop: 0,
+    marginBottom: ms(10),
   },
   helperText: {
     marginTop: ms(6),
@@ -705,7 +770,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   searchButtonWrap: {
-    marginTop: ms(2),
+    marginTop: ms(4),
   },
   searchButton: {
     width: '100%',
@@ -716,9 +781,8 @@ const styles = StyleSheet.create({
     marginBottom: ms(12),
   },
   resultText: {
-    fontSize: fs(13),
-    lineHeight: fs(18),
-    marginBottom: ms(10),
+    fontSize: fs(14),
+    lineHeight: fs(20),
   },
   requiredMessage: {
     fontSize: fs(12),
@@ -726,7 +790,7 @@ const styles = StyleSheet.create({
     marginBottom: ms(12),
   },
   reasonInput: {
-    height: hs(100),
+    height: hs(120),
     textAlignVertical: 'top',
     paddingTop: ms(10),
   },

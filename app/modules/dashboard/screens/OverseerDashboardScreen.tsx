@@ -174,7 +174,8 @@ export default function OverseerDashboardScreen() {
       const [meRes, dashboardRes, indicatorRes] = await withTimeout(
         Promise.all([
           api.get('users/me'),
-          api.get('dashboard'),
+          // Overseer profile + permissions (was `dashboard`).
+          api.get('dashboard/oversight'),
           api.get('dashboard/overseer-indicators'),
         ]),
       );
@@ -234,7 +235,7 @@ export default function OverseerDashboardScreen() {
 
   const refreshProfilePhoto = useCallback(async () => {
     try {
-      const dashboardRes = await api.get('dashboard');
+      const dashboardRes = await api.get('dashboard/oversight');
       const dashboardData: OverseerDashboardData = dashboardRes?.data?.data ?? {};
       const p = dashboardData?.overseer_profile;
       setProfile(prev => ({

@@ -5,9 +5,6 @@ import { Text } from '@ui-kitten/components';
 import { authStyles } from '../styles';
 import { authImages } from '../config/auth.constants';
 import { useLoginForm } from '../hooks/useLoginForm';
-import { useNavigation } from '@react-navigation/native';
-import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { RootStackParamList } from '../../../config/navigation';
 import { LANGUAGES } from '../../../config/languages';
 import { useLanguage } from '../../../shared/context/LanguageContext';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
@@ -22,7 +19,6 @@ import { BiometricSvgIcon } from '../../../shared/components/icons';
 const blankAvatar = require('../../../assets/images/blank-avatar.png');
 
 export default function LoginScreen() {
-  const { navigate } = useNavigation<NativeStackNavigationProp<RootStackParamList>>();
   const { selectedLanguage, setLanguage } = useLanguage();
   const { t } = useTranslation();
   const C = useThemedColors();
@@ -136,16 +132,8 @@ export default function LoginScreen() {
           />
         </View>
 
-        <View style={styles.secondaryActionsRow}>
-          <TouchableOpacity
-            onPress={() => navigate('ForgotPassword')}
-            activeOpacity={0.7}
-            style={styles.secondaryAction}>
-            <Text style={[styles.secondaryActionText, {color: COLORS.mainColor}]}>
-              {t('forgotPassword')}
-            </Text>
-          </TouchableOpacity>
-          {useSavedAccount && savedAccount && (
+        {useSavedAccount && savedAccount && (
+          <View style={styles.secondaryActionsRow}>
             <TouchableOpacity
               onPress={handleSwitchAccount}
               activeOpacity={0.7}
@@ -154,8 +142,8 @@ export default function LoginScreen() {
                 {t('switchAccount')}
               </Text>
             </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        )}
 
         {showBiometricButton && (
           <TouchableOpacity
@@ -258,7 +246,7 @@ const styles = StyleSheet.create({
   secondaryActionsRow: {
     width: '100%',
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    justifyContent: 'center',
     alignItems: 'center',
     marginTop: ms(14),
   },

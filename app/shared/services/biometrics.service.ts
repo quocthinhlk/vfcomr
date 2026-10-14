@@ -4,10 +4,11 @@
  *
  * Design: biometrics never replace the password API. After a normal
  * username/password login, the already-issued session token can be stored
- * behind a biometric-gated Keychain/Keystore entry. On a later app launch,
- * a successful biometric prompt unlocks that token and the app resumes the
- * existing "token in AsyncStorage" session — without ever touching or
- * persisting the user's password.
+ * behind a biometric-gated Keychain/Keystore entry. App launches with a stored
+ * session go straight to the app; after the user logs out, a successful
+ * biometric prompt on the Login screen unlocks that token and resumes the
+ * "token in AsyncStorage" session — without ever touching or persisting the
+ * user's password.
  *
  * Mirrors the lazy-load / typed-result conventions used in
  * app/shared/services/permissions.service.ts.

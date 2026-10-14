@@ -75,7 +75,8 @@ export function flattenGeographicalRegionTree(
       if (n.id === excludeId) {
         return;
       }
-      out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
+      // Leading hyphens = depth, read by createHierarchyDropdownRenderItem (same as Add Church).
+      out.push({label: `${'-'.repeat(depth)}${n.name}`, value: n.id});
       walk(n.children, depth + 1);
     });
   };

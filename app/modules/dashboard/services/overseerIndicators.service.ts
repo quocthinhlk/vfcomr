@@ -130,7 +130,7 @@ export async function getOverseerChartHeaderInfo(
   if (provided) {
     return provided.header;
   }
-  const [dashRes, meRes] = await Promise.all([api.get('dashboard'), api.get('users/me')]);
+  const [dashRes, meRes] = await Promise.all([api.get('dashboard/oversight'), api.get('users/me')]);
   const dash = dashRes?.data?.data ?? {};
   const me = meRes?.data?.data ?? {};
   const profile = dash?.overseer_profile ?? {};
