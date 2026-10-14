@@ -104,6 +104,10 @@ const ms = {
     // Dashboard Menu
     myDashboard: 'Dashboard Saya',
     myChurchProfile: 'Profil Gereja Saya',
+    myProfile: "Profil Saya",
+    assignedChurches: "Gereja Ditugaskan",
+    myChurchProfileEmpty: "Belum ada gereja yang dipautkan ke profil anda.",
+    excludedLabel: "Dikecualikan",
     pastorsLeadersListMenu: 'Senarai Pastor & Pemimpin',
     churchesListMenu: 'Senarai Gereja',
     churchAttendanceChart: 'Carta Kehadiran Gereja',

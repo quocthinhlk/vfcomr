@@ -278,8 +278,17 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
   },
 ];
 
+// Only the Overseer role uses this menu (roles: Pastor, Super Admin, Overseer).
 const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
-  {label: t('myDashboard'), routeName: 'Dashboard'},
+  {
+    label: t('myDashboard'),
+    children: [
+      {label: t('myDashboard'), routeName: 'Dashboard'},
+      // UserScreen without a userId: the signed-in user's profile (with Edit).
+      {label: t('myProfile'), routeName: 'MyProfile'},
+      {label: t('myChurchProfile'), routeName: 'MyChurchProfile'},
+    ],
+  },
   {
     label: t('watchLists'),
     children: [
@@ -307,6 +316,13 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
     ],
   },
   getReportMenuItem(t),
+  {
+    label: t('churchPlantingProjections'),
+    children: [
+      {label: t('addProjections'), routeName: 'AddChurchPlantingProjection'},
+      {label: t('viewProjections'), routeName: 'ChurchPlantingProjections'},
+    ],
+  },
   // {
   //   label: t('visits'),
   //   children: [
@@ -341,6 +357,7 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('bibleVerse'), routeName: 'SettingsBibleVerse'},
     ],
   },
+  {label: t('omrSupport'), routeName: 'OmrSupport'},
 ];
 
 // Function to get translated menu items

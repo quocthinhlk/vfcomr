@@ -20,7 +20,7 @@ import {formStyles} from '../../../shared/styles/form';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useLanguage} from '../../../shared/context/LanguageContext';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import {getWeekInfo, WeekInfo} from '../services/monthlydata.service';
@@ -287,8 +287,9 @@ export default function MonthlyDataSelectScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <KeyboardAvoidingView
         style={[styles.container, {backgroundColor: C.background, flex: 1}]}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
+        // No extra offset: the KAV already starts at the top safe area, so the
+        // old 64pt left a gap above the keyboard. Android uses adjustResize.
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.headerWrapper}>
           <Header

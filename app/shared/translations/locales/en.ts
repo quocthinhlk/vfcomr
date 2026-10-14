@@ -104,6 +104,10 @@ const en = {
     // Dashboard Menu
     myDashboard: 'My Dashboard',
     myChurchProfile: 'My Church Profile',
+    myProfile: "My Profile",
+    assignedChurches: "Assigned Churches",
+    myChurchProfileEmpty: "No church is linked to your profile yet.",
+    excludedLabel: "Excluded",
     pastorsLeadersListMenu: 'List of Pastors & Leaders',
     churchesListMenu: 'List of Churches',
     churchAttendanceChart: 'Church Attendance Chart',

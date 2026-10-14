@@ -166,9 +166,11 @@ export const ChurchesListScreen: React.FC = () => {
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
+      {/* The KAV already sits under the header and above the bottom safe area,
+          so no extra offset (it left a gap above the keyboard). Android resizes
+          the window itself (adjustResize). */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{flex: 1, minHeight: 0, backgroundColor: C.background}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('disabledChurches')} />

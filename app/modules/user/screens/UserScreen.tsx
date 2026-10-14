@@ -22,7 +22,7 @@ import {getUserById, updateUser, UserDetailData} from '../services/user.service'
 import api from '../../../config/api';
 import {COLORS} from '../../../shared/constants/colors';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {isOverseer, isSuperAdmin} from '../../../shared/utils/permissions';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
@@ -82,7 +82,11 @@ function withTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T> {
 export const UserScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const userId: number | undefined = route?.params?.userId;
+  // No userId (Overseer menu → My Profile): show the signed-in user.
+  const paramUserId: number | undefined = route?.params?.userId;
+  const isMyProfileRoute = paramUserId == null;
+  const [selfId, setSelfId] = useState<number | undefined>(undefined);
+  const userId: number | undefined = paramUserId ?? selfId;
   const refetchKey: number | undefined = route?.params?.refetchKey;
   const {t} = useTranslation();
   const C = useThemedColors();
@@ -138,6 +142,10 @@ export const UserScreen = () => {
       setError(null);
 
       if (!userId) {
+        if (isMyProfileRoute) {
+          // Waiting for users/me to resolve the signed-in user's id.
+          return;
+        }
         setUser(null);
         setError(tRef.current('userIDMissing'));
         if (shouldShowLoading) setLoading(false);
@@ -164,7 +172,7 @@ export const UserScreen = () => {
         }
       }
     },
-    [userId],
+    [userId, isMyProfileRoute],
   );
 
   useEffect(() => {
@@ -190,11 +198,66 @@ export const UserScreen = () => {
 
         if (typeof r === 'number') setRoleId(r);
         if (typeof currentId === 'number') {
-          setIsOwnProfile(userId === currentId);
+          if (paramUserId == null) {
+            setSelfId(currentId);
+          }
+          setIsOwnProfile((paramUserId ?? currentId) === currentId);
         }
-      } catch {}
+      } catch {
+        if (paramUserId == null) {
+          setError(tRef.current('userIDMissing'));
+          setLoading(false);
+        }
+      }
     })();
-  }, [userId]);
+  }, [paramUserId]);
+
+  // Overseer viewing their own profile: each oversight assignment (with
+  // exclusions) and the assigned churches, from dashboard/oversight.
+  const [oversight, setOversight] = useState<any | null>(null);
+  const showOversightBreakdown = isOwnProfile && isOverseer(roleId);
+  useEffect(() => {
+    if (!showOversightBreakdown) {
+      return;
+    }
+    let active = true;
+    api
+      .get('dashboard/oversight')
+      .then(res => {
+        if (active) {
+          setOversight(res?.data?.data ?? null);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [showOversightBreakdown, refetchKey]);
+
+  const oversightRows = useMemo(() => {
+    if (!oversight) {
+      return [];
+    }
+    const perms = oversight?.overseer_permissions ?? {};
+    const allowed = perms?.allowedIds ?? {};
+    const excluded = perms?.excludedIds ?? {};
+    const names = (list: unknown) =>
+      Array.isArray(list)
+        ? list.map((i: any) => String(i?.name ?? '').trim()).filter(Boolean)
+        : [];
+    const assigned =
+      oversight?.assignedChurches ??
+      perms?.assignedChurches ??
+      allowed?.assignedChurches ??
+      [];
+    return [
+      {label: t('geographicalRegions'), allow: names(allowed.geographicalRegionIds), exclude: names(excluded.geographicalRegionIds)},
+      {label: t('churchApostolicRegions'), allow: names(allowed.churchRegionIds), exclude: names(excluded.churchRegionIds)},
+      {label: t('languageRegions'), allow: names(allowed.languageRegionIds), exclude: names(excluded.languageRegionIds)},
+      {label: t('churchNetworks'), allow: names(allowed.churchNetworkIds), exclude: names(excluded.churchNetworkIds)},
+      {label: t('assignedChurches'), allow: names(assigned), exclude: [] as string[]},
+    ];
+  }, [oversight, t]);
 
   useEffect(() => {
     setFromChurchesExpanded(false);
@@ -455,7 +518,7 @@ export const UserScreen = () => {
         style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
         edges={['top', 'bottom', 'left', 'right']}>
         <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
-          <Header title={t('pastorLeaderDetails')} />
+          <Header title={isMyProfileRoute ? t('myProfile') : t('pastorLeaderDetails')} />
           <View style={styles.fullScreenLoading}>
             <ActivityIndicator size="large" color={COLORS.mainColor} />
           </View>
@@ -470,7 +533,7 @@ export const UserScreen = () => {
         style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
         edges={['top', 'bottom', 'left', 'right']}>
         <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
-          <Header title={t('pastorLeaderDetails')} />
+          <Header title={isMyProfileRoute ? t('myProfile') : t('pastorLeaderDetails')} />
           <ApiErrorState
             message={error}
             onRetry={() => void fetchUserDetails({showLoading: true})}
@@ -485,7 +548,7 @@ export const UserScreen = () => {
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
-        <Header title={t('pastorLeaderDetails')} />
+        <Header title={isMyProfileRoute ? t('myProfile') : t('pastorLeaderDetails')} />
         <ScrollView>
           <View style={[styles.profileCard, {backgroundColor: C.surface, borderColor: C.border}]}>
             <View style={[styles.summaryRow, {borderBottomColor: C.border}]}>
@@ -610,7 +673,25 @@ export const UserScreen = () => {
               )}
               {renderDetailRow(t('omrNumber'), omrNumber)}
               {renderDetailRow(t('omrStatus'), user?.role?.name || '-')}
-              {renderDetailRow(t('oversightAssignment'), oversightAssignment)}
+              {showOversightBreakdown && oversight ? (
+                oversightRows.map(row => (
+                  <View key={row.label} style={[styles.detailRow, {borderBottomColor: C.border}]}>
+                    <Text style={[styles.detailLabel, {color: C.textPrimary}]}>{row.label}</Text>
+                    <View style={{flex: 1}}>
+                      <Text style={[styles.detailValue, {color: C.textPrimary}]}>
+                        {row.allow.length ? row.allow.join(', ') : '-'}
+                      </Text>
+                      {row.exclude.length ? (
+                        <Text style={[styles.detailValue, {color: C.error || '#c0392b', marginTop: 2}]}>
+                          {`${t('excludedLabel')}: ${row.exclude.join(', ')}`}
+                        </Text>
+                      ) : null}
+                    </View>
+                  </View>
+                ))
+              ) : (
+                renderDetailRow(t('oversightAssignment'), oversightAssignment)
+              )}
               {renderDetailRow(
                 t('language'),
                 (user as any)?.language_name || (user as any)?.language?.name || '-',

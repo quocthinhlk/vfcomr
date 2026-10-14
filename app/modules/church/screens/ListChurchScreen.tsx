@@ -36,7 +36,7 @@ import {
 } from '../../../shared/utils/permissions';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import {ListPageBar, ListToolbar} from '../../../shared/components/crud';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
@@ -370,9 +370,11 @@ export const ChurchesListScreen: React.FC = () => {
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
+      {/* The KAV already sits under the header and above the bottom safe area,
+          so no extra offset (it left a gap above the keyboard). Android resizes
+          the window itself (adjustResize). */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{flex: 1, minHeight: 0}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
 

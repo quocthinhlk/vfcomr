@@ -104,6 +104,10 @@ const pt = {
     // Dashboard Menu
     myDashboard: 'Meu Painel',
     myChurchProfile: 'Meu Perfil da Igreja',
+    myProfile: "Meu perfil",
+    assignedChurches: "Igrejas atribuídas",
+    myChurchProfileEmpty: "Ainda não há nenhuma igreja vinculada ao seu perfil.",
+    excludedLabel: "Excluídas",
     pastorsLeadersListMenu: 'Lista de Pastores e Lideres',
     churchesListMenu: 'Lista de Igrejas',
     churchAttendanceChart: 'Grafico de Presenca da Igreja',

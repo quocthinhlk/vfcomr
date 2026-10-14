@@ -104,6 +104,10 @@ const ja = {
     // Dashboard Menu
     myDashboard: 'マイダッシュボード',
     myChurchProfile: '私の教会プロフィール',
+    myProfile: "マイプロフィール",
+    assignedChurches: "割り当て教会",
+    myChurchProfileEmpty: "プロフィールに紐付いた教会はまだありません。",
+    excludedLabel: "除外",
     pastorsLeadersListMenu: '牧師・リーダー一覧',
     churchesListMenu: '教会一覧',
     churchAttendanceChart: '教会出席チャート',

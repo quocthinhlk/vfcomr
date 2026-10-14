@@ -104,6 +104,10 @@ const zh = {
     // Dashboard Menu
     myDashboard: '我的仪表板',
     myChurchProfile: '我的教会档案',
+    myProfile: "我的资料",
+    assignedChurches: "分配的教会",
+    myChurchProfileEmpty: "您的资料尚未关联任何教会。",
+    excludedLabel: "已排除",
     pastorsLeadersListMenu: '牧师与领袖名单',
     churchesListMenu: '教会列表',
     churchAttendanceChart: '教会出席图表',

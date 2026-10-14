@@ -29,7 +29,7 @@ import {InitialsAvatar} from '../../../shared/components/SelectionSheet';
 import {EyeIcon} from '../../../shared/components/icons/UiIcons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {COLORS} from '../../../shared/constants/colors';
-import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
+import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {listUsers, ListUsersItem} from '../services/user.service';
 import {switchToUser} from '../../auth/services/auth.service';
@@ -250,9 +250,11 @@ export const SwitchUserScreen = () => {
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
+      {/* The KAV already sits under the header and above the bottom safe area,
+          so no extra offset (it left a gap above the keyboard). Android resizes
+          the window itself (adjustResize). */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{flex: 1}}>
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Header title={t('switchUser')} />

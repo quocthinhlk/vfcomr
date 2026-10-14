@@ -34,6 +34,8 @@ export type RootStackParamList = {
   Notifications: undefined;
   NotificationDetail: import('../modules/notifications/screens/NotificationDetailScreen').NotificationDetailParams;
   User: { userId?: number } | undefined;
+  MyProfile: undefined;
+  MyChurchProfile: undefined;
   UserRoles: undefined;
   Churches: { refresh?: boolean; openChurchInPastorDashboard?: boolean } | undefined;
   WatchList: undefined;
@@ -196,6 +198,7 @@ import ListOverseerScreen from '../modules/user/screens/ListOverseerScreen';
 
 // New Screens Imports
 import UserScreen from '../modules/user/screens/UserScreen';
+import MyChurchProfileScreen from '../modules/user/screens/MyChurchProfileScreen';
 import { UserRolesScreen } from '../modules/user/screens/UserRolesScreen';
 import { ChurchesListScreen } from '../modules/church/screens/ListChurchScreen';
 import ChangePasswordForOtherUserScreen from '../modules/user/screens/ChangePasswordForOtherUserScreen';
@@ -425,6 +428,8 @@ export default function Navigation() {
               <Stack.Screen name="NotificationDetail" component={NotificationDetailScreen} />
               {/* New screens */}
               <Stack.Screen name="User" component={UserScreen} />
+              <Stack.Screen name="MyProfile" component={UserScreen} />
+              <Stack.Screen name="MyChurchProfile" component={MyChurchProfileScreen} />
               <Stack.Screen name="UserRoles" component={UserRolesScreen} />
               <Stack.Screen name="Overseers" component={ListOverseerScreen} />
               <Stack.Screen name="Churches" component={ChurchesListScreen} />

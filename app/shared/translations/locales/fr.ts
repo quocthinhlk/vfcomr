@@ -104,6 +104,10 @@ const fr = {
     // Dashboard Menu
     myDashboard: 'Mon Tableau de Bord',
     myChurchProfile: "Mon Profil d'Eglise",
+    myProfile: "Mon profil",
+    assignedChurches: "Églises assignées",
+    myChurchProfileEmpty: "Aucune église n'est encore liée à votre profil.",
+    excludedLabel: "Exclues",
     pastorsLeadersListMenu: 'Liste des Pasteurs et Leaders',
     churchesListMenu: 'Liste des Eglises',
     churchAttendanceChart: "Graphique de Presence de l'Eglise",
