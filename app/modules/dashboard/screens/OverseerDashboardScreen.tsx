@@ -38,6 +38,7 @@ import ImagePicker from 'react-native-image-crop-picker';
 import {updateUser} from '../../user/services/user.service';
 import AppLoadingView from '../../../shared/components/AppLoadingView';
 import {useOnReconnect} from '../../../shared/hooks/useOnReconnect';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -211,6 +212,15 @@ export default function OverseerDashboardScreen() {
   useOnReconnect(() => {
     void loadDashboard();
   });
+
+  // Back from Edit Profile / Edit Church (or another screen that saved a user
+  // or church): reload. A plain Back with no save does nothing.
+  useReloadOnReturn(
+    () => {
+      void loadDashboard();
+    },
+    {dataKey: ['users', 'churches']},
+  );
 
   useEffect(() => {
     void loadDashboard();

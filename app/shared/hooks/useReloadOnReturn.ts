@@ -15,13 +15,14 @@ export function markDataChanged(key: DataKey) {
   dataVersions.set(key, (dataVersions.get(key) ?? 0) + 1);
 }
 
-function versionOf(key?: DataKey) {
-  return key ? dataVersions.get(key) ?? 0 : 0;
+function versionOf(key?: DataKey | DataKey[]) {
+  const keys = key == null ? [] : Array.isArray(key) ? key : [key];
+  return keys.reduce((sum, k) => sum + (dataVersions.get(k) ?? 0), 0);
 }
 
 type Options = {
   /** Reload when another screen called markDataChanged(dataKey) since we last loaded. */
-  dataKey?: DataKey;
+  dataKey?: DataKey | DataKey[];
   /** Route `reload` param (set by returnToList / returnAfterEdit / navigate). */
   reload?: unknown;
   /** Clears the `reload` param once handled. */
@@ -35,6 +36,8 @@ type Options = {
  */
 export function useReloadOnReturn(onReload: () => void, {dataKey, reload, clearReload}: Options) {
   const seenVersion = useRef(versionOf(dataKey));
+  // Stable dependency for array keys (a new array literal each render).
+  const dataKeyDep = Array.isArray(dataKey) ? dataKey.join(',') : dataKey;
   const onReloadRef = useRef(onReload);
   onReloadRef.current = onReload;
   const clearReloadRef = useRef(clearReload);
@@ -51,6 +54,7 @@ export function useReloadOnReturn(onReload: () => void, {dataKey, reload, clearR
         clearReloadRef.current?.();
       }
       onReloadRef.current();
-    }, [dataKey, reload]),
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [dataKeyDep, reload]),
   );
 }

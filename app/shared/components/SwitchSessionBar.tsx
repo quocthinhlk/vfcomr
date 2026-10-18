@@ -12,7 +12,9 @@ import {useSafeAreaInsets} from 'react-native-safe-area-context';
 import {COLORS} from '../constants/colors';
 import {useTranslation} from '../hooks/useTranslation';
 import {useThemeMode} from '../context/ThemeContext';
-import {fs, ms, rs} from '../utils/scale';
+import {fs, ms, ws} from '../utils/scale';
+import {useNetworkStatus} from '../hooks/useNetworkStatus';
+import {EyeIcon} from './icons/UiIcons';
 import {
   getSwitchSession,
   SWITCH_SESSION_EVENT,
@@ -24,6 +26,8 @@ export const SwitchSessionBar = () => {
   const {t} = useTranslation();
   const {theme} = useThemeMode();
   const isDark = theme === 'dark';
+  // The network strip (above this one) already pads for the status bar.
+  const networkStripVisible = useNetworkStatus() !== 'online';
   const [name, setName] = useState('');
   const [active, setActive] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -45,7 +49,7 @@ export const SwitchSessionBar = () => {
     return () => subscription.remove();
   }, [refresh]);
 
-  // Ask first: the bar sits at the bottom edge, where it is easy to tap by mistake.
+  // Ask first: switching back reloads the app as the admin.
   const confirmSwitchBack = () => {
     if (busy) {
       return;
@@ -82,57 +86,67 @@ export const SwitchSessionBar = () => {
     return null;
   }
 
+  const bg = isDark ? '#3A2E12' : '#FFF4CC';
+  const fg = isDark ? '#F6E3B0' : '#8A4B16';
+
+  // Slim strip at the top of the app (under the network strip): it takes its
+  // own space and pushes every screen down, so it never covers content.
   return (
     <View
-      pointerEvents="box-none"
-      style={[styles.wrap, {paddingBottom: Math.max(insets.bottom, ms(8))}]}>
-      <View style={[styles.bar, {backgroundColor: isDark ? '#3A2E12' : '#FFF4CC'}]}>
-        <Text
-          style={[styles.label, {color: isDark ? '#F6E3B0' : '#8A4B16'}]}
-          numberOfLines={1}>
-          {t('viewingAs')} {name}
-        </Text>
-        <TouchableOpacity
-          onPress={confirmSwitchBack}
-          disabled={busy}
-          accessibilityRole="button"
-          accessibilityLabel={t('switchBack')}>
-          {busy ? (
-            <ActivityIndicator color={COLORS.mainColor} size="small" />
-          ) : (
-            <Text style={styles.action}>{t('switchBack')}</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      accessibilityRole="summary"
+      style={[
+        styles.strip,
+        {backgroundColor: bg, paddingTop: (networkStripVisible ? 0 : insets.top) + ms(2)},
+      ]}>
+      <EyeIcon color={fg} size={ws(13)} />
+      <Text style={[styles.label, {color: fg}]} numberOfLines={1}>
+        {t('viewingAs')} <Text style={styles.name}>{name}</Text>
+      </Text>
+      <TouchableOpacity
+        onPress={confirmSwitchBack}
+        disabled={busy}
+        hitSlop={{top: 10, bottom: 10, left: 12, right: 12}}
+        style={styles.action}
+        accessibilityRole="button"
+        accessibilityLabel={t('switchBack')}>
+        {busy ? (
+          <ActivityIndicator color={COLORS.mainColor} size="small" style={styles.spinner} />
+        ) : (
+          <Text style={styles.actionText}>{t('switchBack')}</Text>
+        )}
+      </TouchableOpacity>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  wrap: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 20,
-    paddingHorizontal: ms(12),
-  },
-  bar: {
+  // One compact line (~24pt): icon · "Viewing as Name" · Switch back link.
+  strip: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: rs(10),
-    paddingHorizontal: ms(12),
-    paddingVertical: ms(10),
+    gap: ms(6),
+    paddingHorizontal: ms(16),
+    paddingBottom: ms(3),
   },
   label: {
     flex: 1,
-    fontSize: fs(13),
-    fontWeight: '600',
-    marginRight: ms(8),
+    fontSize: fs(12),
+    lineHeight: fs(16),
   },
-  action: {
-    color: COLORS.mainColor,
-    fontSize: fs(13),
+  name: {
     fontWeight: '700',
+  },
+  // Text link; hitSlop keeps the tap target comfortable despite the slim strip.
+  action: {
+    paddingVertical: ms(2),
+  },
+  actionText: {
+    color: COLORS.mainColor,
+    fontSize: fs(12),
+    lineHeight: fs(16),
+    fontWeight: '700',
+  },
+  spinner: {
+    transform: [{scale: 0.8}],
   },
 });

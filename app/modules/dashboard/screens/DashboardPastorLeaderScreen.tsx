@@ -50,6 +50,7 @@ import {
 } from '../../../shared/utils/permissions';
 import AppLoadingView from '../../../shared/components/AppLoadingView';
 import {useOnReconnect} from '../../../shared/hooks/useOnReconnect';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 
 // Helper function to decode HTML entities (e.g., &#x20ab; -> ₫)
 const decodeHtmlEntity = (str: string): string => {
@@ -715,6 +716,18 @@ export default function DashboardPastorLeaderScreen() {
         });
     });
   }, [orgModalVisible, sortedAssignedChurches, dashboardData?.dashboard_info?.church_id, dashboardData?.dashboard_info?.photo_url]);
+
+  // Back from Edit Profile / Edit Church (or anything else that saved a user or
+  // church): re-run the dashboard loaders. A plain Back with no save does nothing.
+  useReloadOnReturn(
+    () => {
+      // Church photos may have changed: drop the picker's cached covers.
+      churchPhotoRequestedRef.current.clear();
+      setChurchPhotoById({});
+      setReloadToken(token => token + 1);
+    },
+    {dataKey: ['users', 'churches']},
+  );
   const [imageModalVisible, setImageModalVisible] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [toastVisible, setToastVisible] = useState(false);
@@ -1443,7 +1456,10 @@ export default function DashboardPastorLeaderScreen() {
       }
     })();
     return () => { cancelled = true; };
-  }, [isOverseerUser, dashboardData?.dashboard_info?.pastor_id]);
+    // Keyed on dashboard_info (new object per dashboard load) so a reload,
+    // which resets the profile card to the current user, re-applies the pastor.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOverseerUser, dashboardData?.dashboard_info]);
 
   const handleLogout = async () => {
     try {

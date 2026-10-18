@@ -386,10 +386,12 @@ export default function Navigation() {
         <NetworkReloadListener />
         <View style={{ flex: 1 }}>
         <NetworkStatusBar />
-        {/* Nested provider sits below the status strip, so screens' SafeAreaViews
-            measure their top inset from here: no double gap while the strip shows. */}
-        <SafeAreaProvider style={{ flex: 1 }}>
+        {/* "Viewing as …" strip: also above the nested provider, so it takes
+            its own space at the top instead of covering screen content. */}
         {isAuthenticated ? <SwitchSessionBar /> : null}
+        {/* Nested provider sits below the status strips, so screens' SafeAreaViews
+            measure their top inset from here: no double gap while a strip shows. */}
+        <SafeAreaProvider style={{ flex: 1 }}>
         {isAuthenticated ? <NotificationListener /> : null}
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           {!isAuthenticated ? (

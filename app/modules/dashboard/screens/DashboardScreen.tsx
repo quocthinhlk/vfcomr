@@ -44,6 +44,7 @@ import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {BellSvgIcon} from '../../../shared/components/icons';
 import AppLoadingView from '../../../shared/components/AppLoadingView';
 import {useOnReconnect} from '../../../shared/hooks/useOnReconnect';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 
 const DASHBOARD_SCROLL_DATA: {id: string}[] = [];
 
@@ -183,6 +184,20 @@ export default function DashboardScreen() {
 
   // Back online: refresh what's on screen (including the header name).
   useOnReconnect(reloadDashboard);
+
+  // Back from Edit Profile (or another screen that saved a user / church):
+  // refresh the header and overseer blocks. The Pastor Leader / Overseer
+  // dashboards below reload themselves, and a plain Back does nothing.
+  useReloadOnReturn(
+    () => {
+      if (loading || isPastorLeader(currentUserRoleId) || isOverseer(currentUserRoleId)) {
+        return;
+      }
+      void loadProfile();
+      void loadOverseers();
+    },
+    {dataKey: ['users', 'churches']},
+  );
 
   const handleLogout = async () => {
     try {

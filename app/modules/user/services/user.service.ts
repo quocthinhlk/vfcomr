@@ -155,10 +155,80 @@ export interface ListUsersResponse {
   message: string;
 }
 
+const MULTI_WORD_FETCH_LIMIT = 100;
+const MULTI_WORD_MAX_PAGES = 5;
+
+/**
+ * The /users search matches one field at a time, so "shane c" or a full name
+ * finds nothing. For multi-word queries: ask the server for the longest word,
+ * keep users whose name / username / email contain every word, and page
+ * the result here so the screens keep working unchanged.
+ */
+async function listUsersMultiWord(
+  params: ListUsersParams,
+  words: string[],
+): Promise<ListUsersResponse> {
+  const page = params.page ?? 1;
+  const limit = params.limit ?? DEFAULT_PAGE_LIMIT;
+  const seed = [...words].sort((a, b) => b.length - a.length)[0];
+  const collected: ListUsersItem[] = [];
+  for (let p = 1; p <= MULTI_WORD_MAX_PAGES; p++) {
+    const response = await api.get<ListUsersResponse>(`/users`, {
+      params: {
+        page: p,
+        limit: MULTI_WORD_FETCH_LIMIT,
+        search: seed,
+        ...(params.sort_by ? {sort_by: params.sort_by} : {}),
+        ...(typeof params.sort_desc === 'boolean' ? {sort_desc: params.sort_desc} : {}),
+      },
+    });
+    const data = response.data?.data;
+    collected.push(...(data?.items ?? []));
+    if (!data?.has_next) {
+      break;
+    }
+  }
+  const needles = words.map(w => w.toLowerCase());
+  const matches = collected.filter(u => {
+    const any = u as any;
+    // Name-like fields only: "shane c" means a person, not a church or city.
+    const haystack = [u.prefix, u.name, any.first_name, any.last_name, any.username, u.email]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    return needles.every(n => haystack.includes(n));
+  });
+  const total = matches.length;
+  const totalPages = Math.max(1, Math.ceil(total / limit));
+  const safePage = Math.min(Math.max(1, page), totalPages);
+  return {
+    success: true,
+    data: {
+      items: matches.slice((safePage - 1) * limit, safePage * limit),
+      total,
+      page: safePage,
+      limit,
+      total_pages: totalPages,
+      has_next: safePage < totalPages,
+      has_previous: safePage > 1,
+    },
+  } as ListUsersResponse;
+}
+
 export async function listUsers(params: ListUsersParams = {}) {
   const page = params.page ?? 1;
   const limit = params.limit ?? DEFAULT_PAGE_LIMIT;
   const search = params.search ?? '';
+
+  const words = search.trim().split(/\s+/).filter(Boolean);
+  if (words.length > 1) {
+    try {
+      return await listUsersMultiWord(params, words);
+    } catch (error) {
+      console.error('Error fetching users:', error);
+      throw error;
+    }
+  }
 
   try {
     const response = await api.get<ListUsersResponse>(`/users`, {
