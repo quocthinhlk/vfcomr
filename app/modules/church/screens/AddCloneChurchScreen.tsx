@@ -484,7 +484,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                       <View style={churchStyles.input}>
                         <View style={{flexDirection: 'row', alignItems: 'center'}}>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            {t('isMultiServiceChurchMsc')}?
+                            {t('isMultiServiceChurchMsc')}
                           </Text>
                           <HelpIcon title={t('multiServiceChurchMsc')} message={t('helpIsMsc')} />
                         </View>

@@ -664,7 +664,7 @@ const es = {
     'El nombre completo de la iglesia, incluyendo ciudad y barrio/pueblo.',
   helpShortName:
     'Un nombre corto en 10 caracteres, por ejemplo VFC-NewLyn',
-  isMultiServiceChurchMsc: 'Es una iglesia de múltiples servicios (MSC)?',
+  isMultiServiceChurchMsc: '¿Es una iglesia de múltiples servicios (MSC)?',
   helpIsMsc:
     'Iglesia de múltiples servicios es si una Iglesia tiene dos o más Servicios de Iglesia, en otro horario, en otro lugar o en otro idioma.',
   helpEnableCp:
