@@ -2166,12 +2166,14 @@ export default function DashboardPastorLeaderScreen() {
               accessibilityRole="button"
               accessibilityLabel={t('cancel')}
             />
-            <Animated.View style={[styles.modalCard, { backgroundColor: C.surface, transform: [{ translateY: orgSheetSlide }] }]}>
+            {/* Pixel maxHeight: a '%' is resolved against a parent whose height some
+                Android devices report differently inside a statusBarTranslucent Modal. */}
+            <Animated.View style={[styles.modalCard, { maxHeight: Math.round(Dimensions.get('window').height * 0.8), backgroundColor: C.surface, transform: [{ translateY: orgSheetSlide }] }]}>
               <View style={[styles.modalHandle, { backgroundColor: C.border }]} />
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t('yourOtherChurches')}</Text>
               </View>
-              <ScrollView style={styles.modalList}>
+              <ScrollView style={styles.modalList} showsVerticalScrollIndicator>
                 {sortedAssignedChurches.map((ch: any) => {
                   const isCurrent =
                     dashboardData?.dashboard_info?.church_id != null &&
@@ -2930,7 +2932,6 @@ const styles = StyleSheet.create({
   },
   modalCard: {
     width: '100%',
-    maxHeight: '80%',
     borderTopLeftRadius: rs(16),
     borderTopRightRadius: rs(16),
     paddingTop: ms(8),
@@ -2957,8 +2958,12 @@ const styles = StyleSheet.create({
     fontSize: fs(17),
     fontWeight: '700',
   },
+  // flexShrink lets the list shrink to the card's maxHeight and scroll. With
+  // RN's default flexShrink 0 it kept its full content height and was only
+  // clipped, so on some Android phones there was nothing to scroll.
   modalList: {
     flexGrow: 0,
+    flexShrink: 1,
   },
   modalItemRow: {
     flexDirection: 'row',

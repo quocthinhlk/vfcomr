@@ -143,8 +143,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: ms(8),
   },
+  // flexShrink: shrink to the sheet's maxHeight and scroll (RN defaults it to 0,
+  // which left the list at full height and unscrollable on some Android phones).
   list: {
     flexGrow: 0,
+    flexShrink: 1,
   },
   row: {
     flexDirection: 'row',
