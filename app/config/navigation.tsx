@@ -49,6 +49,7 @@ export type RootStackParamList = {
   EditOverseerGoalDefaults: { defaults?: boolean } | undefined;
   PushMailSearch: undefined;
   MyOverseers: undefined;
+  MyOverseerDetail: { overseerId: number };
   PushReportConfig: { userId: number; name?: string };
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: { group?: string } | undefined;
@@ -222,6 +223,7 @@ import { OverseerGoalsScreen } from '../modules/overseergoals/screens/OverseerGo
 import AddOverseerGoalsScreen from '../modules/overseergoals/screens/AddOverseerGoalsScreen';
 import DeleteOverseerGoalPeriodScreen from '../modules/overseergoals/screens/DeleteOverseerGoalPeriodScreen';
 import MyOverseersScreen from '../modules/dashboard/screens/MyOverseersScreen';
+import MyOverseerDetailScreen from '../modules/dashboard/screens/MyOverseerDetailScreen';
 import PushMailSearchScreen from '../modules/pushmail/screens/PushMailSearchScreen';
 import PushReportConfigScreen from '../modules/pushmail/screens/PushReportConfigScreen';
 import EditOverseerGoalParametersScreen from '../modules/overseergoals/screens/EditOverseerGoalParametersScreen';
@@ -410,6 +412,7 @@ export default function Navigation() {
             <>
               <Stack.Screen name="Dashboard" component={DashboardScreen} />
               <Stack.Screen name="MyOverseers" component={MyOverseersScreen} />
+              <Stack.Screen name="MyOverseerDetail" component={MyOverseerDetailScreen} />
               <Stack.Screen name="WeeklyReport" component={WeeklyReportScreen} />
               <Stack.Screen name="Profile" component={ProfileScreen} />
               <Stack.Screen name="AddUser" component={AddUserScreen} />

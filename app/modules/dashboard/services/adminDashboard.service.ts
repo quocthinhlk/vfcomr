@@ -51,8 +51,15 @@ function parseNdjson(raw: string): StreamLine[] {
     .map(line => JSON.parse(line) as StreamLine);
 }
 
+/** Last my-overseers result, so a detail screen can show one without a second (heavy) request. */
+const myOverseersCache = new Map<number, AdminOverseerSummary>();
+
+export function getCachedMyOverseer(id: number): AdminOverseerSummary | undefined {
+  return myOverseersCache.get(id);
+}
+
 /**
- * Overseers assigned to the logged-in Admin, each with their dashboard
+ * Overseers assigned to the logged-in user (Admin or Overseer), each with their dashboard
  * indicators. The endpoint streams NDJSON (`application/x-ndjson`): a `meta`
  * line with `total_count`, then one line per overseer **in any order**, so the
  * result is sorted by `index`. The whole body is read at once (React Native
@@ -73,7 +80,7 @@ export async function getMyOverseers(): Promise<AdminOverseerSummary[]> {
     throw new Error(failed.message || 'Failed to load overseers.');
   }
 
-  return lines
+  const list = lines
     .filter(line => line.data?.type !== 'meta' && line.data?.item?.overseer_profile)
     .map(line => ({
       index: Number(line.data?.index ?? 0),
@@ -84,6 +91,9 @@ export async function getMyOverseers(): Promise<AdminOverseerSummary[]> {
       churchPlantedGraph: line.data?.item?.church_planted_graph,
     }))
     .sort((a, b) => a.index - b.index);
+  myOverseersCache.clear();
+  list.forEach(item => myOverseersCache.set(item.profile.id, item));
+  return list;
 }
 
 const hasGraphData = (g: any) => Array.isArray(g?.data) && g.data.length > 0;

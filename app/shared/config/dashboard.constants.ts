@@ -297,6 +297,7 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
       // UserScreen without a userId: the signed-in user's profile (with Edit).
       {label: t('myProfile'), routeName: 'MyProfile'},
       {label: t('myChurchProfile'), routeName: 'MyChurchProfile'},
+      {label: t('myOverseers'), routeName: 'MyOverseers'},
     ],
   },
   {

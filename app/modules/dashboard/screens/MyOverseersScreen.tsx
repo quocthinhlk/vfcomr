@@ -13,6 +13,8 @@ import {
   listContentStyle,
 } from '../../../shared/components/crud';
 import {AdminOverseerSummary, getMyOverseers} from '../services/adminDashboard.service';
+import api from '../../../config/api';
+import {isSuperAdmin} from '../../../shared/utils/permissions';
 
 const blankAvatar = require('../../../assets/icons/avatar_blank.png');
 
@@ -63,8 +65,10 @@ const OverseerRow = React.memo(function OverseerRow({
 });
 
 /**
- * Admin: My Dashboard > My Overseers (GET dashboard/overseer-assignments/my-overseers).
- * Tapping one opens the admin Dashboard with that overseer selected.
+ * My Dashboard > My Overseers (GET dashboard/overseer-assignments/my-overseers),
+ * for Admin and Overseer. Tapping one: Admin opens their Dashboard with that
+ * overseer selected; an Overseer (whose dashboard has no overseer picker) opens
+ * that overseer's indicators screen.
  */
 export default function MyOverseersScreen() {
   const navigation = useNavigation<any>();
@@ -74,6 +78,26 @@ export default function MyOverseersScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
+  const [roleId, setRoleId] = useState<number | undefined>(undefined);
+
+  useEffect(() => {
+    api
+      .get('users/me')
+      .then((res: any) => {
+        if (mountedRef.current) {
+          setRoleId(res?.data?.data?.role?.id);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const openOverseer = (id: number) => {
+    if (isSuperAdmin(roleId)) {
+      navigation.navigate('Dashboard', {overseerId: id});
+    } else {
+      navigation.navigate('MyOverseerDetail', {overseerId: id});
+    }
+  };
 
   const load = useCallback(async () => {
     try {
@@ -125,7 +149,7 @@ export default function MyOverseersScreen() {
         renderItem={({item}) => (
           <OverseerRow
             overseer={item}
-            onPress={() => navigation.navigate('Dashboard', {overseerId: item.profile.id})}
+            onPress={() => openOverseer(item.profile.id)}
           />
         )}
         style={styles.list}
