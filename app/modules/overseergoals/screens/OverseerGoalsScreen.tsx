@@ -22,11 +22,13 @@ import {
   listOverseerGoalPeriods,
   OverseerGoalPeriodItem,
 } from '../services/overseerGoals.service';
+import {useNationName} from '../hooks/useNationName';
 
 export const OverseerGoalsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
+  const nationName = useNationName();
   const [items, setItems] = useState<OverseerGoalPeriodItem[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -101,7 +103,7 @@ export const OverseerGoalsScreen = () => {
   };
 
   const renderItem = ({item}: {item: OverseerGoalPeriodItem}) => {
-    const nationName = getSafeText(item.nation_name) || '-';
+    const nation = nationName(item) || '-';
     const churchName = getSafeText(item.local_church_name) || '-';
     const overseerName = getSafeText(item.user_name) || '-';
     const periodText = `${item.start_year ?? '-'} - ${item.end_year ?? '-'}`;
@@ -116,7 +118,7 @@ export const OverseerGoalsScreen = () => {
         onMorePress={() => setSelectedGoal(item)}>
         <CardMeta lines={1}>{churchName}</CardMeta>
         <CardMeta>
-          {nationName} · {periodText}
+          {nation} · {periodText}
         </CardMeta>
       </EntityListCard>
     );
@@ -201,7 +203,7 @@ export const OverseerGoalsScreen = () => {
           return [
             {label: t('view'), icon: 'view', onPress: go('OverseerGoalDetail')},
             {label: t('editGoals'), icon: 'edit', onPress: go('EditOverseerGoals')},
-            {label: t('editParameters'), icon: 'edit', onPress: go('EditOverseerGoalDefaults')},
+            {label: t('editParameters'), icon: 'edit', onPress: go('EditOverseerGoalParameters')},
             {
               label: t('delete'),
               icon: 'delete',

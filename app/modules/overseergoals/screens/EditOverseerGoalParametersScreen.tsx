@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,67 +19,56 @@ import {
   ScreenContainer,
 } from '../../../shared/components/crud';
 import {
+  getAllNationOptions,
   getOverseerGoalPeriodDetail,
+  GoalPeriodDetailItem,
+  PickerOption,
   updateOverseerGoalPeriodParameters,
 } from '../services/overseerGoals.service';
+import {repairText} from '../config/goalPeriodFields';
+import {useThemedColors} from '../../../shared/styles/theme';
+import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {ms} from '../../../shared/utils/scale';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 
-const EditOverseerGoalDefaultsScreen = () => {
+const EditOverseerGoalParametersScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const goalPeriodId: number | undefined = route?.params?.goalPeriodId;
   const {t} = useTranslation();
+  const C = useThemedColors();
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const retryLoad = () => setReloadKey(k => k + 1);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
-  const [assignedTo, setAssignedTo] = useState('');
+  const [goalPeriod, setGoalPeriod] = useState<GoalPeriodDetailItem | null>(null);
   const [localChurchId, setLocalChurchId] = useState<number | null>(null);
   const [nationId, setNationId] = useState<number | null>(null);
-  const [startYear, setStartYear] = useState('');
-  const [endYear, setEndYear] = useState('');
-  const [churchOptions, setChurchOptions] = useState<
-    Array<{label: string; value: number}>
-  >([]);
-  const [nationOptions, setNationOptions] = useState<
-    Array<{label: string; value: number}>
-  >([]);
+  const [churchOptions, setChurchOptions] = useState<PickerOption[]>([]);
+  const currentChurchRef = useRef<PickerOption | null>(null);
+  // Nation = a geographical region (whole tree, as on the old web form).
+  const [nationOptions, setNationOptions] = useState<PickerOption[]>([]);
 
   const clearInvalid = (key: string) =>
     setInvalid(prev => ({...prev, [key]: false}));
-
-  const normalizePositiveNumberInput = (text: string) => {
-    const digitsOnly = text.replace(/[^0-9]/g, '');
-    return digitsOnly;
-  };
 
   const loadChurches = async (search = '') => {
     const res = await api.get('churches', {
       params: {page: 1, limit: 50, sort_by: 'name', sort_desc: false, ...(search ? {search} : {})},
     });
     const items = res?.data?.data?.items ?? [];
-    setChurchOptions(
-      items.map((item: any) => ({
-        label: item.name,
-        value: item.id,
-      })),
-    );
-  };
-
-  const loadNations = async (search = '') => {
-    const res = await api.get('countries', {
-      params: {page: 1, limit: 50, sort_by: 'name', sort_desc: false, ...(search ? {name: search} : {})},
-    });
-    const items = res?.data?.data?.items ?? [];
-    setNationOptions(
-      items.map((item: any) => ({
-        label: item.name,
-        value: item.id,
-      })),
-    );
+    const options: PickerOption[] = items.map((item: any) => ({
+      label: item.name,
+      value: item.id,
+    }));
+    // The list is one search page; keep the saved church pickable (and its label shown).
+    const current = currentChurchRef.current;
+    if (!search && current && !options.some(option => option.value === current.value)) {
+      options.unshift(current);
+    }
+    setChurchOptions(options);
   };
 
   useEffect(() => {
@@ -93,20 +82,28 @@ const EditOverseerGoalDefaultsScreen = () => {
 
       try {
         setLoading(true);
-        const [detailResponse] = await Promise.all([
+        const [detailResponse, nations] = await Promise.all([
           getOverseerGoalPeriodDetail(goalPeriodId),
-          loadChurches(),
-          loadNations(),
+          getAllNationOptions(),
         ]);
         if (!mounted) {
           return;
         }
-        const goalPeriod = detailResponse?.data?.goal_period;
-        setAssignedTo(goalPeriod?.user_name || '');
-        setLocalChurchId(goalPeriod?.local_church_id ?? null);
-        setNationId(goalPeriod?.nation_id ?? null);
-        setStartYear(goalPeriod?.start_year ? String(goalPeriod.start_year) : '');
-        setEndYear(goalPeriod?.end_year ? String(goalPeriod.end_year) : '');
+        const period = detailResponse?.data?.goal_period ?? null;
+        currentChurchRef.current = period?.local_church_id
+          ? {
+              label: repairText(period.local_church_name) || `#${period.local_church_id}`,
+              value: period.local_church_id,
+            }
+          : null;
+        await loadChurches();
+        if (!mounted) {
+          return;
+        }
+        setGoalPeriod(period);
+        setLocalChurchId(period?.local_church_id ?? null);
+        setNationId(period?.nation_id ?? null);
+        setNationOptions(nations);
         setLoadError(null);
       } catch (error) {
         console.error('Failed to load goal period parameters:', error);
@@ -129,17 +126,13 @@ const EditOverseerGoalDefaultsScreen = () => {
   }, [goalPeriodId, reloadKey]);
 
   const onSave = async () => {
-    const startYearNumber = Number(startYear);
-    const endYearNumber = Number(endYear);
     const nextInvalid: Record<string, boolean> = {
       localChurchId: !localChurchId,
       nationId: !nationId,
-      startYear: !startYear.trim() || !Number.isFinite(startYearNumber) || startYearNumber <= 0,
-      endYear: !endYear.trim() || !Number.isFinite(endYearNumber) || endYearNumber <= 0,
     };
     setInvalid(nextInvalid);
 
-    if (Object.values(nextInvalid).some(Boolean) || !goalPeriodId) {
+    if (Object.values(nextInvalid).some(Boolean) || !goalPeriodId || !goalPeriod) {
       return;
     }
 
@@ -148,8 +141,9 @@ const EditOverseerGoalDefaultsScreen = () => {
       await updateOverseerGoalPeriodParameters(goalPeriodId, {
         local_church_id: Number(localChurchId),
         nation_id: Number(nationId),
-        start_year: startYearNumber,
-        end_year: endYearNumber,
+        // Years are read-only here (old web): send them back unchanged.
+        start_year: goalPeriod.start_year,
+        end_year: goalPeriod.end_year,
       });
       Alert.alert(t('success'), t('goalParametersUpdatedSuccess'));
       returnAfterEdit(navigation);
@@ -177,11 +171,11 @@ const EditOverseerGoalDefaultsScreen = () => {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled">
-          <FormField label={t('assignedTo')}>
-            <AppInput value={assignedTo} editable={false} />
+          <FormField label={t('overseer')}>
+            <AppInput value={repairText(goalPeriod?.user_name)} editable={false} />
           </FormField>
 
-          <FormField label={t('church')} required>
+          <FormField label={t('localChurch')} required>
             <ElementDropdown
               data={churchOptions}
               value={localChurchId}
@@ -189,7 +183,7 @@ const EditOverseerGoalDefaultsScreen = () => {
                 setLocalChurchId(value as number);
                 clearInvalid('localChurchId');
               }}
-              placeholder={t('selectChurch')}
+              placeholder={t('selectLocalChurch')}
               error={!!invalid.localChurchId}
               onSearchText={text => loadChurches(text)}
             />
@@ -205,37 +199,37 @@ const EditOverseerGoalDefaultsScreen = () => {
               }}
               placeholder={t('selectNation')}
               error={!!invalid.nationId}
-              onSearchText={text => loadNations(text)}
+              renderItem={createHierarchyDropdownRenderItem(C) as any}
             />
           </FormField>
 
+          {/* Read-only, as on the old web form ("Nil" there when empty). */}
+          {[
+            {label: t('churchNetworks'), value: goalPeriod?.church_network},
+            {label: t('geographicalRegions'), value: goalPeriod?.geographical_region},
+            {label: t('churchApostolicRegions'), value: goalPeriod?.church_region},
+            {label: t('languageRegions'), value: goalPeriod?.language_region},
+          ].map(row => (
+            <FormField key={row.label} label={row.label}>
+              <AppInput value={repairText(row.value) || '-'} editable={false} multiline />
+            </FormField>
+          ))}
+
           <View style={styles.row}>
             <View style={styles.halfField}>
-              <FormField label={t('startYear')} required>
+              <FormField label={t('startYear')}>
                 <AppInput
-                  value={startYear}
-                  onChangeText={text => {
-                    setStartYear(normalizePositiveNumberInput(text));
-                    clearInvalid('startYear');
-                  }}
-                  placeholder={t('startYear')}
-                  keyboardType="numeric"
-                  error={!!invalid.startYear}
+                  value={goalPeriod?.start_year ? String(goalPeriod.start_year) : ''}
+                  editable={false}
                 />
               </FormField>
             </View>
 
             <View style={styles.halfField}>
-              <FormField label={t('endYear')} required>
+              <FormField label={t('endYear')}>
                 <AppInput
-                  value={endYear}
-                  onChangeText={text => {
-                    setEndYear(normalizePositiveNumberInput(text));
-                    clearInvalid('endYear');
-                  }}
-                  placeholder={t('endYear')}
-                  keyboardType="numeric"
-                  error={!!invalid.endYear}
+                  value={goalPeriod?.end_year ? String(goalPeriod.end_year) : ''}
+                  editable={false}
                 />
               </FormField>
             </View>
@@ -266,4 +260,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default EditOverseerGoalDefaultsScreen;
+export default EditOverseerGoalParametersScreen;

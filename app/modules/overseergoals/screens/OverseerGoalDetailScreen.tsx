@@ -23,29 +23,9 @@ import {
   countRedGoalMetrics,
   formatGoalRangeLabel,
   GOAL_SECTION_OPTIONS,
+  repairText,
 } from '../config/goalPeriodFields';
-
-/** Some API strings arrive as UTF-8 bytes decoded as Latin-1 (e.g. "RegiÃ£o"). */
-function repairText(value?: string | null): string {
-  const text = String(value ?? '').trim();
-  if (!/[ÃÂ]/.test(text)) {
-    return text;
-  }
-  const bytes: number[] = [];
-  for (let index = 0; index < text.length; index += 1) {
-    const code = text.charCodeAt(index);
-    if (code > 0xff) {
-      return text;
-    }
-    bytes.push(code);
-  }
-  try {
-    const decoded = new TextDecoder('utf-8').decode(new Uint8Array(bytes));
-    return decoded.includes('\uFFFD') ? text : decoded;
-  } catch {
-    return text;
-  }
-}
+import {useNationName} from '../hooks/useNationName';
 
 function EditGoalsIcon({size}: {size: number}) {
   return (
@@ -108,6 +88,7 @@ const OverseerGoalDetailScreen = () => {
   const goalPeriodId: number | undefined = route?.params?.goalPeriodId;
   const C = useThemedColors();
   const {t} = useTranslation();
+  const nationName = useNationName();
   const [loading, setLoading] = useState(true);
   const [detail, setDetail] = useState<GoalPeriodDetailData | null>(null);
   const hasDetail = useRef(false);
@@ -244,7 +225,7 @@ const OverseerGoalDetailScreen = () => {
                   <IconAction
                     label={t('editParameters')}
                     onPress={() =>
-                      navigation.navigate('EditOverseerGoalDefaults', {goalPeriodId})
+                      navigation.navigate('EditOverseerGoalParameters', {goalPeriodId})
                     }>
                     <EditParametersIcon size={ms(22)} />
                   </IconAction>
@@ -258,7 +239,7 @@ const OverseerGoalDetailScreen = () => {
                 {repairText(detail.goal_period.local_church_name) || '-'}
               </Text>
               <Text style={[styles.nation, {color: C.textSecondary}]}>
-                {repairText(detail.goal_period.nation_name) || '-'}
+                {nationName(detail.goal_period) || '-'}
               </Text>
 
               <View style={[styles.stats, {borderTopColor: C.border}]}>

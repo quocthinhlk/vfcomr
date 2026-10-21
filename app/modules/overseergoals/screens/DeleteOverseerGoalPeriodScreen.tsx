@@ -5,6 +5,7 @@ import {
   deleteOverseerGoalPeriod,
   getOverseerGoalPeriodDetail,
 } from '../services/overseerGoals.service';
+import {getNationNameMap} from '../services/overseerGoals.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {returnToList} from '../../../shared/utils/returnToList';
 import {
@@ -31,7 +32,11 @@ export const DeleteOverseerGoalPeriodScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getOverseerGoalPeriodDetail(goalPeriodId);
+      const [res, nationNames] = await Promise.all([
+        getOverseerGoalPeriodDetail(goalPeriodId),
+        // nation_id is a geographical region; the API's nation_name is wrong.
+        getNationNameMap().catch(() => null),
+      ]);
       if (!mountedRef.current) {
         return;
       }
@@ -40,7 +45,9 @@ export const DeleteOverseerGoalPeriodScreen: React.FC = () => {
         goalPeriod?.start_year && goalPeriod?.end_year
           ? `${goalPeriod.start_year} - ${goalPeriod.end_year}`
           : '';
-      const summary = [goalPeriod?.nation_name, periodLabel]
+      const nationName =
+        goalPeriod?.nation_id != null ? nationNames?.get(Number(goalPeriod.nation_id)) : '';
+      const summary = [nationName, periodLabel]
         .filter(Boolean)
         .join(' - ');
 

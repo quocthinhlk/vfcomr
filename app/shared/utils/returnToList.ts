@@ -10,7 +10,7 @@ const RECORD_SCREENS = new Set([
   'WorshipServiceDetail',
   'OverseerGoalDetail',
   'EditOverseerGoals',
-  'EditOverseerGoalDefaults',
+  'EditOverseerGoalParameters',
   'WatchListDetail',
   'WatchListForm',
   'ResourceDetail',

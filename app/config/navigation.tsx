@@ -45,7 +45,8 @@ export type RootStackParamList = {
   AddOverseerGoals: undefined;
   OverseerGoalDetail: { goalPeriodId: number } | undefined;
   DeleteOverseerGoalPeriod: { goalPeriodId: number } | undefined;
-  EditOverseerGoalDefaults: { goalPeriodId: number } | undefined;
+  EditOverseerGoalParameters: { goalPeriodId: number } | undefined;
+  EditOverseerGoalDefaults: { defaults?: boolean } | undefined;
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: { group?: string } | undefined;
   ChurchesPlantedLast10Years: undefined;
@@ -217,7 +218,7 @@ import WatchListFormScreen from '../modules/watchlist/screens/WatchListFormScree
 import { OverseerGoalsScreen } from '../modules/overseergoals/screens/OverseerGoalsScreen';
 import AddOverseerGoalsScreen from '../modules/overseergoals/screens/AddOverseerGoalsScreen';
 import DeleteOverseerGoalPeriodScreen from '../modules/overseergoals/screens/DeleteOverseerGoalPeriodScreen';
-import EditOverseerGoalDefaultsScreen from '../modules/overseergoals/screens/EditOverseerGoalDefaultsScreen';
+import EditOverseerGoalParametersScreen from '../modules/overseergoals/screens/EditOverseerGoalParametersScreen';
 import { GenerateReportsScreen } from '../modules/report/screens/GenerateReportsScreen';
 import { ChurchesPlantedLast10YearsScreen } from '../modules/dashboard/screens/ChurchesPlantedLast10YearsScreen';
  
@@ -446,8 +447,14 @@ export default function Navigation() {
                 component={DeleteOverseerGoalPeriodScreen}
               />
               <Stack.Screen
+                name="EditOverseerGoalParameters"
+                component={EditOverseerGoalParametersScreen}
+              />
+              {/* Same goals editor, on the defaults template (GET/PUT goal-periods/defaults). */}
+              <Stack.Screen
                 name="EditOverseerGoalDefaults"
-                component={EditOverseerGoalDefaultsScreen}
+                component={EditOverseerGoalsScreen}
+                initialParams={{defaults: true}}
               />
               <Stack.Screen
                 name="EditOverseerGoals"

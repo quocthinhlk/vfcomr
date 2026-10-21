@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -8,7 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import {useNavigation} from '@react-navigation/native';
+import {CommonActions, useNavigation} from '@react-navigation/native';
 import api from '../../../config/api';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import AppInput from '../../../shared/components/AppInput';
@@ -18,34 +18,44 @@ import {
   FormField,
   ScreenContainer,
 } from '../../../shared/components/crud';
-import {createOverseerGoalPeriod} from '../services/overseerGoals.service';
+import {
+  createOverseerGoalPeriod,
+  getOverseerChurchOptions,
+  getOverseerNationOptions,
+  PickerOption,
+} from '../services/overseerGoals.service';
+import {useThemedColors} from '../../../shared/styles/theme';
+import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {ms} from '../../../shared/utils/scale';
+
+// Same as the old web form: Start Year from 2000 to five years ahead (newest
+// first, defaults to this year); End Year is always Start Year + 2.
+const CURRENT_YEAR = new Date().getFullYear();
+const START_YEAR_OPTIONS = Array.from({length: CURRENT_YEAR + 5 - 2000 + 1}, (_, index) => {
+  const year = CURRENT_YEAR + 5 - index;
+  return {label: String(year), value: year};
+});
+const GOAL_PERIOD_YEARS = 2;
 
 const AddOverseerGoalsScreen = () => {
   const navigation = useNavigation<any>();
   const {t} = useTranslation();
+  const C = useThemedColors();
   const [submitting, setSubmitting] = useState(false);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [userId, setUserId] = useState<number | null>(null);
   const [localChurchId, setLocalChurchId] = useState<number | null>(null);
   const [nationId, setNationId] = useState<number | null>(null);
-  const [startYear, setStartYear] = useState('');
-  const [endYear, setEndYear] = useState('');
+  const [startYear, setStartYear] = useState<number>(CURRENT_YEAR);
   const [userOptions, setUserOptions] = useState<Array<{label: string; value: number}>>([]);
-  const [churchOptions, setChurchOptions] = useState<
-    Array<{label: string; value: number}>
-  >([]);
-  const [nationOptions, setNationOptions] = useState<
-    Array<{label: string; value: number}>
-  >([]);
+  // Local Church / Nation are limited to what the picked overseer oversees.
+  const [churchOptions, setChurchOptions] = useState<PickerOption[]>([]);
+  const [nationOptions, setNationOptions] = useState<PickerOption[]>([]);
+  const [scopeLoading, setScopeLoading] = useState(false);
+  const scopeRequestRef = useRef(0);
 
   const clearInvalid = (key: string) =>
     setInvalid(prev => ({...prev, [key]: false}));
-
-  const normalizePositiveNumberInput = (text: string) => {
-    const digitsOnly = text.replace(/[^0-9]/g, '');
-    return digitsOnly;
-  };
 
   const loadUsers = async (search = '') => {
     const res = await api.get('users/overseers', {
@@ -60,41 +70,15 @@ const AddOverseerGoalsScreen = () => {
     );
   };
 
-  const loadChurches = async (search = '') => {
-    const res = await api.get('churches', {
-      params: {page: 1, limit: 50, sort_by: 'name', sort_desc: false, ...(search ? {search} : {})},
-    });
-    const items = res?.data?.data?.items ?? [];
-    setChurchOptions(
-      items.map((item: any) => ({
-        label: item.name,
-        value: item.id,
-      })),
-    );
-  };
-
-  const loadNations = async (search = '') => {
-    const res = await api.get('countries', {
-      params: {page: 1, limit: 50, sort_by: 'name', sort_desc: false, ...(search ? {name: search} : {})},
-    });
-    const items = res?.data?.data?.items ?? [];
-    setNationOptions(
-      items.map((item: any) => ({
-        label: item.name,
-        value: item.id,
-      })),
-    );
-  };
-
   const [loadError, setLoadError] = useState<unknown>(null);
 
   const loadFormData = async () => {
     try {
-      await Promise.all([loadUsers(), loadChurches(), loadNations()]);
+      await loadUsers();
       setLoadError(null);
     } catch (error) {
       console.error('Failed to load add goal period form data:', error);
-      // Empty user / church / nation pickers would make the form unusable.
+      // An empty overseer picker would make the form unusable.
       setLoadError(error);
     }
   };
@@ -104,19 +88,52 @@ const AddOverseerGoalsScreen = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  const loadOverseerScope = async (overseerId: number) => {
+    const requestId = ++scopeRequestRef.current;
+    setScopeLoading(true);
+    setChurchOptions([]);
+    setNationOptions([]);
+    try {
+      const [churches, nations] = await Promise.all([
+        getOverseerChurchOptions(overseerId),
+        getOverseerNationOptions(overseerId),
+      ]);
+      if (requestId === scopeRequestRef.current) {
+        setChurchOptions(churches);
+        setNationOptions(nations);
+      }
+    } catch (error: any) {
+      console.error('Failed to load overseer churches / nations:', error);
+      if (requestId === scopeRequestRef.current) {
+        Alert.alert(t('error'), error?.message || t('failedToLoadData'));
+      }
+    } finally {
+      if (requestId === scopeRequestRef.current) {
+        setScopeLoading(false);
+      }
+    }
+  };
+
+  const onSelectOverseer = (value: number | null) => {
+    setUserId(value);
+    setLocalChurchId(null);
+    setNationId(null);
+    clearInvalid('userId');
+    if (value) {
+      loadOverseerScope(value);
+    } else {
+      scopeRequestRef.current += 1;
+      setChurchOptions([]);
+      setNationOptions([]);
+      setScopeLoading(false);
+    }
+  };
+
   const onSave = async () => {
-    const startYearNumber = Number(startYear);
-    const endYearNumber = Number(endYear);
     const nextInvalid: Record<string, boolean> = {
       userId: !userId,
       localChurchId: !localChurchId,
       nationId: !nationId,
-      startYear:
-        !startYear.trim() ||
-        !Number.isFinite(startYearNumber) ||
-        startYearNumber <= 0,
-      endYear:
-        !endYear.trim() || !Number.isFinite(endYearNumber) || endYearNumber <= 0,
     };
     setInvalid(nextInvalid);
 
@@ -130,15 +147,26 @@ const AddOverseerGoalsScreen = () => {
         user_id: Number(userId),
         local_church_id: Number(localChurchId),
         nation_id: Number(nationId),
-        start_year: startYearNumber,
-        end_year: endYearNumber,
+        start_year: startYear,
+        end_year: startYear + GOAL_PERIOD_YEARS,
       });
       const createdId =
         response?.data?.goal_period?.id ?? response?.data?.id ?? response?.goal_period?.id;
 
+      // The list underneath should show the new period even if Edit Goals is left without saving.
+      const routes = navigation.getState?.()?.routes ?? [];
+      const listRoute = routes.find((r: any) => r.name === 'OverseerGoals');
+      if (listRoute) {
+        navigation.dispatch({
+          ...CommonActions.setParams({reload: true}),
+          source: listRoute.key,
+        });
+      }
+
       Alert.alert(t('success'), t('goalPeriodCreatedSuccess'));
+      // Old web: after Add, go straight to Edit Goals for the new period.
       if (createdId) {
-        navigation.replace('OverseerGoalDetail', {goalPeriodId: createdId});
+        navigation.replace('EditOverseerGoals', {goalPeriodId: createdId});
       } else {
         navigation.goBack();
       }
@@ -148,6 +176,9 @@ const AddOverseerGoalsScreen = () => {
       setSubmitting(false);
     }
   };
+
+  const scopePlaceholder = (placeholder: string) =>
+    !userId ? t('selectOverseer') : scopeLoading ? t('loading') : placeholder;
 
   return (
     <ScreenContainer
@@ -165,21 +196,18 @@ const AddOverseerGoalsScreen = () => {
         <ScrollView
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled">
-          <FormField label={t('assignedTo')} required>
+          <FormField label={t('overseer')} required>
             <ElementDropdown
               data={userOptions}
               value={userId}
-              onChange={value => {
-                setUserId(value as number);
-                clearInvalid('userId');
-              }}
-              placeholder={t('selectAssignedTo')}
+              onChange={value => onSelectOverseer(value ? Number(value) : null)}
+              placeholder={t('selectOverseer')}
               error={!!invalid.userId}
               onSearchText={text => loadUsers(text)}
             />
           </FormField>
 
-          <FormField label={t('church')} required>
+          <FormField label={t('localChurch')} required>
             <ElementDropdown
               data={churchOptions}
               value={localChurchId}
@@ -187,9 +215,10 @@ const AddOverseerGoalsScreen = () => {
                 setLocalChurchId(value as number);
                 clearInvalid('localChurchId');
               }}
-              placeholder={t('selectChurch')}
+              placeholder={scopePlaceholder(t('selectLocalChurch'))}
               error={!!invalid.localChurchId}
-              onSearchText={text => loadChurches(text)}
+              disabled={!userId || scopeLoading}
+              renderItem={createHierarchyDropdownRenderItem(C) as any}
             />
           </FormField>
 
@@ -201,40 +230,33 @@ const AddOverseerGoalsScreen = () => {
                 setNationId(value as number);
                 clearInvalid('nationId');
               }}
-              placeholder={t('selectNation')}
+              placeholder={scopePlaceholder(t('selectNation'))}
               error={!!invalid.nationId}
-              onSearchText={text => loadNations(text)}
+              disabled={!userId || scopeLoading}
+              renderItem={createHierarchyDropdownRenderItem(C) as any}
             />
           </FormField>
 
           <View style={styles.row}>
             <View style={styles.halfField}>
               <FormField label={t('startYear')} required>
-                <AppInput
+                <ElementDropdown
+                  data={START_YEAR_OPTIONS}
                   value={startYear}
-                  onChangeText={text => {
-                    setStartYear(normalizePositiveNumberInput(text));
-                    clearInvalid('startYear');
+                  onChange={value => {
+                    if (value) {
+                      setStartYear(Number(value));
+                    }
                   }}
-                  placeholder={t('startYear')}
-                  keyboardType="numeric"
-                  error={!!invalid.startYear}
+                  placeholder={t('selectYear')}
+                  search={false}
                 />
               </FormField>
             </View>
 
             <View style={styles.halfField}>
-              <FormField label={t('endYear')} required>
-                <AppInput
-                  value={endYear}
-                  onChangeText={text => {
-                    setEndYear(normalizePositiveNumberInput(text));
-                    clearInvalid('endYear');
-                  }}
-                  placeholder={t('endYear')}
-                  keyboardType="numeric"
-                  error={!!invalid.endYear}
-                />
+              <FormField label={t('endYear')}>
+                <AppInput value={String(startYear + GOAL_PERIOD_YEARS)} editable={false} />
               </FormField>
             </View>
           </View>

@@ -142,13 +142,28 @@ export default function OverseerAssignmentsScreen() {
     return overseerOrder.some((o, i) => o.id !== saved[i]?.id);
   }, [overseerOrder, data]);
 
+  /** Shows the HTTP status + the server's own message, and logs the full response. */
+  const showRemoveError = (e: any, context: Record<string, unknown>) => {
+    const status = e?.response?.status;
+    const body = e?.response?.data;
+    const serverMessage =
+      (typeof body?.message === 'string' && body.message) ||
+      (typeof body?.error === 'string' && body.error) ||
+      e?.message ||
+      getApiErrorMessage(e, t);
+    console.error('[OverseerAssignments] remove failed', {
+      ...context,
+      status,
+      response: body,
+      message: e?.message,
+    });
+    Alert.alert(
+      status ? `${t('error')} ${status}` : t('error'),
+      String(serverMessage),
+    );
+  };
+
   const confirmRemove = (section: Section, item: AssignedItem) => {
-    // Removing an exclusion needs the exclusion record's own id, which the API
-    // does not return yet; never fall back to the region id.
-    if (section.kind === 'exclude' && !item.exclusionId) {
-      Alert.alert(t('remove'), t('exclusionRemoveUnavailable'));
-      return;
-    }
     Alert.alert(t('remove'), t('removeAssignmentConfirm').replace('{name}', item.name), [
       {text: t('cancel'), style: 'cancel'},
       {
@@ -159,13 +174,19 @@ export default function OverseerAssignmentsScreen() {
           setRemovingKey(key);
           try {
             if (section.kind === 'exclude') {
-              await removeExclusion(userId, section.type as ExclusionType, item.exclusionId!);
+              await removeExclusion(userId, section.type as ExclusionType, item.id);
             } else {
               await removeAssignment(userId, section.type, item.id);
             }
             await load();
           } catch (e) {
-            Alert.alert(t('error'), getApiErrorMessage(e, t));
+            showRemoveError(e, {
+              userId,
+              kind: section.kind,
+              type: section.type,
+              entityId: item.id,
+              name: item.name,
+            });
           } finally {
             if (mountedRef.current) {
               setRemovingKey(null);

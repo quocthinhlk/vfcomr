@@ -137,3 +137,25 @@ export function countRedGoalMetrics(item: GoalPeriodDetailRow) {
     return item[`${metric.key}_is_red`] ? count + 1 : count;
   }, 0);
 }
+
+/** Some API strings arrive as UTF-8 bytes decoded as Latin-1 (e.g. "RegiÃ£o"). */
+export function repairText(value?: string | null): string {
+  const text = String(value ?? '').trim();
+  if (!/[ÃÂ]/.test(text)) {
+    return text;
+  }
+  const bytes: number[] = [];
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code > 0xff) {
+      return text;
+    }
+    bytes.push(code);
+  }
+  try {
+    const decoded = new TextDecoder('utf-8').decode(new Uint8Array(bytes));
+    return decoded.includes('\uFFFD') ? text : decoded;
+  } catch {
+    return text;
+  }
+}

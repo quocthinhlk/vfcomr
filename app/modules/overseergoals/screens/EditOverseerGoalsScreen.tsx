@@ -22,11 +22,13 @@ import {
 } from '../../../shared/components/crud';
 import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import {
+  getOverseerGoalDefaults,
   getOverseerGoalPeriodDetail,
   GoalPeriodBatchUpdatePayload,
   GoalPeriodDetailData,
   GoalPeriodDetailRow,
   GoalSectionKey,
+  updateOverseerGoalDefaults,
   updateOverseerGoalPeriodDetailsBatch,
 } from '../services/overseerGoals.service';
 import {
@@ -41,6 +43,8 @@ const EditOverseerGoalsScreen = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const goalPeriodId: number | undefined = route?.params?.goalPeriodId;
+  // Edit Defaults: the template every new goal period starts from.
+  const isDefaults: boolean = !!route?.params?.defaults;
   const C = useThemedColors();
   const {t} = useTranslation();
   const [loading, setLoading] = useState(true);
@@ -75,14 +79,16 @@ const EditOverseerGoalsScreen = () => {
     let mounted = true;
 
     const loadDetail = async () => {
-      if (!goalPeriodId) {
+      if (!goalPeriodId && !isDefaults) {
         setLoading(false);
         return;
       }
 
       try {
         setLoading(true);
-        const response = await getOverseerGoalPeriodDetail(goalPeriodId);
+        const response = isDefaults
+          ? await getOverseerGoalDefaults()
+          : await getOverseerGoalPeriodDetail(goalPeriodId!);
         if (mounted) {
           setDetail(response?.data ?? null);
           setLoadError(null);
@@ -105,7 +111,7 @@ const EditOverseerGoalsScreen = () => {
     return () => {
       mounted = false;
     };
-  }, [goalPeriodId, reloadKey]);
+  }, [goalPeriodId, isDefaults, reloadKey]);
 
   const updateRowField = (
     sectionKey: GoalSectionKey,
@@ -150,18 +156,22 @@ const EditOverseerGoalsScreen = () => {
   };
 
   const onSave = async () => {
-    if (!goalPeriodId) {
+    if (!goalPeriodId && !isDefaults) {
       return;
     }
 
     const payload = buildPayload();
-    if (!payload) {
+    if (!payload || !detail) {
       return;
     }
 
     try {
       setSubmitting(true);
-      await updateOverseerGoalPeriodDetailsBatch(goalPeriodId, payload);
+      if (isDefaults) {
+        await updateOverseerGoalDefaults({goal_period: detail.goal_period, ...payload});
+      } else {
+        await updateOverseerGoalPeriodDetailsBatch(goalPeriodId!, payload);
+      }
       Alert.alert(t('success'), t('goalsUpdatedSuccess'));
       returnAfterEdit(navigation);
     } catch (error: any) {
@@ -191,7 +201,7 @@ const EditOverseerGoalsScreen = () => {
 
   return (
     <ScreenContainer
-      title={t('editGoals')}
+      title={isDefaults ? t('editDefaults') : t('editGoals')}
       loading={loading}
       error={!detail ? loadError : null}
       onRetry={retryLoad}>

@@ -14,12 +14,6 @@ export type ExclusionType = 'geographical_region' | 'church_region';
 export type AssignedItem = {
   id: number;
   name: string;
-  /**
-   * Primary key of the exclusion record, needed by DELETE …/exclusions.
-   * GET does not send it yet, so excluded items can't be removed until it does
-   * (sending the region id instead would hit a different record).
-   */
-  exclusionId?: number;
 };
 
 export type OverseerAssignments = {
@@ -35,18 +29,12 @@ export type OverseerAssignments = {
   excluded: Record<ExclusionType, AssignedItem[]>;
 };
 
-const toNumber = (v: unknown) => {
-  const n = Number(v);
-  return Number.isFinite(n) && n > 0 ? n : undefined;
-};
-
 const list = (v: unknown): AssignedItem[] =>
   Array.isArray(v)
     ? v
         .map((x: any) => ({
           id: Number(x?.id),
           name: String(x?.name ?? ''),
-          exclusionId: toNumber(x?.exclusion_id ?? x?.exclusionId),
         }))
         .filter(x => Number.isFinite(x.id))
     : [];
@@ -96,8 +84,9 @@ export async function addExclusion(userId: number, type: ExclusionType, entityId
   return res.data;
 }
 
-export async function removeExclusion(userId: number, type: ExclusionType, exclusionId: number) {
-  const res = await api.delete(`overseer-assignments/${userId}/exclusions/${type}/${exclusionId}`);
+/** DELETE …/exclusions/{type}/{entityId}: entityId is the excluded region's id (confirmed by backend). */
+export async function removeExclusion(userId: number, type: ExclusionType, entityId: number) {
+  const res = await api.delete(`overseer-assignments/${userId}/exclusions/${type}/${entityId}`);
   return res.data;
 }
 

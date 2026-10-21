@@ -155,3 +155,98 @@ export async function deleteOverseerGoalPeriod(id: number) {
   const response = await api.delete(`goal-periods/${id}`);
   return response.data;
 }
+
+export interface GoalPeriodDefaultsData extends GoalPeriodDetailData {}
+
+/** GET goal-periods/defaults: the template copied into every new goal period. */
+export async function getOverseerGoalDefaults() {
+  const response = await api.get<{success: boolean; data: GoalPeriodDefaultsData; message: string}>(
+    'goal-periods/defaults',
+  );
+  return response.data;
+}
+
+/** PUT goal-periods/defaults: the whole template (goal_period + the four sections). */
+export async function updateOverseerGoalDefaults(payload: GoalPeriodDefaultsData) {
+  const response = await api.put('goal-periods/defaults', payload);
+  return response.data;
+}
+
+type TreeNode = {id: number; name: string; children?: TreeNode[] | null};
+export type PickerOption = {label: string; value: number};
+
+/** Indented picker options (leading hyphens = depth, read by createHierarchyDropdownRenderItem). */
+function flattenTree(nodes: TreeNode[] | null | undefined, depth = 0, out: PickerOption[] = []) {
+  nodes?.forEach(node => {
+    out.push({label: `${'-'.repeat(depth)}${String(node.name ?? '').trim()}`, value: node.id});
+    flattenTree(node.children, depth + 1, out);
+  });
+  return out;
+}
+
+/** Churches the overseer oversees (GET overseers/{id}/churches), as an indented tree. */
+export async function getOverseerChurchOptions(userId: number): Promise<PickerOption[]> {
+  const response = await api.get(`overseers/${userId}/churches`);
+  const data = response?.data?.data;
+  return flattenTree(Array.isArray(data) ? data : data?.items ?? []);
+}
+
+let geoTreeCache: Promise<TreeNode[]> | null = null;
+
+/** GET geographical-regions (whole tree), shared by the goal screens. */
+export function getGeoRegionTree(): Promise<TreeNode[]> {
+  if (!geoTreeCache) {
+    geoTreeCache = api
+      .get('geographical-regions')
+      .then(response => {
+        const items = response?.data?.data?.items;
+        return Array.isArray(items) ? items : [];
+      })
+      .catch(error => {
+        geoTreeCache = null;
+        throw error;
+      });
+  }
+  return geoTreeCache;
+}
+
+/** Goal periods store a geographical region in `nation_id` (the API's nation_name is wrong). */
+export async function getAllNationOptions(): Promise<PickerOption[]> {
+  return flattenTree(await getGeoRegionTree());
+}
+
+export async function getNationNameMap(): Promise<Map<number, string>> {
+  const map = new Map<number, string>();
+  const walk = (nodes?: TreeNode[] | null) =>
+    nodes?.forEach(node => {
+      map.set(node.id, String(node.name ?? '').trim());
+      walk(node.children);
+    });
+  walk(await getGeoRegionTree());
+  return map;
+}
+
+/**
+ * Nations for a new goal period: the overseer's assigned geographical regions
+ * (GET overseer-assignments/{id}) and every region under them.
+ */
+export async function getOverseerNationOptions(userId: number): Promise<PickerOption[]> {
+  const [assignmentsResponse, tree] = await Promise.all([
+    api.get(`overseer-assignments/${userId}`),
+    getGeoRegionTree(),
+  ]);
+  const assigned: Array<{id: number}> =
+    assignmentsResponse?.data?.data?.assignments?.allowedIds?.geographicalRegionIds ?? [];
+  const assignedIds = new Set(assigned.map(item => Number(item.id)));
+  const roots: TreeNode[] = [];
+  const find = (nodes?: TreeNode[] | null) =>
+    nodes?.forEach(node => {
+      if (assignedIds.has(node.id)) {
+        roots.push(node);
+        return;
+      }
+      find(node.children);
+    });
+  find(tree);
+  return flattenTree(roots);
+}
