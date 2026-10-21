@@ -80,7 +80,19 @@ export const mergeAssignedChurchesLists = (
         continue;
       }
       const prev = byId.get(normalized.id);
-      byId.set(normalized.id, prev ? {...prev, ...normalized} : normalized);
+      // A source without the flags normalizes them to false: never let it
+      // clear a true flag from another source.
+      byId.set(
+        normalized.id,
+        prev
+          ? {
+              ...prev,
+              ...normalized,
+              is_msc: prev.is_msc || normalized.is_msc,
+              is_first_msc: prev.is_first_msc || normalized.is_first_msc,
+            }
+          : normalized,
+      );
     }
   };
   addRows(primary);

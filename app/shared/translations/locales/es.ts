@@ -418,6 +418,16 @@ const es = {
   viewEventType: 'Ver tipo de evento',
   eventTypeDetail: 'Detalle del tipo de evento',
   pushMail: 'Correo push',
+  frequency: "Frecuencia",
+  dayOfMonth: "Día del mes",
+  changeScope: "Cambiar alcance",
+  pushReportsTo: "Enviar informes a {name}",
+  pushReportNotConfigured: "Este usuario aún no tiene envío de informes configurado.",
+  nextSendDate: "Próximo envío",
+  pushReportChooseAll: "Elija una opción en cada grupo.",
+  pushReportSaved: "Configuración de envío guardada.",
+  pushReportRemoved: "Configuración de envío eliminada.",
+  pushReportRemoveConfirm: "¿Eliminar la configuración de envío de informes de {name}?",
   support: 'Soporte',
   settings: 'Configuración',
   bibleVerse: 'Versículo bíblico',
@@ -654,7 +664,7 @@ const es = {
     'El nombre completo de la iglesia, incluyendo ciudad y barrio/pueblo.',
   helpShortName:
     'Un nombre corto en 10 caracteres, por ejemplo VFC-NewLyn',
-  isMultiServiceChurchMsc: '¿Es una iglesia de múltiples servicios (MSC)?',
+  isMultiServiceChurchMsc: 'Es una iglesia de múltiples servicios (MSC)?',
   helpIsMsc:
     'Iglesia de múltiples servicios es si una Iglesia tiene dos o más Servicios de Iglesia, en otro horario, en otro lugar o en otro idioma.',
   helpEnableCp:

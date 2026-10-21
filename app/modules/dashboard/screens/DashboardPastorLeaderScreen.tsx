@@ -681,14 +681,25 @@ export default function DashboardPastorLeaderScreen() {
     refreshAssignedChurchesFromUserMe();
     setOrgModalVisible(true);
   }, [refreshAssignedChurchesFromUserMe]);
+  // MSC flags from each church's detail: the list rows (users/me, dashboard)
+  // don't carry is_first_msc, so without this the First MSC badge never shows.
+  const [churchMscById, setChurchMscById] = useState<
+    Record<number, {is_msc: boolean; is_first_msc: boolean}>
+  >({});
   const sortedAssignedChurches = useMemo(
-    () => sortChurchesForAssignedList(dashboardData?.assigned_churches || []),
-    [dashboardData?.assigned_churches],
+    () =>
+      sortChurchesForAssignedList(
+        (dashboardData?.assigned_churches || []).map((ch: any) => {
+          const fromDetail = churchMscById[Number(ch.id)];
+          return fromDetail ? {...ch, ...fromDetail} : ch;
+        }),
+      ),
+    [dashboardData?.assigned_churches, churchMscById],
   );
 
   // Church photos for the picker: the list rows carry no photo, so load each
-  // church's photo_url once (in parallel) when the popup opens; cached by id.
-  // null = loaded, no photo (shows the blank cover).
+  // church's detail once (in parallel) when the popup opens; cached by id.
+  // null = loaded, no photo (shows the blank cover). The same call gives the MSC flags.
   const [churchPhotoById, setChurchPhotoById] = useState<Record<number, string | null>>({});
   const churchPhotoRequestedRef = useRef<Set<number>>(new Set());
   useEffect(() => {
@@ -697,9 +708,11 @@ export default function DashboardPastorLeaderScreen() {
     }
     const currentId = Number(dashboardData?.dashboard_info?.church_id);
     const currentPhoto = dashboardData?.dashboard_info?.photo_url;
-    if (Number.isFinite(currentId) && currentPhoto && !churchPhotoRequestedRef.current.has(currentId)) {
-      churchPhotoRequestedRef.current.add(currentId);
-      setChurchPhotoById(prev => ({...prev, [currentId]: String(currentPhoto)}));
+    if (Number.isFinite(currentId) && currentPhoto) {
+      // Show the cover right away; its detail is still loaded below for the MSC flags.
+      setChurchPhotoById(prev =>
+        prev[currentId] === undefined ? {...prev, [currentId]: String(currentPhoto)} : prev,
+      );
     }
     const missing = sortedAssignedChurches
       .map((ch: any) => Number(ch.id))
@@ -709,6 +722,9 @@ export default function DashboardPastorLeaderScreen() {
       getChurchDetail(id)
         .then((d: any) => {
           setChurchPhotoById(prev => ({...prev, [id]: d?.photo_url ? String(d.photo_url) : null}));
+          if (d) {
+            setChurchMscById(prev => ({...prev, [id]: getChurchMscFlags(d)}));
+          }
         })
         .catch(() => {
           // Retry next time the popup opens; blank cover meanwhile.
@@ -724,6 +740,7 @@ export default function DashboardPastorLeaderScreen() {
       // Church photos may have changed: drop the picker's cached covers.
       churchPhotoRequestedRef.current.clear();
       setChurchPhotoById({});
+      setChurchMscById({});
       setReloadToken(token => token + 1);
     },
     {dataKey: ['users', 'churches']},

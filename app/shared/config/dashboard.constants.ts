@@ -270,6 +270,10 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
     ],
   },
   {
+    label: t('pushMail'),
+    children: [{label: t('search'), routeName: 'PushMailSearch'}],
+  },
+  {
     label: t('settings'),
     children: [
       {label: t('general'), routeName: 'SettingsGeneral'},

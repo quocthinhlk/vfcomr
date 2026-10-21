@@ -47,6 +47,8 @@ export type RootStackParamList = {
   DeleteOverseerGoalPeriod: { goalPeriodId: number } | undefined;
   EditOverseerGoalParameters: { goalPeriodId: number } | undefined;
   EditOverseerGoalDefaults: { defaults?: boolean } | undefined;
+  PushMailSearch: undefined;
+  PushReportConfig: { userId: number; name?: string };
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: { group?: string } | undefined;
   ChurchesPlantedLast10Years: undefined;
@@ -218,6 +220,8 @@ import WatchListFormScreen from '../modules/watchlist/screens/WatchListFormScree
 import { OverseerGoalsScreen } from '../modules/overseergoals/screens/OverseerGoalsScreen';
 import AddOverseerGoalsScreen from '../modules/overseergoals/screens/AddOverseerGoalsScreen';
 import DeleteOverseerGoalPeriodScreen from '../modules/overseergoals/screens/DeleteOverseerGoalPeriodScreen';
+import PushMailSearchScreen from '../modules/pushmail/screens/PushMailSearchScreen';
+import PushReportConfigScreen from '../modules/pushmail/screens/PushReportConfigScreen';
 import EditOverseerGoalParametersScreen from '../modules/overseergoals/screens/EditOverseerGoalParametersScreen';
 import { GenerateReportsScreen } from '../modules/report/screens/GenerateReportsScreen';
 import { ChurchesPlantedLast10YearsScreen } from '../modules/dashboard/screens/ChurchesPlantedLast10YearsScreen';
@@ -460,6 +464,8 @@ export default function Navigation() {
                 name="EditOverseerGoals"
                 component={EditOverseerGoalsScreen}
               />
+              <Stack.Screen name="PushMailSearch" component={PushMailSearchScreen} />
+              <Stack.Screen name="PushReportConfig" component={PushReportConfigScreen} />
               <Stack.Screen name="GenerateReports" component={GenerateReportsScreen} />
               <Stack.Screen
                 name="ChurchesPlantedLast10Years"
