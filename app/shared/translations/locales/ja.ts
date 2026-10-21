@@ -103,6 +103,8 @@ const ja = {
     continue: '続行',
     // Dashboard Menu
     myDashboard: 'マイダッシュボード',
+    dashboard: "ダッシュボード",
+    myOverseers: "私の監督者",
     myChurchProfile: '私の教会プロフィール',
     myProfile: "マイプロフィール",
     assignedChurches: "割り当て教会",

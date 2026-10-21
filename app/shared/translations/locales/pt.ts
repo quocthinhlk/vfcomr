@@ -103,6 +103,8 @@ const pt = {
     continue: 'Continuar',
     // Dashboard Menu
     myDashboard: 'Meu Painel',
+    dashboard: "Painel",
+    myOverseers: "Meus supervisores",
     myChurchProfile: 'Meu Perfil da Igreja',
     myProfile: "Meu perfil",
     assignedChurches: "Igrejas atribuídas",

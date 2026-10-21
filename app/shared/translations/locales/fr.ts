@@ -103,6 +103,8 @@ const fr = {
     continue: 'Continuer',
     // Dashboard Menu
     myDashboard: 'Mon Tableau de Bord',
+    dashboard: "Tableau de bord",
+    myOverseers: "Mes superviseurs",
     myChurchProfile: "Mon Profil d'Eglise",
     myProfile: "Mon profil",
     assignedChurches: "Églises assignées",

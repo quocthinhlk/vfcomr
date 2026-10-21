@@ -121,6 +121,8 @@ const es = {
     'No pudimos iniciar sesión en este momento. Inténtalo de nuevo en unos instantes.',
   // Dashboard Menu
   myDashboard: 'Mi panel',
+  dashboard: "Panel",
+  myOverseers: "Mis supervisores",
   myChurchProfile: 'Perfil de mi iglesia',
   myProfile: "Mi perfil",
   assignedChurches: "Iglesias asignadas",

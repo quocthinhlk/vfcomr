@@ -152,6 +152,17 @@ export default function DashboardScreen() {
   const [selectedOverseerId, setSelectedOverseerId] = useState<number | null>(null);
   const selectedOverseer =
     overseers.find(o => o.profile.id === selectedOverseerId) ?? overseers[0] ?? null;
+
+  // Opened from My Overseers: pre-select that overseer, then clear the param
+  // so picking another one in the switcher isn't overridden.
+  const requestedOverseerId = Number((route.params as any)?.overseerId) || null;
+  useEffect(() => {
+    if (requestedOverseerId) {
+      setSelectedOverseerId(requestedOverseerId);
+      navigation.setParams({overseerId: undefined});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedOverseerId]);
   const loadOverseers = async () => {
     setOverseersLoading(true);
     setOverseersError(null);

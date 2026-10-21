@@ -103,6 +103,8 @@ const zh = {
     continue: '继续',
     // Dashboard Menu
     myDashboard: '我的仪表板',
+    dashboard: "仪表板",
+    myOverseers: "我的监督者",
     myChurchProfile: '我的教会档案',
     myProfile: "我的资料",
     assignedChurches: "分配的教会",

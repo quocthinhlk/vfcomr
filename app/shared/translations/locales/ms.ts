@@ -103,6 +103,8 @@ const ms = {
     continue: 'Teruskan',
     // Dashboard Menu
     myDashboard: 'Dashboard Saya',
+    dashboard: "Papan Pemuka",
+    myOverseers: "Penyelia Saya",
     myChurchProfile: 'Profil Gereja Saya',
     myProfile: "Profil Saya",
     assignedChurches: "Gereja Ditugaskan",

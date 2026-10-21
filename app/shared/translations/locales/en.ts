@@ -103,6 +103,8 @@ const en = {
     loginFailed: 'We couldn’t sign you in right now. Please try again in a moment.',
     // Dashboard Menu
     myDashboard: 'My Dashboard',
+    dashboard: "Dashboard",
+    myOverseers: "My Overseers",
     myChurchProfile: 'My Church Profile',
     myProfile: "My Profile",
     assignedChurches: "Assigned Churches",

@@ -14,7 +14,7 @@ import { setUnauthorizedHandler } from './api';
 export type RootStackParamList = {
   Login: undefined;
   ForgotPassword: undefined;
-  Dashboard: undefined;
+  Dashboard: { overseerId?: number } | undefined;
   WeeklyReport: undefined;
   AddUser: undefined;
   AddChurch: undefined;
@@ -48,6 +48,7 @@ export type RootStackParamList = {
   EditOverseerGoalParameters: { goalPeriodId: number } | undefined;
   EditOverseerGoalDefaults: { defaults?: boolean } | undefined;
   PushMailSearch: undefined;
+  MyOverseers: undefined;
   PushReportConfig: { userId: number; name?: string };
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: { group?: string } | undefined;
@@ -220,6 +221,7 @@ import WatchListFormScreen from '../modules/watchlist/screens/WatchListFormScree
 import { OverseerGoalsScreen } from '../modules/overseergoals/screens/OverseerGoalsScreen';
 import AddOverseerGoalsScreen from '../modules/overseergoals/screens/AddOverseerGoalsScreen';
 import DeleteOverseerGoalPeriodScreen from '../modules/overseergoals/screens/DeleteOverseerGoalPeriodScreen';
+import MyOverseersScreen from '../modules/dashboard/screens/MyOverseersScreen';
 import PushMailSearchScreen from '../modules/pushmail/screens/PushMailSearchScreen';
 import PushReportConfigScreen from '../modules/pushmail/screens/PushReportConfigScreen';
 import EditOverseerGoalParametersScreen from '../modules/overseergoals/screens/EditOverseerGoalParametersScreen';
@@ -407,6 +409,7 @@ export default function Navigation() {
           ) : (
             <>
               <Stack.Screen name="Dashboard" component={DashboardScreen} />
+              <Stack.Screen name="MyOverseers" component={MyOverseersScreen} />
               <Stack.Screen name="WeeklyReport" component={WeeklyReportScreen} />
               <Stack.Screen name="Profile" component={ProfileScreen} />
               <Stack.Screen name="AddUser" component={AddUserScreen} />

@@ -152,7 +152,13 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
 ];
 
 const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
-  {label: t('myDashboard'), routeName: 'Dashboard'},
+  {
+    label: t('myDashboard'),
+    children: [
+      {label: t('dashboard'), routeName: 'Dashboard'},
+      {label: t('myOverseers'), routeName: 'MyOverseers'},
+    ],
+  },
   {
     label: t('watchLists'),
     children: [
