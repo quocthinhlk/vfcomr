@@ -6,7 +6,8 @@ export type AssignmentType =
   | 'geographical_region'
   | 'church_region'
   | 'language_region'
-  | 'overseer';
+  | 'overseer'
+  | 'church';
 
 /** Only these two can be excluded. */
 export type ExclusionType = 'geographical_region' | 'church_region';
@@ -53,6 +54,7 @@ export async function getOverseerAssignments(userId: number): Promise<OverseerAs
       church_region: list(allowed.churchRegionIds),
       language_region: list(allowed.languageRegionIds),
       overseer: list(allowed.overseerIds),
+      church: list(allowed.churchIds),
     },
     excluded: {
       geographical_region: list(excluded.geographicalRegionIds),
@@ -66,6 +68,8 @@ export async function addAssignments(userId: number, type: AssignmentType, entit
   const res = await api.post(`overseer-assignments/${userId}`, {
     assignment_type: type,
     entity_ids: entityIds,
+    // The documented church request carries sort_order 0.
+    ...(type === 'church' ? {sort_order: 0} : {}),
   });
   return res.data;
 }
@@ -122,8 +126,10 @@ const dataOf = (res: any) => {
   return Array.isArray(d) ? d : d?.items ?? [];
 };
 
-/** All options for a fixed list; overseers are searched instead (see searchOverseerOptions). */
-export async function loadAssignOptions(type: Exclude<AssignmentType, 'overseer'>): Promise<AssignOption[]> {
+/** All options for a fixed list; overseers and churches are searched instead. */
+export async function loadAssignOptions(
+  type: Exclude<AssignmentType, 'overseer' | 'church'>,
+): Promise<AssignOption[]> {
   switch (type) {
     case 'church_network':
       return dataOf(await api.get('church-networks')).map((n: any) => ({id: n.id, name: n.name}));
@@ -144,5 +150,17 @@ export async function searchOverseerOptions(search: string): Promise<AssignOptio
     id: u.id,
     name: u.name,
     path: [u.title, u.role_name, u.country_name].filter(Boolean).join(' · ') || undefined,
+  }));
+}
+
+/** Churches are too many for one list: searched by name (first 50 matches). */
+export async function searchChurchOptions(search: string): Promise<AssignOption[]> {
+  const res = await api.get('churches', {
+    params: {page: 1, limit: 50, sort_by: 'name', sort_desc: false, ...(search ? {search} : {})},
+  });
+  return dataOf(res).map((c: any) => ({
+    id: c.id,
+    name: c.name,
+    path: [c.city, c.country_name].filter(Boolean).join(', ') || undefined,
   }));
 }

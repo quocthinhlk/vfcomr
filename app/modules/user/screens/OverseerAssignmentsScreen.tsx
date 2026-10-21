@@ -41,6 +41,7 @@ import {
   OverseerAssignments,
   removeAssignment,
   removeExclusion,
+  searchChurchOptions,
   searchOverseerOptions,
   updateSubOverseerOrder,
 } from '../services/overseerAssignment.service';
@@ -63,6 +64,7 @@ const SECTION: Record<string, Section> = {
   cr: {key: 'cr', kind: 'allow', type: 'church_region', labelKey: 'churchApostolicRegions', Icon: ChurchIcon},
   crEx: {key: 'crEx', kind: 'exclude', type: 'church_region', labelKey: 'churchApostolicRegions', Icon: ChurchIcon},
   lang: {key: 'lang', kind: 'allow', type: 'language_region', labelKey: 'languageRegions', Icon: ChatIcon},
+  church: {key: 'church', kind: 'allow', type: 'church', labelKey: 'churches', Icon: ChurchIcon},
   ov: {key: 'ov', kind: 'allow', type: 'overseer', labelKey: 'overseersOnDashboard', Icon: UsersIcon},
 };
 
@@ -72,6 +74,7 @@ const GROUPS: {allow: Section; exclude?: Section}[] = [
   {allow: SECTION.geo, exclude: SECTION.geoEx},
   {allow: SECTION.cr, exclude: SECTION.crEx},
   {allow: SECTION.lang},
+  {allow: SECTION.church},
   {allow: SECTION.ov},
 ];
 
@@ -233,9 +236,13 @@ export default function OverseerAssignmentsScreen() {
       if (!picker) {
         return Promise.resolve([]);
       }
-      return picker.type === 'overseer'
-        ? searchOverseerOptions(search).then(list => list.filter(o => o.id !== userId))
-        : loadAssignOptions(picker.type);
+      if (picker.type === 'overseer') {
+        return searchOverseerOptions(search).then(list => list.filter(o => o.id !== userId));
+      }
+      if (picker.type === 'church') {
+        return searchChurchOptions(search);
+      }
+      return loadAssignOptions(picker.type);
     },
     [picker, userId],
   );
@@ -452,7 +459,7 @@ export default function OverseerAssignmentsScreen() {
         title={picker ? `${picker.kind === 'exclude' ? t('exclude') : t('add')}: ${t(picker.labelKey)}` : ''}
         note={t('noDuplicatesNote')}
         loadOptions={loadPickerOptions}
-        remoteSearch={picker?.type === 'overseer'}
+        remoteSearch={picker?.type === 'overseer' || picker?.type === 'church'}
         excludeIds={picker ? itemsOf(picker).map(i => i.id) : []}
         saveLabel={t('save')}
         onSave={savePicked}
