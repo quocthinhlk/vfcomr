@@ -182,6 +182,8 @@ const en = {
     overseer: 'Overseer',
     selectOverseer: 'Select an overseer',
     changeOverseer: 'Change',
+    overseerFiguresHint: "The figures and charts below are for this overseer.",
+    overseerActions: "For this overseer",
     addNewPastor: 'Add New Pastor',
     addNewChurchAndPastor: 'Add New Church & New Pastor',
     newPastorAndNewChurch: 'New Pastor & New Church',

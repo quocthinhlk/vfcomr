@@ -182,6 +182,8 @@ const pt = {
     overseer: 'Supervisor',
     selectOverseer: 'Selecione um supervisor',
     changeOverseer: 'Alterar',
+    overseerFiguresHint: "Os números e gráficos abaixo são deste supervisor.",
+    overseerActions: "Para este supervisor",
     addNewPastor: 'Adicionar Novo Pastor',
     addNewChurchAndPastor: 'Adicionar nova igreja e novo pastor',
     newPastorAndNewChurch: 'Novo Pastor & Nova Igreja',

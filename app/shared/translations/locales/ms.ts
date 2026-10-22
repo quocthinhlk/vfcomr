@@ -182,6 +182,8 @@ const ms = {
     overseer: 'Penyelia',
     selectOverseer: 'Pilih penyelia',
     changeOverseer: 'Tukar',
+    overseerFiguresHint: "Angka dan carta di bawah adalah untuk penyelia ini.",
+    overseerActions: "Untuk penyelia ini",
     addNewPastor: 'Tambah Pastor Baru',
     addNewChurchAndPastor: 'Tambah Gereja Baru & Pastor Baru',
     newPastorAndNewChurch: 'Pastor Baru & Gereja Baru',

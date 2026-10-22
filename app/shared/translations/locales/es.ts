@@ -200,6 +200,8 @@ const es = {
   overseer: 'Supervisor',
   selectOverseer: 'Seleccione un supervisor',
   changeOverseer: 'Cambiar',
+  overseerFiguresHint: "Las cifras y gráficos de abajo son de este supervisor.",
+  overseerActions: "Para este supervisor",
   addNewPastor: 'Agregar nuevo pastor',
   addNewChurchAndPastor: 'Agregar nueva iglesia y nuevo pastor',
   newPastorAndNewChurch: 'Nuevo pastor y nueva iglesia',

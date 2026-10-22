@@ -181,6 +181,8 @@ const zh = {
     overseer: '监督者',
     selectOverseer: '选择监督者',
     changeOverseer: '切换',
+    overseerFiguresHint: "以下数据和图表属于该监督者。",
+    overseerActions: "针对该监督者",
     addNewPastor: '添加新牧师',
     addNewChurchAndPastor: '添加新教会和新牧师',
     newPastorAndNewChurch: '新牧师和新教会',

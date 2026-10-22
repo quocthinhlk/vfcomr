@@ -1,15 +1,17 @@
 import React, {useMemo, useState} from 'react';
-import {Pressable, StyleSheet, Text, View} from 'react-native';
+import {Image, Pressable, StyleSheet, Text, View} from 'react-native';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {ChevronRightIcon} from '../../../shared/components/icons/UiIcons';
 import {SelectionSheet} from '../../../shared/components/SelectionSheet';
-import {fs, ms, ws} from '../../../shared/utils/scale';
+import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import type {AdminOverseerSummary} from '../services/adminDashboard.service';
 
+const blankAvatar = require('../../../assets/icons/avatar_blank.png');
+
 const subtitleOf = (o: AdminOverseerSummary) =>
-  [o.profile.role_name, o.profile.title].filter(Boolean).join(' · ');
+  [o.profile.title, o.profile.role_name].filter(Boolean).join(' · ');
 
 type Props = {
   overseers: AdminOverseerSummary[];
@@ -18,19 +20,22 @@ type Props = {
 };
 
 /**
- * Compact overseer picker for the Admin dashboard: "Overseer · n" with the
- * selected name as a borderless dropdown on the right and the full role · title
- * underneath. Tapping the name slides up the shared SelectionSheet listing
- * every overseer with their avatar.
+ * Top of the Admin dashboard's overseer block: an "Overseer · n" label, then the
+ * selected overseer as a light outlined field (avatar, name, one-line title and
+ * a round ⌄ button) so it reads as tappable, and a one-line hint that the
+ * figures underneath belong to this overseer. Tapping opens the SelectionSheet.
  */
 export const OverseerSwitcher: React.FC<Props> = ({overseers, selected, onSelect}) => {
   const C = useThemedColors();
   const T = useUiTokens();
   const {t} = useTranslation();
   const [open, setOpen] = useState(false);
+  const [photoFailed, setPhotoFailed] = useState<number | null>(null);
 
   const canSwitch = overseers.length > 1;
   const subtitle = subtitleOf(selected);
+  const photo = String(selected.profile.photo_url ?? '').trim();
+  const showPhoto = !!photo && photoFailed !== selected.profile.id;
   const items = useMemo(
     () =>
       overseers.map(o => ({
@@ -43,44 +48,54 @@ export const OverseerSwitcher: React.FC<Props> = ({overseers, selected, onSelect
   );
 
   return (
-    <View style={styles.wrap}>
-      <View style={styles.headerRow}>
-        <Text style={[styles.title, {color: C.textPrimary}]} accessibilityRole="header">
-          {t('overseer') || 'Overseer'}
-          <Text style={[styles.count, {color: C.textSecondary}]}>{`  ·  ${overseers.length}`}</Text>
-        </Text>
+    <View>
+      <Text style={[styles.label, {color: C.textSecondary}]} accessibilityRole="header">
+        {(t('overseer') || 'Overseer').toUpperCase()}
+        {canSwitch ? `  ·  ${overseers.length}` : ''}
+      </Text>
 
-        <Pressable
-          onPress={canSwitch ? () => setOpen(true) : undefined}
-          disabled={!canSwitch}
-          hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}
-          accessibilityRole={canSwitch ? 'button' : 'text'}
-          accessibilityLabel={`${t('overseer')}: ${selected.profile.name}`}
-          accessibilityHint={canSwitch ? t('selectOverseer') : undefined}
-          accessibilityState={canSwitch ? {expanded: open} : undefined}
-          style={({pressed}) => [
-            styles.pill,
-            (pressed || open) && canSwitch && {backgroundColor: T.brandTint},
-          ]}>
-          <Text
-            style={[styles.pillText, {color: canSwitch ? T.brandText : C.textPrimary}]}
-            numberOfLines={1}>
+      <Pressable
+        onPress={canSwitch ? () => setOpen(true) : undefined}
+        disabled={!canSwitch}
+        accessibilityRole={canSwitch ? 'button' : 'text'}
+        accessibilityLabel={`${t('overseer')}: ${selected.profile.name}${subtitle ? `, ${subtitle}` : ''}`}
+        accessibilityHint={canSwitch ? t('selectOverseer') : undefined}
+        accessibilityState={canSwitch ? {expanded: open} : undefined}
+        style={({pressed}) => [
+          styles.field,
+          {
+            backgroundColor: pressed && canSwitch ? T.pressedBg : 'transparent',
+            borderColor: open ? T.brandText : C.border,
+          },
+        ]}>
+        <Image
+          source={showPhoto ? {uri: photo} : blankAvatar}
+          onError={() => setPhotoFailed(selected.profile.id)}
+          style={styles.avatar}
+          accessibilityIgnoresInvertColors
+        />
+        <View style={styles.fieldText}>
+          <Text style={[styles.name, {color: C.textPrimary}]} numberOfLines={1}>
             {selected.profile.name}
           </Text>
-          {canSwitch ? (
+          {subtitle ? (
+            <Text style={[styles.subtitle, {color: C.textSecondary}]} numberOfLines={1}>
+              {subtitle}
+            </Text>
+          ) : null}
+        </View>
+        {canSwitch ? (
+          <View style={[styles.chevronButton, {backgroundColor: T.brandTint}]}>
             <View style={styles.chevronDown}>
               <ChevronRightIcon color={T.brandText} size={ws(12)} />
             </View>
-          ) : null}
-        </Pressable>
-      </View>
+          </View>
+        ) : null}
+      </Pressable>
 
-      {subtitle ? (
-        // Full role · title, wrapping onto as many lines as it needs.
-        <Text style={[styles.subtitle, {color: C.textSecondary}]} accessibilityLiveRegion="polite">
-          {subtitle}
-        </Text>
-      ) : null}
+      <Text style={[styles.hint, {color: C.textSecondary}]} accessibilityLiveRegion="polite">
+        {t('overseerFiguresHint')}
+      </Text>
 
       <SelectionSheet
         visible={open}
@@ -95,48 +110,56 @@ export const OverseerSwitcher: React.FC<Props> = ({overseers, selected, onSelect
 };
 
 const styles = StyleSheet.create({
-  // Sits right under the header (the list container already pads the top).
-  wrap: {
-    marginTop: ms(2),
+  label: {
+    fontSize: fs(11),
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginBottom: ms(6),
   },
-  headerRow: {
+  // Light outline + round ⌄ button say "tap to pick" without a heavy box.
+  field: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: ms(12),
+    gap: ms(10),
+    minHeight: 52,
+    paddingVertical: ms(8),
+    paddingLeft: ms(10),
+    paddingRight: ms(8),
+    borderWidth: StyleSheet.hairlineWidth * 2,
+    borderRadius: rs(12),
   },
-  title: {
+  avatar: {
+    width: ws(32),
+    height: ws(32),
+    borderRadius: ws(16),
+  },
+  fieldText: {
+    flex: 1,
+    minWidth: 0,
+  },
+  name: {
     fontSize: fs(15),
     fontWeight: '700',
   },
-  count: {
-    fontSize: fs(13),
-    fontWeight: '500',
+  subtitle: {
+    marginTop: ms(1),
+    fontSize: fs(12),
+    lineHeight: fs(16),
   },
-  // Borderless: brand-coloured text + chevron mark it as a dropdown.
-  pill: {
-    flexShrink: 1,
-    maxWidth: '62%',
-    minHeight: 32,
-    flexDirection: 'row',
+  chevronButton: {
+    width: ws(28),
+    height: ws(28),
+    borderRadius: ws(14),
     alignItems: 'center',
-    gap: ms(6),
-    paddingLeft: ms(10),
-    paddingRight: ms(8),
-    borderRadius: 16,
-  },
-  pillText: {
-    fontSize: fs(13),
-    fontWeight: '600',
-    flexShrink: 1,
+    justifyContent: 'center',
   },
   chevronDown: {
     transform: [{rotate: '90deg'}],
   },
-  subtitle: {
-    marginTop: ms(2),
+  hint: {
+    marginTop: ms(6),
     fontSize: fs(12),
-    lineHeight: fs(17),
+    lineHeight: fs(16),
   },
 });
 

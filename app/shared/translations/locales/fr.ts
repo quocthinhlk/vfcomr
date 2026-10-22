@@ -182,6 +182,8 @@ const fr = {
     overseer: 'Superviseur',
     selectOverseer: 'Sélectionnez un superviseur',
     changeOverseer: 'Changer',
+    overseerFiguresHint: "Les chiffres et graphiques ci-dessous concernent ce superviseur.",
+    overseerActions: "Pour ce superviseur",
     addNewPastor: 'Ajouter Nouveau Pasteur',
     addNewChurchAndPastor: 'Ajouter Nouvelle Église et Nouveau Pasteur',
     newPastorAndNewChurch: 'Nouveau Pasteur & Nouvelle Église',

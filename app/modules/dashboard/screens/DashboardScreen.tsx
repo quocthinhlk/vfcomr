@@ -36,7 +36,7 @@ import {MenuPopup} from '../../../shared/components/MenuPopup';
 import {isOverseer, isPastorLeader} from '../../../shared/utils/permissions';
 import DashboardPastorLeaderScreen from './DashboardPastorLeaderScreen';
 import OverseerDashboardScreen from './OverseerDashboardScreen';
-import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
+import {fs, ws, ms} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {FlatListWithVerticalScrollbar} from '../../../shared/components/FlatListWithVerticalScrollbar';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
@@ -224,11 +224,9 @@ export default function DashboardScreen() {
   const handleMenuItemPress = (item: any) => {
     if (item.routeName) {
       if (item.routeName === 'EditProfile') {
-        // Admin dashboard: edits the overseer picked above (falls back to the
-        // Admin only when no overseer is loaded).
-        const targetId = selectedOverseer?.profile.id ?? currentUserId;
-        if (targetId) {
-          navigation.navigate('EditProfile', {id: targetId});
+        // Only offered when no overseer is loaded: edits the Admin's own profile.
+        if (currentUserId) {
+          navigation.navigate('EditProfile', {id: currentUserId});
         }
       } else if (item.chartFor) {
         // Charts of the overseer picked above: hand over their indicators
@@ -265,12 +263,18 @@ export default function DashboardScreen() {
       label: t('enterVisits') || 'Enter Visits',
       routeName: 'EnterVisits',
     },
-    {
-      icon: require('../../../../app/assets/images/icon/edit.png'),
-      label: t('editProfile') || 'Edit Profile',
-      routeName: 'EditProfile',
-      disabled: !currentUserId,
-    },
+    // Admin's own profile, only when there's no overseer card (removed from
+    // the overseer actions on request).
+    ...(selectedOverseer
+      ? []
+      : [
+          {
+            icon: require('../../../../app/assets/images/icon/edit.png'),
+            label: t('editProfile') || 'Edit Profile',
+            routeName: 'EditProfile',
+            disabled: !currentUserId,
+          },
+        ]),
     {
       icon: require('../../../../app/assets/images/icon/house-user.png'),
       label: t('addNewChurchAndPastor') || 'Add New Pastor & New Church',
@@ -292,6 +296,7 @@ export default function DashboardScreen() {
       label: t('attendanceChart') || 'Attendance Chart',
       routeName: 'OverseerChurchAttendanceChart',
       chartFor: true,
+      overseerScoped: true,
       disabled: !selectedOverseer,
     },
     {
@@ -299,6 +304,7 @@ export default function DashboardScreen() {
       label: t('pastoralVisits') || 'Church Visits Chart',
       routeName: 'PastoralVisitsChart',
       chartFor: true,
+      overseerScoped: true,
       disabled: !selectedOverseer,
     },
     {
@@ -306,6 +312,7 @@ export default function DashboardScreen() {
       label: t('churchesPlantedLast10Years') || 'Churches Planted last 10 years',
       routeName: 'OverseerChurchesPlantedLast10Years',
       chartFor: true,
+      overseerScoped: true,
       disabled: !selectedOverseer,
     },
     // TEMPORARY – testing only, remove later: opens the push-notification test
@@ -317,6 +324,42 @@ export default function DashboardScreen() {
       routeName: 'Notifications',
     },
   ];
+
+  // Overseer-specific rows live inside the overseer card; the rest are the Admin's own.
+  const overseerActions = selectedOverseer ? menuItems.filter(item => item.overseerScoped) : [];
+  const adminActions = menuItems.filter(item => !overseerActions.includes(item));
+
+  const renderActionRow = (item: (typeof menuItems)[number], index: number, last: boolean) => (
+    <TouchableOpacity
+      key={`${item.routeName}-${index}`}
+      style={[
+        localStyles.actionRow,
+        !last && {borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: C.border},
+        item?.disabled && localStyles.actionDisabled,
+      ]}
+      onPress={() => {
+        if (!item?.disabled) {
+          handleMenuItemPress(item);
+        }
+      }}
+      disabled={!!item?.disabled}
+      accessibilityRole="button"
+      accessibilityState={{disabled: !!item?.disabled}}
+      activeOpacity={item?.disabled ? 1 : 0.7}>
+      {item.bellIcon ? (
+        <View style={localStyles.actionIconBox}>
+          <BellSvgIcon width={ws(20)} height={ws(20)} color={COLORS.mainColor} />
+        </View>
+      ) : (
+        <Image source={item.icon} style={localStyles.actionIcon} />
+      )}
+      <Text style={[localStyles.actionLabel, {color: C.textPrimary}]}>{item.label}</Text>
+      <Image
+        source={require('../../../../app/assets/images/icon-down.png')}
+        style={localStyles.menuArrow}
+      />
+    </TouchableOpacity>
+  );
 
   if (loading) {
     return <AppLoadingView />;
@@ -424,7 +467,9 @@ export default function DashboardScreen() {
         ) : (
           <>
             {selectedOverseer ? (
-              <>
+              // Everything about the picked overseer sits together, so its
+              // figures and actions can't be mistaken for the Admin's own.
+              <View style={localStyles.overseerCard}>
                 <OverseerSwitcher
                   overseers={overseers}
                   selected={selectedOverseer}
@@ -435,59 +480,30 @@ export default function DashboardScreen() {
                   key={selectedOverseer.profile.id}
                   overseer={selectedOverseer}
                 />
-              </>
+                {overseerActions.length > 0 ? (
+                  <>
+                    <Text style={[localStyles.sectionLabel, {color: C.textSecondary}]}>
+                      {t('overseerActions').toUpperCase()}
+                    </Text>
+                    {overseerActions.map((item, index) =>
+                      renderActionRow(item, index, index === overseerActions.length - 1),
+                    )}
+                  </>
+                ) : null}
+              </View>
             ) : null}
           </>
         )}
 
-        <View style={{marginTop: ms(8)}}>
-          {menuItems.map((item, index) => (
-            <TouchableOpacity
-              key={index}
-              style={[
-                {
-                  flexDirection: 'row',
-                  alignItems: 'center',
-                  paddingVertical: ms(12),
-                  paddingHorizontal: 0,
-                  borderBottomWidth: StyleSheet.hairlineWidth,
-                },
-                {
-                  borderBottomColor: C.border,
-                  opacity: item?.disabled ? 0.5 : 1,
-                },
-              ]}
-              onPress={() => {
-                if (!item?.disabled) {
-                  handleMenuItemPress(item);
-                }
-              }}
-              disabled={!!item?.disabled}
-              activeOpacity={item?.disabled ? 1 : 0.7}>
-              {item.bellIcon ? (
-                <View style={{width: ws(23), height: hs(23), marginRight: ms(12), alignItems: 'center', justifyContent: 'center'}}>
-                  <BellSvgIcon width={ws(20)} height={ws(20)} color={COLORS.mainColor} />
-                </View>
-              ) : (
-                <Image
-                  source={item.icon}
-                  style={{
-                    width: ws(23),
-                    height: hs(23),
-                    marginRight: ms(12),
-                    resizeMode: 'contain',
-                  }}
-                />
-              )}
-              <Text style={[{flex: 1}, {color: C.textPrimary, fontSize: fs(14)}]}>
-                {item.label}
-              </Text>
-              <Image
-                source={require('../../../../app/assets/images/icon-down.png')}
-                style={localStyles.menuArrow}
-              />
-            </TouchableOpacity>
-          ))}
+        <Text
+          style={[localStyles.sectionLabel, localStyles.quickActionsLabel, {color: C.textSecondary}]}
+          accessibilityRole="header">
+          {t('quickActions').toUpperCase()}
+        </Text>
+        <View>
+          {adminActions.map((item, index) =>
+            renderActionRow(item, index, index === adminActions.length - 1),
+          )}
         </View>
 
           </>
@@ -498,6 +514,45 @@ export default function DashboardScreen() {
 }
 
 const localStyles = StyleSheet.create({
+  overseerCard: {
+    marginTop: ms(4),
+  },
+  sectionLabel: {
+    fontSize: fs(11),
+    fontWeight: '700',
+    letterSpacing: 0.6,
+    marginTop: ms(4),
+    marginBottom: ms(2),
+  },
+  quickActionsLabel: {
+    marginTop: ms(20),
+  },
+  actionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    minHeight: 48,
+    paddingVertical: ms(12),
+  },
+  actionDisabled: {
+    opacity: 0.5,
+  },
+  actionIconBox: {
+    width: ws(23),
+    height: ws(23),
+    marginRight: ms(12),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionIcon: {
+    width: ws(23),
+    height: ws(23),
+    marginRight: ms(12),
+    resizeMode: 'contain',
+  },
+  actionLabel: {
+    flex: 1,
+    fontSize: fs(14),
+  },
   menuArrow: {
     width: ws(15),
     height: ws(15),

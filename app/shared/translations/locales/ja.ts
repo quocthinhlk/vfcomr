@@ -182,6 +182,8 @@ const ja = {
     overseer: '監督者',
     selectOverseer: '監督者を選択',
     changeOverseer: '変更',
+    overseerFiguresHint: "以下の数値とグラフはこの監督者のものです。",
+    overseerActions: "この監督者について",
     addNewPastor: '新しい牧師を追加',
     addNewChurchAndPastor: '新しい教会と新しい牧師を追加',
     newPastorAndNewChurch: '新しい牧師と新しい教会',
