@@ -52,7 +52,7 @@ export type RootStackParamList = {
   MyOverseerDetail: { overseerId: number };
   PushReportConfig: { userId: number; name?: string };
   EditOverseerGoals: { goalPeriodId: number } | undefined;
-  GenerateReports: { group?: string } | undefined;
+  GenerateReports: { report?: string; group?: string } | undefined;
   ChurchesPlantedLast10Years: undefined;
   OverseerChurchAttendanceChart: undefined;
   PastoralVisitsChart: undefined;

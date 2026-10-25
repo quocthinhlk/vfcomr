@@ -3,6 +3,8 @@ import { CommonMenuItem } from '../interfaces/MenuItem';
 import api from '../../config/api';
 import { isSuperAdmin, isPastorLeader } from '../utils/permissions';
 import { translations, TranslationKey, LanguageCode } from '../translations';
+import { reportText } from '../../modules/report/reportTexts';
+import { reportMenuForRole } from '../../modules/report/reportPages';
 
 const iconChurch = require('../../assets/images/icon/church.png');
 const iconRelated = require('../../assets/images/icon/related.png');
@@ -39,38 +41,25 @@ const iconEdit = require('../../assets/images/edit.png');
 
 type TFunc = (key: TranslationKey) => string;
 
-const getReportMenuItem = (t: TFunc): CommonMenuItem => ({
-  label: t('generateReports'),
-  children: [
-    {label: t('reportGroupChurch'), routeName: 'GenerateReports', params: {group: 'church'}},
-    {
-      label: t('reportGroupChurchGraph'),
-      routeName: 'GenerateReports',
-      params: {group: 'church_reports_graph_reports'},
-    },
-    {label: t('reportGroupVisit'), routeName: 'GenerateReports', params: {group: 'visit_report'}},
-    {
-      label: t('reportGroupStatus'),
-      routeName: 'GenerateReports',
-      params: {group: 'church_report_status'},
-    },
-    {
-      label: t('reportGroupMultiChurch'),
-      routeName: 'GenerateReports',
-      params: {group: 'multi_church'},
-    },
-    {label: t('reportGroupUserData'), routeName: 'GenerateReports', params: {group: 'user_data'}},
-    {label: t('reportGroupUserGraph'), routeName: 'GenerateReports', params: {group: 'user_graph'}},
-    {label: t('reportGroupEvent'), routeName: 'GenerateReports', params: {group: 'event'}},
-    {
-      label: t('reportGroupDirectory'),
-      routeName: 'GenerateReports',
-      params: {group: 'my_directory'},
-    },
-  ],
+// Generate Reports: the web app's menu (same items, order, names and
+// per-role visibility), plus the app-only Research Info page.
+const getReportMenuItem = (
+  t: TFunc,
+  languageCode: LanguageCode,
+  roleId?: number,
+): CommonMenuItem => ({
+  label: reportText(languageCode, 'mainMenu.generateReports'),
+  children: reportMenuForRole(roleId).map(entry => ({
+    label:
+      entry.id === 'overseer_researching'
+        ? t('reportGroupOverseerResearching')
+        : reportText(languageCode, entry.menuKey),
+    routeName: 'GenerateReports',
+    params: {report: entry.id},
+  })),
 });
 
-const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
+const getPastorMenuItems = (t: TFunc, reportMenu: CommonMenuItem): CommonMenuItem[] => [
   {
     label: t('myChurchProfile'),
     children: [
@@ -120,7 +109,7 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('viewProjections'), routeName: 'ChurchPlantingProjections'},
     ],
   },
-  getReportMenuItem(t),
+  reportMenu,
   {
     label: t('relating'),
     children: [
@@ -151,7 +140,7 @@ const getPastorMenuItems = (t: TFunc): CommonMenuItem[] => [
   {label: t('omrSupport'), routeName: 'OmrSupport'},
 ];
 
-const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
+const getSuperAdminMenuItems = (t: TFunc, reportMenu: CommonMenuItem): CommonMenuItem[] => [
   {
     label: t('myDashboard'),
     children: [
@@ -195,7 +184,7 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('editDefaults'), routeName: 'EditOverseerGoalDefaults'},
     ],
   },
-  getReportMenuItem(t),
+  reportMenu,
   {
     label: t('churchNetworks'),
     children: [
@@ -289,7 +278,7 @@ const getSuperAdminMenuItems = (t: TFunc): CommonMenuItem[] => [
 ];
 
 // Only the Overseer role uses this menu (roles: Pastor, Super Admin, Overseer).
-const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
+const getDefaultMenuItems = (t: TFunc, reportMenu: CommonMenuItem): CommonMenuItem[] => [
   {
     label: t('myDashboard'),
     children: [
@@ -326,7 +315,7 @@ const getDefaultMenuItems = (t: TFunc): CommonMenuItem[] => [
       {label: t('disabledChurches'), routeName: 'DisableChurches'},
     ],
   },
-  getReportMenuItem(t),
+  reportMenu,
   {
     label: t('churchPlantingProjections'),
     children: [
@@ -381,13 +370,14 @@ export const getTranslatedMenuItems = (
     return dict[key] || translations.en[key] || key;
   };
 
+  const reportMenu = getReportMenuItem(t, languageCode, userRoleId);
   if (isPastorLeader(userRoleId)) {
-    return getPastorMenuItems(t);
+    return getPastorMenuItems(t, reportMenu);
   }
   if (isSuperAdmin(userRoleId)) {
-    return getSuperAdminMenuItems(t);
+    return getSuperAdminMenuItems(t, reportMenu);
   }
-  return getDefaultMenuItems(t);
+  return getDefaultMenuItems(t, reportMenu);
 };
 
 export const dashboardMenuItems: CommonMenuItem[] = [

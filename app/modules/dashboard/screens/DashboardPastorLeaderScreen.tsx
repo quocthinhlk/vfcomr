@@ -1,7 +1,7 @@
 import React, { useCallback, useMemo, useState, useContext, useEffect, useRef } from 'react';
-import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS, Dimensions } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Image, StyleSheet, Platform, Animated, Easing, Modal, Alert, PermissionsAndroid, Text as RNText, ActivityIndicator, ActionSheetIOS, Dimensions, useWindowDimensions, RefreshControl } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, SafeAreaProvider, SafeAreaInsetsContext } from 'react-native-safe-area-context';
 import { Text, Popover, MenuItem as UIKittenMenuItem, Button } from '@ui-kitten/components';
 import {useNavigation, useRoute, useIsFocused} from '@react-navigation/native';
 import { logout } from '../../auth/services/auth.service';
@@ -633,6 +633,19 @@ export default function DashboardPastorLeaderScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [reloadToken, setReloadToken] = useState(0);
+  // Pull-to-refresh: re-runs the same loaders "silently", i.e. the dashboard
+  // stays on screen (no full-screen loader) and a failure is shown as an alert
+  // instead of replacing the content with the error state.
+  const [refreshing, setRefreshing] = useState(false);
+  const silentReloadRef = useRef(false);
+  const silentReloadErrorRef = useRef<string | null>(null);
+  const reportLoadError = (message: string) => {
+    if (silentReloadRef.current) {
+      silentReloadErrorRef.current = message;
+      return;
+    }
+    setLoadError(message);
+  };
   // Back online: re-run the dashboard loaders.
   useOnReconnect(() => setReloadToken(token => token + 1));
   const [logoError, setLogoError] = useState(false);
@@ -643,19 +656,41 @@ export default function DashboardPastorLeaderScreen() {
   const fade = useRef(new Animated.Value(1)).current;
   const translateY = useRef(new Animated.Value(0)).current;
   const [orgModalVisible, setOrgModalVisible] = useState(false);
-  const orgSheetSlide = useRef(new Animated.Value(Dimensions.get('window').height)).current;
-  useEffect(() => {
-    if (!orgModalVisible) {
+  const orgSheetSlide = useRef(new Animated.Value(Dimensions.get('screen').height)).current;
+  const {height: windowHeight} = useWindowDimensions();
+  // Handle + title height, measured: the list gets an explicit pixel maxHeight
+  // from it (see the ScrollView below).
+  const [orgSheetHeaderH, setOrgSheetHeaderH] = useState(ms(60));
+  const orgSheetOpenedRef = useRef(false);
+  // Started from the Modal's onShow (the Dialog really exists), JS-driven: a
+  // native-driver animation started before the Android Dialog mounted could
+  // fail to attach on Fabric and leave the sheet off-screen.
+  const startOrgSheetSlide = useCallback(() => {
+    if (orgSheetOpenedRef.current) {
       return;
     }
-    orgSheetSlide.setValue(Dimensions.get('window').height);
+    orgSheetOpenedRef.current = true;
     Animated.timing(orgSheetSlide, {
       toValue: 0,
       duration: 260,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [orgModalVisible, orgSheetSlide]);
+      useNativeDriver: false,
+    }).start(({finished}) => {
+      if (!finished) {
+        orgSheetSlide.setValue(0);
+      }
+    });
+  }, [orgSheetSlide]);
+  useEffect(() => {
+    if (!orgModalVisible) {
+      orgSheetOpenedRef.current = false;
+      return;
+    }
+    orgSheetSlide.setValue(Dimensions.get('screen').height);
+    // Fallback for devices where onShow does not fire.
+    const timer = setTimeout(startOrgSheetSlide, 350);
+    return () => clearTimeout(timer);
+  }, [orgModalVisible, orgSheetSlide, startOrgSheetSlide]);
   const userMeRef = useRef<any>(null);
   const refreshAssignedChurchesFromUserMe = useCallback(() => {
     const userData = userMeRef.current;
@@ -732,6 +767,20 @@ export default function DashboardPastorLeaderScreen() {
         });
     });
   }, [orgModalVisible, sortedAssignedChurches, dashboardData?.dashboard_info?.church_id, dashboardData?.dashboard_info?.photo_url]);
+
+  const onRefresh = () => {
+    if (silentReloadRef.current) {
+      return;
+    }
+    silentReloadRef.current = true;
+    silentReloadErrorRef.current = null;
+    setRefreshing(true);
+    // Church photos may have changed: drop the picker's cached covers.
+    churchPhotoRequestedRef.current.clear();
+    setChurchPhotoById({});
+    setChurchMscById({});
+    setReloadToken(token => token + 1);
+  };
 
   // Back from Edit Profile / Edit Church (or anything else that saved a user or
   // church): re-run the dashboard loaders. A plain Back with no save does nothing.
@@ -1005,7 +1054,9 @@ export default function DashboardPastorLeaderScreen() {
     const churchCountryFromParam = typeof church?.country_name === 'string' ? church.country_name.trim() : '';
 
     setOrgModalVisible(false);
-    setLoading(true);
+    if (!silentReloadRef.current) {
+      setLoading(true);
+    }
     setBannerError(false);
     setProfileError(false);
     setLogoError(false);
@@ -1038,7 +1089,7 @@ export default function DashboardPastorLeaderScreen() {
         // Offline: don't pass off an empty dashboard (all zeros) as real data.
         const parsed = parseApiError(apiErr);
         if (parsed.isNetworkError || parsed.isTimeout) {
-          setLoadError(getApiErrorMessage(apiErr, tRef.current));
+          reportLoadError(getApiErrorMessage(apiErr, tRef.current));
           return false;
         }
         // Build a minimal data structure so the screen is still usable
@@ -1379,20 +1430,38 @@ export default function DashboardPastorLeaderScreen() {
             setLoadError(null);
           }
         } else if (mounted) {
-          setUserProfile(null);
-          setDashboardData(null);
-          setLoadError(tRef.current('failedToLoadData'));
+          if (silentReloadRef.current) {
+            reportLoadError(tRef.current('failedToLoadData'));
+          } else {
+            setUserProfile(null);
+            setDashboardData(null);
+            setLoadError(tRef.current('failedToLoadData'));
+          }
         }
       } catch (error) {
         console.error('Error fetching data:', error);
         if (mounted) {
-          setUserProfile(null);
-          setDashboardData(null);
-          setLoadError(getApiErrorMessage(error, tRef.current));
+          if (silentReloadRef.current) {
+            // Keep what is on screen; just tell the user the refresh failed.
+            reportLoadError(getApiErrorMessage(error, tRef.current));
+          } else {
+            setUserProfile(null);
+            setDashboardData(null);
+            setLoadError(getApiErrorMessage(error, tRef.current));
+          }
         }
       } finally {
         bootstrapDoneRef.current = true;
         if (mounted) setLoading(false);
+        if (silentReloadRef.current) {
+          silentReloadRef.current = false;
+          setRefreshing(false);
+          const failed = silentReloadErrorRef.current;
+          silentReloadErrorRef.current = null;
+          if (failed && mounted) {
+            Alert.alert(tRef.current('error'), failed);
+          }
+        }
       }
     })();
     return () => { mounted = false; };
@@ -2014,6 +2083,14 @@ export default function DashboardPastorLeaderScreen() {
       </View>
       <FlatListWithVerticalScrollbar
         style={styles.scrollView}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={COLORS.mainColor}
+            colors={[COLORS.mainColor]}
+          />
+        }
         data={DASHBOARD_SCROLL_DATA}
         keyExtractor={item => item.id}
         renderItem={() => null}
@@ -2157,7 +2234,32 @@ export default function DashboardPastorLeaderScreen() {
 
         {/* Assigned Churches Modal — same logic as before, shown as a bottom sheet like the Admin overseer picker */}
         {/* Backdrop fades in like the list action sheets; only the card slides up. */}
-        <Modal visible={orgModalVisible} transparent animationType="fade" statusBarTranslucent onRequestClose={() => setOrgModalVisible(false)}>
+        {/* navigationBarTranslucent + an inner SafeAreaProvider: the sheet draws
+            under both system bars on every Android version (Android 15+ forces
+            edge-to-edge, older ones do not) and pads by the Modal window's own
+            bottom inset, so the last church is never hidden behind the nav bar. */}
+        <Modal
+          visible={orgModalVisible}
+          transparent
+          animationType="fade"
+          statusBarTranslucent
+          navigationBarTranslucent
+          onShow={startOrgSheetSlide}
+          onRequestClose={() => setOrgModalVisible(false)}>
+          <SafeAreaProvider>
+          <SafeAreaInsetsContext.Consumer>
+          {insets => {
+            const bottomPad = ms(16) + Math.max(insets?.bottom ?? 0, ms(12));
+            const cardMaxHeight = Math.round(windowHeight * 0.8);
+            // Explicit pixel cap on the ScrollView itself. Relying on the list
+            // shrinking inside the card's maxHeight (flexShrink) is not applied
+            // by every Android device: the list then kept its full height, was
+            // only clipped, and had nothing to scroll.
+            const listMaxHeight = Math.max(
+              ms(120),
+              cardMaxHeight - ms(8) - orgSheetHeaderH - bottomPad,
+            );
+            return (
           <View style={styles.modalBackdrop}>
             <TouchableOpacity
               activeOpacity={1}
@@ -2168,12 +2270,24 @@ export default function DashboardPastorLeaderScreen() {
             />
             {/* Pixel maxHeight: a '%' is resolved against a parent whose height some
                 Android devices report differently inside a statusBarTranslucent Modal. */}
-            <Animated.View style={[styles.modalCard, { maxHeight: Math.round(Dimensions.get('window').height * 0.8), backgroundColor: C.surface, transform: [{ translateY: orgSheetSlide }] }]}>
-              <View style={[styles.modalHandle, { backgroundColor: C.border }]} />
-              <View style={styles.modalHeader}>
-                <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t('yourOtherChurches')}</Text>
+            <Animated.View style={[styles.modalCard, { maxHeight: cardMaxHeight, paddingBottom: bottomPad, backgroundColor: C.surface, transform: [{ translateY: orgSheetSlide }] }]}>
+              <View
+                onLayout={e => {
+                  const h = Math.round(e.nativeEvent.layout.height);
+                  if (h > 0 && h !== orgSheetHeaderH) {
+                    setOrgSheetHeaderH(h);
+                  }
+                }}>
+                <View style={[styles.modalHandle, { backgroundColor: C.border }]} />
+                <View style={styles.modalHeader}>
+                  <Text style={[styles.modalTitle, { color: C.textPrimary }]}>{t('yourOtherChurches')}</Text>
+                </View>
               </View>
-              <ScrollView style={styles.modalList} showsVerticalScrollIndicator>
+              <ScrollView
+                style={[styles.modalList, { maxHeight: listMaxHeight }]}
+                showsVerticalScrollIndicator
+                nestedScrollEnabled
+                keyboardShouldPersistTaps="handled">
                 {sortedAssignedChurches.map((ch: any) => {
                   const isCurrent =
                     dashboardData?.dashboard_info?.church_id != null &&
@@ -2228,6 +2342,10 @@ export default function DashboardPastorLeaderScreen() {
               </ScrollView>
             </Animated.View>
           </View>
+            );
+          }}
+          </SafeAreaInsetsContext.Consumer>
+          </SafeAreaProvider>
         </Modal>
 
 

@@ -1,16 +1,27 @@
-import React, {useCallback, useEffect, useMemo, useRef} from 'react';
-import {StyleSheet, View, type LayoutChangeEvent, type ViewStyle} from 'react-native';
-import {Gesture, GestureDetector} from 'react-native-gesture-handler';
-import Animated, {
-  runOnJS,
-  useAnimatedStyle,
-  useSharedValue,
-  withTiming,
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {
+  Animated,
   Easing,
-  type SharedValue,
-} from 'react-native-reanimated';
+  StyleSheet,
+  View,
+  type LayoutChangeEvent,
+  type ViewStyle,
+} from 'react-native';
+import {Gesture, GestureDetector} from 'react-native-gesture-handler';
 import {useThemedColors} from '../styles/theme';
 import {ws} from '../utils/scale';
+
+/*
+ * Why React Native's Animated and not react-native-reanimated here:
+ * on Android (RN 0.78, new architecture) a Reanimated-animated view on a screen
+ * stops that screen's <Modal>s from ever receiving their window size. Every
+ * Modal on the screen (action sheet, attribute key…) then lays out at 0×0: an
+ * invisible full-screen dialog that swallows every tap, so the sheet "never
+ * opens" and the list looks frozen until Back is pressed. Reproduced on an
+ * emulator with the church list; with one page (carousel off) the same sheet
+ * worked. Keep this carousel on RN Animated (native driver) + JS gesture
+ * callbacks so no view here is driven by Reanimated.
+ */
 
 /** Above this, horizontal swipe is disabled to avoid huge native page counts. */
 export const PAGINATED_LIST_PAGER_MAX_PAGES = 80;
@@ -20,11 +31,7 @@ const VELOCITY_THRESHOLD = 650;
 const RUBBER_BAND = 0.25;
 const MAX_OVERSHOOT = ws(40);
 const COMMIT_DURATION_MS = 150;
-
-const COMMIT_TIMING = {
-  duration: COMMIT_DURATION_MS,
-  easing: Easing.out(Easing.quad),
-};
+const COMMIT_EASING = Easing.out(Easing.quad);
 
 export type PaginatedListPagerProps = {
   page: number;
@@ -48,13 +55,13 @@ export type PaginatedListPagerProps = {
 
 type CarouselPageProps = {
   pageNumber: number;
-  pageWidth: SharedValue<number>;
-  scrollX: SharedValue<number>;
+  pageWidth: Animated.Value;
+  scrollX: Animated.Value;
   background: string;
   children: React.ReactNode;
 };
 
-/** A single page instance, positioned along the virtual track via shared values. */
+/** A single page instance, positioned along the virtual track: x = page * width - scrollX. */
 function CarouselPage({
   pageNumber,
   pageWidth,
@@ -62,13 +69,16 @@ function CarouselPage({
   background,
   children,
 }: CarouselPageProps) {
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{translateX: pageNumber * pageWidth.value - scrollX.value}],
-  }));
+  // Width and scroll are both animated values, updated in the same native
+  // batch, so a page never jumps when the width arrives or changes.
+  const translateX = useMemo(
+    () => Animated.subtract(Animated.multiply(pageWidth, pageNumber), scrollX),
+    [pageNumber, pageWidth, scrollX],
+  );
 
   return (
     <Animated.View
-      style={[styles.page, {backgroundColor: background}, animatedStyle]}
+      style={[styles.page, {backgroundColor: background, transform: [{translateX}]}]}
       collapsable={false}>
       {children}
     </Animated.View>
@@ -96,26 +106,67 @@ function CarouselPager({
 }: CarouselPagerProps) {
   const C = useThemedColors();
 
-  const pageWidth = useSharedValue(0);
-  const scrollX = useSharedValue(0);
-  const startScroll = useSharedValue(0);
-  const isAnimating = useSharedValue(false);
-  const pageShared = useSharedValue(page);
-  const totalShared = useSharedValue(totalPages);
-
-  const widthReadyRef = useRef(false);
+  // Neighbour pages are mounted only once the width is known.
+  const [hasWidth, setHasWidth] = useState(false);
+  // Track position in px: page p sits at p * width - scrollX.
+  const pageWidth = useRef(new Animated.Value(0)).current;
+  const scrollX = useRef(new Animated.Value(0)).current;
+  // JS mirror of scrollX (the native value cannot be read synchronously).
+  const scrollRef = useRef(0);
+  const widthRef = useRef(0);
+  const pageRef = useRef(page);
+  pageRef.current = page;
+  const totalRef = useRef(totalPages);
+  totalRef.current = totalPages;
+  const animatingRef = useRef(false);
+  const draggingRef = useRef(false);
+  const dragStartRef = useRef(0);
   const prevPageRef = useRef(page);
   const swipeRef = useRef(false);
 
   const usePager =
     totalPages > 1 && totalPages <= PAGINATED_LIST_PAGER_MAX_PAGES;
 
+  const setScroll = useCallback(
+    (value: number) => {
+      scrollRef.current = value;
+      scrollX.setValue(value);
+    },
+    [scrollX],
+  );
+
+  const animateScrollTo = useCallback(
+    (value: number) => {
+      animatingRef.current = true;
+      scrollRef.current = value;
+      Animated.timing(scrollX, {
+        toValue: value,
+        duration: COMMIT_DURATION_MS,
+        easing: COMMIT_EASING,
+        useNativeDriver: true,
+      }).start(() => {
+        animatingRef.current = false;
+      });
+    },
+    [scrollX],
+  );
+
+  // Move both values to the native driver once, so drag updates (setValue) are
+  // applied natively too instead of re-rendering through the shadow tree.
   useEffect(() => {
-    pageShared.value = page;
-  }, [page, pageShared]);
-  useEffect(() => {
-    totalShared.value = totalPages;
-  }, [totalPages, totalShared]);
+    Animated.parallel([
+      Animated.timing(pageWidth, {
+        toValue: widthRef.current,
+        duration: 0,
+        useNativeDriver: true,
+      }),
+      Animated.timing(scrollX, {
+        toValue: scrollRef.current,
+        duration: 0,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [pageWidth, scrollX]);
 
   const notifyChange = useCallback(
     (target: number) => {
@@ -127,9 +178,8 @@ function CarouselPager({
 
   // Snap to current page (no animation) on remount / filter reset.
   useEffect(() => {
-    const w = pageWidth.value;
-    scrollX.value = w > 0 ? pageShared.value * w : 0;
-    prevPageRef.current = pageShared.value;
+    setScroll(widthRef.current > 0 ? pageRef.current * widthRef.current : 0);
+    prevPageRef.current = pageRef.current;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pagerRemountKey]);
 
@@ -143,45 +193,51 @@ function CarouselPager({
       prevPageRef.current = page;
       return;
     }
-    const w = pageWidth.value;
+    const w = widthRef.current;
     if (w > 0) {
-      scrollX.value = withTiming(page * w, COMMIT_TIMING);
+      animateScrollTo(page * w);
     }
     prevPageRef.current = page;
-  }, [page, scrollX, pageWidth]);
+  }, [page, animateScrollTo]);
 
   const onLayout = useCallback(
     (event: LayoutChangeEvent) => {
       const w = event.nativeEvent.layout.width;
-      pageWidth.value = w;
-      if (w > 0 && !widthReadyRef.current) {
-        widthReadyRef.current = true;
-        scrollX.value = pageShared.value * w;
+      if (w <= 0 || w === widthRef.current) {
+        return;
       }
+      widthRef.current = w;
+      // Keep the current page in place when the width first arrives or changes.
+      pageWidth.setValue(w);
+      setScroll(pageRef.current * w);
+      setHasWidth(true);
     },
-    [pageShared, pageWidth, scrollX],
+    [pageWidth, setScroll],
   );
 
+  // Callbacks run on the JS thread (runOnJS): nothing here is a Reanimated worklet.
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
+        .runOnJS(true)
         .activeOffsetX([-16, 16])
         .failOffsetY([-12, 12])
         .onStart(() => {
-          if (isAnimating.value) {
+          if (animatingRef.current || widthRef.current <= 0) {
+            draggingRef.current = false;
             return;
           }
-          startScroll.value = scrollX.value;
+          draggingRef.current = true;
+          dragStartRef.current = scrollRef.current;
         })
         .onUpdate(event => {
-          if (isAnimating.value) {
+          if (!draggingRef.current) {
             return;
           }
-          const w = pageWidth.value || 1;
-          const max = totalShared.value;
-          let next = startScroll.value - event.translationX;
+          const w = widthRef.current;
           const minS = w; // page 1
-          const maxS = max * w; // last page
+          const maxS = totalRef.current * w; // last page
+          let next = dragStartRef.current - event.translationX;
           if (next < minS) {
             const over = minS - next;
             next = minS - Math.min(over * RUBBER_BAND, MAX_OVERSHOOT);
@@ -189,19 +245,20 @@ function CarouselPager({
             const over = next - maxS;
             next = maxS + Math.min(over * RUBBER_BAND, MAX_OVERSHOOT);
           }
-          scrollX.value = next;
+          setScroll(next);
         })
         .onEnd(event => {
-          if (isAnimating.value) {
+          if (!draggingRef.current) {
             return;
           }
-          const w = pageWidth.value;
+          draggingRef.current = false;
+          const w = widthRef.current;
           if (w <= 0) {
             return;
           }
-          const cur = pageShared.value;
-          const max = totalShared.value;
-          const diff = scrollX.value - cur * w; // > 0 → moved toward next
+          const cur = pageRef.current;
+          const max = totalRef.current;
+          const diff = scrollRef.current - cur * w; // > 0 → moved toward next
           const threshold = w * SWIPE_THRESHOLD_RATIO;
 
           let target = cur;
@@ -214,25 +271,21 @@ function CarouselPager({
             target = cur - 1;
           }
 
-          isAnimating.value = true;
-          scrollX.value = withTiming(target * w, COMMIT_TIMING, finished => {
-            if (finished) {
-              isAnimating.value = false;
-            }
-          });
+          animateScrollTo(target * w);
           if (target !== cur) {
-            runOnJS(notifyChange)(target);
+            notifyChange(target);
+          }
+        })
+        .onFinalize(() => {
+          // Cancelled mid-drag (e.g. the list took over): settle on the current page.
+          if (draggingRef.current) {
+            draggingRef.current = false;
+            if (widthRef.current > 0) {
+              animateScrollTo(pageRef.current * widthRef.current);
+            }
           }
         }),
-    [
-      isAnimating,
-      notifyChange,
-      pageShared,
-      pageWidth,
-      scrollX,
-      startScroll,
-      totalShared,
-    ],
+    [animateScrollTo, notifyChange, setScroll],
   );
 
   if (!usePager) {
@@ -245,12 +298,18 @@ function CarouselPager({
     );
   }
 
-  // Window of pages kept mounted: previous / current / next (clamped).
+  // Window of pages kept mounted: previous / current / next (clamped). Until the
+  // width is known only the current page is shown, so a neighbour can never sit
+  // on top of it.
   const windowPages: number[] = [];
-  for (let p = page - 1; p <= page + 1; p++) {
-    if (p >= 1 && p <= totalPages) {
-      windowPages.push(p);
+  if (hasWidth) {
+    for (let p = page - 1; p <= page + 1; p++) {
+      if (p >= 1 && p <= totalPages) {
+        windowPages.push(p);
+      }
     }
+  } else {
+    windowPages.push(page);
   }
 
   return (
@@ -258,7 +317,7 @@ function CarouselPager({
       style={[styles.pager, {backgroundColor: C.background}, style]}
       onLayout={onLayout}>
       <GestureDetector gesture={panGesture}>
-        <Animated.View style={styles.track} collapsable={false}>
+        <View style={styles.track} collapsable={false}>
           {windowPages.map(pn => (
             <CarouselPage
               key={pn}
@@ -269,7 +328,7 @@ function CarouselPager({
               {renderPage(pn)}
             </CarouselPage>
           ))}
-        </Animated.View>
+        </View>
       </GestureDetector>
     </View>
   );

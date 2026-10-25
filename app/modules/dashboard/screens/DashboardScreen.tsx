@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Image,
   StyleSheet,
+  RefreshControl,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text, Button} from '@ui-kitten/components';
@@ -191,6 +192,20 @@ export default function DashboardScreen() {
     void loadCurrentUser();
     void loadProfile();
     void loadOverseers();
+  };
+
+  // Pull-to-refresh: header + overseer blocks, keeping the page on screen
+  // (reloadDashboard would swap it for the full-screen loader).
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([loadProfile(), loadOverseers()]);
+    } finally {
+      if (profileMountedRef.current) {
+        setRefreshing(false);
+      }
+    }
   };
 
   // Back online: refresh what's on screen (including the header name).
@@ -450,6 +465,16 @@ export default function DashboardScreen() {
       <FlatListWithVerticalScrollbar
         // Admin only: the overseer picker sits close under the header.
         style={[dashboardStyles.container, {backgroundColor: C.background, paddingTop: ms(4)}]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              void onRefresh();
+            }}
+            tintColor={COLORS.mainColor}
+            colors={[COLORS.mainColor]}
+          />
+        }
         data={DASHBOARD_SCROLL_DATA}
         keyExtractor={item => item.id}
         renderItem={() => null}

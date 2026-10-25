@@ -2,6 +2,7 @@ import React, {useCallback, useContext, useEffect, useMemo, useRef, useState} fr
 import {
   ActionSheetIOS,
   Alert,
+  RefreshControl,
   Animated,
   Easing,
   Image,
@@ -168,9 +169,16 @@ export default function OverseerDashboardScreen() {
     }).start();
   }, [showAllStats, rotation]);
 
-  const loadDashboard = useCallback(async () => {
-    setLoading(true);
-    setLoadError(null);
+  /**
+   * `silent` (pull-to-refresh): keep the dashboard on screen instead of the
+   * full-screen loader, and report a failure as an alert without wiping data.
+   */
+  const loadDashboard = useCallback(async (opts?: {silent?: boolean}) => {
+    const silent = opts?.silent === true;
+    if (!silent) {
+      setLoading(true);
+      setLoadError(null);
+    }
     try {
       const [meRes, dashboardRes, indicatorRes] = await withTimeout(
         Promise.all([
@@ -201,12 +209,28 @@ export default function OverseerDashboardScreen() {
       setLoadError(null);
     } catch (error) {
       console.error('Failed to load overseer dashboard:', error);
-      setIndicatorData({});
-      setLoadError(getApiErrorMessage(error, tRef.current));
+      if (silent) {
+        Alert.alert(tRef.current('error'), getApiErrorMessage(error, tRef.current));
+      } else {
+        setIndicatorData({});
+        setLoadError(getApiErrorMessage(error, tRef.current));
+      }
     } finally {
-      setLoading(false);
+      if (!silent) {
+        setLoading(false);
+      }
     }
   }, []);
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await loadDashboard({silent: true});
+    } finally {
+      setRefreshing(false);
+    }
+  }, [loadDashboard]);
 
   // Back online: refresh what's on screen.
   useOnReconnect(() => {
@@ -605,6 +629,16 @@ export default function OverseerDashboardScreen() {
       </View>
       <FlatListWithVerticalScrollbar
         style={[dashboardStyles.container, {backgroundColor: C.background}]}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              void onRefresh();
+            }}
+            tintColor={COLORS.mainColor}
+            colors={[COLORS.mainColor]}
+          />
+        }
         data={DASHBOARD_SCROLL_DATA}
         keyExtractor={item => item.id}
         renderItem={() => null}

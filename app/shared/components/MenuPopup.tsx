@@ -29,7 +29,7 @@ const ACTIVE_ROUTE_ALIASES: Record<string, string> = {
 };
 // Params a screen assumes when opened without them (menu entries are explicit).
 const ACTIVE_ROUTE_DEFAULT_PARAMS: Record<string, Record<string, unknown>> = {
-  GenerateReports: {group: 'church'},
+  GenerateReports: {report: 'church'},
 };
 
 /** True when `item` is the screen currently open (route + its menu params). */

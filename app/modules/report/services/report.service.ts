@@ -1,36 +1,39 @@
 import RNFS from 'react-native-fs';
 import api from '../../../config/api';
 
+/**
+ * Generate Reports API, mirroring the web app's generateReportService
+ * (staging.vfc-omr.org): same endpoints, same request bodies, same file
+ * handling ("file" → file_url, "pdf" → pdf_url).
+ */
+
 export type ReportCatalog = {
   title: string;
   subHeading: string;
-  groups: {key: string; types: string[]}[];
+  /** Catalog group → report types the API offers (GET generate-reports). */
+  reportTypes: Record<string, string[]>;
 };
 
-const ENDPOINTS: Record<string, string> = {
+export const REPORT_ENDPOINTS = {
   church: 'generate-reports/church',
-  church_reports_graph_reports: 'generate-reports/church-reports-graph-reports',
-  visit_report: 'generate-reports/visit-report',
-  church_report_status: 'generate-reports/church-report-status',
-  multi_church: 'generate-reports/multi-church',
-  user_data: 'generate-reports/user-data',
-  user_graph: 'generate-reports/user-graph',
+  churchGraph: 'generate-reports/church-reports-graph-reports',
+  churchReportStatus: 'generate-reports/church-report-status',
+  myDirectory: 'generate-reports/my-directory',
+  visitReport: 'generate-reports/visit-report',
+  userGraph: 'generate-reports/user-graph',
+  multiChurch: 'generate-reports/multi-church',
+  userData: 'generate-reports/user-data',
   event: 'generate-reports/event',
-  my_directory: 'generate-reports/my-directory',
-};
+  uaogSearchLog: 'generate-reports/uaog-public-search-log',
+  overseerAccessRights: 'generate-reports/overseer-access-rights',
+  /** App only (Research Info sketch): not on the web. */
+  overseerResearching: 'generate-reports/overseer-researching',
+} as const;
 
-export type ReportRequest = {
-  group: string;
-  reportType?: string;
-  churchId?: number | null;
-  userId?: number | null;
-  endMonth?: number | null;
-  endYear?: number | null;
-  geographicalRegionId?: number | null;
-  geographicalRegionIds?: number[];
-  churchRegionIds?: number[];
-  languageRegionIds?: number[];
-};
+export type ReportEndpoint = keyof typeof REPORT_ENDPOINTS;
+
+/** "file": the report file (file_url). "pdf": its PDF version (pdf_url). */
+export type ReportFileMode = 'file' | 'pdf';
 
 export type ReportDownload = {url: string; filename: string; label: 'pdf' | 'excel'};
 
@@ -38,100 +41,75 @@ export type GeneratedReport =
   | {kind: 'files'; files: ReportDownload[]}
   | {kind: 'message'; message: string};
 
-export async function getReportCatalog(): Promise<ReportCatalog> {
-  const response = await api.get('generate-reports');
-  const data = response.data?.data ?? {};
-  const types = data.report_types ?? {};
-  const groups = Object.keys(types).map(key => ({
-    key,
-    types: Array.isArray(types[key]) ? types[key].map(String) : [],
-  }));
-  return {
-    title: data.title || 'Generate Reports',
-    subHeading: data.sub_heading || '',
-    groups,
-  };
+let catalogRequest: Promise<ReportCatalog> | null = null;
+
+/** GET generate-reports, cached like the web (retried after a failure). */
+export function getReportCatalog(): Promise<ReportCatalog> {
+  if (!catalogRequest) {
+    catalogRequest = api
+      .get('generate-reports')
+      .then(response => {
+        const data = response.data?.data ?? {};
+        const types = data.report_types ?? {};
+        const reportTypes: Record<string, string[]> = {};
+        Object.keys(types).forEach(key => {
+          reportTypes[key] = Array.isArray(types[key]) ? types[key].map(String) : [];
+        });
+        return {
+          title: data.title || 'Generate Reports',
+          subHeading: data.sub_heading || '',
+          reportTypes,
+        };
+      })
+      .catch(error => {
+        catalogRequest = null;
+        throw error;
+      });
+  }
+  return catalogRequest;
 }
 
-export function buildReportBody(request: ReportRequest): Record<string, unknown> {
-  const group = request.group;
-  if (
-    group === 'church' ||
-    group === 'church_reports_graph_reports' ||
-    group === 'visit_report'
-  ) {
-    return {
-      church_id: request.churchId,
-      end_month: request.endMonth,
-      end_year: request.endYear,
-      report_type: request.reportType,
-      msc_report_type: 1,
-    };
+/** POST a report request and return the file(s) to open, like the web's generate(). */
+export async function generateReport(
+  endpoint: ReportEndpoint,
+  body: Record<string, unknown>,
+  fallbackFilename: string,
+  mode: ReportFileMode = 'file',
+): Promise<GeneratedReport> {
+  const response = await api.post(REPORT_ENDPOINTS[endpoint], body, {timeout: 120000});
+  const payload = response.data ?? {};
+  if (payload?.success === false) {
+    throw {response: {data: payload}};
   }
-  if (group === 'church_report_status') {
-    return {
-      user_id: request.userId,
-      end_month: request.endMonth,
-      end_year: request.endYear,
-      report_type: request.reportType,
-    };
-  }
-  if (group === 'user_data') {
-    return {
-      user_id: request.userId,
-      geographical_region_id: request.geographicalRegionId ?? null,
-      end_year: request.endYear,
-      report_type: request.reportType,
-    };
-  }
-  if (group === 'user_graph') {
-    return {
-      user_id: request.userId,
-      end_year: request.endYear,
-      report_type: request.reportType,
-    };
-  }
-  if (group === 'multi_church') {
-    return {
-      geographical_region_ids: request.geographicalRegionIds ?? [],
-      church_region_ids: request.churchRegionIds ?? [],
-      language_region_ids: request.languageRegionIds ?? [],
-      end_year: request.endYear,
-      report_type: request.reportType,
-    };
-  }
-  if (group === 'event') {
-    return {
-      user_id: request.userId,
-      end_year: request.endYear,
-    };
-  }
-  return {sort_by: request.reportType};
-}
-
-type ReportFilePayload = {
-  report_type?: string;
-  file_name?: string;
-  file_url?: string;
-  file_type?: string;
-  pdf_url?: string;
-};
-
-export async function generateReport(request: ReportRequest): Promise<GeneratedReport> {
-  const path = ENDPOINTS[request.group];
-  if (!path) {
-    throw new Error('Unknown report.');
-  }
-  const response = await api.post(path, buildReportBody(request), {timeout: 120000});
-  const body = response.data ?? {};
-  const data = readReportPayload(body);
-  const files = listReportFiles(data);
+  const files = listReportFiles(readReportPayload(payload), mode, fallbackFilename);
   if (files.length === 0) {
     const message =
-      (typeof body?.message === 'string' && body.message) || 'Request was successful';
+      (typeof payload?.message === 'string' && payload.message) || 'Request was successful';
     return {kind: 'message', message};
   }
   return {kind: 'files', files};
+}
+
+/**
+ * The API's own explanation of a failed report, as the web shows it:
+ * `errors.detail` first, then `message`. Null when there is none.
+ */
+export function reportErrorMessage(error: unknown): string | null {
+  const data = (error as any)?.response?.data ?? error;
+  if (!data || typeof data !== 'object') {
+    return null;
+  }
+  const pick = (value: unknown): string | null => {
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+    if (Array.isArray(value)) {
+      const joined = value.map(item => String(item).trim()).filter(Boolean).join('\n');
+      return joined || null;
+    }
+    return null;
+  };
+  return pick((data as any).errors?.detail) || pick((data as any).message);
 }
 
 export async function downloadReportFile(file: ReportDownload): Promise<string> {
@@ -146,42 +124,58 @@ export async function downloadReportFile(file: ReportDownload): Promise<string> 
   return localPath;
 }
 
+type ReportFilePayload = {
+  file_name?: string;
+  file_url?: string;
+  file_type?: string;
+  pdf_url?: string;
+};
+
 function readReportPayload(body: any): ReportFilePayload {
   const nested = body?.data;
-  if (nested && (nested.file_url || nested.pdf_url || nested.file_name)) {
+  if (nested && typeof nested === 'object') {
     return nested;
   }
-  if (body?.file_url || body?.pdf_url) {
-    return body;
-  }
-  return nested ?? {};
+  return body ?? {};
 }
 
-function listReportFiles(data: ReportFilePayload): ReportDownload[] {
-  const files: ReportDownload[] = [];
+function listReportFiles(
+  data: ReportFilePayload,
+  mode: ReportFileMode,
+  fallbackFilename: string,
+): ReportDownload[] {
   const pdfUrl = httpUrl(data.pdf_url);
   const fileUrl = httpUrl(data.file_url);
-  const fileType = (data.file_type || '').toLowerCase().replace(/^\./, '');
   const fileName = safeFileName(data.file_name);
-  const base = (fileName || 'report').replace(/\.[^.]+$/, '');
+  const fallback = safeFileName(fallbackFilename) || 'report';
 
-  if (pdfUrl) {
-    files.push({url: pdfUrl, filename: `${base}.pdf`, label: 'pdf'});
-  }
-  if (fileUrl) {
-    const ext = fileType || extensionOf(fileName) || 'xlsx';
-    const named = fileName && fileName.toLowerCase().endsWith(`.${ext}`)
-      ? fileName
-      : `${base}.${ext}`;
-    if (!files.some(file => file.url === fileUrl)) {
-      files.push({
-        url: fileUrl,
-        filename: named,
-        label: ext === 'pdf' ? 'pdf' : 'excel',
-      });
+  // Web: "pdf" takes pdf_url, named after file_name with a .pdf extension.
+  if (mode === 'pdf' || (!fileUrl && pdfUrl)) {
+    if (!pdfUrl) {
+      return [];
     }
+    const base = (fileName || nameFromUrl(pdfUrl) || fallback).replace(/\.[^.]+$/, '');
+    return [{url: pdfUrl, filename: `${base}.pdf`, label: 'pdf'}];
   }
-  return files;
+  if (!fileUrl) {
+    return [];
+  }
+  // Web: "file" takes file_url, named file_name (or the URL's last segment).
+  let filename = fileName || nameFromUrl(fileUrl) || fallback;
+  const fileType = (data.file_type || '').toLowerCase().replace(/^\./, '');
+  if (!extensionOf(filename)) {
+    filename = `${filename}.${fileType || extensionOf(fallback) || 'pdf'}`;
+  }
+  const ext = extensionOf(filename);
+  return [{url: fileUrl, filename, label: ext === 'pdf' ? 'pdf' : 'excel'}];
+}
+
+function nameFromUrl(url: string): string {
+  try {
+    return safeFileName(decodeURIComponent(url.split('?')[0].split('/').pop() || ''));
+  } catch {
+    return '';
+  }
 }
 
 function httpUrl(value: unknown): string {
@@ -192,7 +186,7 @@ function safeFileName(value: unknown): string {
   if (typeof value !== 'string') {
     return '';
   }
-  return value.split('?')[0].split('/').pop()?.replace(/[^\w.\-]+/g, '_') || '';
+  return value.trim().split('?')[0].split('/').pop()?.replace(/[^\w.\-]+/g, '_') || '';
 }
 
 function extensionOf(filename: string): string {
@@ -200,29 +194,48 @@ function extensionOf(filename: string): string {
   return match?.[1]?.toLowerCase() || '';
 }
 
-export function reportGroupNeeds(group: string) {
-  return {
-    church: group === 'church' || group === 'church_reports_graph_reports' || group === 'visit_report',
-    user:
-      group === 'church_report_status' ||
-      group === 'user_data' ||
-      group === 'user_graph' ||
-      group === 'event',
-    month:
-      group === 'church' ||
-      group === 'church_reports_graph_reports' ||
-      group === 'visit_report' ||
-      group === 'church_report_status',
-    year: group !== 'my_directory',
-    reportType: group !== 'event',
-    geoSingle: group === 'user_data',
-    regions: group === 'multi_church',
-    directory: group === 'my_directory',
-  };
+/* ------------------------------------------------------------------ */
+/* Option lists used by the report forms                                */
+/* ------------------------------------------------------------------ */
+
+export type NamedId = {id: number; label: string};
+
+/** GET users/overseers (the web's #40 loads up to 200). */
+export async function listReportOverseers(search = '', limit = 200): Promise<NamedId[]> {
+  const response = await api.get('users/overseers', {
+    params: {page: 1, limit, ...(search.trim() ? {search: search.trim()} : {})},
+  });
+  const items = response.data?.data?.items ?? [];
+  return items
+    .map((item: any) => ({id: Number(item?.id), label: item?.name || String(item?.id)}))
+    .filter((item: NamedId) => Number.isFinite(item.id));
 }
 
-export function humanizeReportKey(key: string): string {
-  return key
-    .replace(/_/g, ' ')
-    .replace(/\b\w/g, char => char.toUpperCase());
+/** Research reports take a "YYYY-YYYY" period: next one first, then 15 back. */
+export function researchYearPeriods(today = new Date()): string[] {
+  const current = today.getFullYear();
+  return Array.from({length: 16}, (_, index) => {
+    const start = current - index;
+    return `${start}-${start + 1}`;
+  });
+}
+
+/** Web `yearOptions(n, e)`: next `ahead` years down to `back` years ago. */
+export function yearOptions(back = 15, ahead = 1, today = new Date()): string[] {
+  const current = today.getFullYear();
+  const years: string[] = [];
+  for (let year = current + ahead; year >= current - back; year--) {
+    years.push(String(year));
+  }
+  return years;
+}
+
+/** Web `reportYearOptions()`: this year down to 1980. */
+export function yearsSince1980(today = new Date()): string[] {
+  const current = today.getFullYear();
+  const years: string[] = [];
+  for (let year = current; year >= Math.min(1980, current); year--) {
+    years.push(String(year));
+  }
+  return years;
 }
