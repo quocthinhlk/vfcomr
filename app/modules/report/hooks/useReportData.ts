@@ -1,4 +1,4 @@
-import {useCallback, useEffect, useRef, useState} from 'react';
+import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {Platform, Share} from 'react-native';
 import axios from 'axios';
 import FileViewer from 'react-native-file-viewer';
@@ -58,7 +58,11 @@ type PageFetcher = (
 /** Searchable, paged list (web UserSelectInput: 25 per page, search with a 400 ms delay). */
 function usePagedSearch(fetchPage: PageFetcher) {
   const mounted = useMounted();
-  const [items, setItems] = useState<NamedId[]>([]);
+  const [loaded, setLoaded] = useState<NamedId[]>([]);
+  // Pre-selected entries (e.g. the signed-in user). Kept apart from the loaded
+  // page so a search or the first page arriving later can't drop them, which
+  // left the field showing its placeholder although a value was selected.
+  const [pinned, setPinned] = useState<NamedId[]>([]);
   const [loading, setLoading] = useState(false);
   const stateRef = useRef({page: 1, search: '', hasNext: true, busy: false, token: 0});
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -84,7 +88,7 @@ function usePagedSearch(fetchPage: PageFetcher) {
         }
         state.hasNext = result.hasNext;
         state.page += 1;
-        setItems(current => (reset ? result.items : mergeById(current, result.items)));
+        setLoaded(current => (reset ? result.items : mergeById(current, result.items)));
       } catch {
         // A failed search keeps the current list.
       } finally {
@@ -128,9 +132,11 @@ function usePagedSearch(fetchPage: PageFetcher) {
   /** Keep a pre-selected entry (e.g. the signed-in user) in the list. */
   const ensure = useCallback((item: NamedId | null) => {
     if (item) {
-      setItems(current => (current.some(entry => entry.id === item.id) ? current : [item, ...current]));
+      setPinned(current => (current.some(entry => entry.id === item.id) ? current : [...current, item]));
     }
   }, []);
+
+  const items = useMemo(() => mergeById(pinned, loaded), [pinned, loaded]);
 
   return {items, loading, search, loadMore, ensure};
 }

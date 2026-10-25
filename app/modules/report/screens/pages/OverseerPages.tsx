@@ -224,9 +224,8 @@ export function ResearchInfoPage({catalog, me}: ReportPageProps) {
   const loadOverseers = (search: string) => {
     listReportOverseers(search, 30)
       .then(list => {
-        setOverseers(
-          list.some(item => item.id === me.id) || search ? list : [{id: me.id, label: me.name}, ...list],
-        );
+        // Keep the signed-in user (the default) in the list whatever the search returns.
+        setOverseers(list.some(item => item.id === me.id) ? list : [{id: me.id, label: me.name}, ...list]);
       })
       .catch(() => {});
   };
