@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -32,6 +32,7 @@ import {COLORS} from '../../../shared/constants/colors';
 import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {listUsers, ListUsersItem} from '../services/user.service';
+import {usePagedList} from '../hooks/usePagedList';
 import {switchToUser} from '../../auth/services/auth.service';
 
 // API values often carry stray spaces (" Bonyoko  Fred", "Pastor  ").
@@ -54,23 +55,12 @@ const BASE_URL = 'https://tintran.cloud-ip.cc/storage';
 export const SwitchUserScreen = () => {
   const navigation = useNavigation<any>();
   const {t} = useTranslation();
-  const tRef = useRef(t);
-  tRef.current = t;
   const C = useThemedColors();
   const T = useUiTokens();
 
   const [query, setQuery] = useState('');
-  const [items, setItems] = useState<ListUsersItem[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [switchingId, setSwitchingId] = useState<number | null>(null);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
-  const [loadError, setLoadError] = useState<unknown>(null);
-  const itemsCountRef = useRef(0);
-  itemsCountRef.current = items.length;
 
   useEffect(() => {
     let mounted = true;
@@ -88,71 +78,20 @@ export const SwitchUserScreen = () => {
     };
   }, []);
 
-  const fetchData = useCallback(async (targetPage: number, search: string) => {
-    setLoading(true);
-    try {
-      const params = {
-        page: targetPage,
-        limit: DEFAULT_PAGE_LIMIT,
-        search,
-        sort_by: 'name',
-        sort_desc: false,
-      };
-      let res = await listUsers(params);
-      // On first open the API sometimes returns pagination totals that
-      // contradict the page itself (e.g. total: 1 with 10 items) while other
-      // requests (users/me) run concurrently. Retry once when that happens.
-      const looksInconsistent = (d: any) => {
-        if (!d) {
-          return false;
-        }
-        const count = d.items?.length ?? 0;
-        return (
-          (d.total ?? 0) < count ||
-          (!!d.has_next && (d.total_pages ?? 1) <= (d.page ?? targetPage))
-        );
-      };
-      if (looksInconsistent(res?.data)) {
-        res = await listUsers(params);
-      }
-      setItems(res?.data?.items ?? []);
-      setTotalPages(res?.data?.total_pages ?? 1);
-      setTotal(res?.data?.total ?? 0);
-      setPage(res?.data?.page ?? targetPage);
-      setLoadError(null);
-    } catch (error: any) {
-      if (itemsCountRef.current === 0) {
-        // Nothing on screen: show a recoverable error instead of "no users".
-        setLoadError(error);
-      } else {
-        // Keep the users already on screen (e.g. pull-to-refresh failed).
-        const message =
-          error?.response?.data?.message ||
-          error?.message ||
-          tRef.current('switchUserFailed');
-        Alert.alert(tRef.current('switchUser'), String(message));
-      }
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void fetchData(1, query);
-  }, [query, fetchData]);
-
-  const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {
-      return;
-    }
-    void fetchData(targetPage, query);
-  };
-
-  const onRefresh = () => {
-    setRefreshing(true);
-    void fetchData(1, query);
-  };
+  const {items, page, totalPages, total, loading, refreshing, loadError, goToPage, retry, onRefresh} =
+    usePagedList<ListUsersItem>(
+      async (targetPage, search) =>
+        (
+          await listUsers({
+            page: targetPage,
+            limit: DEFAULT_PAGE_LIMIT,
+            search,
+            sort_by: 'name',
+            sort_desc: false,
+          })
+        )?.data,
+      query,
+    );
 
   const confirmSwitch = (user: ListUsersItem) => {
     if (switchingId != null || user.id === currentUserId) {
@@ -281,7 +220,6 @@ export const SwitchUserScreen = () => {
             value={query}
             onChangeText={setQuery}
             placeholder={t('search')}
-            onSubmitEditing={() => goToPage(1)}
           />
           <View style={{flex: 1, minHeight: 0}}>
             {loading && items.length === 0 ? (
@@ -308,7 +246,7 @@ export const SwitchUserScreen = () => {
                     loading ? null : (
                       <ListLoadState
                         error={loadError}
-                        onRetry={() => fetchData(page, query)}>
+                        onRetry={retry}>
                         <ListEmptyState title={t('noUsersFound')} />
                       </ListLoadState>
                     )

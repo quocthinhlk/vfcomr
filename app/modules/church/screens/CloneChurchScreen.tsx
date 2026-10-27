@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   RefreshControl,
@@ -46,71 +46,91 @@ export const CloneChurchScreen: React.FC = () => {
   // Church whose "…" menu is open.
   const [selectedChurch, setSelectedChurch] = useState<ChurchListItem | null>(null);
 
-  const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
-      try {
-        if (loading) {
-          return;
+  // Latest request only, reading the current query from a ref: the old version
+  // closed over a stale query and bailed out while `loading`, so typing then
+  // pressing Search showed the unfiltered list under the new search text.
+  const requestId = useRef(0);
+  const queryRef = useRef(query);
+  queryRef.current = query;
+
+  const fetchData = useCallback(async (targetPage: number) => {
+    const id = ++requestId.current;
+    setLoading(true);
+    try {
+      const q = queryRef.current.trim();
+      const params = {
+        page: targetPage,
+        limit: DEFAULT_PAGE_LIMIT,
+        sort_by: 'id',
+        sort_desc: true,
+        search: q || undefined,
+      };
+      let data = await getChurchesList(params);
+      // On first open the API sometimes returns pagination totals that
+      // contradict the page itself (e.g. total: 1 with 10 items) while other
+      // requests (users/me) run concurrently. Retry once when that happens.
+      const looksInconsistent = (d: any) => {
+        if (!d) {
+          return false;
         }
-        setLoading(true);
-        const params = {
-          page: targetPage,
-          limit: DEFAULT_PAGE_LIMIT,
-          sort_by: 'id',
-          sort_desc: true,
-          search: query && query.trim() ? query.trim() : undefined,
-        };
-        let data = await getChurchesList(params);
-        // On first open the API sometimes returns pagination totals that
-        // contradict the page itself (e.g. total: 1 with 10 items) while other
-        // requests (users/me) run concurrently. Retry once when that happens.
-        const looksInconsistent = (d: any) => {
-          if (!d) {
-            return false;
-          }
-          const count = d.items?.length ?? 0;
-          return (
-            (Number(d.total) || 0) < count ||
-            (!!d.has_next && (Number(d.total_pages) || 1) <= (Number(d.page) || targetPage))
-          );
-        };
-        if (looksInconsistent(data)) {
-          data = await getChurchesList(params);
-        }
-        const nextItems = (data?.items ?? []) as ChurchListItem[];
-        setTotalPages(data?.total_pages ?? 1);
-        setTotal(data?.total ?? 0);
-        setPage(data?.page ?? targetPage);
-        setItems(reset ? nextItems : [...items, ...nextItems]);
-        setLoadError(null);
-      } catch (e) {
-        // Surface the failure as a recoverable error, never as "no churches".
+        const count = d.items?.length ?? 0;
+        return (
+          (Number(d.total) || 0) < count ||
+          (!!d.has_next && (Number(d.total_pages) || 1) <= (Number(d.page) || targetPage))
+        );
+      };
+      if (looksInconsistent(data) && id === requestId.current) {
+        data = await getChurchesList(params);
+      }
+      if (id !== requestId.current) {
+        return;
+      }
+      const nextItems = (data?.items ?? []) as ChurchListItem[];
+      const limit = Number(data?.limit) || DEFAULT_PAGE_LIMIT;
+      const reportedTotal = Number(data?.total);
+      const reportedPages = Number(data?.total_pages);
+      const nextTotal = Number.isFinite(reportedTotal)
+        ? Math.max(reportedTotal, nextItems.length)
+        : nextItems.length;
+      const nextPages =
+        Number.isFinite(reportedPages) && reportedPages > 0
+          ? reportedPages
+          : Math.max(1, Math.ceil(nextTotal / limit));
+      setItems(nextItems);
+      setTotal(nextTotal);
+      setTotalPages(Math.max(nextPages, Math.ceil(nextTotal / limit) || 1));
+      setPage(Number(data?.page ?? targetPage) || targetPage);
+      setLoadError(null);
+    } catch (e) {
+      // Surface the failure as a recoverable error, never as "no churches".
+      if (id === requestId.current) {
+        setItems([]);
         setLoadError(e);
-      } finally {
+      }
+    } finally {
+      if (id === requestId.current) {
         setLoading(false);
       }
-    },
-    [loading, query, items],
-  );
+    }
+  }, []);
 
   useEffect(() => {
     setItems([]);
-    fetchData(1, true);
-  }, [query]);
+    fetchData(1);
+  }, [query, fetchData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
+    await fetchData(1);
     setRefreshing(false);
   };
 
   const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {
+    if (targetPage < 1 || targetPage > totalPages) {
       return;
     }
     setItems([]);
-    fetchData(targetPage, true);
+    fetchData(targetPage);
   };
 
   const renderItem = ({item}: {item: ChurchListItem}) => (
@@ -172,7 +192,7 @@ export const CloneChurchScreen: React.FC = () => {
                 <ListLoadState
                   loading={loading}
                   error={loadError}
-                  onRetry={() => fetchData(page, true)}>
+                  onRetry={() => fetchData(page)}>
                   <ListEmptyState icon={ChurchIcon} title={t('noChurchesFound')} />
                 </ListLoadState>
               }

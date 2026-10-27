@@ -98,8 +98,12 @@ export const ChurchesListScreen: React.FC = () => {
   // Live refs so async fetches read the latest cache/loading without stale closures.
   const pagesRef = useRef(pages);
   pagesRef.current = pages;
-  const pageLoadingRef = useRef(pageLoading);
-  pageLoadingRef.current = pageLoading;
+  // Pages being fetched, updated synchronously: pageLoading state only catches
+  // up on the next render, so page 1 used to be requested twice on mount.
+  const inFlightRef = useRef(new Set<number>());
+  // Bumped on every reset so the neighbour pages are prefetched again too.
+  const [cacheEpoch, setCacheEpoch] = useState(0);
+  const searchKey = query.trim();
   const queryRef = useRef(query);
   const pageRef = useRef(page);
   pageRef.current = page;
@@ -130,9 +134,10 @@ export const ChurchesListScreen: React.FC = () => {
       const force = !!opts?.force;
       if (!force) {
         if (pagesRef.current[targetPage]) {return;}
-        if (pageLoadingRef.current[targetPage]) {return;}
+        if (inFlightRef.current.has(targetPage)) {return;}
       }
       const token = fetchTokenRef.current;
+      inFlightRef.current.add(targetPage);
       setPageLoading(prev => ({...prev, [targetPage]: true}));
       try {
         const q = queryRef.current;
@@ -178,8 +183,20 @@ export const ChurchesListScreen: React.FC = () => {
           const nextPages = Number.isFinite(reportedPages) && reportedPages > 0
             ? reportedPages
             : Math.max(1, Math.ceil(nextTotal / limit));
+          // has_next is the API's own word that more pages exist, even when its
+          // totals disagree.
+          const finalPages = Math.max(
+            nextPages,
+            Math.ceil(nextTotal / limit) || 1,
+            data?.has_next ? targetPage + 1 : 1,
+          );
           setTotal(nextTotal);
-          setTotalPages(Math.max(nextPages, Math.ceil(nextTotal / limit) || 1));
+          setTotalPages(finalPages);
+          // Fewer pages than before (new search / deletions): don't stay on a page
+          // past the end, which showed an empty list with "Page 3/2".
+          if (pageRef.current > finalPages) {
+            setPage(finalPages);
+          }
         }
       } catch (e) {
         // A failed load of the page on screen shows a recoverable error,
@@ -189,6 +206,7 @@ export const ChurchesListScreen: React.FC = () => {
         }
       } finally {
         if (token === fetchTokenRef.current) {
+          inFlightRef.current.delete(targetPage);
           setPageLoading(prev => {
             const next = {...prev};
             delete next[targetPage];
@@ -203,18 +221,20 @@ export const ChurchesListScreen: React.FC = () => {
   // Clear the cache and reload from page 1 (search/filter/refresh/focus).
   const resetAndLoad = useCallback(() => {
     fetchTokenRef.current += 1;
+    inFlightRef.current.clear();
     setPages({});
     setPageLoading({});
     setPage(1);
+    setCacheEpoch(epoch => epoch + 1);
     fetchPage(1, {force: true});
   }, [fetchPage]);
 
-  // Query change → reset cache and fetch page 1
+  // Search change → reset cache and fetch page 1 (a trailing space is not a new search)
   useEffect(() => {
     queryRef.current = query;
     resetAndLoad();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query]);
+  }, [searchKey]);
 
   // Fetch user role once
   useEffect(() => {
@@ -235,7 +255,7 @@ export const ChurchesListScreen: React.FC = () => {
     fetchPage(page);
     if (page + 1 <= totalPages) {fetchPage(page + 1);}
     if (page - 1 >= 1) {fetchPage(page - 1);}
-  }, [page, totalPages, fetchPage]);
+  }, [page, totalPages, fetchPage, cacheEpoch]);
 
   // Reload when coming back after a church was added / edited / enabled /
   // disabled (a `reload` param or markDataChanged('churches')); a plain Back keeps the list.
@@ -248,9 +268,11 @@ export const ChurchesListScreen: React.FC = () => {
   const onRefresh = async () => {
     setRefreshing(true);
     fetchTokenRef.current += 1;
+    inFlightRef.current.clear();
     setPages({});
     setPageLoading({});
     setPage(1);
+    setCacheEpoch(epoch => epoch + 1);
     await fetchPage(1, {force: true});
     setRefreshing(false);
   };
@@ -328,8 +350,8 @@ export const ChurchesListScreen: React.FC = () => {
       <ListLoadState error={loadError} onRetry={resetAndLoad}>
         <ListEmptyState
           icon={ChurchIcon}
-          title={query ? 'No results found' : t('noChurchesFound')}
-          hint={query ? 'Try a different search term' : undefined}
+          title={searchKey ? t('noResultsFound') : t('noChurchesFound')}
+          hint={searchKey ? t('tryDifferentSearchTerm') : undefined}
         />
       </ListLoadState>
     );
@@ -409,7 +431,7 @@ export const ChurchesListScreen: React.FC = () => {
               totalPages={totalPages}
               onPageChange={goToPage}
               renderPage={renderPage}
-              pagerRemountKey={query}
+              pagerRemountKey={searchKey}
             />
           </View>
 
@@ -423,7 +445,7 @@ export const ChurchesListScreen: React.FC = () => {
                   <Text style={[styles.attrKeyIconText, {color: C.textSecondary}]}>i</Text>
                 </View>
                 <Text style={[styles.attrKeyLabel, {color: C.textSecondary}]}>
-                  View Attribute Info
+                  {t('viewAttributeInfo')}
                 </Text>
               </TouchableOpacity>
               <ListPageBar
@@ -446,37 +468,37 @@ export const ChurchesListScreen: React.FC = () => {
               onPress={() => setAttributeKeyVisible(false)}>
               <Pressable style={[styles.modalCard, {backgroundColor: C.surface}]}>
                 <Text style={[styles.modalTitle, {color: C.textPrimary}]}>
-                  Church Attribute Key
+                  {t('churchAttributeKey')}
                 </Text>
                 <View style={[styles.modalDivider, {backgroundColor: C.border}]} />
                 {[
                   {
                     key: 'mother',
-                    label: 'Mother',
+                    label: t('mother'),
                     badge: churchAttributeBadgeStyles.badgeMother,
                     text: churchAttributeBadgeStyles.badgeTextMother,
-                    desc: 'A Mother Church — a church that has planted or oversees other churches.',
+                    desc: t('attrMotherDesc'),
                   },
                   {
                     key: 'firstMsc',
-                    label: t('firstMsc') || 'First MSC',
+                    label: t('firstMsc'),
                     badge: churchAttributeBadgeStyles.badgeMsc,
                     text: churchAttributeBadgeStyles.badgeTextMsc,
-                    desc: 'The first Multi-Service Church in a region or network.',
+                    desc: t('attrFirstMscDesc'),
                   },
                   {
                     key: 'msc',
-                    label: 'MSC',
+                    label: t('msc'),
                     badge: churchAttributeBadgeStyles.badgeMsc,
                     text: churchAttributeBadgeStyles.badgeTextMsc,
-                    desc: 'A Multi-Service Church — holds multiple services per week.',
+                    desc: t('attrMscDesc'),
                   },
                   {
                     key: 'map',
-                    label: 'On Map',
+                    label: t('onMap'),
                     badge: churchAttributeBadgeStyles.badgeMap,
                     text: churchAttributeBadgeStyles.badgeTextMap,
-                    desc: 'Location identified on OMR Maps.',
+                    desc: t('attrOnMapDesc'),
                   },
                 ].map(row => (
                   <View key={row.key} style={styles.modalRow}>
@@ -492,7 +514,7 @@ export const ChurchesListScreen: React.FC = () => {
                   style={[styles.modalClose, {borderColor: C.border}]}
                   onPress={() => setAttributeKeyVisible(false)}>
                   <Text style={[styles.modalCloseText, {color: C.textPrimary}]}>
-                    Close
+                    {t('close')}
                   </Text>
                 </TouchableOpacity>
               </Pressable>
@@ -509,7 +531,7 @@ export const ChurchesListScreen: React.FC = () => {
               list.push({label: t('churchDetail'), icon: 'view', onPress: () => {if (selectedChurch) {navigation.navigate('ChurchDetail', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
               list.push({label: t('editChurch'), icon: 'edit', onPress: () => {if (selectedChurch) {navigation.navigate('EditChurch', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
               if (isSuperAdmin(roleId)) {
-                list.push({label: t('disableChurch') || 'Disable Church', type: 'danger', onPress: () => {if (selectedChurch) {navigation.navigate('DisableChurch', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
+                list.push({label: t('disableChurch'), type: 'danger', onPress: () => {if (selectedChurch) {navigation.navigate('DisableChurch', {id: selectedChurch.id});} setActionsVisible(false); setSelectedChurch(null);}});
               }
               return list;
             })()}

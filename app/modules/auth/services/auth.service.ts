@@ -37,6 +37,8 @@ export async function logout() {
     ORIGINAL_TOKEN_KEY,
     SWITCHED_USER_KEY,
     SWITCHED_USER_NAME_KEY,
+    // "Add New Church & New Pastor" draft: belongs to this account, not the next one.
+    'new_pastor_and_church_church_draft_v1',
   ]);
   DeviceEventEmitter.emit(SWITCH_SESSION_EVENT);
   // Keep biometric enrollment so the Login screen can offer Face ID / Fingerprint

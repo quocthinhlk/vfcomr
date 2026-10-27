@@ -106,7 +106,14 @@ export default function OverseerAssignmentsScreen() {
       const next = await getOverseerAssignments(userId);
       if (mountedRef.current) {
         setData(next);
-        setOverseerOrder(next.allowed.overseer);
+        // Keep a sub-overseer order the user changed but hasn't saved yet when
+        // the reload (after adding / removing something else) has the same people.
+        setOverseerOrder(prev => {
+          const fresh = next.allowed.overseer;
+          const sameSet =
+            prev.length === fresh.length && fresh.every(o => prev.some(p => p.id === o.id));
+          return sameSet ? prev.map(p => fresh.find(o => o.id === p.id) ?? p) : fresh;
+        });
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -251,15 +258,21 @@ export default function OverseerAssignmentsScreen() {
     if (!picker) {
       return;
     }
-    if (picker.kind === 'exclude') {
-      // The exclusions API takes one region per request.
-      for (const id of ids) {
-        await addExclusion(userId, picker.type as ExclusionType, id);
+    try {
+      if (picker.kind === 'exclude') {
+        // The exclusions API takes one region per request. Skip the ones
+        // already saved, so Save after a partial failure retries only the rest.
+        const saved = new Set(itemsOf(picker).map(i => i.id));
+        for (const id of ids.filter(i => !saved.has(i))) {
+          await addExclusion(userId, picker.type as ExclusionType, id);
+        }
+      } else {
+        await addAssignments(userId, picker.type, ids);
       }
-    } else {
-      await addAssignments(userId, picker.type, ids);
+    } finally {
+      // Also after a failure part-way: show what was saved.
+      await load();
     }
-    await load();
   };
 
   // Removable value: name + #id, with its own ✕ target (labels never wrap).

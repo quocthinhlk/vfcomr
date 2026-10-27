@@ -13,10 +13,16 @@ export const parseChurchBooleanFlag = (value: unknown): boolean => {
     return false;
   }
   const normalized = String(value).trim().toLowerCase();
-  if (normalized === 'true' || normalized === '1' || normalized === 'yes') {
+  if (normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y') {
     return true;
   }
-  if (normalized === 'false' || normalized === '0' || normalized === 'no' || normalized === '') {
+  if (
+    normalized === 'false' ||
+    normalized === '0' ||
+    normalized === 'no' ||
+    normalized === 'n' ||
+    normalized === ''
+  ) {
     return false;
   }
   return Boolean(value);
@@ -80,19 +86,28 @@ export const mergeAssignedChurchesLists = (
         continue;
       }
       const prev = byId.get(normalized.id);
+      if (!prev) {
+        byId.set(normalized.id, normalized);
+        continue;
+      }
+      // A sparser source must not wipe what the other one knows: skip its
+      // missing fields (undefined parent_id / disabled / data_entry_status) and
+      // its id-as-name fallback.
+      const merged = {...prev};
+      Object.entries(normalized).forEach(([key, value]) => {
+        if (value === undefined) {
+          return;
+        }
+        if (key === 'name' && !String(row?.name ?? '').trim()) {
+          return;
+        }
+        merged[key] = value;
+      });
       // A source without the flags normalizes them to false: never let it
       // clear a true flag from another source.
-      byId.set(
-        normalized.id,
-        prev
-          ? {
-              ...prev,
-              ...normalized,
-              is_msc: prev.is_msc || normalized.is_msc,
-              is_first_msc: prev.is_first_msc || normalized.is_first_msc,
-            }
-          : normalized,
-      );
+      merged.is_msc = prev.is_msc || normalized.is_msc;
+      merged.is_first_msc = prev.is_first_msc || normalized.is_first_msc;
+      byId.set(normalized.id, merged);
     }
   };
   addRows(primary);

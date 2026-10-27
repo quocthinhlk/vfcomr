@@ -18,18 +18,24 @@ import {Layout, Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import {DeleteButton} from '../../../shared/components/ActionButtons';
-import {getUserById, updateUser, UserDetailData} from '../services/user.service';
+import {
+  getUserById,
+  updateUser,
+  uploadUserPhoto,
+  UserDetailData,
+} from '../services/user.service';
+import {useImagePicker} from '../../church/hooks/useImagePicker';
+import {parseYmd} from '../../church/utils/churchForm';
 import api from '../../../config/api';
 import {COLORS} from '../../../shared/constants/colors';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {isOverseer, isSuperAdmin} from '../../../shared/utils/permissions';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
+import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 import {downloadImageToCameraRoll} from '../../../shared/utils/downloadImage';
 import IosActionSheet from '../../../shared/components/IosActionSheet';
-import ImagePicker from 'react-native-image-crop-picker';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 
@@ -88,7 +94,7 @@ export const UserScreen = () => {
   const [selfId, setSelfId] = useState<number | undefined>(undefined);
   const userId: number | undefined = paramUserId ?? selfId;
   const refetchKey: number | undefined = route?.params?.refetchKey;
-  const {t} = useTranslation();
+  const {t, selectedLanguage} = useTranslation();
   const C = useThemedColors();
 
   const tRef = useRef(t);
@@ -263,6 +269,11 @@ export const UserScreen = () => {
     setFromChurchesExpanded(false);
   }, [userId]);
 
+  // A new photo gets its own chance to load (a failed old one hid it).
+  useEffect(() => {
+    setAvatarError(false);
+  }, [user?.photo_url]);
+
   /** Primary church for "Pastor of" — API `church_name`. */
   const pastorOfChurchDisplay = useMemo(() => {
     const n = String((user as any)?.church_name || (user as any)?.church?.name || '').trim();
@@ -309,16 +320,19 @@ export const UserScreen = () => {
   const omrNumber = omrNumberRaw ? `#${omrNumberRaw}` : '-';
   const oversightAssignment =
     (user as any)?.oversight_assignment || user?.role?.remarks || '-';
-  const credentialsForm =
-    (user as any)?.credentials_form ||
-    (user as any)?.credentials ||
-    '';
-  const hasMinisterialCredentials = Boolean(credentialsForm);
+  // Credential type ('No' = none), issuing body (`credentials_from`), number, expiry.
+  const credentialType = String(user?.credentials ?? '').trim();
+  const hasMinisterialCredentials = !!credentialType && credentialType !== 'No';
   const ministerialCredentials = (() => {
     if (!hasMinisterialCredentials) return '';
     const number = user?.credentials_number ? `# ${user.credentials_number}` : '';
-    const expiry = formatDatePretty(user?.credentials_expiry_date);
-    const lines = [credentialsForm, number, expiry ? `${t('expires')}: ${expiry}` : ''].filter(Boolean);
+    const expiry = formatDatePretty(user?.credentials_expiry_date, selectedLanguage);
+    const lines = [
+      credentialType,
+      String(user?.credentials_from ?? '').trim(),
+      number,
+      expiry ? `${t('expires')}: ${expiry}` : '',
+    ].filter(Boolean);
     return lines.join('\n');
   })();
   const normalizeFileUri = (p: string) => (p.startsWith('file://') ? p : `file://${p}`);
@@ -367,28 +381,13 @@ export const UserScreen = () => {
       const targetId = Number(userId || user?.id);
       if (!targetId) return;
 
-      let uploadedUserPhotoPath: string | null = null;
+      let uploadedUserPhotoPath: string;
       try {
-        const form = new FormData();
-        const fileName = imagePath.split('/').pop() || 'photo.jpg';
-        form.append('file', {
-          uri: imagePath,
-          name: fileName,
-          type: 'image/jpeg',
-        } as any);
-        form.append('entity_type', 'users');
-        form.append('alt_text', String(displayName || '').trim());
-
-        const uploadRes = await api.post('images/upload', form, {
-          headers: {'Content-Type': 'multipart/form-data'},
-        });
-        uploadedUserPhotoPath = uploadRes?.data?.data?.path || null;
-      } catch {
-        uploadedUserPhotoPath = null;
-      }
-
-      if (!uploadedUserPhotoPath) {
-        Alert.alert(t('error'), t('imageDownloadError') || 'Could not upload image');
+        uploadedUserPhotoPath = await uploadUserPhoto(imagePath, String(displayName || ''));
+      } catch (error: any) {
+        // Not saved: go back to the current photo instead of showing the new one.
+        setLocalAvatarPath(null);
+        Alert.alert(t('error'), error?.response?.data?.message || t('photoUploadFailed'));
         return;
       }
 
@@ -399,96 +398,26 @@ export const UserScreen = () => {
         closeImagePopup();
         showToast(t('profileUpdatedSuccess'));
       } catch (error: any) {
+        setLocalAvatarPath(null);
         Alert.alert(
           t('error'),
           getApiErrorMessage(error, t) || t('couldNotUpdateUser'),
         );
       }
     },
-    [api, closeImagePopup, displayName, refreshUser, showToast, t, user?.id, userId],
+    [closeImagePopup, displayName, refreshUser, showToast, t, user?.id, userId],
   );
 
-  const openPhotoSourcePicker = useCallback(() => {
-    const pickFromLibrary = async () => {
-      try {
-        const image: any = await ImagePicker.openPicker({
-          width: 300,
-          height: 300,
-          cropping: true,
-          cropperCircleOverlay: false,
-          compressImageMaxWidth: 1024,
-          compressImageMaxHeight: 1024,
-          compressImageQuality: 0.8,
-          includeBase64: false,
-        });
-        if (image?.size && image.size > 1572864) {
-          Alert.alert('File too large', 'Please select an image under 1.5MB');
-          return;
-        }
-        if (image?.path) {
-          // Close the fullscreen preview immediately after cropping completes
-          // to avoid flashing the old image while the new one loads.
-          closeImagePopup();
-          setLocalAvatarPath(image.path);
-          void uploadAndApplyAvatar(image.path);
-        }
-      } catch {
-        // user cancelled or picker error
-      }
-    };
-
-    const takePhoto = async () => {
-      try {
-        const image: any = await ImagePicker.openCamera({
-          width: 300,
-          height: 300,
-          cropping: true,
-          cropperCircleOverlay: false,
-          compressImageMaxWidth: 1024,
-          compressImageMaxHeight: 1024,
-          compressImageQuality: 0.8,
-          includeBase64: false,
-        });
-        if (image?.size && image.size > 1572864) {
-          Alert.alert('File too large', 'Please select an image under 1.5MB');
-          return;
-        }
-        if (image?.path) {
-          // Close the fullscreen preview immediately after cropping completes
-          // to avoid flashing the old image while the new one loads.
-          closeImagePopup();
-          setLocalAvatarPath(image.path);
-          void uploadAndApplyAvatar(image.path);
-        }
-      } catch {
-        // user cancelled or camera error
-      }
-    };
-
-    if (Platform.OS === 'ios') {
-      const takeLabel = 'Take Photo';
-      const chooseLabel = 'Choose Photo';
-      const cancelLabel = t('cancel') || 'Cancel';
-      ActionSheetIOS.showActionSheetWithOptions(
-        {
-          options: [takeLabel, chooseLabel, cancelLabel],
-          cancelButtonIndex: 2,
-          userInterfaceStyle: 'light',
-        },
-        (idx: number) => {
-          if (idx === 0) void takePhoto();
-          if (idx === 1) void pickFromLibrary();
-        },
-      );
-      return;
-    }
-
-    Alert.alert(t('changePhoto') || 'Change Photo', '', [
-      {text: 'Take Photo', onPress: () => void takePhoto()},
-      {text: 'Choose Photo', onPress: () => void pickFromLibrary()},
-      {text: t('cancel') || 'Cancel', style: 'cancel'},
-    ]);
-  }, [t, uploadAndApplyAvatar]);
+  // Same picker as the forms (permissions, size limit, translated labels):
+  // the cropped photo is shown at once and uploaded.
+  const {handleImagePick: openPhotoSourcePicker} = useImagePicker({
+    onPicked: path => {
+      // Close the fullscreen preview so the old image doesn't flash.
+      closeImagePopup();
+      setLocalAvatarPath(path);
+      void uploadAndApplyAvatar(path);
+    },
+  });
 
   const openEditScreen = () => {
     const targetId = Number(userId || user?.id);
@@ -838,12 +767,17 @@ export const UserScreen = () => {
   );
 };
 
-function formatDatePretty(value?: any): string {
-  if (!value) return '';
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return '';
+/** API date → "10 May 2026" in the app language, on that calendar day in any time zone. */
+function formatDatePretty(value: unknown, language = 'en'): string {
+  const d = parseYmd(value);
+  if (!d) return '';
   const dd = String(d.getDate()).padStart(2, '0');
-  const month = d.toLocaleString('en-US', {month: 'short'});
+  let month: string;
+  try {
+    month = d.toLocaleString(language || 'en', {month: 'short'});
+  } catch {
+    month = d.toLocaleString('en-US', {month: 'short'});
+  }
   const yyyy = String(d.getFullYear());
   return `${dd} ${month} ${yyyy}`;
 }

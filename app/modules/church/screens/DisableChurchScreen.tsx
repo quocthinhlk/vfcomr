@@ -41,7 +41,7 @@ const DisableChurchScreen: React.FC = () => {
       if (!mountedRef.current) {
         return;
       }
-      setName(d?.name || 'this church');
+      setName(d?.name || t('thisChurch'));
       setLoadError(null);
     } catch (e) {
       // Don't ask to confirm an action on a church we couldn't load.
@@ -49,7 +49,7 @@ const DisableChurchScreen: React.FC = () => {
         setLoadError(e);
       }
     }
-  }, [churchId]);
+  }, [churchId, t]);
 
   useEffect(() => {
     mountedRef.current = true;

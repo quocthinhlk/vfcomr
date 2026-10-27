@@ -19,14 +19,15 @@ import api from '../../../config/api';
 import {COLORS} from '../../../shared/constants/colors';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
-import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {isSuperAdmin, resolveRoleIdFromUser} from '../../../shared/utils/permissions';
 import AppButton from '../../../shared/components/AppButton';
 import {DeleteButton} from '../../../shared/components/ActionButtons';
 import {fs, ws, ms, rs} from '../../../shared/utils/scale';
 import ZoomableImageModal from '../../../shared/components/ZoomableImageModal';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
-import {removeChurchLocation} from '../services/church.service';
+import {getChurchDetail, removeChurchLocation} from '../services/church.service';
+import {fillTemplate, parseYmd} from '../utils/churchForm';
 
 const blankChurch = require('../../../assets/images/church.png');
 const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
@@ -39,7 +40,7 @@ export default function ChurchDetailScreen() {
   const refetchKey: number | undefined = route?.params?.refetchKey;
   // Opened from the Clone Church list: the bottom action clones instead of disabling.
   const fromClone: boolean = route?.params?.fromClone === true;
-  const {t} = useTranslation();
+  const {t, selectedLanguage} = useTranslation();
   const C = useThemedColors();
   const [data, setData] = useState<any | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -49,36 +50,43 @@ export default function ChurchDetailScreen() {
   const [loadError, setLoadError] = useState<unknown>(null);
   const [removingLocation, setRemovingLocation] = useState(false);
 
+  const mountedRef = React.useRef(true);
+  const fetchSeqRef = React.useRef(0);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+
+  // Loaded on every focus (that includes the first one). Only the first load
+  // shows the spinner: refreshing after Back used to blank the page and jump to
+  // the top, and the mount + focus effects fetched it twice.
   const fetchChurch = React.useCallback(async () => {
     if (!churchId) {
       setLoading(false);
       return;
     }
+    const seq = ++fetchSeqRef.current;
     try {
-      setLoading(true);
-      const res = await api.get(`churches/${churchId}`);
-      setData(res?.data?.data || null);
+      const next = await getChurchDetail(churchId);
+      if (!mountedRef.current || seq !== fetchSeqRef.current) {
+        return;
+      }
+      setData(next || null);
       setLoadError(null);
     } catch (e) {
+      if (!mountedRef.current || seq !== fetchSeqRef.current) {
+        return;
+      }
       // Shown only when nothing is on screen yet; a failed focus-refresh keeps the details.
       setLoadError(e);
     } finally {
-      setLoading(false);
+      if (mountedRef.current && seq === fetchSeqRef.current) {
+        setLoading(false);
+      }
     }
   }, [churchId]);
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!mounted) {
-        return;
-      }
-      await fetchChurch();
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [fetchChurch]);
 
   useFocusEffect(
     React.useCallback(() => {
@@ -106,8 +114,9 @@ export default function ChurchDetailScreen() {
         if (!mounted) {
           return;
         }
-        const rid = me?.data?.data?.role?.id;
-        if (typeof rid === 'number') {
+        // Same rule as the lists: some accounts only expose role_id.
+        const rid = resolveRoleIdFromUser(me?.data?.data);
+        if (rid != null) {
           setCurrentUserRoleId(rid);
         }
       } catch {}
@@ -116,6 +125,11 @@ export default function ChurchDetailScreen() {
       mounted = false;
     };
   }, []);
+
+  // A new photo after a failed load (e.g. offline) must be tried again.
+  useEffect(() => {
+    setImageError(false);
+  }, [data?.photo_url]);
 
   const isSuperAdminUser = isSuperAdmin(currentUserRoleId || undefined);
   const imageUri = data?.photo_url && !imageError ? String(data.photo_url) : null;
@@ -138,11 +152,16 @@ export default function ChurchDetailScreen() {
   const serviceTimeDay = [data?.service_time, data?.service_day]
     .filter(Boolean)
     .join(', ');
-  const churchBirthday = formatDateWithAge(data?.date_of_birth);
+  const churchBirthday = formatDateWithAge(data?.date_of_birth, selectedLanguage, age =>
+    fillTemplate(t('yearsOld'), {age: String(age)}),
+  );
   const attributeItems = [
     data?.is_mother_church ? {key: 'mother', label: t('mother')} : null,
     data?.is_msc ? {key: 'msc', label: t('msc')} : null,
-    omrMapUrl ? {key: 'map', label: 'On Map'} : null,
+    // Pinned through Edit Location = coordinates, which count as "on map" too.
+    omrMapUrl || (data?.latitude != null && data?.longitude != null)
+      ? {key: 'map', label: t('onMap')}
+      : null,
   ].filter(Boolean) as Array<{key: 'mother' | 'msc' | 'map'; label: string}>;
   const socialItems = [
     {label: 'f', url: normalizeUrl(data?.facebook)},
@@ -188,9 +207,14 @@ export default function ChurchDetailScreen() {
     ]);
   };
 
+  // A link that can't be opened (no mail app, bad URL) used to do nothing at all.
   const openLink = (url?: string) => {
-    if (!url) return;
-    Linking.openURL(url).catch(() => {});
+    if (!url) {
+      return;
+    }
+    Linking.openURL(url).catch(() => {
+      Alert.alert(t('error'), `${t('cannotOpenLink')}\n${url.replace(/^(mailto|tel):/, '')}`);
+    });
   };
 
   const renderRow = (
@@ -307,24 +331,26 @@ export default function ChurchDetailScreen() {
               </View>
 
               <View style={[styles.table, {borderColor: C.border}]}>
-                {renderRow('City, Town', data.city_name || '-', {valueStyle: styles.boldValue})}
+                {renderRow(t('churchCityTown'), data.city_name || '-', {valueStyle: styles.boldValue})}
                 {renderRow(t('nation'), data.country_name || '-', {
                   valueStyle: styles.boldValue,
                 })}
                 {renderRow(
-                  'Service Address &\nPostal Code',
+                  t('churchServiceAddressPostal'),
                   serviceAddressLine || '-',
                 )}
-                {renderRow('Service Time &\nDay', serviceTimeDay || '-', {valueStyle: styles.normalValue})}
+                {renderRow(t('churchServiceTimeDay'), serviceTimeDay || '-', {valueStyle: styles.normalValue})}
                 {renderRow(t('language'), data.language_name || '-', {valueStyle: styles.normalValue})}
-                {renderRow('We are\nmeeting', prettyMeetingVenue(data.service_venue))}
-                {renderRow('Church’s\nBirthday', churchBirthday || '-', {valueStyle: styles.normalValue})}
-                {renderRow('Mother\nChurch', data.parent_name || '-', {
+                {renderRow(t('churchWeAreMeeting'), prettyMeetingVenue(data.service_venue))}
+                {renderRow(t('churchBirthdayLabel'), churchBirthday || '-', {valueStyle: styles.normalValue})}
+                {renderRow(t('churchMotherChurchLabel'), data.parent_name || '-', {
                   valueStyle: styles.normalValue,
                   link: data.parent_id ? `church:${data.parent_id}` : '',
+                  // push: navigate() to the same screen name only swapped this
+                  // church out (Back then skipped it).
                   press: data.parent_id
                     ? () =>
-                        navigation.navigate('ChurchDetail' as any, {
+                        navigation.push('ChurchDetail' as any, {
                           id: data.parent_id,
                         })
                     : undefined,
@@ -333,12 +359,12 @@ export default function ChurchDetailScreen() {
 
               <View style={[styles.sectionHeader, {borderColor: C.border}]}>
                 <Text style={[styles.sectionHeaderText, {color: C.textPrimary}]}>
-                  Contact Details
+                  {t('churchContactDetails')}
                 </Text>
               </View>
 
               <View style={[styles.table, {borderColor: C.border}]}>
-                {renderRow('Pastor', data.pastor_name || '-', {
+                {renderRow(t('pastor'), data.pastor_name || '-', {
                   press: data.pastor_id
                     ? () =>
                         navigation.navigate('User' as any, {
@@ -347,14 +373,19 @@ export default function ChurchDetailScreen() {
                     : undefined,
                   valueStyle: {color: COLORS.mainColor, fontWeight: '700'},
                 })}
-                {renderRow('Church e-mail', emailAddress || '-', {
+                {renderRow(t('churchEmailLabel'), emailAddress || '-', {
                   link: emailAddress ? `mailto:${emailAddress}` : '',
                   valueStyle: styles.normalValue,
                 })}
-                {renderRow('Church Phone', data.office_phone || '-', {valueStyle: styles.normalValue})}
+                {renderRow(t('churchPhoneLabel'), data.office_phone || '-', {
+                  valueStyle: styles.normalValue,
+                  link: data.office_phone
+                    ? `tel:${String(data.office_phone).replace(/[^\d+]/g, '')}`
+                    : '',
+                })}
                 {renderRow(t('website'), websiteUrl || '-', {link: websiteUrl || '', valueStyle: styles.normalValue})}
                 <View style={[styles.row, {borderBottomColor: C.border}]}>
-                  <Text style={[styles.rowLabel, {color: C.textPrimary}]}>Social Media</Text>
+                  <Text style={[styles.rowLabel, {color: C.textPrimary}]}>{t('socialMedia')}</Text>
                   <View style={styles.socialWrap}>
                     {socialItems.length ? (
                       socialItems.map(item => (
@@ -372,14 +403,14 @@ export default function ChurchDetailScreen() {
                     )}
                   </View>
                 </View>
-                {renderRow('Mailing\nAddress &\nPostal Code', mailingAddressLine || '-', {
+                {renderRow(t('churchMailingAddressPostal'), mailingAddressLine || '-', {
                   noDivider: true,
                 })}
               </View>
 
               <View style={[styles.sectionHeader, {borderColor: C.border}]}>
                 <Text style={[styles.sectionHeaderText, {color: C.textPrimary}]}>
-                  OMR Details
+                  {t('omrDetails')}
                 </Text>
               </View>
 
@@ -387,7 +418,7 @@ export default function ChurchDetailScreen() {
                 {renderRow(t('omrNumber'), data.omr_number ? `#${data.omr_number}` : '-', {
                   valueStyle: styles.normalValue,
                 })}
-                {renderRow('Geographic\nRegion', data.geographical_region_name || '-', {
+                {renderRow(t('churchGeographicRegionLabel'), data.geographical_region_name || '-', {
                   valueStyle: styles.normalValue,
                 })}
                 {renderRow(t('churchNetwork'), data.church_network_name || '-', {
@@ -400,7 +431,7 @@ export default function ChurchDetailScreen() {
                   valueStyle: styles.normalValue,
                 })}
                 <View style={[styles.row, {borderBottomColor: C.border}]}>
-                  <Text style={[styles.rowLabel, {color: C.textPrimary}]}>Attributes</Text>
+                  <Text style={[styles.rowLabel, {color: C.textPrimary}]}>{t('attributes')}</Text>
                   <View style={styles.attributeWrap}>
                     {attributeItems.length ? (
                       attributeItems.map(item => (
@@ -431,7 +462,7 @@ export default function ChurchDetailScreen() {
                 })}
                 <View style={[styles.row, styles.noDivider, {borderBottomColor: C.border}]}>
                   <Text style={[styles.rowLabel, {color: C.textPrimary}]}>
-                    OMR Map{'\n'}Location
+                    {t('omrMapLocationLabel')}
                   </Text>
                   <View style={styles.locationRowRight}>
                     <Text
@@ -796,15 +827,30 @@ const styles = StyleSheet.create({
   },
 });
 
-function formatDateWithAge(value?: any): string {
-  if (!value) return '';
-  const d = new Date(value);
-  if (isNaN(d.getTime())) return '';
+/**
+ * "01 January 2018\n[8 years old]" in the app language. The API date is a
+ * calendar day: parsed as local (new Date('2018-01-01') is UTC midnight, the
+ * previous day west of UTC).
+ */
+function formatDateWithAge(
+  value: unknown,
+  language: string,
+  yearsOld: (age: number) => string,
+): string {
+  const d = parseYmd(value);
+  if (!d) {
+    return '';
+  }
   const dd = String(d.getDate()).padStart(2, '0');
-  const month = d.toLocaleString('en-US', {month: 'long'});
+  let month: string;
+  try {
+    month = d.toLocaleString(language || 'en', {month: 'long'});
+  } catch {
+    month = d.toLocaleString('en-US', {month: 'long'});
+  }
   const yyyy = String(d.getFullYear());
   const age = getAge(d);
-  return `${dd} ${month} ${yyyy}${age ? `\n[${age} years old]` : ''}`;
+  return `${dd} ${month} ${yyyy}${age ? `\n[${yearsOld(age)}]` : ''}`;
 }
 
 function getAge(date: Date): number {

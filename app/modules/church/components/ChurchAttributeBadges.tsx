@@ -74,7 +74,7 @@ export const ChurchAttributeBadges: React.FC<ChurchAttributeBadgesProps> = ({
       )}
       {isOnMap && (
         <View style={[s.badge, s.badgeMap]}>
-          <Text style={s.badgeTextMap}>On Map</Text>
+          <Text style={s.badgeTextMap}>{t('onMap')}</Text>
         </View>
       )}
     </View>

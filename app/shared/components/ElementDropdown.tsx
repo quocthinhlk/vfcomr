@@ -54,6 +54,11 @@ interface ElementDropdownProps {
   onFocus?: () => void;
   onOpen?: () => void;
   renderItem?: (item: ElementDropdownItem) => React.ReactElement | null;
+  /** Multi-select mode: rows toggle, the sheet stays open until Done. */
+  multiple?: boolean;
+  values?: Array<string | number>;
+  onChangeValues?: (values: Array<string | number>) => void;
+  accessibilityLabel?: string;
 }
 
 /** Select field that opens a bottom sheet (search + list), styled like MultiSelectSheet. */
@@ -76,6 +81,10 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   onFocus,
   onOpen,
   renderItem,
+  multiple = false,
+  values,
+  onChangeValues,
+  accessibilityLabel,
 }) => {
   const C = useThemedColors();
   const T = useUiTokens();
@@ -89,6 +98,15 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   const lastPickedRef = useRef<ElementDropdownItem | null>(null);
   const slide = useRef(new Animated.Value(screenH)).current;
   const [keyboardH, setKeyboardH] = useState(0);
+  // Height of the modal's root view. On Android a statusBarTranslucent Modal
+  // window is often not resized for the keyboard (adjustResize is ignored), so
+  // the sheet stayed under the keyboard; when the root did not shrink, lift the
+  // sheet ourselves, as on iOS.
+  const [rootH, setRootH] = useState(0);
+  const rootShrank = rootH > 0 && rootH < screenH - keyboardH / 2;
+  const keyboardPad =
+    keyboardH > 0 && (Platform.OS === 'ios' || !rootShrank) ? keyboardH : 0;
+  const availableH = (rootShrank ? rootH : screenH) - keyboardPad;
 
   // Track the keyboard ourselves so the sheet shrinks instead of being pushed off the top.
   useEffect(() => {
@@ -118,6 +136,22 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       useNativeDriver: true,
     }).start();
   }, [open, slide, screenH]);
+
+  // Multi-select: labels of picked items, kept even when a search replaces `data`.
+  const pickedRef = useRef(new Map<string | number, ElementDropdownItem>());
+  const selectedValues = useMemo(() => (multiple ? values ?? [] : []), [multiple, values]);
+  const selectedItems = useMemo(() => {
+    if (!multiple) {
+      return [];
+    }
+    return selectedValues
+      .map(v => data.find(item => item.value === v) ?? pickedRef.current.get(v))
+      .filter((item): item is ElementDropdownItem => !!item);
+  }, [multiple, selectedValues, data]);
+  const hasValue = multiple ? selectedValues.length > 0 : value !== null && value !== undefined && value !== '';
+  const fieldLabel = multiple
+    ? selectedItems.map(item => item.label).join(', ')
+    : null;
 
   const selectedItem = useMemo(() => {
     if (value === null || value === undefined) {
@@ -188,6 +222,16 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   };
 
   const pick = (item: ElementDropdownItem) => {
+    if (multiple) {
+      const on = selectedValues.includes(item.value);
+      if (!on) {
+        pickedRef.current.set(item.value, item);
+      }
+      onChangeValues?.(
+        on ? selectedValues.filter(v => v !== item.value) : [...selectedValues, item.value],
+      );
+      return;
+    }
     lastPickedRef.current = item;
     onChange(item.value ?? null);
     closeSheet();
@@ -202,12 +246,12 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
     if (disabled) {
       return <RNText style={[themed.downArrow, {opacity: 0.5}]}>⌵</RNText>;
     }
-    if (!value) {
+    if (!hasValue) {
       return <RNText style={themed.downArrow}>⌵</RNText>;
     }
     return (
       <TouchableOpacity
-        onPress={() => onChange(null)}
+        onPress={() => (multiple ? onChangeValues?.([]) : onChange(null))}
         style={styles.clearButton}
         hitSlop={8}
         accessibilityRole="button"
@@ -218,12 +262,12 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
   };
 
   const renderRow = ({item}: {item: ElementDropdownItem}) => {
-    const checked = item.value === value;
+    const checked = multiple ? selectedValues.includes(item.value) : item.value === value;
     const activeBg = activeItemColor || T.brandTint;
     return (
       <Pressable
         onPress={() => pick(item)}
-        accessibilityRole="radio"
+        accessibilityRole={multiple ? 'checkbox' : 'radio'}
         accessibilityState={{checked}}
         accessibilityLabel={item.description ? `${item.label}, ${item.description}` : item.label}
         style={({pressed}) => [
@@ -267,14 +311,18 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         disabled={disabled}
         accessibilityRole="button"
         accessibilityState={{disabled, expanded: open}}
-        accessibilityLabel={selectedItem?.label || placeholder}
+        accessibilityLabel={accessibilityLabel || (multiple ? fieldLabel : selectedItem?.label) || placeholder}
         style={[
           themed.field,
           error ? {borderColor: C.error || '#ff4444'} : null,
           disabled ? {opacity: 0.6} : null,
           containerStyle,
         ]}>
-        {selectedItem ? (
+        {multiple && fieldLabel ? (
+          <RNText style={themed.selectedText} numberOfLines={1}>
+            {fieldLabel}
+          </RNText>
+        ) : !multiple && selectedItem ? (
           <RNText
             style={[themed.selectedText, selectedItem.color ? {color: selectedItem.color} : null]}
             numberOfLines={1}>
@@ -289,7 +337,9 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       </Pressable>
 
       <Modal visible={open} transparent animationType="fade" statusBarTranslucent onRequestClose={closeSheet}>
-        <View style={[styles.modal, Platform.OS === 'ios' && {paddingBottom: keyboardH}]}>
+        <View
+          style={[styles.modal, {paddingBottom: keyboardPad}]}
+          onLayout={e => setRootH(e.nativeEvent.layout.height)}>
           <Pressable
             style={[StyleSheet.absoluteFill, {backgroundColor: `rgba(0,0,0,${T.backdropOpacity})`}]}
             onPress={closeSheet}
@@ -303,7 +353,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
               {
                 backgroundColor: T.sheetBg,
                 maxHeight: Math.round(
-                  Math.min(screenH * 0.82, screenH - keyboardH - insets.top - ms(12)),
+                  Math.min(screenH * 0.82, availableH - insets.top - ms(12)),
                 ),
                 paddingBottom: keyboardH ? ms(12) : Math.max(insets.bottom, ms(12)),
                 transform: [{translateY: slide}],
@@ -311,9 +361,22 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
               dropdownContainerStyle,
             ]}>
             <View style={[styles.handle, {backgroundColor: C.border}]} />
-            <RNText style={[styles.title, {color: C.textPrimary}]} accessibilityRole="header">
-              {title || placeholder}
-            </RNText>
+            <View style={styles.titleRow}>
+              <RNText
+                style={[styles.title, styles.titleText, {color: C.textPrimary}]}
+                accessibilityRole="header">
+                {title || placeholder}
+              </RNText>
+              {multiple ? (
+                <TouchableOpacity
+                  onPress={closeSheet}
+                  hitSlop={8}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('done')}>
+                  <RNText style={[styles.doneText, {color: T.brandText}]}>{t('done')}</RNText>
+                </TouchableOpacity>
+              ) : null}
+            </View>
             {note ? <RNText style={[styles.note, {color: C.textSecondary}]}>{note}</RNText> : null}
 
             {search ? (
@@ -337,7 +400,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
               keyboardShouldPersistTaps="handled"
               initialNumToRender={20}
               windowSize={9}
-              extraData={value}
+              extraData={multiple ? selectedValues : value}
               onEndReached={onEndReached}
               onEndReachedThreshold={0.2}
               ListEmptyComponent={
@@ -372,6 +435,18 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: fs(17),
+    fontWeight: '700',
+  },
+  titleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(12),
+  },
+  titleText: {
+    flex: 1,
+  },
+  doneText: {
+    fontSize: fs(15),
     fontWeight: '700',
   },
   note: {

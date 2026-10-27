@@ -58,20 +58,34 @@ export const DeleteUserScreen: React.FC = () => {
     };
   }, [loadUser]);
 
+  // Set synchronously: a fast double tap lands before `submitting` re-renders
+  // the button as disabled, and would send a second DELETE.
+  const submittingRef = useRef(false);
   const onConfirm = async () => {
-    if (!userId) return;
+    if (!userId) {
+      Alert.alert(t('error'), t('userIDMissing'));
+      return;
+    }
+    if (submittingRef.current) {
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
     try {
-      setSubmitting(true);
       await deleteUser(userId);
       markDataChanged('users');
       Alert.alert(t('success'), t('userHasBeenDeleted'));
       returnToList(navigation);
-    } catch (e) {
-      Alert.alert(t('error'), t('failedToDeleteUser'));
-    } finally {
-      setSubmitting(false);
+    } catch (e: any) {
+      Alert.alert(t('error'), e?.response?.data?.message || t('failedToDeleteUser'));
+      submittingRef.current = false;
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
+  // Without a name passed in, wait for it so the confirmation names the user.
+  const nameLoading = !!userId && !userName && !loadError;
 
   return (
     <SafeAreaView
@@ -96,7 +110,7 @@ export const DeleteUserScreen: React.FC = () => {
           <DeleteButton
             label={t('delete')}
             onPress={onConfirm}
-            disabled={submitting}
+            disabled={submitting || nameLoading}
             style={styles.btn}
           />
         </View>

@@ -1,5 +1,4 @@
 import api from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export interface CreateCityPayload {
   name: string;
@@ -12,28 +11,21 @@ export interface CityItem {
   country_id?: number;
 }
 
+/**
+ * POST /cities. Errors keep the API response and carry the API's message only
+ * (empty otherwise), so screens fall back to their translated text.
+ */
 export async function createCity(payload: CreateCityPayload): Promise<CityItem> {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-
   try {
-    const response = await api.post('/cities', payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${token}`,
-      },
-    });
+    const response = await api.post('/cities', payload);
     const body = response.data as any;
     const city = body?.data ?? body;
     if (!city?.id) {
-      throw new Error(body?.message || 'Failed to create city.');
+      throw new Error(typeof body?.message === 'string' ? body.message : '');
     }
     return city as CityItem;
   } catch (err: any) {
-    const message =
-      err?.response?.data?.message || err?.message || 'Failed to create city.';
+    const message = err?.response?.data?.message || err?.message || '';
     console.error('Create city error:', message);
     const error = new Error(message) as Error & {response?: any};
     error.response = err?.response;

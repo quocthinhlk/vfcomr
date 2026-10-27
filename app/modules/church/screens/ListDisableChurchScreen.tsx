@@ -22,7 +22,8 @@ import {
 } from '../services/church.service';
 import {ChurchListCard} from '../components/ChurchListCard';
 import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
-import {isSuperAdmin} from '../../../shared/utils/permissions';
+import {isSuperAdmin, resolveRoleIdFromUser} from '../../../shared/utils/permissions';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {
   ListEmptyState,
@@ -105,6 +106,9 @@ export const ChurchesListScreen: React.FC = () => {
     } catch (e) {
       // Surface the failure as a recoverable error, never as "no churches".
       if (id === requestId.current) {
+        // The error + retry is shown in place of the list: keeping the old rows
+        // (or the previous search's results) hid the failure completely.
+        setItems([]);
         setLoadError(e);
       }
     } finally {
@@ -122,18 +126,22 @@ export const ChurchesListScreen: React.FC = () => {
     (async () => {
       try {
         const res = await api.get('users/me');
-        const r = res?.data?.data?.role?.id;
-        if (typeof r === 'number') setRoleId(r);
+        // Same rule as the church list: some accounts only expose role_id.
+        const r = resolveRoleIdFromUser(res?.data?.data);
+        if (r != null) {
+          setRoleId(r);
+        }
       } catch {}
     })();
   }, []);
 
-  useEffect(() => {
-    if (route?.params?.refresh || route?.params?.reload) {
-      fetchData(1);
-      navigation.setParams({refresh: false, reload: undefined});
-    }
-  }, [route?.params?.refresh, route?.params?.reload, fetchData, navigation]);
+  // Reload after a church was enabled / edited / disabled anywhere (a `reload`
+  // param or markDataChanged('churches')); a plain Back keeps the list.
+  useReloadOnReturn(() => fetchData(1), {
+    dataKey: 'churches',
+    reload: route?.params?.refresh || route?.params?.reload,
+    clearReload: () => navigation.setParams({refresh: false, reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);

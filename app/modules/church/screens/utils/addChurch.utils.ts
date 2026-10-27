@@ -1,10 +1,5 @@
-import * as Yup from 'yup';
 import api from '../../../../config/api';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import { isMscOptions, enableHouseCp, enableCpmOptions } from '../../config/church.constants';
-
-export const ADD_NEW_CITY_VALUE = '__add_new_city__';
 
 export interface AddChurchFormValues {
   name: string;
@@ -42,30 +37,68 @@ export interface AddChurchFormValues {
   date_of_birth: Date | null;
 }
 
-export const AddChurchSchema = Yup.object().shape({
-  name: Yup.string().required('Required'),
-  short_name: Yup.string(),
-  is_msc: Yup.string(),
-  is_first_msc: Yup.string().when('is_msc', {
-    is: (v: any) => v === 'Yes',
-    then: schema => schema.required('Required'),
-    otherwise: schema => schema.notRequired(),
-  }),
-  enable_cpm: Yup.string().required('Required'),
-  msc_parent_id: Yup.string().when(['is_msc', 'is_first_msc'], {
-    is: (isMsc: any, isFirst: any) => isMsc === 'Yes' && isFirst === 'No',
-    then: schema => schema.required('Required'),
-    otherwise: schema => schema.notRequired(),
-  }),
-  language_id: Yup.string(),
-  church_type_id: Yup.string().required('Required'),
-  pastor_id: Yup.string().required('Required'),
-  geographical_region_id: Yup.string().required('Required'),
-  country_id: Yup.string().required('Required'),
-  currency_id: Yup.string().required('Required'),
-  email_address: Yup.string().email('Invalid email').required('Required'),
-  date_of_birth: Yup.date().nullable().required('Required'),
-});
+type Option = {label: string; value: string};
+
+const listOf = (res: any): any[] => (Array.isArray(res?.data?.data) ? res.data.data : []);
+const itemsOf = (res: any): any[] =>
+  Array.isArray(res?.data?.data?.items) ? res.data.data.items : [];
+const toOption = (i: any): Option => ({label: i.name, value: String(i.id)});
+
+/** Geographical regions tree → flat list, children prefixed with "-" per level. */
+function flattenGeo(nodes: any[], depth = 0): Option[] {
+  const result: Option[] = [];
+  for (const n of nodes) {
+    result.push({label: `${'-'.repeat(depth)}${n.name}`, value: String(n.id)});
+    if (Array.isArray(n.children) && n.children.length) {
+      result.push(...flattenGeo(n.children, Math.min(depth + 1, 5)));
+    }
+  }
+  return result;
+}
+
+const MAX_OPTION_PAGES = 200;
+
+/**
+ * Every page of a paged list as options (deduplicated by id). Page 1 tells how
+ * many pages there are; the rest are then fetched in parallel instead of one
+ * after another (languages answer in ~2 s per page).
+ */
+async function fetchAllPagedOptions(endpoint: string, params: Record<string, any>): Promise<Option[]> {
+  const pageItems = (res: any) => itemsOf(res);
+  const first = await api.get(endpoint, {params: {...params, page: 1}});
+  const pages: any[][] = [pageItems(first)];
+  const firstData = first?.data?.data;
+  const totalPages = Number(firstData?.total_pages);
+  if (Number.isFinite(totalPages) && totalPages > 1) {
+    const rest = await Promise.all(
+      Array.from({length: Math.min(totalPages, MAX_OPTION_PAGES) - 1}, (_, index) =>
+        api.get(endpoint, {params: {...params, page: index + 2}}),
+      ),
+    );
+    pages.push(...rest.map(pageItems));
+  } else if (firstData?.has_next) {
+    // No page count in the response: follow has_next.
+    let page = 2;
+    let hasNext = true;
+    while (hasNext && page <= MAX_OPTION_PAGES) {
+      const res = await api.get(endpoint, {params: {...params, page}});
+      pages.push(pageItems(res));
+      hasNext = Boolean(res?.data?.data?.has_next);
+      page += 1;
+    }
+  }
+  const seen = new Set<string>();
+  const out: Option[] = [];
+  for (const item of pages.flat()) {
+    const option = toOption(item);
+    if (!option.value || seen.has(option.value)) {
+      continue;
+    }
+    seen.add(option.value);
+    out.push(option);
+  }
+  return out;
+}
 
 export function useFormOptions() {
   const [loading, setLoading] = useState(true);
@@ -84,125 +117,74 @@ export function useFormOptions() {
     languageRegionOptions: [] as { label: string; value: string }[],
     countryOptions: [] as { label: string; value: string }[],
     localCurrencyOptions: [] as { label: string; value: string }[],
-    isMscOptions,
-    enableHouseCp,
-    enableCpmOptions,
+    /** True when there are more pastors than the first page in pastorOptions. */
+    pastorHasNext: false,
   });
 
   const fetchOptions = useCallback(async () => {
     const token = ++loadTokenRef.current;
     const current = () => token === loadTokenRef.current;
+    setLoading(true);
+    setError(null);
+
+    // Phase 1: the small lookups behind the required fields (type, pastor,
+    // regions, country, currency), in parallel. They used to wait behind ~20
+    // sequential page requests for languages and churches, so these required
+    // dropdowns stayed empty for ~20 s on the add/edit/clone forms.
     try {
-      setLoading(true);
-      setError(null);
-      const fetchAllPagedOptions = async (
-        endpoint: string,
-        params: Record<string, any>,
-        mapItem: (i: any) => {label: string; value: string},
-      ) => {
-        const seen = new Set<string>();
-        const out: {label: string; value: string}[] = [];
-        let page = 1;
-        let hasNext = true;
-        let safety = 0;
-
-        while (hasNext && safety < 200) {
-          safety += 1;
-          const res = await api.get(endpoint, {params: {...params, page}});
-          const data = res?.data?.data;
-          const items = (data?.items ?? []) as any[];
-          for (const i of items) {
-            const opt = mapItem(i);
-            if (!opt?.value) continue;
-            if (seen.has(opt.value)) continue;
-            seen.add(opt.value);
-            out.push(opt);
-          }
-          hasNext = Boolean(data?.has_next);
-          page += 1;
-        }
-
-        return out;
-      };
-
-      // languages: load all pages so dropdown shows full list without searching
-      const languageOptions = await fetchAllPagedOptions(
-        'languages',
-        {limit: 200, sort_by: 'name', sort_desc: false},
-        i => ({label: i.name, value: String(i.id)}),
-      );
-
-      // mother churches: load all pages so dropdown shows full list without searching
-      const motherChurchOptions = await fetchAllPagedOptions(
-        'churches',
-        {limit: 200, sort_by: 'name', sort_desc: false},
-        i => ({label: i.name, value: String(i.id)}),
-      );
-
-      // church types
-      const types = await api.get('church-types', { params: { sort_by: 'name', sort_desc: false } });
-      const churchTypeOptions = ((types.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-
-      // pastors
-      const pastors = await api.get('users/pastors', { params: { page: 1, limit: 10, sort_by: 'name', sort_desc: false } });
-      const pastorOptions = ((pastors.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-
-      // church networks
-      const networks = await api.get('church-networks', { params: { sort_by: 'name', sort_desc: false } });
-      const churchNetworkOptions = ((networks.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-
-      // church regions
-      const cRegions = await api.get('church-regions', { params: { sort_by: 'name', sort_desc: false } });
-      const churchRegionOptions = ((cRegions.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-
-      // geographical regions (tree -> flattened with hyphens)
-      const geo = await api.get('geographical-regions', { params: { sort_by: 'name', sort_desc: false } });
-      function flattenGeo(nodes: any[], depth = 0): { label: string; value: string }[] {
-        const result: { label: string; value: string }[] = [];
-        for (const n of nodes) {
-          const label = `${'-'.repeat(depth)}${n.name}`;
-          result.push({ label, value: String(n.id) });
-          if (Array.isArray(n.children) && n.children.length) {
-            result.push(...flattenGeo(n.children, Math.min(depth + 1, 5)));
-          }
-        }
-        return result;
+      const [types, pastors, networks, cRegions, geo, langRegions, countries, currencies] =
+        await Promise.all([
+          api.get('church-types', {params: {sort_by: 'name', sort_desc: false}}),
+          api.get('users/pastors', {params: {page: 1, limit: 10, sort_by: 'name', sort_desc: false}}),
+          api.get('church-networks', {params: {sort_by: 'name', sort_desc: false}}),
+          api.get('church-regions', {params: {sort_by: 'name', sort_desc: false}}),
+          api.get('geographical-regions', {params: {sort_by: 'name', sort_desc: false}}),
+          api.get('language-regions', {params: {sort_by: 'name', sort_desc: false}}),
+          // countries: all at once (limit=1000); search handled on demand in the screen
+          api.get('countries', {params: {page: 1, limit: 1000, sort_by: 'name', sort_desc: false}}),
+          api.get('currencies', {params: {sort_by: 'name', sort_desc: false}}),
+        ]);
+      if (!current()) {
+        return;
       }
-      const geoRootItems = ((geo.data?.data?.items ?? []) as any[]);
-      const geographicalRegionOptions = geoRootItems.length ? flattenGeo(geoRootItems) : [];
-
-      // language regions
-      const langRegions = await api.get('language-regions', { params: { sort_by: 'name', sort_desc: false } });
-      const languageRegionOptions = ((langRegions.data?.data ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-
-      // countries: fetch all once (limit=1000); search handled on demand in screen
-      const countries = await api.get('countries', { params: { page: 1, limit: 1000, sort_by: 'name', sort_desc: false } });
-      const countryOptions = ((countries.data?.data?.items ?? []) as any[]).map(i => ({ label: i.name, value: String(i.id) }));
-
-      // currencies
-      const currencies = await api.get('currencies', { params: { sort_by: 'name', sort_desc: false } });
-      const localCurrencyOptions = ((currencies.data?.data?.items ?? []) as any[]).map((i: any) => ({ label: `${i.name} (${i.three_letter_code})`, value: String(i.id) }));
-
-      if (!current()) return;
-      setOptions({
-        motherChurchOptions,
-        churchTypeOptions,
-        churchNetworkOptions,
-        pastorOptions,
-        languageOptions,
-        churchRegionOptions,
-        geographicalRegionOptions,
-        languageRegionOptions,
-        countryOptions,
-        localCurrencyOptions,
-        isMscOptions,
-        enableHouseCp,
-        enableCpmOptions,
-      });
+      const geoRootItems = (geo.data?.data?.items ?? []) as any[];
+      setOptions(prev => ({
+        ...prev,
+        churchTypeOptions: listOf(types).map(toOption),
+        pastorOptions: itemsOf(pastors).map(toOption),
+        pastorHasNext: Boolean(pastors?.data?.data?.has_next),
+        churchNetworkOptions: listOf(networks).map(toOption),
+        churchRegionOptions: listOf(cRegions).map(toOption),
+        geographicalRegionOptions: geoRootItems.length ? flattenGeo(geoRootItems) : [],
+        languageRegionOptions: listOf(langRegions).map(toOption),
+        countryOptions: itemsOf(countries).map(toOption),
+        localCurrencyOptions: itemsOf(currencies).map((i: any) => ({
+          label: `${i.name} (${i.three_letter_code})`,
+          value: String(i.id),
+        })),
+      }));
     } catch (e) {
       if (current()) {
         setError(e);
+        setLoading(false);
       }
+      return;
+    }
+
+    // Phase 2: the full language and church lists (several pages each), so
+    // those dropdowns can be scrolled without searching. Both are also searched
+    // on the server, so a failure here must not replace a form the user may
+    // already be filling in with the error state.
+    try {
+      const [languageOptions, motherChurchOptions] = await Promise.all([
+        fetchAllPagedOptions('languages', {limit: 200, sort_by: 'name', sort_desc: false}),
+        fetchAllPagedOptions('churches', {limit: 200, sort_by: 'name', sort_desc: false}),
+      ]);
+      if (current()) {
+        setOptions(prev => ({...prev, languageOptions, motherChurchOptions}));
+      }
+    } catch (e) {
+      console.warn('Could not load the full language / church lists:', e);
     } finally {
       if (current()) {
         setLoading(false);
@@ -219,16 +201,4 @@ export function useFormOptions() {
   }, [fetchOptions]);
 
   return { loading, error, reload: fetchOptions, ...options };
-}
-
-export function formatNumber(numStr: any): string {
-  if (numStr === undefined || numStr === null) return '';
-  const cleanStr = String(numStr).replace(/\D/g, '');
-  if (!cleanStr) return '';
-  return parseInt(cleanStr, 10).toLocaleString('en-US');
-}
-
-export function parseNumber(formattedStr: any): string {
-  if (formattedStr === undefined || formattedStr === null) return '';
-  return String(formattedStr).replace(/[^\d]/g, '');
 }

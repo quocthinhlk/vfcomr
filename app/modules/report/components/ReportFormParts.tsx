@@ -16,7 +16,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {COLORS} from '../../../shared/constants/colors';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
-import type {ReportDownload} from '../services/report.service';
+import type {ReportDownload, ReportFormat} from '../services/report.service';
 
 export type DropdownItem = {label: string; value: string | number};
 
@@ -287,43 +287,6 @@ export function ToggleLink({label, open, onPress}: {label: string; open: boolean
   );
 }
 
-/** PDF / XLS choice (web: Other Reports on Churches, #21). */
-export function FormatChoice({
-  value,
-  onChange,
-  disabled = false,
-}: {
-  value: 'pdf' | 'xls';
-  onChange: (value: 'pdf' | 'xls') => void;
-  disabled?: boolean;
-}) {
-  const C = useThemedColors();
-  const option = (id: 'pdf' | 'xls', label: string) => {
-    const selected = value === id;
-    return (
-      <TouchableOpacity
-        key={id}
-        style={styles.formatOption}
-        disabled={disabled}
-        onPress={() => onChange(id)}
-        accessibilityRole="radio"
-        accessibilityState={{selected}}>
-        <View style={[styles.radioOuter, {borderColor: selected ? COLORS.mainColor : C.inputBorder}]}>
-          {selected ? <View style={styles.radioInner} /> : null}
-        </View>
-        <ReportFileIcon kind={id === 'pdf' ? 'pdf' : 'excel'} small />
-        <RNText style={[styles.formatLabel, {color: C.textPrimary}]}>{label}</RNText>
-      </TouchableOpacity>
-    );
-  };
-  return (
-    <View style={styles.formatRow}>
-      {option('pdf', 'PDF')}
-      {option('xls', 'XLS')}
-    </View>
-  );
-}
-
 export function ErrorBanner({message}: {message: string}) {
   if (!message) {
     return null;
@@ -358,45 +321,117 @@ export function GenerateButton({
   );
 }
 
-/** Generated files: tap to download and open. */
+/**
+ * After a report is generated, one card per format (Excel .xlsx / PDF):
+ * tapping the card opens the file; the download button saves it on the device.
+ * A format the API did not produce for this report stays visible but disabled.
+ */
 export function ReportFiles({
   files,
   onOpen,
+  onSave,
   busyUrl,
+  savingUrl = null,
   disabled = false,
 }: {
   files: ReportDownload[];
   onOpen: (file: ReportDownload) => void;
+  onSave: (file: ReportDownload) => void;
   busyUrl: string | null;
+  savingUrl?: string | null;
   disabled?: boolean;
 }) {
   const C = useThemedColors();
+  const {t} = useTranslation();
   if (files.length === 0) {
     return null;
   }
+  const busy = disabled || busyUrl != null || savingUrl != null;
+  const choice = (format: ReportFormat, title: string) => {
+    const file = files.find(item => item.label === format);
+    const ext = file ? extensionLabel(file.filename) : format === 'pdf' ? '.pdf' : '.xlsx';
+    const opening = !!file && busyUrl === file.url;
+    const saving = !!file && savingUrl === file.url;
+    return (
+      <View
+        key={format}
+        style={[
+          styles.formatCard,
+          {borderColor: C.border, backgroundColor: C.surface},
+          !file && styles.formatCardOff,
+        ]}>
+        <TouchableOpacity
+          style={styles.formatOpen}
+          disabled={!file || busy}
+          activeOpacity={0.6}
+          onPress={() => file && onOpen(file)}
+          accessibilityRole="button"
+          accessibilityState={{disabled: !file || busy, busy: opening}}
+          accessibilityLabel={
+            file ? `${t('open')} ${title} ${ext}, ${file.filename}` : `${title}: ${t('formatNotAvailable')}`
+          }>
+          <ReportFileIcon kind={format} />
+          <View style={styles.formatText}>
+            <RNText style={[styles.formatTitle, {color: C.textPrimary}]}>
+              {title} <RNText style={{color: C.textSecondary}}>({ext})</RNText>
+            </RNText>
+            <RNText style={[styles.formatSub, {color: C.textSecondary}]} numberOfLines={2}>
+              {file ? file.filename : t('formatNotAvailable')}
+            </RNText>
+          </View>
+          {opening ? <ActivityIndicator color={COLORS.mainColor} /> : null}
+        </TouchableOpacity>
+        {file ? (
+          <TouchableOpacity
+            style={[styles.formatSave, {borderLeftColor: C.border}]}
+            disabled={busy}
+            activeOpacity={0.6}
+            onPress={() => onSave(file)}
+            hitSlop={{top: 6, bottom: 6, left: 4, right: 6}}
+            accessibilityRole="button"
+            accessibilityState={{disabled: busy, busy: saving}}
+            accessibilityLabel={`${t('download')} ${title} ${ext}`}>
+            {saving ? (
+              <ActivityIndicator color={COLORS.mainColor} />
+            ) : (
+              <DownloadGlyph color={busy ? C.textSecondary : COLORS.mainColor} />
+            )}
+          </TouchableOpacity>
+        ) : null}
+      </View>
+    );
+  };
   return (
     <View style={[styles.fileList, {borderColor: C.border}]}>
-      {files.map((file, index) => (
-        <TouchableOpacity
-          key={file.url}
-          style={[
-            styles.fileRow,
-            index > 0 && {borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: C.border},
-          ]}
-          disabled={disabled || busyUrl != null}
-          activeOpacity={0.6}
-          onPress={() => onOpen(file)}>
-          <ReportFileIcon kind={file.label} />
-          <RNText style={[styles.fileName, {color: C.textPrimary}]} numberOfLines={2}>
-            {file.filename}
-          </RNText>
-        </TouchableOpacity>
-      ))}
+      <RNText style={[styles.readyTitle, {color: C.textPrimary}]}>✓ {t('reportReady')}</RNText>
+      <RNText style={[styles.readySub, {color: C.textSecondary}]}>{t('chooseDownloadFormat')}</RNText>
+      {choice('excel', 'Excel')}
+      {choice('pdf', 'PDF')}
     </View>
   );
 }
 
-export function ReportFileIcon({kind, small = false}: {kind: 'pdf' | 'excel'; small?: boolean}) {
+function extensionLabel(filename: string): string {
+  const match = /(\.[a-z0-9]+)$/i.exec(filename);
+  return match ? match[1].toLowerCase() : '';
+}
+
+function DownloadGlyph({color}: {color: string}) {
+  return (
+    <Svg width={ws(20)} height={ws(20)} viewBox="0 0 24 24">
+      <Path
+        d="M12 3v12m0 0-5-5m5 5 5-5M4 19h16"
+        stroke={color}
+        strokeWidth={2}
+        fill="none"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </Svg>
+  );
+}
+
+export function ReportFileIcon({kind, small = false}: {kind: ReportFormat; small?: boolean}) {
   const badge = kind === 'pdf' ? '#E53935' : '#1D6F42';
   const label = kind === 'pdf' ? 'PDF' : 'XLS';
   const width = small ? ws(18) : ws(28);
@@ -558,20 +593,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: ms(10),
   },
-  formatRow: {
-    flexDirection: 'row',
-    gap: ms(18),
-    marginBottom: ms(12),
-  },
-  formatOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(6),
-  },
-  formatLabel: {
-    fontSize: fs(14),
-    fontWeight: '600',
-  },
   errorBanner: {
     backgroundColor: 'rgba(229,57,53,0.12)',
     borderRadius: rs(6),
@@ -605,17 +626,55 @@ const styles = StyleSheet.create({
   },
   fileList: {
     marginTop: ms(16),
+    paddingTop: ms(14),
     borderTopWidth: StyleSheet.hairlineWidth,
+    gap: ms(10),
   },
-  fileRow: {
+  readyTitle: {
+    fontSize: fs(15),
+    fontWeight: '700',
+    color: '#1D6F42',
+  },
+  readySub: {
+    fontSize: fs(13),
+    marginTop: -ms(6),
+  },
+  formatCard: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    borderWidth: 1,
+    borderRadius: rs(8),
+    overflow: 'hidden',
+  },
+  formatOpen: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: ms(12),
+    gap: ms(12),
+    paddingVertical: ms(10),
+    paddingLeft: ms(12),
+    paddingRight: ms(8),
   },
-  fileName: {
+  formatSave: {
+    width: ws(52),
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderLeftWidth: StyleSheet.hairlineWidth,
+  },
+  formatCardOff: {
+    opacity: 0.45,
+  },
+  formatText: {
     flex: 1,
-    marginLeft: ms(12),
-    fontSize: fs(13),
-    lineHeight: fs(18),
+    minWidth: 0,
+  },
+  formatTitle: {
+    fontSize: fs(15),
+    fontWeight: '600',
+  },
+  formatSub: {
+    marginTop: ms(2),
+    fontSize: fs(12),
+    lineHeight: fs(16),
   },
 });

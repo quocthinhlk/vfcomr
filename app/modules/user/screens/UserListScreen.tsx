@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback, useRef} from 'react';
+import React, {useEffect, useState} from 'react';
 import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {
   View,
@@ -6,8 +6,6 @@ import {
   RefreshControl,
   StyleSheet,
   TouchableOpacity,
-  ActivityIndicator,
-  ScrollView,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -38,6 +36,7 @@ import {
 } from '../../../shared/components/crud';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {usePagedList} from '../hooks/usePagedList';
 
 export const UserListScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -45,14 +44,7 @@ export const UserListScreen: React.FC = () => {
   const {t} = useTranslation();
   const C = useThemedColors();
   const {theme} = useThemeMode();
-  const [items, setItems] = useState<ListUsersItem[]>([]);
   const listStyles = getListStyles(C, theme);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
-  const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
   const [roleId, setRoleId] = useState<number | null>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
@@ -79,89 +71,39 @@ export const UserListScreen: React.FC = () => {
     })();
   }, []);
 
-  const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
-      try {
-        if (loading) {
-          return;
-        }
-        setLoading(true);
-        const params = {
+  const {
+    items,
+    page,
+    totalPages,
+    total,
+    loading,
+    refreshing,
+    loadError,
+    reload,
+    goToPage,
+    retry,
+    onRefresh,
+  } = usePagedList<ListUsersItem>(
+    async (targetPage, search) =>
+      (
+        await listUsers({
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
-          search: query,
+          search,
           sort_by: 'name',
           sort_desc: false,
-        };
-        let res = await listUsers(params);
-        // On first open the API sometimes returns pagination totals that
-        // contradict the page itself (e.g. total: 1 with 10 items) while other
-        // requests (users/me) run concurrently. Retry once when that happens.
-        const looksInconsistent = (r: typeof res) => {
-          const d = r?.data;
-          if (!d) {
-            return false;
-          }
-          const count = d.items?.length ?? 0;
-          return (
-            (d.total ?? 0) < count ||
-            (!!d.has_next && (d.total_pages ?? 1) <= (d.page ?? targetPage))
-          );
-        };
-        if (looksInconsistent(res)) {
-          res = await listUsers(params);
-        }
-        const nextItems = res?.data?.items ?? [];
-        setTotalPages(res?.data?.total_pages ?? 1);
-        setTotal(res?.data?.total ?? 0);
-        setPage(res?.data?.page ?? targetPage);
-        setItems(reset ? nextItems : [...items, ...nextItems]);
-        setLoadError(null);
-      } catch (e) {
-        console.error(e);
-        // Surface the failure as a recoverable error, never as "no users".
-        setLoadError(e);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loading, query, items],
+        })
+      )?.data,
+    query,
   );
-
-  useEffect(() => {
-    // On query change, reset to page 1
-    setItems([]);
-    fetchData(1, true);
-  }, [query]);
 
   // Reload when coming back after a user was added / edited / deleted (a
   // `reload` param or markDataChanged('users')); a plain Back keeps the list.
-  useReloadOnReturn(
-    () => {
-      setItems([]);
-      fetchData(1, true);
-    },
-    {
-      dataKey: 'users',
-      reload: route?.params?.refresh || route?.params?.reload,
-      clearReload: () => navigation.setParams({refresh: false, reload: undefined}),
-    },
-  );
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
-    setRefreshing(false);
-  };
-
-  const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {
-      return;
-    }
-    setItems([]);
-    fetchData(targetPage, true);
-  };
+  useReloadOnReturn(reload, {
+    dataKey: 'users',
+    reload: route?.params?.refresh || route?.params?.reload,
+    clearReload: () => navigation.setParams({refresh: false, reload: undefined}),
+  });
 
   const openActions = (user: ListUsersItem) => {
     setSelectedUser(user);
@@ -175,7 +117,7 @@ export const UserListScreen: React.FC = () => {
   // open animation is inside ActionSheetModal; close is instant
 
   const blankAvatar = require('../../../assets/icons/avatar_blank.png');
-  const BASE_URL = 'http://34.126.158.119/storage';
+  const BASE_URL = 'https://tintran.cloud-ip.cc/storage';
 
   const renderItem = ({item}: {item: ListUsersItem}) => {
     const displayName = [item.prefix, item.name].filter(Boolean).join(' ');
@@ -298,7 +240,6 @@ export const UserListScreen: React.FC = () => {
             value={query}
             onChangeText={setQuery}
             placeholder={t('search')}
-            onSubmitEditing={() => goToPage(1)}
           />
 
           <View style={{flex: 1, minHeight: 0}}>
@@ -323,7 +264,7 @@ export const UserListScreen: React.FC = () => {
                   <ListLoadState
                     loading={loading}
                     error={loadError}
-                    onRetry={() => fetchData(page, true)}>
+                    onRetry={retry}>
                     <ListEmptyState title={t('noUsersFound')} />
                   </ListLoadState>
                 }

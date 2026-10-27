@@ -1,6 +1,7 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
+  ActivityIndicator,
   ScrollView,
   View,
   Alert,
@@ -35,6 +36,32 @@ import {ms, hs, fs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {useLatestRequest} from '../hooks/useLatestRequest';
+import {fillTemplate, formatYmd, parseYmd, splitApiFieldErrors} from '../utils/churchForm';
+
+/** Fields that show their own error under the input (anything else is alerted). */
+const FIELDS_WITH_ERROR_TEXT = new Set([
+  'name',
+  'enable_cpm',
+  'is_msc',
+  'is_first_msc',
+  'msc_parent_id',
+  'language_id',
+  'church_type_id',
+  'pastor_id',
+  'church_network_id',
+  'church_region_id',
+  'geographical_region_id',
+  'language_region_id',
+  'country_id',
+  'currency_id',
+  'new_city_name',
+  'email_address',
+  'date_of_birth',
+]);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const PASTOR_PAGE_LIMIT = 10;
+type Option = {label: string; value: string};
 
 export const AddCloneChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -66,9 +93,9 @@ export const AddCloneChurchScreen: React.FC = () => {
   const requiredFieldMessageForKey = (key: string) => {
     const labelByKey: Record<string, string> = {
       name: t('churchName') || 'Church Name',
-      is_first_msc: 'Is this the first MSC?',
+      is_first_msc: t('isThisFirstMsc'),
       enable_cpm: t('houseCp') || 'House C.P.',
-      msc_parent_id: 'MSC Designated Parent',
+      msc_parent_id: t('mscDesignatedParent'),
       church_type_id: t('churchType') || 'Church Type',
       pastor_id: t('pastorLeader') || 'Pastor Leader',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
@@ -79,7 +106,7 @@ export const AddCloneChurchScreen: React.FC = () => {
       date_of_birth: t('dob') || 'Date of Birth',
     };
     const label = labelByKey[key] || key;
-    return `${label} is a required field`;
+    return fillTemplate(t('fieldIsRequired'), {field: label});
   };
 
   const renderFieldError = (key: string) => {
@@ -99,6 +126,7 @@ export const AddCloneChurchScreen: React.FC = () => {
     churchTypeOptions,
     churchNetworkOptions,
     pastorOptions,
+    pastorHasNext: pastorOptionsHasNext,
     languageOptions,
     churchRegionOptions,
     geographicalRegionOptions,
@@ -113,16 +141,74 @@ export const AddCloneChurchScreen: React.FC = () => {
     width: 1600,
     height: 900,
   });
+  const {begin, debounce} = useLatestRequest();
+  // Photo uploaded by an earlier, failed save: reused instead of uploading again.
+  const uploadedPhotoRef = useRef<{source: string; path: string} | null>(null);
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
   const [isAddingNewCity, setIsAddingNewCity] = useState(false);
+  // Latest country only: a slower response for the previous country must not
+  // fill the list (a city of another country would then be saved).
   const loadCities = async (countryId: string | number) => {
+    const isLatest = begin('cities');
+    setCityOptions([]);
     try {
       const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
+      if (!isLatest()) {
+        return;
+      }
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
     } catch {}
   };
 
+  // Pastor list: first page from the options hook, then server search / paging
+  // (the dropdown used to offer only the first 10 pastors, and the source
+  // church's pastor was not shown when it wasn't among them).
+  const [pastorOpts, setPastorOpts] = useState<Option[]>([]);
+  const [pastorPage, setPastorPage] = useState(1);
+  const [pastorHasNext, setPastorHasNext] = useState(false);
+  const [pastorQuery, setPastorQuery] = useState('');
+  const [selectedPastor, setSelectedPastor] = useState<Option | null>(null);
+  useEffect(() => {
+    if (!pastorQuery) {
+      setPastorOpts(pastorOptions);
+      setPastorPage(1);
+      setPastorHasNext(pastorOptionsHasNext);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pastorOptions, pastorOptionsHasNext]);
+  const loadPastors = async (page: number, name: string) => {
+    const isLatest = begin('pastor');
+    try {
+      const res = await api.get('users/pastors', {
+        params: {
+          page,
+          limit: PASTOR_PAGE_LIMIT,
+          sort_by: 'name',
+          sort_desc: false,
+          ...(name.trim() ? {name: name.trim()} : {}),
+        },
+      });
+      if (!isLatest()) {
+        return;
+      }
+      const items: Option[] = ((res.data?.data?.items ?? []) as any[]).map(i => ({
+        label: i.name,
+        value: String(i.id),
+      }));
+      setPastorOpts(prev => (page === 1 ? items : [...prev, ...items]));
+      setPastorPage(page);
+      setPastorHasNext(!!res.data?.data?.has_next);
+    } catch {}
+  };
+  const pastorDropdownData = useMemo(() => {
+    if (!selectedPastor || pastorOpts.some(o => o.value === selectedPastor.value)) {
+      return pastorOpts;
+    }
+    return [selectedPastor, ...pastorOpts];
+  }, [pastorOpts, selectedPastor]);
+
+  const [sourceLoaded, setSourceLoaded] = useState(!sourceId);
   const [initialFormValues, setInitialFormValues] = useState<AddChurchFormValues>({
     name: '', short_name: '', is_msc: '', is_first_msc: '', enable_cpm: '', parent_id: '', msc_parent_id: '',
     language_id: '', church_type_id: '', pastor_id: '', church_network_id: '',
@@ -145,7 +231,12 @@ export const AddCloneChurchScreen: React.FC = () => {
       const token = ++loadTokenRef.current;
       try {
         const d = await getChurchDetail(sourceId);
-        if (token !== loadTokenRef.current || !d) {
+        if (token !== loadTokenRef.current) {
+          return;
+        }
+        if (!d) {
+          // Nothing to clone from: show the retryable error, not an endless spinner.
+          setLoadError(new Error(t('noDataFound')));
           return;
         }
         setLoadError(null);
@@ -193,8 +284,15 @@ export const AddCloneChurchScreen: React.FC = () => {
           facebook: d.facebook || '',
           instagram: d.instagram || '',
           twitter: d.twitter || '',
-          date_of_birth: d.date_of_birth ? new Date(d.date_of_birth) : null,
+          date_of_birth: parseYmd(d.date_of_birth),
         });
+        if (d.pastor_id) {
+          setSelectedPastor({
+            value: String(d.pastor_id),
+            label: d.pastor_name || String(d.pastor_id),
+          });
+        }
+        setSourceLoaded(true);
         if (d.country_id) {
           await loadCities(d.country_id);
         }
@@ -230,6 +328,8 @@ export const AddCloneChurchScreen: React.FC = () => {
               ])
             }
           />
+        ) : !sourceLoaded ? (
+          <ActivityIndicator color={COLORS.mainColor} style={{marginTop: ms(40)}} />
         ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
@@ -250,18 +350,19 @@ export const AddCloneChurchScreen: React.FC = () => {
             <Formik<AddChurchFormValues>
               enableReinitialize
               initialValues={{...initialFormValues}}
-              onSubmit={async values => {
+              onSubmit={async (values, {setFieldValue: setFormValue}) => {
                 try {
                   setFieldErrorText({});
                   const newInvalid: Record<string, boolean> = {};
-                  newInvalid.name = !values.name;
+                  newInvalid.name = !values.name?.trim();
                   newInvalid.enable_cpm = !values.enable_cpm;
                   newInvalid.church_type_id = !values.church_type_id;
                   newInvalid.pastor_id = !values.pastor_id;
                   newInvalid.geographical_region_id = !values.geographical_region_id;
                   newInvalid.country_id = !values.country_id;
                   newInvalid.currency_id = !values.currency_id;
-                  newInvalid.email_address = !values.email_address;
+                  const email = values.email_address?.trim() || '';
+                  newInvalid.email_address = !email || !EMAIL_PATTERN.test(email);
                   newInvalid.date_of_birth = !values.date_of_birth;
                   newInvalid.is_first_msc =
                     values.is_msc === 'Yes' && !values.is_first_msc;
@@ -277,7 +378,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                   const newFieldErrors: Record<string, string> = {};
                   Object.keys(newInvalid).forEach(k => {
                     if (newInvalid[k]) {
-                      newFieldErrors[k] = requiredFieldMessageForKey(k);
+                      newFieldErrors[k] =
+                        k === 'email_address' && email
+                          ? t('invalidEmailFormat')
+                          : requiredFieldMessageForKey(k);
                     }
                   });
                   setFieldErrorText(newFieldErrors);
@@ -299,11 +403,23 @@ export const AddCloneChurchScreen: React.FC = () => {
                     : null;
                   if (isAddingNewCity) {
                     try {
+                      const cityName = values.new_city_name.trim();
                       const createdCity = await createCity({
-                        name: values.new_city_name.trim(),
+                        name: cityName,
                         country_id: Number(values.country_id),
                       });
                       resolvedCityId = createdCity.id;
+                      // A later failure must not create it again on retry: from
+                      // now on the form simply has this city selected.
+                      const cityValue = String(createdCity.id);
+                      setCityOptions(prev =>
+                        prev.some(o => o.value === cityValue)
+                          ? prev
+                          : [...prev, {label: createdCity.name || cityName, value: cityValue}],
+                      );
+                      setIsAddingNewCity(false);
+                      setFormValue('city_id', cityValue);
+                      setFormValue('new_city_name', '');
                     } catch (cityErr: any) {
                       Alert.alert(
                         t('error'),
@@ -336,7 +452,9 @@ export const AddCloneChurchScreen: React.FC = () => {
                   const shortName = ensureShortWithCopy(values.short_name || '');
 
                   let uploadedPhotoPath: string | undefined;
-                  if (imagePath) {
+                  if (imagePath && uploadedPhotoRef.current?.source === imagePath) {
+                    uploadedPhotoPath = uploadedPhotoRef.current.path;
+                  } else if (imagePath) {
                     const form = new FormData();
                     const fileName = imagePath.split('/').pop() || 'photo.jpg';
                     form.append('file', {uri: imagePath, name: fileName, type: 'image/jpeg'} as any);
@@ -346,6 +464,10 @@ export const AddCloneChurchScreen: React.FC = () => {
                       headers: {'Content-Type': 'multipart/form-data'},
                     });
                     uploadedPhotoPath = uploadRes?.data?.data?.path;
+                    if (!uploadedPhotoPath) {
+                      throw new Error(t('photoUploadFailed'));
+                    }
+                    uploadedPhotoRef.current = {source: imagePath, path: uploadedPhotoPath};
                   }
 
                   const raw: any = {
@@ -382,10 +504,11 @@ export const AddCloneChurchScreen: React.FC = () => {
                     email_address: toStr(values.email_address),
                     website: toStr(values.website),
                     facebook: toStr(values.facebook),
+                    instagram: toStr(values.instagram),
                     twitter: toStr(values.twitter),
-                    date_of_birth: values.date_of_birth
-                      ? values.date_of_birth.toISOString().split('T')[0]
-                      : undefined,
+                    // Local calendar date: toISOString() shifted it to the previous
+                    // day east of UTC (e.g. Vietnam).
+                    date_of_birth: formatYmd(values.date_of_birth) ?? undefined,
                     service_venue: '',
                     church_planting_projection_id: 0,
                     photo_dir: toStr(values.photo_dir),
@@ -395,35 +518,35 @@ export const AddCloneChurchScreen: React.FC = () => {
                   const payload: any = Object.fromEntries(
                     Object.entries(raw).filter(([_, v]) => v !== undefined),
                   );
-                  const res = await addChurch(payload);
+                  await addChurch(payload);
                   markDataChanged('churches');
-                  Alert.alert(t('success'), 'Church cloned successfully');
-                  navigation.navigate('Churches');
+                  Alert.alert(t('success'), t('cloneChurchSuccess'));
+                  // navigate() would push a new list on top of this filled form
+                  // (React Navigation 7): Back + Save would clone it twice.
+                  navigation.popTo('Churches');
                 } catch (e: any) {
-                  const apiErrors = e?.response?.data?.errors;
-                  if (apiErrors && typeof apiErrors === 'object') {
-                    const nextInvalid: Record<string, boolean> = {};
-                    const nextFieldErrors: Record<string, string> = {};
-                    Object.entries(apiErrors).forEach(([key, value]) => {
-                      if (typeof value === 'string' && value.trim()) {
-                        nextInvalid[key] = true;
-                        nextFieldErrors[key] = value;
-                      }
-                    });
-                    if (Object.keys(nextFieldErrors).length > 0) {
-                      setInvalid(prev => ({...prev, ...nextInvalid}));
-                      setFieldErrorText(nextFieldErrors);
-                      const firstKey = Object.keys(nextFieldErrors)[0];
-                      if (firstKey) {
-                        scrollToField(firstKey);
-                      }
-                      return;
-                    }
-                  }
-                  Alert.alert(
-                    'Error',
-                    e?.response?.data?.message || e?.message || 'Failed to clone church',
+                  const {fieldErrors, otherMessages} = splitApiFieldErrors(
+                    e?.response?.data?.errors,
+                    FIELDS_WITH_ERROR_TEXT,
                   );
+                  const fieldKeys = Object.keys(fieldErrors);
+                  if (fieldKeys.length > 0) {
+                    setInvalid(prev => ({
+                      ...prev,
+                      ...Object.fromEntries(fieldKeys.map(k => [k, true])),
+                    }));
+                    setFieldErrorText(fieldErrors);
+                    scrollToField(fieldKeys[0]);
+                  }
+                  if (otherMessages.length > 0 || fieldKeys.length === 0) {
+                    Alert.alert(
+                      t('error'),
+                      otherMessages.join('\n') ||
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        t('failedToCloneChurch'),
+                    );
+                  }
                 }
               }}>
               {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
@@ -470,6 +593,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                         </View>
                         <AppInput
                           autoCapitalize="none"
+                          maxLength={10}
                           value={values.short_name}
                           onChangeText={handleChange('short_name')}
                           onBlur={handleBlur('short_name')}
@@ -526,7 +650,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <Text
                             style={[formStyles.label, {color: C.textSecondary}]}
                             category="label">
-                            Is this the first MSC?{' '}
+                            {t('isThisFirstMsc')}{' '}
                             <Text style={{color: '#c00000'}}>*</Text>
                           </Text>
                           <ElementDropdown
@@ -649,7 +773,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <Text
                             style={[formStyles.label, {color: C.textSecondary}]}
                             category="label">
-                            MSC Designated Parent{' '}
+                            {t('mscDesignatedParent')}{' '}
                             <Text style={{color: '#c00000'}}>*</Text>
                           </Text>
                           <ElementDropdown
@@ -716,16 +840,30 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <HelpIcon title={t('pastorLeader')} message={t('helpPastorLeader')} />
                         </View>
                         <ElementDropdown
-                          data={pastorOptions}
+                          data={pastorDropdownData}
                           value={values.pastor_id as any}
                           onChange={v => {
                             setFieldValue('pastor_id', v as any);
+                            setSelectedPastor(
+                              pastorDropdownData.find(o => o.value === String(v)) ?? null,
+                            );
                             setInvalid(prev => ({...prev, pastor_id: false}));
                             clearFieldError('pastor_id');
                           }}
                           placeholder={t('selectOption')}
                           containerStyle={{backgroundColor: C.inputBg, borderColor: invalid?.pastor_id ? '#db2d2d' : C.inputBorder} as any}
                           error={!!invalid?.pastor_id}
+                          onSearchText={text => {
+                            setPastorQuery(text);
+                            debounce('pastor', () => {
+                              loadPastors(1, text);
+                            });
+                          }}
+                          onEndReached={() => {
+                            if (pastorHasNext) {
+                              loadPastors(pastorPage + 1, pastorQuery);
+                            }
+                          }}
                         />
                         {renderFieldError('pastor_id')}
                       </View>

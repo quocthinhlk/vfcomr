@@ -36,7 +36,6 @@ export type RootStackParamList = {
   User: { userId?: number } | undefined;
   MyProfile: undefined;
   MyChurchProfile: undefined;
-  UserRoles: undefined;
   Churches: { refresh?: boolean; openChurchInPastorDashboard?: boolean } | undefined;
   WatchList: undefined;
   WatchListDetail: { watchListId: number };
@@ -101,7 +100,6 @@ export type RootStackParamList = {
   SettingsBibleVerse: undefined;
   SettingsRationalising: undefined;
   PermissionExamples: undefined;
-  Profile: undefined;
   SwitchUser: undefined;
   Support: undefined;
   OmrSupport: undefined;
@@ -204,7 +202,6 @@ import ListOverseerScreen from '../modules/user/screens/ListOverseerScreen';
 // New Screens Imports
 import UserScreen from '../modules/user/screens/UserScreen';
 import MyChurchProfileScreen from '../modules/user/screens/MyChurchProfileScreen';
-import { UserRolesScreen } from '../modules/user/screens/UserRolesScreen';
 import { ChurchesListScreen } from '../modules/church/screens/ListChurchScreen';
 import ChangePasswordForOtherUserScreen from '../modules/user/screens/ChangePasswordForOtherUserScreen';
 import ChangeEmailScreen from '../modules/user/screens/ChangeEmailScreen';
@@ -281,7 +278,6 @@ import { PermissionExamplesScreen } from '../shared/screens/PermissionExamplesSc
 import GeneralScreen from '../modules/setting/screens/GeneralScreen';
 import BibleVerseScreen from '../modules/setting/screens/BibleVerseScreen';
 import RationalisingScreen from '../modules/setting/screens/RationalisingScreen';
-import { ProfileScreen } from '../modules/user/screens/ProfileScreen';
 import { SwitchUserScreen } from '../modules/user/screens/SwitchUserScreen';
 import NotificationsScreen from '../modules/notifications/screens/NotificationsScreen';
 import NotificationDetailScreen from '../modules/notifications/screens/NotificationDetailScreen';
@@ -414,7 +410,6 @@ export default function Navigation() {
               <Stack.Screen name="MyOverseers" component={MyOverseersScreen} />
               <Stack.Screen name="MyOverseerDetail" component={MyOverseerDetailScreen} />
               <Stack.Screen name="WeeklyReport" component={WeeklyReportScreen} />
-              <Stack.Screen name="Profile" component={ProfileScreen} />
               <Stack.Screen name="AddUser" component={AddUserScreen} />
               <Stack.Screen name="SwitchUser" component={SwitchUserScreen} />
               <Stack.Screen name="AddChurch" component={AddChurchScreen} />
@@ -443,7 +438,6 @@ export default function Navigation() {
               <Stack.Screen name="User" component={UserScreen} />
               <Stack.Screen name="MyProfile" component={UserScreen} />
               <Stack.Screen name="MyChurchProfile" component={MyChurchProfileScreen} />
-              <Stack.Screen name="UserRoles" component={UserRolesScreen} />
               <Stack.Screen name="Overseers" component={ListOverseerScreen} />
               <Stack.Screen name="Churches" component={ChurchesListScreen} />
               <Stack.Screen name="WatchList" component={WatchListScreen} />

@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {
+  ActivityIndicator,
   View,
   FlatList,
   RefreshControl,
@@ -20,6 +21,7 @@ import {
   RoleChangeRequestItem,
 } from '../services/roleChangeRequest.service';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {usePagedList, type PagedListPage} from '../hooks/usePagedList';
 import {
   ListEmptyState,
   ListLoadState,
@@ -42,14 +44,9 @@ export const RoleChangeRequestsScreen: React.FC = () => {
   const listStyles = getListStyles(C, theme);
   const navigation = useNavigation<any>();
 
-  const [items, setItems] = useState<RoleChangeRequestItem[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
-  const [loadError, setLoadError] = useState<unknown>(null);
+  // Until users/me answers the role is unknown: show a spinner, not "Access denied".
+  const [roleLoaded, setRoleLoaded] = useState(false);
   // users/me failing must not read as "Access denied".
   const [roleError, setRoleError] = useState<unknown>(null);
   const mountedRef = useRef(true);
@@ -63,6 +60,7 @@ export const RoleChangeRequestsScreen: React.FC = () => {
       const roleId = resolveRoleIdFromUser(res?.data?.data);
       setCurrentUserRoleId(roleId);
       setRoleError(null);
+      setRoleLoaded(true);
     } catch (e) {
       if (!mountedRef.current) {
         return;
@@ -80,71 +78,17 @@ export const RoleChangeRequestsScreen: React.FC = () => {
     };
   }, [loadCurrentUser]);
 
-  const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
-      try {
-        setLoading(true);
-        const params = {
-          status: 'pending',
-          page: targetPage,
-          sort_desc: true,
-        } as const;
-        let res = await listRoleChangeRequests(params);
-        // On first open the API sometimes returns pagination totals that
-        // contradict the page itself (e.g. total: 1 with 10 items) while other
-        // requests (users/me) run concurrently. Retry once when that happens.
-        const looksInconsistent = (d: any) => {
-          if (!d) {
-            return false;
-          }
-          const count = d.items?.length ?? 0;
-          return (
-            (d.total ?? 0) < count ||
-            (!!d.has_next && (d.total_pages ?? 1) <= (d.page ?? targetPage))
-          );
-        };
-        if (looksInconsistent(res?.data)) {
-          res = await listRoleChangeRequests(params);
-        }
-        const data = res?.data;
-        const nextItems = (data?.items ?? []) as RoleChangeRequestItem[];
-        setTotalPages(data?.total_pages ?? 1);
-        setTotal(data?.total ?? 0);
-        setPage(data?.page ?? targetPage);
-        setItems(prev => (reset ? nextItems : [...prev, ...nextItems]));
-        setLoadError(null);
-      } catch (error: any) {
-        console.error('Failed to load role change requests:', error);
-        // Shown in place of the empty list (with Try again) instead of an Alert.
-        setLoadError(error);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [],
-  );
-  useEffect(() => {
-    setItems([]);
-    fetchData(1, true);
-  }, [fetchData]);
+  const {items, page, totalPages, total, loading, refreshing, loadError, reload, goToPage, retry, onRefresh} =
+    usePagedList<RoleChangeRequestItem>(
+      async targetPage =>
+        (await listRoleChangeRequests({status: 'pending', page: targetPage, sort_desc: true}))
+          ?.data as PagedListPage<RoleChangeRequestItem> | undefined,
+      '',
+      isSuperAdmin(currentUserRoleId),
+    );
 
   // Reload only after a request was approved / rejected.
-  useReloadOnReturn(() => fetchData(1, true), {dataKey: 'roleChangeRequests'});
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
-    setRefreshing(false);
-  };
-
-  const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {
-      return;
-    }
-    setItems([]);
-    fetchData(targetPage, true);
-  };
+  useReloadOnReturn(reload, {dataKey: 'roleChangeRequests'});
 
   const renderItem = ({item}: {item: RoleChangeRequestItem}) => {
     return (
@@ -186,11 +130,14 @@ export const RoleChangeRequestsScreen: React.FC = () => {
         <Header title={t('roleChangeRequests')} />
         {roleError && currentUserRoleId == null ? (
           <ApiErrorState error={roleError} onRetry={loadCurrentUser} />
+        ) : !roleLoaded ? (
+          <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
+            <ActivityIndicator size="large" color={COLORS.mainColor} />
+          </View>
         ) : !isSuperAdmin(currentUserRoleId) ? (
           <View style={{flex: 1, justifyContent: 'center', alignItems: 'center'}}>
             <Text style={{color: C.textPrimary, textAlign: 'center', paddingHorizontal: 24}}>
-              {t('accessDenied') ||
-                'Access denied. Only Super Admin users can manage role change requests.'}
+              {t('accessDenied')}
             </Text>
           </View>
         ) : (
@@ -217,7 +164,7 @@ export const RoleChangeRequestsScreen: React.FC = () => {
                   <ListLoadState
                     loading={loading}
                     error={loadError}
-                    onRetry={() => fetchData(page, true)}>
+                    onRetry={retry}>
                     <ListEmptyState title={t('noPendingRoleChangeRequests')} />
                   </ListLoadState>
                 }

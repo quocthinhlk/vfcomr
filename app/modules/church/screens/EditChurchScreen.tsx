@@ -1,6 +1,7 @@
-import React, {useEffect, useRef, useState} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
+  ActivityIndicator,
   ScrollView,
   View,
   TouchableOpacity,
@@ -37,6 +38,38 @@ import {ms, hs, fs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import {getLanguageById} from '../../language/services/language.service';
+import {useLatestRequest} from '../hooks/useLatestRequest';
+import {fillTemplate, formatYmd, parseYmd, splitApiFieldErrors} from '../utils/churchForm';
+
+/** Fields that show their own error under the input (anything else is alerted). */
+const FIELDS_WITH_ERROR_TEXT = new Set([
+  'name',
+  'is_msc',
+  'is_first_msc',
+  'msc_parent_id',
+  'language_id',
+  'church_type_id',
+  'pastor_id',
+  'church_network_id',
+  'church_region_id',
+  'geographical_region_id',
+  'language_region_id',
+  'country_id',
+  'currency_id',
+  'new_city_name',
+  'email_address',
+  'date_of_birth',
+]);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+type Option = {label: string; value: string};
+
+/** `options` with `selected` kept in it (search / paging can replace the list). */
+function withSelected(options: Option[], selected: Option | null): Option[] {
+  if (!selected || options.some(o => o.value === selected.value)) {
+    return options;
+  }
+  return [selected, ...options];
+}
 import {isPastorLeader, isSuperAdmin} from '../../../shared/utils/permissions';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 
@@ -52,6 +85,7 @@ export default function EditChurchScreen() {
     churchTypeOptions,
     churchNetworkOptions,
     pastorOptions,
+    pastorHasNext: pastorOptionsHasNext,
     languageOptions,
     churchRegionOptions,
     geographicalRegionOptions,
@@ -84,6 +118,13 @@ export default function EditChurchScreen() {
   const [motherQuery, setMotherQuery] = useState('');
   const [selectedMother, setSelectedMother] = useState<{label: string; value: string} | null>(null);
 
+  const {begin, debounce, cancel} = useLatestRequest();
+  // Photo uploaded by an earlier, failed save: reused instead of uploading again.
+  const uploadedPhotoRef = useRef<{source: string; path: string} | null>(null);
+  // The form is shown once the church is loaded: typing into the blank form
+  // before that was wiped when the data arrived.
+  const [churchLoaded, setChurchLoaded] = useState(!editId);
+  const [selectedPastor, setSelectedPastor] = useState<Option | null>(null);
   const [pastorOpts, setPastorOpts] = useState<{label: string; value: string}[]>(pastorOptions);
   const [pastorPage, setPastorPage] = useState(1);
   const [pastorHasNext, setPastorHasNext] = useState(false);
@@ -120,6 +161,7 @@ export default function EditChurchScreen() {
   const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
 
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
+  const [roleLoaded, setRoleLoaded] = useState(false);
   useEffect(() => {
     let mounted = true;
     api
@@ -128,6 +170,7 @@ export default function EditChurchScreen() {
         if (!mounted) {
           return;
         }
+        setRoleLoaded(true);
         const me = res?.data?.data;
         const raw =
           me?.role?.id ??
@@ -137,12 +180,18 @@ export default function EditChurchScreen() {
         const parsed = Number(raw);
         setCurrentUserRoleId(Number.isFinite(parsed) ? parsed : null);
       })
-      .catch(() => {});
+      .catch(() => {
+        if (mounted) {
+          setRoleLoaded(true);
+        }
+      });
     return () => {
       mounted = false;
     };
   }, []);
-  const motherChurchDisabled = isPastorLeader(currentUserRoleId);
+  // Pastor-leaders can't change the mother church; keep it locked until the
+  // role is known (it was editable while users/me was still loading).
+  const motherChurchDisabled = !roleLoaded || isPastorLeader(currentUserRoleId);
   // Map pin is edited on its own screen (saved immediately), like on Church Detail.
   const canEditLocation = isSuperAdmin(currentUserRoleId || undefined);
   const [location, setLocation] = useState<{latitude: number; longitude: number} | null>(null);
@@ -180,8 +229,6 @@ export default function EditChurchScreen() {
     const y = fieldY[key] ?? 0;
     scrollRef.current?.scrollTo({y: Math.max(0, y - ms(20)), animated: true});
   };
-  const clearInvalid = (key: string) =>
-    setInvalid(prev => ({...prev, [key]: false}));
   const clearFieldError = (key: string) =>
     setFieldErrorText(prev => {
       if (!prev[key]) {
@@ -196,8 +243,8 @@ export default function EditChurchScreen() {
     const labelByKey: Record<string, string> = {
       name: t('churchName') || 'Church Name',
       enable_cpm: t('houseCp') || 'House C.P.',
-      is_first_msc: 'Is this the first MSC?',
-      msc_parent_id: 'MSC Designated Parent',
+      is_first_msc: t('isThisFirstMsc'),
+      msc_parent_id: t('mscDesignatedParent'),
       church_type_id: t('churchType') || 'Church Type',
       pastor_id: t('pastorLeader') || 'Pastor Leader',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
@@ -208,7 +255,7 @@ export default function EditChurchScreen() {
       date_of_birth: t('dob') || 'Date of Birth',
     };
     const label = labelByKey[key] || key;
-    return `${label} is a required field`;
+    return fillTemplate(t('fieldIsRequired'), {field: label});
   };
 
   const renderFieldError = (key: string) => {
@@ -223,11 +270,21 @@ export default function EditChurchScreen() {
     );
   };
 
-  const loadCities = async (countryId: string | number) => {
+  // Latest country only: a slower response for the previous country must not
+  // fill the list (a city of another country would then be saved).
+  const loadCities = async (countryId: string | number, keep?: Option | null) => {
+    const isLatest = begin('cities');
+    setCityOptions(keep ? [keep] : []);
     try {
       const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
-      const list = Array.isArray(res.data?.data) ? res.data.data : [];
-      setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
+      if (!isLatest()) {
+        return;
+      }
+      const list: Option[] = (Array.isArray(res.data?.data) ? res.data.data : []).map((x: any) => ({
+        label: x.name,
+        value: String(x.id),
+      }));
+      setCityOptions(withSelected(list, keep ?? null));
     } catch {}
   };
 
@@ -251,10 +308,14 @@ export default function EditChurchScreen() {
   };
 
   const loadLanguages = async (page: number, name?: string) => {
+    const isLatest = begin('language');
     try {
       const res = await api.get('languages', {
         params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -266,6 +327,7 @@ export default function EditChurchScreen() {
   };
 
   const loadMothers = async (page: number, name?: string) => {
+    const isLatest = begin('mother');
     try {
       const res = await api.get('churches', {
         params: {
@@ -276,6 +338,9 @@ export default function EditChurchScreen() {
           ...(name?.trim() ? {name: name.trim()} : {}),
         },
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -287,10 +352,14 @@ export default function EditChurchScreen() {
   };
 
   const loadPastors = async (page: number, name?: string) => {
+    const isLatest = begin('pastor');
     try {
       const res = await api.get('users/pastors', {
         params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -302,10 +371,14 @@ export default function EditChurchScreen() {
   };
 
   const loadCountries = async (page: number, name?: string) => {
+    const isLatest = begin('country');
     try {
       const res = await api.get('countries', {
         params: {page, limit: 1000, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -320,6 +393,7 @@ export default function EditChurchScreen() {
     if (!langQuery && langPage === 1) {
       setLangOptions(languageOptions);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [languageOptions]);
   useEffect(() => {
     if (!motherQuery && motherPage === 1) {
@@ -335,12 +409,15 @@ export default function EditChurchScreen() {
   useEffect(() => {
     if (!pastorQuery && pastorPage === 1) {
       setPastorOpts(pastorOptions);
+      setPastorHasNext(pastorOptionsHasNext);
     }
-  }, [pastorOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pastorOptions, pastorOptionsHasNext]);
   useEffect(() => {
     if (!countryQuery && countryPage === 1) {
       setCountryOpts(countryOptions);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countryOptions]);
   useEffect(() => {
     setChurchTypeOpts(churchTypeOptions);
@@ -365,7 +442,12 @@ export default function EditChurchScreen() {
       if (editId) {
         try {
           const d = await getChurchDetail(editId);
-          if (!mountedRef.current || !d) {
+          if (!mountedRef.current) {
+            return;
+          }
+          if (!d) {
+            // Nothing to edit: show the retryable error, not an endless spinner.
+            setLoadError(new Error(t('noDataFound')));
             return;
           }
           setLoadError(null);
@@ -403,7 +485,9 @@ export default function EditChurchScreen() {
             facebook: d.facebook || '',
             instagram: d.instagram || '',
             twitter: d.twitter || '',
-            date_of_birth: d.date_of_birth ? new Date(d.date_of_birth) : null,
+            // Local calendar day: new Date('2023-01-01') is UTC midnight, i.e. the
+            // previous day west of UTC — and saving it back moved it a day earlier.
+            date_of_birth: parseYmd(d.date_of_birth),
           });
           setLangOptions(prev => prependOptionIfMissing(prev, d.language_id, d.language_name));
           const motherOpt =
@@ -415,6 +499,11 @@ export default function EditChurchScreen() {
             prependOptionIfMissing(prev, motherOpt?.value, motherOpt?.label),
           );
           setPastorOpts(prev => prependOptionIfMissing(prev, d.pastor_id, d.pastor_name));
+          setSelectedPastor(
+            d.pastor_id && d.pastor_name
+              ? {value: String(d.pastor_id), label: String(d.pastor_name)}
+              : null,
+          );
           setCountryOpts(prev => prependOptionIfMissing(prev, d.country_id, d.country_name));
           setChurchTypeOpts(prev =>
             prependOptionIfMissing(prev, d.church_type_id, d.church_type_name),
@@ -436,10 +525,13 @@ export default function EditChurchScreen() {
             prependOptionIfMissing(prev, d.language_region_id, d.language_region_name),
           );
           setCurrencyOpts(prev => prependOptionIfMissing(prev, d.currency_id, d.currency_name));
+          const cityOpt =
+            d.city_id && d.city_name ? {value: String(d.city_id), label: String(d.city_name)} : null;
           setCityOptions(prev => prependOptionIfMissing(prev, d.city_id, d.city_name));
           setExistingPhotoUrl(d.photo_url || null);
+          setChurchLoaded(true);
           if (d.country_id) {
-            await loadCities(d.country_id);
+            await loadCities(d.country_id, cityOpt);
           }
         } catch (e) {
           if (mountedRef.current) {
@@ -543,6 +635,17 @@ export default function EditChurchScreen() {
     })();
   }, [selectedLanguageId, langOptions]);
 
+  // A church can't be its own mother / MSC parent.
+  const parentChoices = useMemo(
+    () =>
+      withSelected(motherOptions, selectedMother).filter(o => !editId || o.value !== String(editId)),
+    [motherOptions, selectedMother, editId],
+  );
+  const pastorChoices = useMemo(
+    () => withSelected(pastorOpts, selectedPastor),
+    [pastorOpts, selectedPastor],
+  );
+
   return (
     <SafeAreaView
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
@@ -559,6 +662,8 @@ export default function EditChurchScreen() {
               ])
             }
           />
+        ) : !churchLoaded ? (
+          <ActivityIndicator color={COLORS.mainColor} style={{marginTop: ms(40)}} />
         ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
@@ -577,24 +682,24 @@ export default function EditChurchScreen() {
             contentContainerStyle={{paddingBottom: ms(24)}}>
 
             <Formik<AddChurchFormValues>
-              enableReinitialize
               key={editId ? `edit-${editId}` : 'edit'}
-              initialValues={{...initialFormValues}}
-              onSubmit={async values => {
+              initialValues={initialFormValues}
+              onSubmit={async (values, {setFieldValue: setFormValue}) => {
                 try {
                   if (!editId) {
-                    Alert.alert('Error', 'Missing church id');
+                    Alert.alert(t('error'), t('missingChurchId'));
                     return;
                   }
                   setFieldErrorText({});
                   const newInvalid: Record<string, boolean> = {};
-                  newInvalid.name = !values.name;
+                  newInvalid.name = !values.name?.trim();
                   newInvalid.church_type_id = !values.church_type_id;
                   newInvalid.pastor_id = !values.pastor_id;
                   newInvalid.geographical_region_id = !values.geographical_region_id;
                   newInvalid.country_id = !values.country_id;
                   newInvalid.currency_id = !values.currency_id;
-                  newInvalid.email_address = !values.email_address;
+                  const email = values.email_address?.trim() || '';
+                  newInvalid.email_address = !email || !EMAIL_PATTERN.test(email);
                   newInvalid.date_of_birth = !values.date_of_birth;
                   newInvalid.is_first_msc =
                     values.is_msc === 'Yes' && !values.is_first_msc;
@@ -610,7 +715,10 @@ export default function EditChurchScreen() {
                   const newFieldErrors: Record<string, string> = {};
                   Object.keys(newInvalid).forEach(k => {
                     if (newInvalid[k]) {
-                      newFieldErrors[k] = requiredFieldMessageForKey(k);
+                      newFieldErrors[k] =
+                        k === 'email_address' && email
+                          ? t('invalidEmailFormat')
+                          : requiredFieldMessageForKey(k);
                     }
                   });
                   setFieldErrorText(newFieldErrors);
@@ -638,11 +746,23 @@ export default function EditChurchScreen() {
                     : null;
                   if (isAddingNewCity) {
                     try {
+                      const cityName = values.new_city_name.trim();
                       const createdCity = await createCity({
-                        name: values.new_city_name.trim(),
+                        name: cityName,
                         country_id: Number(values.country_id),
                       });
                       resolvedCityId = createdCity.id;
+                      // A later failure must not create it again on retry: from
+                      // now on the form simply has this city selected.
+                      const cityValue = String(createdCity.id);
+                      setCityOptions(prev =>
+                        prev.some(o => o.value === cityValue)
+                          ? prev
+                          : [...prev, {label: createdCity.name || cityName, value: cityValue}],
+                      );
+                      setIsAddingNewCity(false);
+                      setFormValue('city_id', cityValue);
+                      setFormValue('new_city_name', '');
                     } catch (cityErr: any) {
                       Alert.alert(
                         t('error'),
@@ -655,7 +775,9 @@ export default function EditChurchScreen() {
                   }
 
                   let uploadedPhotoPath: string | null = null;
-                  if (imagePath) {
+                  if (imagePath && uploadedPhotoRef.current?.source === imagePath) {
+                    uploadedPhotoPath = uploadedPhotoRef.current.path;
+                  } else if (imagePath) {
                     const form = new FormData();
                     const fileName = imagePath.split('/').pop() || 'photo.jpg';
                     form.append('file', {
@@ -669,10 +791,16 @@ export default function EditChurchScreen() {
                       headers: {'Content-Type': 'multipart/form-data'},
                     });
                     uploadedPhotoPath = uploadRes?.data?.data?.path || null;
+                    // Without a path the new photo would be silently dropped while
+                    // "updated successfully" is shown.
+                    if (!uploadedPhotoPath) {
+                      throw new Error(t('photoUploadFailed'));
+                    }
+                    uploadedPhotoRef.current = {source: imagePath, path: uploadedPhotoPath};
                   }
 
                   const payload: any = {
-                    name: values.name,
+                    name: values.name.trim(),
                     short_name: values.short_name,
                     is_msc: values.is_msc === 'Yes',
                     is_first_msc:
@@ -699,18 +827,12 @@ export default function EditChurchScreen() {
                     office_address_postal_code: values.office_address_postal_code,
                     office_phone: values.office_phone,
                     office_fax: values.office_fax,
-                    email_address: values.email_address,
+                    email_address: values.email_address.trim(),
                     website: values.website,
                     facebook: values.facebook,
                     instagram: values.instagram,
                     twitter: values.twitter,
-                    date_of_birth: values.date_of_birth
-                      ? `${values.date_of_birth.getFullYear()}-${String(
-                          values.date_of_birth.getMonth() + 1,
-                        ).padStart(2, '0')}-${String(
-                          values.date_of_birth.getDate(),
-                        ).padStart(2, '0')}`
-                      : null,
+                    date_of_birth: formatYmd(values.date_of_birth),
                     // PATCH: only fields this form edits. service_venue,
                     // mailing_address_street, property and
                     // church_planting_projection_id have no input here, so they
@@ -729,33 +851,33 @@ export default function EditChurchScreen() {
 
                   await updateChurch(editId, payload as any);
                   markDataChanged('churches');
-                  Alert.alert('Success', 'Church updated successfully!');
+                  Alert.alert(t('success'), t('churchUpdatedSuccess'));
                   returnAfterEdit(navigation);
                 } catch (e: any) {
-                  const apiErrors = e?.response?.data?.errors;
-                  if (apiErrors && typeof apiErrors === 'object') {
-                    const nextInvalid: Record<string, boolean> = {};
-                    const nextFieldErrors: Record<string, string> = {};
-                    Object.entries(apiErrors).forEach(([key, value]) => {
-                      if (typeof value === 'string' && value.trim()) {
-                        nextInvalid[key] = true;
-                        nextFieldErrors[key] = value;
-                      }
-                    });
-                    if (Object.keys(nextFieldErrors).length > 0) {
-                      setInvalid(prev => ({...prev, ...nextInvalid}));
-                      setFieldErrorText(nextFieldErrors);
-                      const firstKey = Object.keys(nextFieldErrors)[0];
-                      if (firstKey) {
-                        scrollToField(firstKey);
-                      }
-                      return;
-                    }
-                  }
-                  Alert.alert(
-                    'Error',
-                    e?.response?.data?.message || e?.message || 'Failed to update church.',
+                  const {fieldErrors, otherMessages} = splitApiFieldErrors(
+                    e?.response?.data?.errors,
+                    FIELDS_WITH_ERROR_TEXT,
                   );
+                  const fieldKeys = Object.keys(fieldErrors);
+                  if (fieldKeys.length > 0) {
+                    setInvalid(prev => ({
+                      ...prev,
+                      ...Object.fromEntries(fieldKeys.map(k => [k, true])),
+                    }));
+                    setFieldErrorText(fieldErrors);
+                    scrollToField(fieldKeys[0]);
+                  }
+                  // Errors without a field on this form (e.g. errors.detail on a 403)
+                  // would otherwise leave Save looking like it did nothing.
+                  if (otherMessages.length > 0 || fieldKeys.length === 0) {
+                    Alert.alert(
+                      t('error'),
+                      otherMessages.join('\n') ||
+                        e?.response?.data?.message ||
+                        e?.message ||
+                        t('failedToUpdateChurch'),
+                    );
+                  }
                 }
               }}>
               {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
@@ -851,7 +973,7 @@ export default function EditChurchScreen() {
                       <View onLayout={e => setFieldPos('is_first_msc', e.nativeEvent.layout.y)}>
                         <View>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            Is this the first MSC? <Text style={{color: '#c00000'}}>*</Text>
+                            {t('isThisFirstMsc')} <Text style={{color: '#c00000'}}>*</Text>
                           </Text>
                           <ElementDropdown
                             data={[{label: t('yes'), value: 'Yes'}, {label: t('no'), value: 'No'}]}
@@ -888,19 +1010,29 @@ export default function EditChurchScreen() {
                           </Text>
                         </View>
                         <ElementDropdown
-                          data={motherOptions}
+                          data={parentChoices}
                           value={values.parent_id as any}
                           onChange={v => setFieldValue('parent_id', v as any)}
                           placeholder={t('selectOption')}
                           disabled={motherChurchDisabled}
                           containerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
-                          onSearchText={async text => {
+                          onSearchText={text => {
                             setMotherQuery(text);
-                            await loadMothers(1, text);
+                            if (!text.trim()) {
+                              // Back to the full list (it used to be cut to 10 rows).
+                              cancel('mother');
+                              setMotherPage(1);
+                              setMotherHasNext(false);
+                              setMotherOptions(motherChurchOptions);
+                              return;
+                            }
+                            debounce('mother', () => {
+                              loadMothers(1, text);
+                            });
                           }}
-                          onEndReached={async () => {
-                            if (motherHasNext) {
-                              await loadMothers(motherPage + 1, motherQuery);
+                          onEndReached={() => {
+                            if (motherQuery.trim() && motherHasNext) {
+                              loadMothers(motherPage + 1, motherQuery);
                             }
                           }}
                         />
@@ -911,10 +1043,10 @@ export default function EditChurchScreen() {
                       <View onLayout={e => setFieldPos('msc_parent_id', e.nativeEvent.layout.y)}>
                         <View>
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                            MSC Designated Parent <Text style={{color: '#c00000'}}>*</Text>
+                            {t('mscDesignatedParent')} <Text style={{color: '#c00000'}}>*</Text>
                           </Text>
                           <ElementDropdown
-                            data={motherOptions}
+                            data={parentChoices}
                             value={values.msc_parent_id as any}
                             onChange={v => {
                               setFieldValue('msc_parent_id', v as any);
@@ -926,13 +1058,23 @@ export default function EditChurchScreen() {
                               backgroundColor: C.inputBg,
                               borderColor: invalid?.msc_parent_id ? '#db2d2d' : C.inputBorder,
                             } as any}
-                            onSearchText={async text => {
+                            onSearchText={text => {
                               setMotherQuery(text);
-                              await loadMothers(1, text);
+                              if (!text.trim()) {
+                                // Back to the full list (it used to be cut to 10 rows).
+                                cancel('mother');
+                                setMotherPage(1);
+                                setMotherHasNext(false);
+                                setMotherOptions(motherChurchOptions);
+                                return;
+                              }
+                              debounce('mother', () => {
+                                loadMothers(1, text);
+                              });
                             }}
-                            onEndReached={async () => {
-                              if (motherHasNext) {
-                                await loadMothers(motherPage + 1, motherQuery);
+                            onEndReached={() => {
+                              if (motherQuery.trim() && motherHasNext) {
+                                loadMothers(motherPage + 1, motherQuery);
                               }
                             }}
                             error={!!invalid?.msc_parent_id}
@@ -970,13 +1112,22 @@ export default function EditChurchScreen() {
                               await loadLanguages(1);
                             }
                           }}
-                          onSearchText={async text => {
+                          onSearchText={text => {
                             setLangQuery(text);
-                            await loadLanguages(1, text);
+                            if (!text.trim()) {
+                              cancel('language');
+                              setLangPage(1);
+                              setLangHasNext(false);
+                              setLangOptions(languageOptions);
+                              return;
+                            }
+                            debounce('language', () => {
+                              loadLanguages(1, text);
+                            });
                           }}
-                          onEndReached={async () => {
-                            if (langHasNext) {
-                              await loadLanguages(langPage + 1, langQuery);
+                          onEndReached={() => {
+                            if (langQuery.trim() && langHasNext) {
+                              loadLanguages(langPage + 1, langQuery);
                             }
                           }}
                           error={!!invalid?.language_id}
@@ -1009,17 +1160,6 @@ export default function EditChurchScreen() {
                             borderColor: invalid?.church_type_id ? '#db2d2d' : C.inputBorder,
                           } as any}
                           error={!!invalid?.church_type_id}
-                          onSearchText={async text => {
-                            try {
-                              const res = await api.get('church-types', {params: {sort_by: 'name', sort_desc: false}});
-                              const items = ((res.data?.data ?? []) as any[]).map(i => ({
-                                label: i.name,
-                                value: String(i.id),
-                              }));
-                              // @ts-ignore
-                              churchTypeOptions.splice(0, churchTypeOptions.length, ...items);
-                            } catch {}
-                          }}
                         />
                         {renderFieldError('church_type_id')}
                       </View>
@@ -1036,10 +1176,11 @@ export default function EditChurchScreen() {
                           <HelpIcon title={t('pastorLeader')} message={t('helpPastorLeader')} />
                         </View>
                         <ElementDropdown
-                          data={pastorOpts}
+                          data={pastorChoices}
                           value={values.pastor_id as any}
                           onChange={v => {
                             setFieldValue('pastor_id', v as any);
+                            setSelectedPastor(pastorChoices.find(o => o.value === String(v)) ?? null);
                             setInvalid(prev => ({...prev, pastor_id: false}));
                             clearFieldError('pastor_id');
                           }}
@@ -1049,13 +1190,15 @@ export default function EditChurchScreen() {
                             borderColor: invalid?.pastor_id ? '#db2d2d' : C.inputBorder,
                           } as any}
                           error={!!invalid?.pastor_id}
-                          onSearchText={async text => {
+                          onSearchText={text => {
                             setPastorQuery(text);
-                            await loadPastors(1, text);
+                            debounce('pastor', () => {
+                              loadPastors(1, text);
+                            });
                           }}
-                          onEndReached={async () => {
+                          onEndReached={() => {
                             if (pastorHasNext) {
-                              await loadPastors(pastorPage + 1, pastorQuery);
+                              loadPastors(pastorPage + 1, pastorQuery);
                             }
                           }}
                         />
@@ -1086,17 +1229,6 @@ export default function EditChurchScreen() {
                             borderColor: invalid?.church_network_id ? '#db2d2d' : C.inputBorder,
                           } as any}
                           error={!!invalid?.church_network_id}
-                          onSearchText={async _text => {
-                            try {
-                              const res = await api.get('church-networks', {params: {sort_by: 'name', sort_desc: false}});
-                              const items = ((res.data?.data ?? []) as any[]).map(i => ({
-                                label: i.name,
-                                value: String(i.id),
-                              }));
-                              // @ts-ignore
-                              churchNetworkOptions.splice(0, churchNetworkOptions.length, ...items);
-                            } catch {}
-                          }}
                         />
                         {renderFieldError('church_network_id')}
                       </View>
@@ -1125,17 +1257,6 @@ export default function EditChurchScreen() {
                             borderColor: invalid?.church_region_id ? '#db2d2d' : C.inputBorder,
                           } as any}
                           error={!!invalid?.church_region_id}
-                          onSearchText={async _text => {
-                            try {
-                              const res = await api.get('church-regions', {params: {sort_by: 'name', sort_desc: false}});
-                              const items = ((res.data?.data ?? []) as any[]).map(i => ({
-                                label: i.name,
-                                value: String(i.id),
-                              }));
-                              // @ts-ignore
-                              churchRegionOptions.splice(0, churchRegionOptions.length, ...items);
-                            } catch {}
-                          }}
                         />
                         {renderFieldError('church_region_id')}
                       </View>
@@ -1260,9 +1381,11 @@ export default function EditChurchScreen() {
                               await loadCountries(1);
                             }
                           }}
-                          onSearchText={async text => {
+                          onSearchText={text => {
                             setCountryQuery(text);
-                            await loadCountries(1, text);
+                            debounce('country', () => {
+                              loadCountries(1, text);
+                            });
                           }}
                           onEndReached={async () => {
                             if (countryHasNext) {
@@ -1378,7 +1501,7 @@ export default function EditChurchScreen() {
                             {t('currency')}{' '}
                             <Text style={{color: '#c00000'}}>*</Text>
                           </Text>
-                          <HelpIcon title="Local Currency" message="Select the monetary currency used" />
+                          <HelpIcon title={t('currency')} message={t('helpCurrency')} />
                         </View>
                         <ElementDropdown
                           data={currencyOpts}
@@ -1394,17 +1517,6 @@ export default function EditChurchScreen() {
                             borderColor: invalid?.currency_id ? '#db2d2d' : C.inputBorder,
                           } as any}
                           error={!!invalid?.currency_id}
-                          onSearchText={async _text => {
-                            try {
-                              const res = await api.get('currencies', {params: {sort_by: 'name', sort_desc: false}});
-                              const items = ((res.data?.data?.items ?? []) as any[]).map((i: any) => ({
-                                label: `${i.name} (${i.three_letter_code})`,
-                                value: String(i.id),
-                              }));
-                              // @ts-ignore
-                              localCurrencyOptions.splice(0, localCurrencyOptions.length, ...items);
-                            } catch {}
-                          }}
                         />
                         {renderFieldError('currency_id')}
                       </View>
@@ -1417,7 +1529,7 @@ export default function EditChurchScreen() {
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                             {t('churchPhoto')}
                           </Text>
-                          <HelpIcon title="Church Picture" message="Photo of the Church congregation" />
+                          <HelpIcon title={t('churchPicture')} message={t('helpChurchPhoto')} />
                         </View>
                         <TouchableOpacity
                           onPress={() => handleImagePick()}
@@ -1554,7 +1666,7 @@ export default function EditChurchScreen() {
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                             {t('website')}
                           </Text>
-                          <HelpIcon title="Website" message="The Church's Website URL" />
+                          <HelpIcon title={t('website')} message={t('helpWebsite')} />
                         </View>
                         <AppInput
                           autoCapitalize="none"
@@ -1572,7 +1684,7 @@ export default function EditChurchScreen() {
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                             Facebook
                           </Text>
-                          <HelpIcon title="Facebook" message="The Church's Facebook URL" />
+                          <HelpIcon title={t('facebook')} message={t('helpFacebook')} />
                         </View>
                         <AppInput
                           autoCapitalize="none"
@@ -1590,7 +1702,7 @@ export default function EditChurchScreen() {
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                             Instagram
                           </Text>
-                          <HelpIcon title="Instagram" message="The Church's Instagram URL" />
+                          <HelpIcon title="Instagram" message={t('helpInstagram')} />
                         </View>
                         <AppInput
                           autoCapitalize="none"
@@ -1608,7 +1720,7 @@ export default function EditChurchScreen() {
                           <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                             X
                           </Text>
-                          <HelpIcon title="X" message="The Church's X (Twitter) URL" />
+                          <HelpIcon title="X" message={t('helpX')} />
                         </View>
                         <AppInput
                           autoCapitalize="none"

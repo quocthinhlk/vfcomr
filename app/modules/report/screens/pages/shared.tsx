@@ -1,7 +1,5 @@
 import React, {useMemo} from 'react';
-import {ActivityIndicator, View} from 'react-native';
-import {COLORS} from '../../../../shared/constants/colors';
-import {ms} from '../../../../shared/utils/scale';
+import {View} from 'react-native';
 import {
   ErrorBanner,
   GenerateButton,
@@ -50,7 +48,7 @@ export function ReportFrame({
         label={buttonLabel}
         onPress={onGenerate}
         loading={generator.submitting}
-        disabled={disabled || generator.openingUrl != null}
+        disabled={disabled || generator.openingUrl != null || generator.savingUrl != null}
       />
       {generator.infoMessage ? (
         <View>
@@ -62,12 +60,13 @@ export function ReportFrame({
         onOpen={file => {
           void generator.openFile(file);
         }}
+        onSave={file => {
+          void generator.saveFile(file);
+        }}
         busyUrl={generator.openingUrl}
+        savingUrl={generator.savingUrl}
         disabled={generator.submitting}
       />
-      {generator.openingUrl ? (
-        <ActivityIndicator color={COLORS.mainColor} style={{marginTop: ms(8)}} />
-      ) : null}
     </ReportPanel>
   );
 }

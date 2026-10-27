@@ -1,37 +1,7 @@
 import api from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface AddChurchPayload {
-  name: string;
-  short_name: string;
-  is_msc: string;
-  enable_cpm: string;
-  parent_id: string;
-  language_id: string;
-  church_type_id: string;
-  pastor_id: string;
-  church_network_id: string;
-  church_region_id: string;
-  geographical_region_id: string;
-  language_region_id: string;
-  sensitive_nation: string;
-  country_id: string;
-  currency_id: string;
-  city: string;
-  photo_dir: string;
-  service_address_street: string;
-  service_address_postal_code: string;
-  mailing_address_postal_code: string;
-  office_address_street: string;
-  office_address_postal_code: string;
-  office_phone: string;
-  office_fax: string;
-  email_address: string;
-  website: string;
-  facebook: string;
-  twitter: string;
-  date_of_birth: Date | null;
-}
+/** Body of POST /churches (field names as in the API: city_id, numeric ids, booleans, 'YYYY-MM-DD'). */
+export type AddChurchPayload = Record<string, unknown>;
 
 export async function addChurch(payload: AddChurchPayload) {
   try {
@@ -114,72 +84,6 @@ export async function getChurchDetail(id: number): Promise<any> {
   }
 }
 
-export async function exportChurches() {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    const response = await api.get('churches?page=1&limit=10', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error exporting churches:', error);
-    throw error;
-  }
-}
-
-export interface ChurchSummary {
-  id: number;
-  parent_id: number | null;
-  name: string;
-}
-
-export async function getChurchChildren(parentId: number): Promise<ChurchSummary[]> {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    const response = await api.get(`churches/${parentId}/children`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    // Response format example shows data: [ { id, name, children: [ ... ] } ]
-    const rootArray = response.data?.data || [];
-    if (Array.isArray(rootArray) && rootArray.length > 0) {
-      const root = rootArray[0];
-      const children = Array.isArray(root.children) ? root.children : [];
-      return children.map((c: any) => ({ id: c.id, parent_id: c.parent_id ?? parentId, name: c.name }));
-    }
-    return [];
-  } catch (error) {
-    console.error('Error fetching church children:', error);
-    throw error;
-  }
-}
-
-export async function deleteChurch(churchId: number): Promise<void> {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    await api.delete(`churches/${churchId}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-  } catch (error) {
-    console.error('Error deleting church:', error);
-    throw error;
-  }
-}
-
 export interface ChurchListItem {
   id: number;
   name: string;
@@ -218,25 +122,11 @@ export interface ChurchListParams {
 }
 
 export async function getChurchesList(params: ChurchListParams): Promise<ChurchListData> {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
   try {
-    const normalizedParams: any = { ...params };
-    if (typeof params.disabled === 'boolean') {
-      normalizedParams.disabled = params.disabled; // let axios serialize as true/false without quotes
-    }
-    const response = await api.get('churches', {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      params: normalizedParams,
-    });
-    const data = response.data?.data;
-    return data as ChurchListData;
+    const response = await api.get('churches', {params});
+    return response.data?.data as ChurchListData;
   } catch (error) {
     console.error('Error fetching churches list:', error);
     throw error;
   }
-} 
+}

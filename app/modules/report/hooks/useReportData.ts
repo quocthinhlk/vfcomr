@@ -1,5 +1,5 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import {Platform, Share} from 'react-native';
+import {Alert, Platform, Share} from 'react-native';
 import axios from 'axios';
 import FileViewer from 'react-native-file-viewer';
 import api from '../../../config/api';
@@ -15,7 +15,8 @@ import {
   ReportDownload,
   ReportEndpoint,
   reportErrorMessage,
-  ReportFileMode,
+  saveReportToDownloads,
+  StoragePermissionError,
 } from '../services/report.service';
 import {useReportText} from '../reportTexts';
 
@@ -270,14 +271,13 @@ export function useReportGenerator() {
       endpoint: ReportEndpoint,
       body: Record<string, unknown>,
       fallbackFilename: string,
-      mode: ReportFileMode = 'file',
     ) => {
       setErrorMessage('');
       setInfoMessage('');
       setFiles([]);
       setSubmitting(true);
       try {
-        const result = await generateReport(endpoint, body, fallbackFilename, mode);
+        const result = await generateReport(endpoint, body, fallbackFilename);
         if (!mounted.current) {
           return;
         }
@@ -348,5 +348,74 @@ export function useReportGenerator() {
     [mounted, openingUrl, t],
   );
 
-  return {submitting, errorMessage, infoMessage, files, generate, openFile, openingUrl};
+  /**
+   * Download icon: save the file on the device.
+   * - iOS: the system share sheet, where "Save to Files" lets the user pick the
+   *   folder (an app's own Documents folder is not shown in Files unless the
+   *   app opts in, so a silent copy there looked "saved" but couldn't be found).
+   * - Android: copied into the Download folder, then offered to open.
+   */
+  const [savingUrl, setSavingUrl] = useState<string | null>(null);
+  const saveFile = useCallback(
+    async (file: ReportDownload) => {
+      if (savingUrl || openingUrl) {
+        return;
+      }
+      setSavingUrl(file.url);
+      try {
+        if (Platform.OS === 'ios') {
+          const localPath = await downloadReportFile(file);
+          await Share.share({
+            url: localPath.startsWith('file://') ? localPath : `file://${localPath}`,
+            title: file.filename,
+          });
+          return;
+        }
+        const savedPath = await saveReportToDownloads(file);
+        const name = savedPath.split('/').pop() || file.filename;
+        Alert.alert(t('reportSaved'), t('reportSavedAndroid').replace('{name}', name), [
+          {text: t('ok'), style: 'cancel'},
+          {
+            text: t('open'),
+            onPress: () => {
+              FileViewer.open(savedPath, {
+                displayName: name,
+                showOpenWithDialog: true,
+                showAppsSuggestions: true,
+              }).catch(() => {});
+            },
+          },
+        ]);
+      } catch (error) {
+        if (mounted.current) {
+          setErrorMessage(
+            error instanceof StoragePermissionError
+              ? t('storagePermissionNeeded')
+              : axios.isAxiosError(error)
+                ? getApiErrorMessage(error, t)
+                : error instanceof Error && error.message
+                  ? error.message
+                  : getApiErrorMessage(error, t),
+          );
+        }
+      } finally {
+        if (mounted.current) {
+          setSavingUrl(null);
+        }
+      }
+    },
+    [mounted, openingUrl, savingUrl, t],
+  );
+
+  return {
+    submitting,
+    errorMessage,
+    infoMessage,
+    files,
+    generate,
+    openFile,
+    openingUrl,
+    saveFile,
+    savingUrl,
+  };
 }

@@ -16,6 +16,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnToList} from '../../../shared/utils/returnToList';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {fillTemplate} from '../utils/churchForm';
 
 const EnableChurchScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -37,7 +38,7 @@ const EnableChurchScreen: React.FC = () => {
       if (!mountedRef.current) {
         return;
       }
-      setName(d?.name || 'this church');
+      setName(d?.name || t('thisChurch'));
       setLoadError(null);
     } catch (e) {
       // Don't ask to confirm an action on a church we couldn't load.
@@ -45,7 +46,7 @@ const EnableChurchScreen: React.FC = () => {
         setLoadError(e);
       }
     }
-  }, [churchId]);
+  }, [churchId, t]);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -85,10 +86,10 @@ const EnableChurchScreen: React.FC = () => {
         ) : (
         <>
         <Text style={[styles.desc, {color: C.textSecondary}]}>
-          Are you sure you want to enable "{name}"?
+          {fillTemplate(t('enableChurchConfirm'), {name})}
         </Text>
         <View style={styles.row}>
-          <CancelButton onPress={onCancel} disabled={submitting} />
+          <CancelButton label={t('cancel')} onPress={onCancel} disabled={submitting} />
           <DeleteButton
             label={t('enableChurch')}
             onPress={onEnable}

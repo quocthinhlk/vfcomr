@@ -14,16 +14,15 @@ import {Layout, Text} from '@ui-kitten/components';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles} from '../../../shared/styles/form';
 import {Header} from '../../../shared/components/Header';
-import {BackButton} from '../../../shared/components/BackButton';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
-import {Formik} from 'formik';
+import {Formik, FormikProps} from 'formik';
 import {AddChurchFormValues, useFormOptions} from './utils/addChurch.utils';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import api from '../../../config/api';
-import {addChurch, getChurchDetail, updateChurch} from '../services/church.service';
+import {addChurch} from '../services/church.service';
 import {createCity} from '../services/city.service';
 import {useNavigation} from '@react-navigation/native';
 import {Alert} from 'react-native';
@@ -31,27 +30,49 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import {Col, Row, Grid} from 'react-native-easy-grid';
-import {ms, hs, fs} from '../../../shared/utils/scale';
+import {ms, fs} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
 import {createHierarchyDropdownRenderItem} from '../../../shared/utils/hierarchyDropdown';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {getLanguageById} from '../../language/services/language.service';
+import {useLatestRequest} from '../hooks/useLatestRequest';
+import {fillTemplate, formatYmd, splitApiFieldErrors} from '../utils/churchForm';
+
+/** Fields that show their own error under the input (anything else is alerted). */
+const FIELDS_WITH_ERROR_TEXT = new Set([
+  'name',
+  'is_msc',
+  'is_first_msc',
+  'msc_parent_id',
+  'language_id',
+  'church_type_id',
+  'pastor_id',
+  'church_network_id',
+  'church_region_id',
+  'geographical_region_id',
+  'language_region_id',
+  'country_id',
+  'currency_id',
+  'new_city_name',
+  'email_address',
+  'date_of_birth',
+]);
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function AddChurchScreen() {
   const navigation = useNavigation<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
-  // read id param for edit
-  const route: any = navigation.getState?.() as any;
-  const maybeParams =
-    (route?.routes || []).find((r: any) => r?.name === 'AddChurch')?.params ||
-    (route?.routes || [])[route?.index || 0]?.params;
-  const editId: number | null = maybeParams?.id ?? null;
+  const {begin, debounce, cancel} = useLatestRequest();
+  const formikRef = useRef<FormikProps<AddChurchFormValues>>(null);
+  // Photo uploaded by an earlier, failed save: reused instead of uploading again.
+  const uploadedPhotoRef = useRef<{source: string; path: string} | null>(null);
   const {
     motherChurchOptions,
     churchTypeOptions,
     churchNetworkOptions,
     pastorOptions,
+    pastorHasNext: pastorOptionsHasNext,
     languageOptions,
     churchRegionOptions,
     geographicalRegionOptions,
@@ -150,7 +171,6 @@ export default function AddChurchScreen() {
     const y = fieldY[key] ?? 0;
     scrollRef.current?.scrollTo({y: Math.max(0, y - ms(20)), animated: true});
   };
-  const clearInvalid = (key: string) => setInvalid(prev => ({...prev, [key]: false}));
   const clearFieldError = (key: string) =>
     setFieldErrorText(prev => {
       if (!prev[key]) {
@@ -160,13 +180,11 @@ export default function AddChurchScreen() {
       delete next[key];
       return next;
     });
-  const requiredFieldMessage = () =>
-    t('fillRequiredFields') || 'Please fill all required fields.';
   const requiredFieldMessageForKey = (key: string) => {
     const labelByKey: Record<string, string> = {
       name: t('churchName') || 'Church Name',
-      is_first_msc: 'Is this the first MSC?',
-      msc_parent_id: 'MSC Designated Parent',
+      is_first_msc: t('isThisFirstMsc'),
+      msc_parent_id: t('mscDesignatedParent'),
       church_type_id: t('churchType') || 'Church Type',
       pastor_id: t('pastorLeader') || 'Pastor Leader',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
@@ -177,7 +195,7 @@ export default function AddChurchScreen() {
       date_of_birth: t('dob') || 'Date of Birth',
     };
     const label = labelByKey[key] || key;
-    return `${label} is a required field`;
+    return fillTemplate(t('fieldIsRequired'), {field: label});
   };
   const renderFieldError = (key: string) => {
     const msg = fieldErrorText[key];
@@ -191,9 +209,16 @@ export default function AddChurchScreen() {
     );
   };
 
+  // Latest country only: a slower response for the previous country must not
+  // fill the list (a city of another country would then be saved).
   const loadCities = async (countryId: string | number) => {
+    const isLatest = begin('cities');
+    setCityOptions([]);
     try {
       const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
+      if (!isLatest()) {
+        return;
+      }
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
     } catch {}
@@ -205,6 +230,7 @@ export default function AddChurchScreen() {
     if (!q) {
       return;
     }
+    const isLatest = begin('language');
     try {
       const res = await api.get('languages', {
         params: {
@@ -215,6 +241,9 @@ export default function AddChurchScreen() {
           name: q,
         },
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -231,6 +260,7 @@ export default function AddChurchScreen() {
     if (!q) {
       return;
     }
+    const isLatest = begin('mother');
     try {
       const res = await api.get('churches', {
         params: {
@@ -241,6 +271,9 @@ export default function AddChurchScreen() {
           name: q,
         },
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -252,10 +285,14 @@ export default function AddChurchScreen() {
   };
 
   const loadPastors = async (page: number, name?: string) => {
+    const isLatest = begin('pastor');
     try {
       const res = await api.get('users/pastors', {
         params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -267,10 +304,14 @@ export default function AddChurchScreen() {
   };
 
   const loadCountries = async (page: number, name?: string) => {
+    const isLatest = begin('country');
     try {
       const res = await api.get('countries', {
         params: {page, limit: 1000, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
@@ -285,109 +326,73 @@ export default function AddChurchScreen() {
   useEffect(() => {
     if (!pastorQuery && pastorPage === 1) {
       setPastorOpts(pastorOptions);
+      setPastorHasNext(pastorOptionsHasNext);
     }
-  }, [pastorOptions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pastorOptions, pastorOptionsHasNext]);
   useEffect(() => {
     if (!countryQuery && countryPage === 1) {
       setCountryOpts(countryOptions);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [countryOptions]);
 
-  // Edit-mode prefill failed: show a retryable error instead of a blank, savable form.
-  // (Create-mode defaults are optional and keep failing silently.)
-  const [loadError, setLoadError] = useState<unknown>(null);
   const loadTokenRef = useRef(0);
 
+  // Optional create-mode defaults (network and regions). Applied only to fields
+  // the user hasn't filled yet: re-initialising the form here (as before) wiped
+  // anything typed while the request was in flight.
   const loadInitial = async () => {
     const token = ++loadTokenRef.current;
     const mounted = () => token === loadTokenRef.current;
-      if (editId) {
-        try {
-          const d = await getChurchDetail(editId);
-          if (!mounted() || !d) {
-            return;
-          }
-          setLoadError(null);
-          // prefill basic fields via Formik setFieldValue through initialValues override approach using key prop
-          setInitialFormValues({
-            name: d.name || '',
-            short_name: d.short_name || '',
-            is_msc: d.is_msc ? 'Yes' : 'No',
-            is_first_msc: d.is_first_msc ? 'Yes' : 'No',
-            enable_cpm: d.enable_cpm ? 'Yes' : 'No',
-            parent_id: d.parent_id ? String(d.parent_id) : '',
-            msc_parent_id: d.msc_parent_id ? String(d.msc_parent_id) : '',
-            language_id: d.language_id ? String(d.language_id) : '',
-            church_type_id: d.church_type_id ? String(d.church_type_id) : '',
-            pastor_id: d.pastor_id ? String(d.pastor_id) : '',
-            church_network_id: d.church_network_id ? String(d.church_network_id) : '',
-            church_region_id: d.church_region_id ? String(d.church_region_id) : '',
-            geographical_region_id: d.geographical_region_id ? String(d.geographical_region_id) : '',
-            language_region_id: d.language_region_id ? String(d.language_region_id) : '',
-            sensitive_nation: d.sensitive_nation ? 'Yes' : 'No',
-            country_id: d.country_id ? String(d.country_id) : '',
-            currency_id: d.currency_id ? String(d.currency_id) : '',
-            city_id: d.city_id ? String(d.city_id) : '',
-            new_city_name: '',
-            photo_dir: d.photo_dir ? String(d.photo_dir) : '',
-            service_address_street: d.service_address_street || '',
-            service_address_postal_code: d.service_address_postal_code || '',
-            mailing_address_postal_code: d.mailing_address_postal_code || '',
-            office_address_street: d.office_address_street || '',
-            office_address_postal_code: d.office_address_postal_code || '',
-            office_phone: d.office_phone || '',
-            office_fax: d.office_fax || '',
-            email_address: d.email_address || '',
-            website: d.website || '',
-            facebook: d.facebook || '',
-            instagram: d.instagram || '',
-            twitter: d.twitter || '',
-            date_of_birth: d.date_of_birth ? new Date(d.date_of_birth) : null,
-          });
-          // preload dependent cities
-          if (d.country_id) {
-            await loadCities(d.country_id);
-          }
-        } catch (e) {
-          if (mounted()) {
-            setLoadError(e);
-          }
-        }
-      } else {
-        // Load defaults for create mode
-        try {
-          const res = await api.get('churches/defaults');
-          if (!mounted()) return;
-          const defaults = res?.data?.data;
-          if (defaults) {
-            setInitialFormValues(prev => ({
-              ...prev,
-              church_network_id: defaults.church_network_id ? String(defaults.church_network_id) : prev.church_network_id,
-              church_region_id: defaults.church_region_id ? String(defaults.church_region_id) : prev.church_region_id,
-              geographical_region_id: defaults.geographical_region_id ? String(defaults.geographical_region_id) : prev.geographical_region_id,
-              language_region_id: defaults.language_region_id ? String(defaults.language_region_id) : prev.language_region_id,
-            }));
-          }
-        } catch (error) {
-          console.error('Error loading church defaults:', error);
-        }
+    try {
+      const res = await api.get('churches/defaults');
+      if (!mounted()) {
+        return;
       }
+      const defaults = res?.data?.data;
+      if (!defaults) {
+        return;
+      }
+      const fields = {
+        church_network_id: defaults.church_network_id,
+        church_region_id: defaults.church_region_id,
+        geographical_region_id: defaults.geographical_region_id,
+        language_region_id: defaults.language_region_id,
+      } as const;
+      const form = formikRef.current;
+      if (!form) {
+        setInitialFormValues(prev => {
+          const next = {...prev};
+          (Object.keys(fields) as (keyof typeof fields)[]).forEach(key => {
+            if (fields[key]) {
+              next[key] = String(fields[key]);
+            }
+          });
+          return next;
+        });
+        return;
+      }
+      (Object.keys(fields) as (keyof typeof fields)[]).forEach(key => {
+        if (fields[key] && !form.values[key]) {
+          form.setFieldValue(key, String(fields[key]));
+        }
+      });
+    } catch (error) {
+      console.error('Error loading church defaults:', error);
+    }
   };
 
-  // Form options are required in both modes, the prefill only when editing.
-  // Create-mode defaults are reloaded on retry since they failed the same way.
-  const initialLoadError = optionsError || (editId ? loadError : null);
-  const retryInitialLoad = () =>
-    Promise.all([optionsError ? reloadOptions() : undefined, loadInitial()]);
+  const retryInitialLoad = () => Promise.all([reloadOptions(), loadInitial()]);
 
   useEffect(() => {
     loadInitial();
     return () => {
-      // Invalidate the in-flight request (unmount / id change).
+      // Ignore the in-flight request after unmount.
       loadTokenRef.current += 1;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editId]);
+  }, []);
 
   const [initialFormValues, setInitialFormValues] = useState<AddChurchFormValues>({
     name: '',
@@ -488,11 +493,11 @@ export default function AddChurchScreen() {
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
         <Header
-          title={maybeParams?.id ? t('editChurch') : t('addNewChurch')}
+          title={t('addNewChurch')}
           showMenu={false}
         />
-        {initialLoadError ? (
-          <ApiErrorState error={initialLoadError} onRetry={retryInitialLoad} />
+        {optionsError ? (
+          <ApiErrorState error={optionsError} onRetry={retryInitialLoad} />
         ) : (
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
@@ -508,22 +513,20 @@ export default function AddChurchScreen() {
             contentContainerStyle={{paddingBottom: ms(24)}}>
 
           <Formik<AddChurchFormValues>
-            enableReinitialize
-            key={editId ? `edit-${editId}` : 'create'}
-            initialValues={{
-              ...initialFormValues,
-            }}
-            onSubmit={async (values) => {
+            innerRef={formikRef}
+            initialValues={initialFormValues}
+            onSubmit={async (values, {setFieldValue: setFormValue}) => {
               try {
                 setFieldErrorText({});
                 const newInvalid: Record<string, boolean> = {};
-                newInvalid.name = !values.name;
+                newInvalid.name = !values.name?.trim();
                 newInvalid.church_type_id = !values.church_type_id;
                 newInvalid.pastor_id = !values.pastor_id;
                 newInvalid.geographical_region_id = !values.geographical_region_id;
                 newInvalid.country_id = !values.country_id;
                 newInvalid.currency_id = !values.currency_id;
-                newInvalid.email_address = !values.email_address;
+                const email = values.email_address?.trim() || '';
+                newInvalid.email_address = !email || !EMAIL_PATTERN.test(email);
                 newInvalid.date_of_birth = !values.date_of_birth;
                 newInvalid.is_first_msc =
                   values.is_msc === 'Yes' && !values.is_first_msc;
@@ -538,7 +541,10 @@ export default function AddChurchScreen() {
                 const newFieldErrors: Record<string, string> = {};
                 Object.keys(newInvalid).forEach(k => {
                   if (newInvalid[k]) {
-                    newFieldErrors[k] = requiredFieldMessageForKey(k);
+                    newFieldErrors[k] =
+                      k === 'email_address' && email
+                        ? t('invalidEmailFormat')
+                        : requiredFieldMessageForKey(k);
                   }
                 });
                 setFieldErrorText(newFieldErrors);
@@ -564,11 +570,23 @@ export default function AddChurchScreen() {
                   : null;
                 if (isAddingNewCity) {
                   try {
+                    const cityName = values.new_city_name.trim();
                     const createdCity = await createCity({
-                      name: values.new_city_name.trim(),
+                      name: cityName,
                       country_id: Number(values.country_id),
                     });
                     resolvedCityId = createdCity.id;
+                    // A later failure (upload / save) must not create it again on
+                    // retry: from now on the form simply has this city selected.
+                    const cityValue = String(createdCity.id);
+                    setCityOptions(prev =>
+                      prev.some(o => o.value === cityValue)
+                        ? prev
+                        : [...prev, {label: createdCity.name || cityName, value: cityValue}],
+                    );
+                    setIsAddingNewCity(false);
+                    setFormValue('city_id', cityValue);
+                    setFormValue('new_city_name', '');
                   } catch (cityErr: any) {
                     Alert.alert(
                       t('error'),
@@ -580,7 +598,9 @@ export default function AddChurchScreen() {
                   }
                 }
                 let uploadedPhotoPath: string | null = null;
-                if (imagePath) {
+                if (imagePath && uploadedPhotoRef.current?.source === imagePath) {
+                  uploadedPhotoPath = uploadedPhotoRef.current.path;
+                } else if (imagePath) {
                   const form = new FormData();
                   const fileName = imagePath.split('/').pop() || 'photo.jpg';
                   form.append('file', {
@@ -594,9 +614,13 @@ export default function AddChurchScreen() {
                     headers: {'Content-Type': 'multipart/form-data'},
                   });
                   uploadedPhotoPath = uploadRes?.data?.data?.path || null;
+                  if (!uploadedPhotoPath) {
+                    throw new Error(t('photoUploadFailed'));
+                  }
+                  uploadedPhotoRef.current = {source: imagePath, path: uploadedPhotoPath};
                 }
                 const payload: any = {
-                  name: values.name,
+                  name: values.name.trim(),
                   short_name: values.short_name,
                   is_msc: values.is_msc === 'Yes',
                   is_first_msc: values.is_msc === 'Yes' && values.is_first_msc === 'Yes',
@@ -619,18 +643,12 @@ export default function AddChurchScreen() {
                   office_address_postal_code: values.office_address_postal_code,
                   office_phone: values.office_phone,
                   office_fax: values.office_fax,
-                  email_address: values.email_address,
+                  email_address: values.email_address.trim(),
                   website: values.website,
                   facebook: values.facebook,
+                  instagram: values.instagram,
                   twitter: values.twitter,
-                  date_of_birth: values.date_of_birth
-                    ? `${values.date_of_birth.getFullYear()}-${String(
-                        values.date_of_birth.getMonth() + 1,
-                      ).padStart(2, '0')}-${String(values.date_of_birth.getDate()).padStart(
-                        2,
-                        '0',
-                      )}`
-                    : null,
+                  date_of_birth: formatYmd(values.date_of_birth),
                   service_venue: '',
                   church_planting_projection_id: 0,
                   msc_parent_id:
@@ -643,41 +661,38 @@ export default function AddChurchScreen() {
                   mailing_address_street: '',
                   property: '',
                 };
-                if (editId) {
-                  await updateChurch(editId, payload as any);
-                  markDataChanged('churches');
-                  Alert.alert('Success', 'Church updated successfully!');
-                } else {
-                  await addChurch(payload as any);
-                  markDataChanged('churches');
-                  Alert.alert('Success', 'Church added successfully!');
-                }
-                navigation.navigate('Churches');
+                await addChurch(payload);
+                markDataChanged('churches');
+                Alert.alert(t('success'), t('churchCreatedSuccess'));
+                // navigate() would push a new list on top of this filled form
+                // (React Navigation 7): Back would then show it again and a
+                // second Save would create a duplicate church.
+                navigation.popTo('Churches');
               } catch (e: any) {
-                const apiErrors = e?.response?.data?.errors;
-                if (apiErrors && typeof apiErrors === 'object') {
-                  const nextInvalid: Record<string, boolean> = {};
-                  const nextFieldErrors: Record<string, string> = {};
-                  Object.entries(apiErrors).forEach(([key, value]) => {
-                    if (typeof value === 'string' && value.trim()) {
-                      nextInvalid[key] = true;
-                      nextFieldErrors[key] = value;
-                    }
-                  });
-                  if (Object.keys(nextFieldErrors).length > 0) {
-                    setInvalid(prev => ({...prev, ...nextInvalid}));
-                    setFieldErrorText(nextFieldErrors);
-                    const firstKey = Object.keys(nextFieldErrors)[0];
-                    if (firstKey) {
-                      scrollToField(firstKey);
-                    }
-                    return;
-                  }
-                }
-                Alert.alert(
-                  'Error',
-                  e?.response?.data?.message || e?.message || 'Failed to add church.',
+                const {fieldErrors, otherMessages} = splitApiFieldErrors(
+                  e?.response?.data?.errors,
+                  FIELDS_WITH_ERROR_TEXT,
                 );
+                const fieldKeys = Object.keys(fieldErrors);
+                if (fieldKeys.length > 0) {
+                  setInvalid(prev => ({
+                    ...prev,
+                    ...Object.fromEntries(fieldKeys.map(k => [k, true])),
+                  }));
+                  setFieldErrorText(fieldErrors);
+                  scrollToField(fieldKeys[0]);
+                }
+                // Errors without a field on this form (and other failures) would
+                // otherwise leave Save looking like it did nothing.
+                if (otherMessages.length > 0 || fieldKeys.length === 0) {
+                  Alert.alert(
+                    t('error'),
+                    otherMessages.join('\n') ||
+                      e?.response?.data?.message ||
+                      e?.message ||
+                      t('failedToCreateChurch'),
+                  );
+                }
               }
             }}>
             {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
@@ -730,6 +745,7 @@ export default function AddChurchScreen() {
                     </View>
                     <AppInput
                       autoCapitalize="none"
+                      maxLength={10}
                       value={values.short_name}
                       onChangeText={handleChange('short_name')}
                       onBlur={handleBlur('short_name')}
@@ -796,7 +812,7 @@ export default function AddChurchScreen() {
                         <Text
                           style={[formStyles.label, {color: C.textSecondary}]}
                           category="label">
-                          Is this the first MSC? <Text style={{color: '#c00000'}}>*</Text>
+                          {t('isThisFirstMsc')} <Text style={{color: '#c00000'}}>*</Text>
                         </Text>
                       </View>
                       <ElementDropdown
@@ -855,15 +871,18 @@ export default function AddChurchScreen() {
                         } as any
                       }
                       onOpen={resetMotherSearchState}
-                      onSearchText={async text => {
+                      onSearchText={text => {
                         setMotherQuery(text);
                         if (!text.trim()) {
+                          cancel('mother');
                           setMotherSearchOptions([]);
                           setMotherSearchPage(1);
                           setMotherSearchHasNext(false);
                           return;
                         }
-                        await loadMotherSearchResults(1, text);
+                        debounce('mother', () => {
+                          loadMotherSearchResults(1, text);
+                        });
                       }}
                       onEndReached={async () => {
                         if (motherQuery.trim() && motherSearchHasNext) {
@@ -887,7 +906,7 @@ export default function AddChurchScreen() {
                         <Text
                           style={[formStyles.label, {color: C.textSecondary}]}
                           category="label">
-                          MSC Designated Parent <Text style={{color: '#c00000'}}>*</Text>
+                          {t('mscDesignatedParent')} <Text style={{color: '#c00000'}}>*</Text>
                         </Text>
                       </View>
                       <ElementDropdown
@@ -908,15 +927,18 @@ export default function AddChurchScreen() {
                           } as any
                         }
                         onOpen={resetMotherSearchState}
-                        onSearchText={async text => {
+                        onSearchText={text => {
                           setMotherQuery(text);
                           if (!text.trim()) {
+                            cancel('mother');
                             setMotherSearchOptions([]);
                             setMotherSearchPage(1);
                             setMotherSearchHasNext(false);
                             return;
                           }
-                          await loadMotherSearchResults(1, text);
+                          debounce('mother', () => {
+                            loadMotherSearchResults(1, text);
+                          });
                         }}
                         onEndReached={async () => {
                           if (motherQuery.trim() && motherSearchHasNext) {
@@ -965,15 +987,18 @@ export default function AddChurchScreen() {
                         } as any
                       }
                       onOpen={resetLangSearchState}
-                      onSearchText={async text => {
+                      onSearchText={text => {
                         setLangQuery(text);
                         if (!text.trim()) {
+                          cancel('language');
                           setLangSearchOptions([]);
                           setLangSearchPage(1);
                           setLangSearchHasNext(false);
                           return;
                         }
-                        await loadLanguageSearchResults(1, text);
+                        debounce('language', () => {
+                          loadLanguageSearchResults(1, text);
+                        });
                       }}
                       onEndReached={async () => {
                         if (langQuery.trim() && langSearchHasNext) {
@@ -1024,20 +1049,6 @@ export default function AddChurchScreen() {
                         } as any
                       }
                       error={!!invalid?.church_type_id}
-                      onSearchText={async text => {
-                        try {
-                          const res = await api.get('church-types', {params: {sort_by: 'name', sort_desc: false}});
-                          const items = ((res.data?.data ?? []) as any[]).map(
-                            i => ({label: i.name, value: String(i.id)}),
-                          );
-                          // @ts-ignore
-                          churchTypeOptions.splice(
-                            0,
-                            churchTypeOptions.length,
-                            ...items,
-                          );
-                        } catch {}
-                      }}
                     />
                     {renderFieldError('church_type_id')}
                   </View>
@@ -1078,9 +1089,11 @@ export default function AddChurchScreen() {
                         } as any
                       }
                       error={!!invalid?.pastor_id}
-                      onSearchText={async text => {
+                      onSearchText={text => {
                         setPastorQuery(text);
-                        await loadPastors(1, text);
+                        debounce('pastor', () => {
+                          loadPastors(1, text);
+                        });
                       }}
                       onEndReached={async () => {
                         if (pastorHasNext) {
@@ -1129,20 +1142,6 @@ export default function AddChurchScreen() {
                         } as any
                       }
                       error={!!invalid?.church_network_id}
-                      onSearchText={async _text => {
-                        try {
-                          const res = await api.get('church-networks', {params: {sort_by: 'name', sort_desc: false}});
-                          const items = ((res.data?.data ?? []) as any[]).map(
-                            i => ({label: i.name, value: String(i.id)}),
-                          );
-                          // @ts-ignore
-                          churchNetworkOptions.splice(
-                            0,
-                            churchNetworkOptions.length,
-                            ...items,
-                          );
-                        } catch {}
-                      }}
                     />
                     {renderFieldError('church_network_id')}
                   </View>
@@ -1185,20 +1184,6 @@ export default function AddChurchScreen() {
                         } as any
                       }
                       error={!!invalid?.church_region_id}
-                      onSearchText={async _text => {
-                        try {
-                          const res = await api.get('church-regions', {params: {sort_by: 'name', sort_desc: false}});
-                          const items = ((res.data?.data ?? []) as any[]).map(
-                            i => ({label: i.name, value: String(i.id)}),
-                          );
-                          // @ts-ignore
-                          churchRegionOptions.splice(
-                            0,
-                            churchRegionOptions.length,
-                            ...items,
-                          );
-                        } catch {}
-                      }}
                     />
                     {renderFieldError('church_region_id')}
                   </View>
@@ -1534,23 +1519,6 @@ export default function AddChurchScreen() {
                         } as any
                       }
                       error={!!invalid?.currency_id}
-                      onSearchText={async _text => {
-                        try {
-                          const res = await api.get('currencies', {params: {sort_by: 'name', sort_desc: false}});
-                          const items = (
-                            (res.data?.data?.items ?? []) as any[]
-                          ).map((i: any) => ({
-                            label: `${i.name} (${i.three_letter_code})`,
-                            value: String(i.id),
-                          }));
-                          // @ts-ignore
-                          localCurrencyOptions.splice(
-                            0,
-                            localCurrencyOptions.length,
-                            ...items,
-                          );
-                        } catch {}
-                      }}
                     />
                     {renderFieldError('currency_id')}
                   </View>

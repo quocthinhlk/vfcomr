@@ -1,6 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
+  ActivityIndicator,
   View,
   ScrollView,
   TextInput,
@@ -24,7 +25,7 @@ import {resolveByCallingCodePrefix} from '../config/phone';
 import {formStyles} from '../../../shared/styles/form';
 import {getChurchesList} from '../../church/services/church.service';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
-import {getUserById, updateUser} from '../services/user.service';
+import {getUserById, updateUser, uploadUserPhoto} from '../services/user.service';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {useRoute, useNavigation} from '@react-navigation/native';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
@@ -39,6 +40,41 @@ import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
 import {LockIcon, MailIcon} from '../../../shared/components/icons/UiIcons';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
+import {COLORS} from '../../../shared/constants/colors';
+import {useLatestRequest} from '../../church/hooks/useLatestRequest';
+import {
+  fillTemplate,
+  formatYmd,
+  parseYmd,
+  splitApiFieldErrors,
+} from '../../church/utils/churchForm';
+
+/** Sentinel value for the credentials dropdown when the user has no credential type. */
+const CREDENTIALS_NONE_VALUE = 'No';
+
+const hasCredentialsSelection = (credentials: string) =>
+  !!credentials && credentials !== CREDENTIALS_NONE_VALUE;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Fields that show their API error under the input; other API errors go to an alert. */
+const FIELDS_WITH_ERROR_TEXT = new Set([
+  'username',
+  'title',
+  'first_name',
+  'last_name',
+  'role_id',
+  'language_id',
+  'church_id',
+  'email_address',
+  'mobile_phone',
+]);
+
+/** Scroll order of the form, for jumping to the first invalid field. */
+const FIELD_ORDER = [
+  'first_name', 'last_name', 'username', 'title', 'role_id',
+  'language_id', 'church_id', 'email_address', 'mobile_phone',
+];
 
 /** Coerce API ids (number | string) to number for dropdown value matching. */
 function parseNullableId(v: unknown): number | null {
@@ -106,7 +142,7 @@ export default function EditProfileScreen() {
   const [churchPage, setChurchPage] = useState<number>(1);
   const [churchQuery, setChurchQuery] = useState<string>('');
 
-  /** Keeps the edited user's church in `churchItems` even when it is not on the first API page. */
+  /** The selected church, kept in `churchItems` even when it is not on the loaded page. */
   const userChurchForDropdownRef = useRef<{id: number; name: string} | null>(null);
 
   const clearInvalid = (key: string) =>
@@ -140,7 +176,7 @@ export default function EditProfileScreen() {
       mobile_phone: t('mobilePhone') || 'Mobile Phone',
     };
     const label = labelByKey[key] || key;
-    return `${label} is a required field`;
+    return fillTemplate(t('fieldIsRequired'), {field: label});
   };
 
   const renderFieldError = (key: string) => {
@@ -163,36 +199,59 @@ export default function EditProfileScreen() {
     return only.replace(/(\d{3})(?=\d)/g, '$1 ').trim();
   };
 
-  const loadChurches = useCallback(async (page: number, query?: string) => {
+  // Searches are debounced, and only the latest request may update the list:
+  // a slow answer for an older query can't replace the newer results.
+  const {begin, debounce} = useLatestRequest();
+  const churchBusyRef = useRef(false);
+
+  const loadChurches = useCallback(async (page: number, query = '') => {
+    const q = query.trim();
+    const isLatest = begin('churches');
+    churchBusyRef.current = true;
     try {
       const data = await getChurchesList({
         page,
         limit: DEFAULT_PAGE_LIMIT,
-        search: query && query.trim() ? query.trim() : undefined,
+        search: q || undefined,
         sort_by: 'name',
         sort_desc: false,
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = (data?.items ?? []).map((c: any) => ({
         id: Number(c.id),
         name: String(c.name ?? ''),
       }));
       setChurchItems(prev => {
-        let base = page === 1 ? items : [...prev, ...items];
-        const seed = page === 1 ? userChurchForDropdownRef.current : null;
-        if (
-          seed &&
-          seed.id > 0 &&
-          seed.name.trim() !== '' &&
-          !base.some(c => c.id === seed.id)
-        ) {
-          base = [{id: seed.id, name: seed.name.trim()}, ...base];
+        if (page !== 1) {
+          const seen = new Set(prev.map(c => c.id));
+          return [...prev, ...items.filter(c => !seen.has(c.id))];
         }
-        return base;
+        // Keep the selected church in the list even when it is not on this
+        // page or in the search results, so the field keeps showing its name.
+        const seed = userChurchForDropdownRef.current;
+        return seed && !items.some(c => c.id === seed.id) ? [seed, ...items] : items;
       });
       setChurchTotal(data?.total ?? items.length);
       setChurchPage(data?.page ?? page);
-    } catch {}
-  }, []);
+    } catch {
+      // A failed search / next page keeps the current list.
+    } finally {
+      if (isLatest()) {
+        churchBusyRef.current = false;
+      }
+    }
+  }, [begin]);
+
+  const searchChurches = (text: string) => {
+    setChurchQuery(text);
+    if (!text.trim()) {
+      loadChurches(1);
+      return;
+    }
+    debounce('churchSearch', () => loadChurches(1, text));
+  };
 
   // Prefill (user + form-data) failed: show a retryable error instead of a
   // blank, savable form (was an Alert + empty form).
@@ -304,13 +363,12 @@ export default function EditProfileScreen() {
           church_id: churchIdResolved,
           email_address: u?.email_address || '',
           mobile_phone: subscriberDigits,
-          credentials: u?.credentials || '',
+          credentials: u?.credentials || CREDENTIALS_NONE_VALUE,
           credentials_number: u?.credentials_number || '',
-          credentials_form:
-            (u as any)?.credentials_form || (u as any)?.credentials_from || '',
-          credentials_expiry_date: u?.credentials_expiry_date
-            ? new Date(u.credentials_expiry_date)
-            : null,
+          credentials_from: u?.credentials_from || '',
+          // parseYmd: `new Date('2026-05-10')` is UTC midnight, the previous
+          // day west of UTC, so every save moved the expiry a day earlier.
+          credentials_expiry_date: parseYmd(u?.credentials_expiry_date),
         });
 
         userChurchForDropdownRef.current =
@@ -322,14 +380,6 @@ export default function EditProfileScreen() {
 
         setLoadError(null);
         await loadChurches(1);
-        if (isCurrent()) {
-          const seed = userChurchForDropdownRef.current;
-          if (seed && seed.id > 0 && seed.name.trim() !== '') {
-            setChurchItems(prev =>
-              prev.some(c => c.id === seed.id) ? prev : [{id: seed.id, name: seed.name.trim()}, ...prev],
-            );
-          }
-        }
       } catch (e: any) {
         if (isCurrent()) {
           setLoadError(e);
@@ -354,9 +404,16 @@ export default function EditProfileScreen() {
     [prefixOptions],
   );
   const credentialDropdownData = useMemo(
-    () => credentialOptions.map(c => ({label: c, value: c})),
-    [credentialOptions],
+    () => [
+      {label: t('no'), value: CREDENTIALS_NONE_VALUE},
+      ...credentialOptions
+        .filter(c => c !== CREDENTIALS_NONE_VALUE)
+        .map(c => ({label: c, value: c})),
+    ],
+    [credentialOptions, t],
   );
+  // A retried save reuses the photo already uploaded for the same file.
+  const uploadedPhotoRef = useRef<{source: string; path: string} | null>(null);
   const roleDropdownData = useMemo(
     () => roleOptions.map(r => ({label: r.name, value: r.id})),
     [roleOptions],
@@ -390,9 +447,9 @@ export default function EditProfileScreen() {
         edges={['top', 'bottom', 'left', 'right']}>
         <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
           <Header title={t('editUser')} showMenu={false} />
-          <ScrollView>
-            <Text style={{color: C.textPrimary}}>{t('loading')}</Text>
-          </ScrollView>
+          <View style={{flex: 1, alignItems: 'center', justifyContent: 'center'}}>
+            <ActivityIndicator size="large" color={COLORS.mainColor} />
+          </View>
         </Layout>
       </SafeAreaView>
     );
@@ -424,19 +481,19 @@ export default function EditProfileScreen() {
               onSubmit={async values => {
                 setFieldErrorText({});
                 const sens = !!values.sensitive_nation;
+                const email = String(values.email_address || '').trim();
                 const newInvalid: Record<string, boolean> = {};
-                newInvalid.username = !values.username;
-                newInvalid.title = !values.title;
-                newInvalid.first_name = !values.first_name;
-                newInvalid.last_name = !values.last_name;
+                newInvalid.username = !String(values.username || '').trim();
+                newInvalid.title = !String(values.title || '').trim();
+                newInvalid.first_name = !String(values.first_name || '').trim();
+                newInvalid.last_name = !String(values.last_name || '').trim();
                 newInvalid.role_id = values.role_id == null;
                 newInvalid.language_id = values.language_id == null;
                 newInvalid.church_id = values.church_id == null;
                 if (!sens) {
-                  newInvalid.email_address = !values.email_address;
+                  newInvalid.email_address = !email;
                   newInvalid.mobile_phone = !values.mobile_phone;
                 }
-                setInvalid(newInvalid);
 
                 const newFieldErrors: Record<string, string> = {};
                 Object.keys(newInvalid).forEach(k => {
@@ -444,12 +501,14 @@ export default function EditProfileScreen() {
                     newFieldErrors[k] = requiredFieldMessageForKey(k);
                   }
                 });
+                if (email && !emailLocked && !EMAIL_PATTERN.test(email)) {
+                  newInvalid.email_address = true;
+                  newFieldErrors.email_address = t('invalidEmailFormat');
+                }
+                setInvalid(newInvalid);
                 setFieldErrorText(newFieldErrors);
 
-                const firstInvalidKey = [
-                  'username', 'title', 'first_name', 'last_name', 'role_id',
-                  'language_id', 'church_id', 'email_address', 'mobile_phone',
-                ].find(k => newInvalid[k]);
+                const firstInvalidKey = FIELD_ORDER.find(k => newInvalid[k]);
                 if (firstInvalidKey) {
                   scrollToField(firstInvalidKey);
                   return;
@@ -460,118 +519,90 @@ export default function EditProfileScreen() {
                   return digits ? `+${callingCode}${digits}` : '';
                 })();
 
-                let uploadedUserPhotoPath: string | null = null;
-                try {
-                  if (imagePath) {
-                    const form = new FormData();
-                    const fileName = imagePath.split('/').pop() || 'photo.jpg';
-                    form.append('file', {
-                      uri: imagePath,
-                      name: fileName,
-                      type: 'image/jpeg',
-                    } as any);
-                    form.append('entity_type', 'users');
-                    form.append(
-                      'alt_text',
-                      `${values.first_name || ''} ${values.last_name || ''}`.trim(),
-                    );
-                    const uploadRes = await api.post('images/upload', form, {
-                      headers: {'Content-Type': 'multipart/form-data'},
-                    });
-                    uploadedUserPhotoPath = uploadRes?.data?.data?.path || null;
-                  }
-                } catch {
-                  // if upload fails, proceed without changing the photo
-                }
-
+                const withCredentials = hasCredentialsSelection(values.credentials);
                 const payload: any = {
-                  username: values.username,
+                  username: String(values.username).trim(),
                   prefix: values.prefix,
-                  title: values.title,
-                  first_name: values.first_name,
-                  last_name: values.last_name,
+                  title: String(values.title).trim(),
+                  first_name: String(values.first_name).trim(),
+                  last_name: String(values.last_name).trim(),
                   role_id: values.role_id,
                   sensitive_nation: sens,
                   language_id: values.language_id,
                   church_id: values.church_id,
-                  email_address: values.email_address,
+                  email_address: email,
                   mobile_phone: formattedPhone,
-                  credentials: values.credentials,
-                  credentials_number: values.credentials_number,
-                  credentials_form: values.credentials_form,
-                  credentials_expiry_date: values.credentials_expiry_date
-                    ? `${values.credentials_expiry_date.getFullYear()}-${String(
-                        values.credentials_expiry_date.getMonth() + 1,
-                      ).padStart(2, '0')}-${String(
-                        values.credentials_expiry_date.getDate(),
-                      ).padStart(2, '0')}`
+                  credentials: withCredentials ? values.credentials : '',
+                  credentials_number: withCredentials
+                    ? String(values.credentials_number || '').trim()
+                    : '',
+                  credentials_from: withCredentials
+                    ? String(values.credentials_from || '').trim()
+                    : '',
+                  credentials_expiry_date: withCredentials
+                    ? formatYmd(values.credentials_expiry_date)
                     : null,
-                };
-                if (uploadedUserPhotoPath) {
-                  payload.user_photo = uploadedUserPhotoPath;
-                } else if (
-                  values.user_photo &&
-                  typeof values.user_photo === 'string' &&
-                  !values.user_photo.startsWith('http')
-                ) {
-                  payload.user_photo = values.user_photo;
-                }
-                if ((values as any).password) {
-                  payload.password = (values as any).password;
-                }
-
-                const navigateAfterSave = () => {
-                  returnAfterEdit(navigation);
                 };
 
                 try {
-                  const response = await updateUser(userId, payload);
-                  markDataChanged('users');
-                  console.log('Update user response:', response);
-                  const warning =
-                    typeof response?.warning === 'string'
-                      ? response.warning.trim()
-                      : '';
-
-                  if (warning) {
-                    Alert.alert(t('success'), warning, [
-                      {text: t('ok') || 'OK', onPress: navigateAfterSave},
-                    ]);
-                    return { ...response, warning }; // Include warning in response
-                  }
-
-                  const successMessage = response?.message || t('profileUpdatedSuccess');
-                  Alert.alert(t('success'), successMessage);
-                  navigateAfterSave();
-                  return { ...response, warning: '' }; // Include empty warning in response
-                } catch (error: any) {
-                  const apiErrors = error?.response?.data?.errors;
-                  if (apiErrors && typeof apiErrors === 'object') {
-                    const nextInvalid: Record<string, boolean> = {};
-                    const nextFieldErrors: Record<string, string> = {};
-                    Object.entries(apiErrors).forEach(([key, value]) => {
-                      if (typeof value === 'string' && value.trim()) {
-                        nextInvalid[key] = true;
-                        nextFieldErrors[key] = value;
-                      }
-                    });
-                    if (Object.keys(nextFieldErrors).length > 0) {
-                      setInvalid(prev => ({...prev, ...nextInvalid}));
-                      setFieldErrorText(nextFieldErrors);
-                      const firstKey = Object.keys(nextFieldErrors)[0];
-                      if (firstKey) {
-                        scrollToField(firstKey);
-                      }
+                  if (imagePath && uploadedPhotoRef.current?.source === imagePath) {
+                    payload.user_photo = uploadedPhotoRef.current.path;
+                  } else if (imagePath) {
+                    // A photo that fails to upload stops the save (it used to be
+                    // dropped silently and the old photo kept).
+                    try {
+                      payload.user_photo = await uploadUserPhoto(
+                        imagePath,
+                        `${payload.first_name} ${payload.last_name}`,
+                      );
+                    } catch (uploadError: any) {
+                      Alert.alert(
+                        t('error'),
+                        uploadError?.response?.data?.message || t('photoUploadFailed'),
+                      );
                       return;
                     }
+                    uploadedPhotoRef.current = {source: imagePath, path: payload.user_photo};
+                  } else if (initial?.user_photo && !values.user_photo && !values.photo_url) {
+                    // The existing photo was removed with ✗.
+                    payload.user_photo = null;
                   }
+
+                  const response = await updateUser(userId, payload);
+                  markDataChanged('users');
+                  const warning =
+                    typeof response?.warning === 'string' ? response.warning.trim() : '';
                   Alert.alert(
-                    t('error'),
-                    error?.response?.data?.message || error.message || t('couldNotUpdateUser'),
+                    t('success'),
+                    warning || response?.message || t('profileUpdatedSuccess'),
+                    [{text: t('ok'), onPress: () => returnAfterEdit(navigation)}],
+                    {cancelable: false},
                   );
+                } catch (error: any) {
+                  const {fieldErrors, otherMessages} = splitApiFieldErrors(
+                    error?.response?.data?.errors,
+                    FIELDS_WITH_ERROR_TEXT,
+                  );
+                  const fieldKeys = Object.keys(fieldErrors);
+                  if (fieldKeys.length) {
+                    setInvalid(prev => ({
+                      ...prev,
+                      ...Object.fromEntries(fieldKeys.map(k => [k, true])),
+                    }));
+                    setFieldErrorText(fieldErrors);
+                    scrollToField(FIELD_ORDER.find(k => fieldErrors[k]) ?? fieldKeys[0]);
+                  }
+                  if (otherMessages.length || !fieldKeys.length) {
+                    Alert.alert(
+                      t('error'),
+                      otherMessages.join('\n') ||
+                        error?.response?.data?.message ||
+                        t('couldNotUpdateUser'),
+                    );
+                  }
                 }
               }}>
-              {({values, handleChange, handleBlur, handleSubmit, setFieldValue}) => (
+              {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
                 <View style={{gap: ms(12)}}>
 
                   {/* Sign-in settings: two compact buttons side by side, above the form fields. */}
@@ -723,7 +754,6 @@ export default function EditProfileScreen() {
                       value={values.role_id as any}
                       onChange={v => {
                         const roleId = (typeof v === 'number' ? v : Number(v)) || null;
-                        console.log('Selected role_id:', roleId);
                         setFieldValue('role_id', roleId);
                         clearInvalid('role_id');
                         clearFieldError('role_id');
@@ -850,7 +880,10 @@ export default function EditProfileScreen() {
                       data={churchDropdownData}
                       value={values.church_id as any}
                       onChange={v => {
-                        setFieldValue('church_id', (typeof v === 'number' ? v : Number(v)) || null);
+                        const id = (typeof v === 'number' ? v : Number(v)) || null;
+                        userChurchForDropdownRef.current =
+                          churchItems.find(c => c.id === id) ?? null;
+                        setFieldValue('church_id', id);
                         clearInvalid('church_id');
                         clearFieldError('church_id');
                       }}
@@ -860,18 +893,12 @@ export default function EditProfileScreen() {
                         backgroundColor: C.inputBg,
                       } as any}
                       error={!!invalid.church_id}
-                      onSearchText={async text => {
-                        setChurchQuery(text);
-                        setChurchItems([]);
-                        setChurchTotal(0);
-                        setChurchPage(1);
-                        await loadChurches(1, text);
-                      }}
-                      onEndReached={async () => {
+                      onSearchText={searchChurches}
+                      onEndReached={() => {
                         const next = churchPage + 1;
                         const maxPages = Math.max(1, Math.ceil(churchTotal / DEFAULT_PAGE_LIMIT));
-                        if (next <= maxPages) {
-                          await loadChurches(next, churchQuery);
+                        if (!churchBusyRef.current && next <= maxPages) {
+                          loadChurches(next, churchQuery);
                         }
                       }}
                     />
@@ -1002,9 +1029,15 @@ export default function EditProfileScreen() {
                     </Text>
                     <ElementDropdown
                       data={credentialDropdownData}
-                      value={values.credentials as any}
+                      value={(values.credentials as string) || CREDENTIALS_NONE_VALUE}
                       onChange={v => {
-                        setFieldValue('credentials', (v as string) || '');
+                        const next = (v as string) || CREDENTIALS_NONE_VALUE;
+                        setFieldValue('credentials', next);
+                        if (!hasCredentialsSelection(next)) {
+                          setFieldValue('credentials_number', '');
+                          setFieldValue('credentials_from', '');
+                          setFieldValue('credentials_expiry_date', null);
+                        }
                         clearInvalid('credentials');
                       }}
                       placeholder={t('selectOption')}
@@ -1012,7 +1045,7 @@ export default function EditProfileScreen() {
                     />
                   </View>
 
-                  {!!values.credentials && (
+                  {hasCredentialsSelection(values.credentials) && (
                     <>
                       {/* Credentials Number */}
                       <View onLayout={e => setFieldPos('credentials_number', e.nativeEvent.layout.y)}>
@@ -1028,15 +1061,15 @@ export default function EditProfileScreen() {
                       </View>
 
                       {/* Credentials From */}
-                      <View onLayout={e => setFieldPos('credentials_form', e.nativeEvent.layout.y)}>
+                      <View onLayout={e => setFieldPos('credentials_from', e.nativeEvent.layout.y)}>
                         <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                           {t('credentialsFrom')}
                         </Text>
                         <AppInput
-                          value={values.credentials_form}
+                          value={values.credentials_from}
                           autoCapitalize="none"
-                          onChangeText={handleChange('credentials_form')}
-                          onBlur={handleBlur('credentials_form')}
+                          onChangeText={handleChange('credentials_from')}
+                          onBlur={handleBlur('credentials_from')}
                         />
                       </View>
 
@@ -1057,6 +1090,8 @@ export default function EditProfileScreen() {
                   {/* Save Button */}
                   <AppButton
                     onPress={() => handleSubmit()}
+                    disabled={isSubmitting}
+                    loading={isSubmitting}
                     variant="primary"
                     style={globalStyles.mainButton}>
                     {t('save')}

@@ -1,4 +1,4 @@
-import React, {useEffect, useState, useCallback} from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   View,
   FlatList,
@@ -14,11 +14,10 @@ import {Text} from '@ui-kitten/components';
 import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
-import {BackButton} from '../../../shared/components/BackButton';
 import {COLORS} from '../../../shared/constants/colors';
 import {globalStyles} from '../../../shared/styles/global';
 import {MoreIcon} from '../../../shared/components/icons/UiIcons';
-import ActionSheetModal from '../../../shared/components/ActionSheetModal';
+import ActionSheetModal, {ActionItem} from '../../../shared/components/ActionSheetModal';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
 import {getListStyles} from '../../../shared/styles/list';
@@ -26,6 +25,9 @@ import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
+import {isSuperAdmin, resolveRoleIdFromUser} from '../../../shared/utils/permissions';
+import {usePagedList} from '../hooks/usePagedList';
 import {
   ListEmptyState,
   ListLoadState,
@@ -76,89 +78,49 @@ export const ListOverseerScreen: React.FC = () => {
   const {t} = useTranslation();
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedUser, setSelectedUser] = useState<OverseerItem | null>(null);
-  const [items, setItems] = useState<OverseerItem[]>([]);
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
-  const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
-  const [loadError, setLoadError] = useState<unknown>(null);
+  const [roleId, setRoleId] = useState<number | null>(null);
 
-  const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
-      try {
-        if (loading) {
-          return;
-        }
-        setLoading(true);
-        const params = {
-          page: targetPage,
-          limit: DEFAULT_PAGE_LIMIT,
-          ...(query?.trim() ? {search: query.trim()} : {}),
-        };
-        let res = await api.get('users/overseers', {params});
-        // On first open the API sometimes returns pagination totals that
-        // contradict the page itself (e.g. total: 1 with 10 items) while other
-        // requests (users/me) run concurrently. Retry once when that happens.
-        const looksInconsistent = (d: any) => {
-          if (!d) {
-            return false;
-          }
-          const count = d.items?.length ?? 0;
-          return (
-            (d.total ?? 0) < count ||
-            (!!d.has_next && (d.total_pages ?? 1) <= (d.page ?? targetPage))
-          );
-        };
-        if (looksInconsistent(res?.data?.data)) {
-          res = await api.get('users/overseers', {params});
-        }
-        const data = res?.data?.data;
-        const nextItems = (data?.items ?? []) as OverseerItem[];
-        setTotalPages(data?.total_pages ?? 1);
-        setTotal(data?.total ?? 0);
-        setPage(data?.page ?? targetPage);
-        setItems(reset ? nextItems : [...items, ...nextItems]);
-        setLoadError(null);
-      } catch (e) {
-        console.error(e);
-        // Surface the failure as a recoverable error, never as "no users".
-        setLoadError(e);
-      } finally {
-        setLoading(false);
-      }
-    },
-    [loading, query, items],
+  useEffect(() => {
+    api
+      .get('users/me')
+      .then(res => setRoleId(resolveRoleIdFromUser(res?.data?.data)))
+      .catch(() => {});
+  }, []);
+
+  const {
+    items,
+    page,
+    totalPages,
+    total,
+    loading,
+    refreshing,
+    loadError,
+    reload,
+    goToPage,
+    retry,
+    onRefresh,
+  } = usePagedList<OverseerItem>(
+    async (targetPage, search) =>
+      (
+        await api.get('users/overseers', {
+          params: {
+            page: targetPage,
+            limit: DEFAULT_PAGE_LIMIT,
+            ...(search ? {search} : {}),
+          },
+        })
+      )?.data?.data,
+    query,
   );
 
-  useEffect(() => {
-    setItems([]);
-    fetchData(1, true);
-  }, [query]);
-
-  useEffect(() => {
-    if (route?.params?.refresh || route?.params?.reload) {
-      setItems([]);
-      fetchData(1, true);
-      navigation.setParams({refresh: false, reload: undefined});
-    }
-  }, [route?.params?.refresh, route?.params?.reload]);
-
-  const onRefresh = async () => {
-    setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
-    setRefreshing(false);
-  };
-
-  const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {
-      return;
-    }
-    setItems([]);
-    fetchData(targetPage, true);
-  };
+  // Reload after a user was edited / deleted / reassigned (a `reload` param or
+  // markDataChanged('users')); a plain Back keeps the list.
+  useReloadOnReturn(reload, {
+    dataKey: 'users',
+    reload: route?.params?.refresh || route?.params?.reload,
+    clearReload: () => navigation.setParams({refresh: false, reload: undefined}),
+  });
 
   const openActions = (item: OverseerItem) => {
     setSelectedUser(item);
@@ -271,7 +233,6 @@ export const ListOverseerScreen: React.FC = () => {
             value={query}
             onChangeText={setQuery}
             placeholder={t('search')}
-            onSubmitEditing={() => goToPage(1)}
           />
 
           <View style={{flex: 1, minHeight: 0}}>
@@ -295,7 +256,7 @@ export const ListOverseerScreen: React.FC = () => {
                   <ListLoadState
                     loading={loading}
                     error={loadError}
-                    onRetry={() => fetchData(page, true)}>
+                    onRetry={retry}>
                     <ListEmptyState title={t('noUsersFound')} />
                   </ListLoadState>
                 }
@@ -378,21 +339,27 @@ export const ListOverseerScreen: React.FC = () => {
                   setSelectedUser(null);
                 },
               },
-              {
-                label: t('deleteUser'),
-                icon: 'delete',
-                type: 'danger',
-                onPress: () => {
-                  if (selectedUser) {
-                    navigation.navigate('DeleteUser', {
-                      userId: selectedUser.id,
-                      userName: selectedUser.name || undefined,
-                    });
-                  }
-                  setActionsVisible(false);
-                  setSelectedUser(null);
-                },
-              },
+              // Same as the users list: only a Super Admin can delete users
+              // (this list is also in the Pastor / Leader menu).
+              ...(isSuperAdmin(roleId)
+                ? ([
+                    {
+                      label: t('deleteUser'),
+                      icon: 'delete',
+                      type: 'danger',
+                      onPress: () => {
+                        if (selectedUser) {
+                          navigation.navigate('DeleteUser', {
+                            userId: selectedUser.id,
+                            userName: selectedUser.name || undefined,
+                          });
+                        }
+                        setActionsVisible(false);
+                        setSelectedUser(null);
+                      },
+                    },
+                  ] as ActionItem[])
+                : []),
             ]}
           />
         </View>

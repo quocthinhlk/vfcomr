@@ -1,4 +1,4 @@
-import {useState} from 'react';
+import {useRef, useState} from 'react';
 import ImagePicker from 'react-native-image-crop-picker';
 import {ActionSheetIOS, Alert, Platform} from 'react-native';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -25,12 +25,16 @@ interface ImagePickerConfig {
    * any crop shape. Defaults to false (fixed ratio from width/height).
    */
   freeAspect?: boolean;
+  /** Called with the picked file (after the size check), e.g. to upload it right away. */
+  onPicked?: (path: string) => void;
 }
 
 export function useImagePicker(config?: ImagePickerConfig) {
   const {t} = useTranslation();
   const [imagePath, setImagePath] = useState<string | null>(null);
   const [imageError, setImageError] = useState<string | null>(null);
+  const onPickedRef = useRef(config?.onPicked);
+  onPickedRef.current = config?.onPicked;
 
   const pick = async (source: 'camera' | 'library') => {
     try {
@@ -71,6 +75,7 @@ export function useImagePicker(config?: ImagePickerConfig) {
       if (image?.path) {
         setImagePath(image.path);
         setImageError(null);
+        onPickedRef.current?.(image.path);
       }
     } catch (error) {
       if (isPickerCancelled(error)) {

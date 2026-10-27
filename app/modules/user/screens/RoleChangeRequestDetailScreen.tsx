@@ -33,7 +33,7 @@ const STATUS_COLOR: Record<string, string> = {
   rejected: COLORS.dangerColor,
 };
 
-function formatDatePretty(value?: string | null): string {
+function formatDatePretty(value?: string | null, language = 'en'): string {
   if (!value) {
     return '-';
   }
@@ -42,7 +42,12 @@ function formatDatePretty(value?: string | null): string {
     return String(value);
   }
   const day = String(d.getDate()).padStart(2, '0');
-  const month = d.toLocaleString('en-US', {month: 'short'});
+  let month: string;
+  try {
+    month = d.toLocaleString(language || 'en', {month: 'short'});
+  } catch {
+    month = d.toLocaleString('en-US', {month: 'short'});
+  }
   const time = `${String(d.getHours()).padStart(2, '0')}:${String(
     d.getMinutes(),
   ).padStart(2, '0')}`;
@@ -54,12 +59,14 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const requestId = Number(route.params?.id);
   const C = useThemedColors();
-  const {t} = useTranslation();
+  const {t, selectedLanguage} = useTranslation();
 
   const [request, setRequest] = useState<RoleChangeRequestItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [actioning, setActioning] = useState<RoleChangeRequestStatus | null>(null);
   const [currentUserRoleId, setCurrentUserRoleId] = useState<number | null>(null);
+  // Until users/me answers the role is unknown: a spinner, not "Access denied".
+  const [roleLoaded, setRoleLoaded] = useState(false);
 
   // users/me failing must not read as "Access denied"; a failed detail load
   // must not read as "No data found". Both show a retryable error.
@@ -81,6 +88,7 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
       }
       setCurrentUserRoleId(resolveRoleIdFromUser(res?.data?.data));
       setRoleError(null);
+      setRoleLoaded(true);
     } catch (e) {
       if (!mountedRef.current) {
         return;
@@ -107,7 +115,6 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
         setLoadError(null);
       }
     } catch (error) {
-      console.error('Failed to load role change request detail:', error);
       if (mountedRef.current) {
         setRequest(null);
         setLoadError(error);
@@ -157,6 +164,10 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
               setActioning(status);
               await updateRoleChangeRequestStatus(request.id, status);
               markDataChanged('roleChangeRequests');
+              // No longer pending: hides Approve / Reject so a second tap
+              // (while the alert is open or with no screen to go back to)
+              // can't send the update again.
+              setRequest(prev => (prev ? {...prev, status} : prev));
               Alert.alert(
                 t('success'),
                 status === 'approved'
@@ -174,7 +185,6 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
                 ],
               );
             } catch (error: any) {
-              console.error('Failed to update role change request:', error);
               Alert.alert(
                 t('error'),
                 error?.response?.data?.message ||
@@ -206,6 +216,13 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
       return <ApiErrorState error={roleError} onRetry={loadCurrentUser} />;
     }
 
+    if (!roleLoaded) {
+      return (
+        <View style={styles.centerWrap}>
+          <ActivityIndicator size="small" color={C.textPrimary} />
+        </View>
+      );
+    }
     if (!isAdmin) {
       return (
         <View style={styles.centerWrap}>
@@ -221,7 +238,7 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
         <View style={styles.centerWrap}>
           <ActivityIndicator size="small" color={C.textPrimary} />
           <Text style={[styles.centerText, {color: C.textSecondary}]}>
-            {t('loading')}...
+            {t('loading')}
           </Text>
         </View>
       );
@@ -318,7 +335,7 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
             {renderRow(t('requestedBy'), request.requested_by_name || '-')}
             {renderRow(
               t('requestedAt'),
-              formatDatePretty(request.requested_at),
+              formatDatePretty(request.requested_at, selectedLanguage),
               isPending && !request.admin_comments,
             )}
             {!isPending
@@ -327,7 +344,7 @@ export const RoleChangeRequestDetailScreen: React.FC = () => {
                     ? t('approvedBy')
                     : t('rejectedBy'),
                   `${decidedByName || '-'}${
-                    decidedAt ? `\n${formatDatePretty(decidedAt)}` : ''
+                    decidedAt ? `\n${formatDatePretty(decidedAt, selectedLanguage)}` : ''
                   }`,
                   !request.admin_comments,
                 )

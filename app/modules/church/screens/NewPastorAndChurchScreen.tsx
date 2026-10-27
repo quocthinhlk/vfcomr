@@ -1,4 +1,4 @@
-import React, {useRef, useState, useEffect, useMemo} from 'react';
+import React, {useCallback, useRef, useState, useEffect, useMemo} from 'react';
 import {
   View,
   ScrollView,
@@ -9,6 +9,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   StatusBar,
+  BackHandler,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
@@ -17,7 +18,7 @@ import {globalStyles} from '../../../shared/styles/global';
 import {churchStyles} from '../styles';
 import {formStyles, FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import {Formik} from 'formik';
+import {Formik, FormikProps} from 'formik';
 import api from '../../../config/api';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import {useNavigation} from '@react-navigation/native';
@@ -25,6 +26,10 @@ import {useImagePicker} from '../../church/hooks/useImagePicker';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {AddChurchFormValues, useFormOptions} from './utils/addChurch.utils';
 import {CountryPicker} from 'react-native-country-codes-picker';
+import {useFocusEffect} from '@react-navigation/native';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {useLatestRequest} from '../hooks/useLatestRequest';
+import {fillTemplate, formatYmd, splitApiFieldErrors} from '../utils/churchForm';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
@@ -87,6 +92,21 @@ const CHURCH_REQUIRED_KEYS = [
   'country_id', 'currency_id', 'email_address', 'date_of_birth',
 ];
 
+/** Fields that show their own error under the input (anything else is alerted). */
+const FIELDS_WITH_ERROR_TEXT = new Set([
+  'church_network_id', 'church_region_id', 'church_type_id', 'city_id', 'country_id',
+  'currency_id', 'date_of_birth', 'email_address', 'first_name', 'geographical_region_id',
+  'is_first_msc', 'is_msc', 'language_id', 'language_region_id', 'msc_parent_id', 'name',
+  'new_city_name', 'password', 'title', 'user_church_id', 'user_country_id',
+  'user_email_address', 'user_language_id', 'user_mobile_phone', 'user_role_id', 'username',
+]);
+/** Church-step fields (hidden while the pastor step is shown). */
+const CHURCH_FIELD_KEYS = new Set([
+  'church_network_id', 'church_region_id', 'church_type_id', 'city_id', 'country_id',
+  'currency_id', 'date_of_birth', 'email_address', 'geographical_region_id', 'is_first_msc',
+  'is_msc', 'language_id', 'language_region_id', 'msc_parent_id', 'name', 'new_city_name',
+]);
+
 const USER_REQUIRED_KEYS = [
   'username', 'password', 'title', 'first_name', 'user_role_id',
   'user_language_id', 'user_church_id', 'user_country_id', 'user_email_address', 'user_mobile_phone',
@@ -120,8 +140,8 @@ export default function NewPastorAndChurchScreen() {
   const requiredFieldMessageForKey = (key: string) => {
     const labelByKey: Record<string, string> = {
       name: t('churchName') || 'Church Name',
-      is_first_msc: 'Is this the first MSC?',
-      msc_parent_id: 'MSC Designated Parent',
+      is_first_msc: t('isThisFirstMsc'),
+      msc_parent_id: t('mscDesignatedParent'),
       church_type_id: t('churchType') || 'Church Type',
       geographical_region_id: t('geographicalRegion') || 'Geographical Region',
       country_id: t('nation') || 'Nation',
@@ -142,7 +162,7 @@ export default function NewPastorAndChurchScreen() {
       user_mobile_phone: t('mobilePhone') || 'Mobile Phone',
     };
     const label = labelByKey[key] || key;
-    return `${label} is a required field`;
+    return fillTemplate(t('fieldIsRequired'), {field: label});
   };
 
   const renderFieldError = (key: string) => {
@@ -158,6 +178,20 @@ export default function NewPastorAndChurchScreen() {
   };
 
   const [showPastorSection, setShowPastorSection] = useState(false);
+  // Android Back in the pastor step returns to the church step (like the header
+  // back arrow) instead of leaving the screen and losing what was entered.
+  useFocusEffect(
+    useCallback(() => {
+      if (!showPastorSection) {
+        return undefined;
+      }
+      const sub = BackHandler.addEventListener('hardwareBackPress', () => {
+        setShowPastorSection(false);
+        return true;
+      });
+      return () => sub.remove();
+    }, [showPastorSection]),
+  );
 
   const {
     motherChurchOptions,
@@ -186,16 +220,29 @@ export default function NewPastorAndChurchScreen() {
 
   const [cityOptions, setCityOptions] = useState<{label: string; value: string}[]>([]);
   const [isAddingNewCity, setIsAddingNewCity] = useState(false);
+  // Latest country only: a slower response for the previous country must not
+  // fill the list (a city of another country would then be saved).
   const loadCities = async (countryId: string | number) => {
+    const isLatest = begin('cities');
+    setCityOptions([]);
     try {
       const res = await api.get(`cities/country/${countryId}`, {params: {sort_by: 'name', sort_desc: false}});
+      if (!isLatest()) {
+        return;
+      }
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
     } catch {}
   };
 
   const PAGE_LIMIT = DEFAULT_PAGE_LIMIT;
-  const [langOptions, setLangOptions] = useState(languageOptions);
+  const {begin, debounce, cancel} = useLatestRequest();
+  const formikRef = useRef<FormikProps<CombinedFormValues>>(null);
+  // Uploads from an earlier, failed save: reused instead of uploading again.
+  const uploadedPhotosRef = useRef<Record<string, {source: string; path: string}>>({});
+  const [continuing, setContinuing] = useState(false);
+  /** Server search results for the church language; the full list stays in languageOptions. */
+  const [langSearchOptions, setLangSearchOptions] = useState<{label: string; value: string}[]>([]);
   const [langPage, setLangPage] = useState(1);
   const [langHasNext, setLangHasNext] = useState(false);
   const [langQuery, setLangQuery] = useState('');
@@ -242,15 +289,19 @@ export default function NewPastorAndChurchScreen() {
   };
 
   const loadLanguages = async (page: number, name?: string) => {
+    const isLatest = begin('language');
     try {
       const res = await api.get('languages', {
         params: {page, limit: PAGE_LIMIT, sort_by: 'name', sort_desc: false, ...(name?.trim() ? {name: name.trim()} : {})},
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = ((res.data?.data?.items ?? []) as any[]).map(i => ({
         label: i.name,
         value: String(i.id),
       }));
-      setLangOptions(prev => (page === 1 ? items : [...prev, ...items]));
+      setLangSearchOptions(prev => (page === 1 ? items : [...prev, ...items]));
       setLangPage(page);
       setLangHasNext(!!res.data?.data?.has_next);
     } catch {}
@@ -281,11 +332,7 @@ export default function NewPastorAndChurchScreen() {
     [userCountryItems],
   );
 
-  useEffect(() => {
-    if (!langQuery && langPage === 1) {
-      setLangOptions(languageOptions);
-    }
-  }, [languageOptions]);
+  const churchLanguageData = langQuery.trim() ? langSearchOptions : languageOptions;
 
   useEffect(() => {
     let mounted = true;
@@ -382,6 +429,8 @@ export default function NewPastorAndChurchScreen() {
     return () => {
       mounted = false;
     };
+    // Restore the draft once, on mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // users/form-data provides the (required) OMR status / role options; without
@@ -421,6 +470,15 @@ export default function NewPastorAndChurchScreen() {
     if (!pastorLeader) {
       return;
     }
+    // Once the form is shown, only fill the empty field: re-initialising the
+    // form (as before) wiped everything typed while users/form-data loaded.
+    const form = formikRef.current;
+    if (form) {
+      if (!form.values.user_role_id) {
+        form.setFieldValue('user_role_id', String(pastorLeader.id));
+      }
+      return;
+    }
     setInitialValues(prev => {
       if (prev.user_role_id) {
         return prev;
@@ -430,6 +488,18 @@ export default function NewPastorAndChurchScreen() {
   }, [roleOptions]);
 
   const handleSaveChurchAndContinue = async (values: CombinedFormValues) => {
+    if (continuing) {
+      return;
+    }
+    setContinuing(true);
+    try {
+      await saveChurchAndContinue(values);
+    } finally {
+      setContinuing(false);
+    }
+  };
+
+  const saveChurchAndContinue = async (values: CombinedFormValues) => {
     setFieldErrorText({});
     const nextInvalid: Record<string, boolean> = {};
     CHURCH_REQUIRED_KEYS.forEach(k => {
@@ -506,10 +576,9 @@ export default function NewPastorAndChurchScreen() {
         email_address: values.email_address,
         website: values.website,
         facebook: values.facebook,
+        instagram: values.instagram,
         twitter: values.twitter,
-        date_of_birth: values.date_of_birth
-          ? `${values.date_of_birth.getFullYear()}-${String(values.date_of_birth.getMonth() + 1).padStart(2, '0')}-${String(values.date_of_birth.getDate()).padStart(2, '0')}`
-          : null,
+        date_of_birth: formatYmd(values.date_of_birth),
         service_venue: '',
         church_planting_projection_id: 0,
         photo_dir: values.photo_dir,
@@ -541,11 +610,20 @@ export default function NewPastorAndChurchScreen() {
         });
 
         if (Object.keys(nextFieldErrorsFromApi).length > 0) {
+          // Errors for church fields without an error line on the form would
+          // otherwise leave "Save & continue" looking like it did nothing.
+          const {fieldErrors, otherMessages} = splitApiFieldErrors(
+            nextFieldErrorsFromApi,
+            FIELDS_WITH_ERROR_TEXT,
+          );
           setInvalid(prev => ({...prev, ...nextInvalidFromApi}));
-          setFieldErrorText(prev => ({...prev, ...nextFieldErrorsFromApi}));
-          const firstKey = Object.keys(nextFieldErrorsFromApi)[0];
+          setFieldErrorText(prev => ({...prev, ...fieldErrors}));
+          const firstKey = Object.keys(fieldErrors)[0];
           if (firstKey) {
             scrollToField(firstKey);
+          }
+          if (otherMessages.length > 0) {
+            Alert.alert(t('error'), otherMessages.join('\n'));
           }
           return;
         }
@@ -608,7 +686,11 @@ export default function NewPastorAndChurchScreen() {
       style={[globalStyles.safeAreaView, {backgroundColor: C.background}]}
       edges={['top', 'bottom', 'left', 'right']}>
       <Layout style={[globalStyles.layout, {backgroundColor: C.background}]}>
-        <Header title={t('addNewChurchAndPastor')} showMenu={false} />
+        <Header
+          title={t('addNewChurchAndPastor')}
+          showMenu={false}
+          onBackPress={showPastorSection ? () => setShowPastorSection(false) : undefined}
+        />
         {formDataError || optionsError ? (
           <ApiErrorState
             error={formDataError || optionsError}
@@ -638,11 +720,10 @@ export default function NewPastorAndChurchScreen() {
 
             {draftLoaded && (
               <Formik<CombinedFormValues>
-                enableReinitialize
+                innerRef={formikRef}
                 initialValues={initialValues}
-                onSubmit={async values => {
+                onSubmit={async (values, {setFieldValue: setFormValue}) => {
                   try {
-                    console.log('[NewPastorAndChurchScreen] submit start');
                     setFieldErrorText({});
                     const newInvalid: Record<string, boolean> = {};
                     [...CHURCH_REQUIRED_KEYS, ...USER_REQUIRED_KEYS].forEach(k => {
@@ -684,11 +765,23 @@ export default function NewPastorAndChurchScreen() {
                       : null;
                     if (isAddingNewCity) {
                       try {
+                        const cityName = values.new_city_name.trim();
                         const createdCity = await createCity({
-                          name: values.new_city_name.trim(),
+                          name: cityName,
                           country_id: Number(values.country_id),
                         });
                         resolvedCityId = createdCity.id;
+                        // A later failure must not create it again on retry: from
+                        // now on the form simply has this city selected.
+                        const cityValue = String(createdCity.id);
+                        setCityOptions(prev =>
+                          prev.some(o => o.value === cityValue)
+                            ? prev
+                            : [...prev, {label: createdCity.name || cityName, value: cityValue}],
+                        );
+                        setIsAddingNewCity(false);
+                        setFormValue('city_id', cityValue);
+                        setFormValue('new_city_name', '');
                       } catch (cityErr: any) {
                         Alert.alert(
                           t('error'),
@@ -700,30 +793,48 @@ export default function NewPastorAndChurchScreen() {
                       }
                     }
 
-                    let churchPhotoPath: string | null = null;
-                    if (churchImagePath) {
+                    // Uploads from an earlier failed attempt are reused, so a retry
+                    // doesn't leave duplicate files on the server.
+                    const uploadPhoto = async (
+                      kind: 'church' | 'user',
+                      source: string | null,
+                      entityType: string,
+                      altText: string,
+                    ): Promise<string | null> => {
+                      if (!source) {
+                        return null;
+                      }
+                      const previous = uploadedPhotosRef.current[kind];
+                      if (previous?.source === source) {
+                        return previous.path;
+                      }
                       const form = new FormData();
-                      const fileName = churchImagePath.split('/').pop() || 'photo.jpg';
-                      form.append('file', {uri: churchImagePath, name: fileName, type: 'image/jpeg'} as any);
-                      form.append('entity_type', 'churches');
-                      form.append('alt_text', values.name || 'church photo');
+                      const fileName = source.split('/').pop() || 'photo.jpg';
+                      form.append('file', {uri: source, name: fileName, type: 'image/jpeg'} as any);
+                      form.append('entity_type', entityType);
+                      form.append('alt_text', altText);
                       const uploadRes = await api.post('images/upload', form, {
                         headers: {'Content-Type': 'multipart/form-data'},
                       });
-                      churchPhotoPath = uploadRes?.data?.data?.path || null;
-                    }
-                    let userPhotoPath: string | null = null;
-                    if (userImagePath) {
-                      const form = new FormData();
-                      const fileName = userImagePath.split('/').pop() || 'photo.jpg';
-                      form.append('file', {uri: userImagePath, name: fileName, type: 'image/jpeg'} as any);
-                      form.append('entity_type', 'users');
-                      form.append('alt_text', values.first_name || 'user photo');
-                      const uploadRes = await api.post('images/upload', form, {
-                        headers: {'Content-Type': 'multipart/form-data'},
-                      });
-                      userPhotoPath = uploadRes?.data?.data?.path || null;
-                    }
+                      const path = uploadRes?.data?.data?.path || null;
+                      if (!path) {
+                        throw new Error(t('photoUploadFailed'));
+                      }
+                      uploadedPhotosRef.current[kind] = {source, path};
+                      return path;
+                    };
+                    const churchPhotoPath = await uploadPhoto(
+                      'church',
+                      churchImagePath,
+                      'churches',
+                      values.name || 'church photo',
+                    );
+                    const userPhotoPath = await uploadPhoto(
+                      'user',
+                      userImagePath,
+                      'users',
+                      values.first_name || 'user photo',
+                    );
 
                     const churchPayload: any = {
                       name: values.name,
@@ -761,10 +872,9 @@ export default function NewPastorAndChurchScreen() {
                       email_address: values.email_address,
                       website: values.website,
                       facebook: values.facebook,
+                      instagram: values.instagram,
                       twitter: values.twitter,
-                      date_of_birth: values.date_of_birth
-                        ? `${values.date_of_birth.getFullYear()}-${String(values.date_of_birth.getMonth() + 1).padStart(2, '0')}-${String(values.date_of_birth.getDate()).padStart(2, '0')}`
-                        : null,
+                      date_of_birth: formatYmd(values.date_of_birth),
                       service_venue: '',
                       church_planting_projection_id: 0,
                       photo_dir: values.photo_dir,
@@ -791,6 +901,9 @@ export default function NewPastorAndChurchScreen() {
                       country_id: values.user_country_id ? Number(values.user_country_id) : null,
                       mobile_phone: formattedUserPhone,
                       email_address: values.user_email_address,
+                      // "Church this pastor belongs to" (required on the form, and
+                      // sent by the web app as user.church_id) was never sent.
+                      church_id: values.user_church_id ? Number(values.user_church_id) : undefined,
                       credentials: hasCredentialsSelection(values.credentials)
                         ? values.credentials
                         : undefined,
@@ -804,16 +917,20 @@ export default function NewPastorAndChurchScreen() {
                           : undefined,
                     };
 
+                    // No logging here: the payload holds the new pastor's password,
+                    // and console output reaches the device log in release builds.
                     const payload = {church: churchPayload, user: userPayload};
-                    console.log('[NewPastorAndChurchScreen] submit payload:', payload);
                     const res = await api.post('churches/with-user', payload);
-                    console.log('[NewPastorAndChurchScreen] submit response:', res?.data);
+                    markDataChanged('churches');
+                    markDataChanged('users');
                     try {
                       await AsyncStorage.removeItem(CHURCH_DRAFT_KEY);
                     } catch {}
 
+                    // navigate() would push a new list on top of this filled form
+                    // (React Navigation 7): Back + Save would create it twice.
                     const navigateAfterSave = () => {
-                      navigation.navigate('Churches');
+                      navigation.popTo('Churches');
                     };
 
                     const warning =
@@ -828,7 +945,7 @@ export default function NewPastorAndChurchScreen() {
                       return;
                     }
 
-                    Alert.alert(t('success'), 'Church and User created successfully!');
+                    Alert.alert(t('success'), t('churchAndUserCreatedSuccess'));
                     navigateAfterSave();
                   } catch (e: any) {
                     console.error('[NewPastorAndChurchScreen] submit error:', {
@@ -884,11 +1001,22 @@ export default function NewPastorAndChurchScreen() {
                         nextFieldErrors[key] = value;
                       });
                       if (Object.keys(nextFieldErrors).length > 0) {
+                        const {fieldErrors, otherMessages} = splitApiFieldErrors(
+                          nextFieldErrors,
+                          FIELDS_WITH_ERROR_TEXT,
+                        );
+                        // Church fields are hidden in the pastor step: show them again.
+                        if (Object.keys(fieldErrors).some(k => CHURCH_FIELD_KEYS.has(k))) {
+                          setShowPastorSection(false);
+                        }
                         setInvalid(prev => ({...prev, ...nextInvalid}));
-                        setFieldErrorText(nextFieldErrors);
-                        const firstKey = Object.keys(nextFieldErrors)[0];
+                        setFieldErrorText(fieldErrors);
+                        const firstKey = Object.keys(fieldErrors)[0];
                         if (firstKey) {
-                          scrollToField(firstKey);
+                          setTimeout(() => scrollToField(firstKey), 0);
+                        }
+                        if (otherMessages.length > 0) {
+                          Alert.alert(t('error'), otherMessages.join('\n'));
                         }
                         return;
                       }
@@ -998,7 +1126,7 @@ export default function NewPastorAndChurchScreen() {
                                 <View onLayout={e => setFieldPos('is_first_msc', e.nativeEvent.layout.y)}>
                                   <View>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      Is this the first MSC? <Text style={{color: '#c00000'}}>*</Text>
+                                      {t('isThisFirstMsc')} <Text style={{color: '#c00000'}}>*</Text>
                                     </Text>
                                     <ElementDropdown
                                       data={[
@@ -1051,7 +1179,7 @@ export default function NewPastorAndChurchScreen() {
                                 <View onLayout={e => setFieldPos('msc_parent_id', e.nativeEvent.layout.y)}>
                                   <View>
                                     <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                      MSC Designated Parent <Text style={{color: '#c00000'}}>*</Text>
+                                      {t('mscDesignatedParent')} <Text style={{color: '#c00000'}}>*</Text>
                                     </Text>
                                     <ElementDropdown
                                       data={motherChurchOptions}
@@ -1082,7 +1210,7 @@ export default function NewPastorAndChurchScreen() {
                                     </Text>
                                   </View>
                                   <ElementDropdown
-                                    data={langOptions}
+                                    data={churchLanguageData}
                                     value={values.language_id as any}
                                     onChange={v => {
                                       setFieldValue('language_id', v as any);
@@ -1091,18 +1219,22 @@ export default function NewPastorAndChurchScreen() {
                                     }}
                                     placeholder={t('selectOption')}
                                     containerStyle={{backgroundColor: C.inputBg, borderColor: invalid?.language_id ? '#db2d2d' : C.inputBorder} as any}
-                                    onFocus={async () => {
-                                      if (langOptions.length === 0) {
-                                        await loadLanguages(1);
-                                      }
-                                    }}
-                                    onSearchText={async text => {
+                                    onSearchText={text => {
                                       setLangQuery(text);
-                                      await loadLanguages(1, text);
+                                      if (!text.trim()) {
+                                        cancel('language');
+                                        setLangSearchOptions([]);
+                                        setLangPage(1);
+                                        setLangHasNext(false);
+                                        return;
+                                      }
+                                      debounce('language', () => {
+                                        loadLanguages(1, text);
+                                      });
                                     }}
-                                    onEndReached={async () => {
-                                      if (langHasNext) {
-                                        await loadLanguages(langPage + 1, langQuery);
+                                    onEndReached={() => {
+                                      if (langQuery.trim() && langHasNext) {
+                                        loadLanguages(langPage + 1, langQuery);
                                       }
                                     }}
                                     error={!!invalid?.language_id}
@@ -1598,6 +1730,7 @@ export default function NewPastorAndChurchScreen() {
 
                               <AppButton
                                 onPress={() => handleSaveChurchAndContinue(values)}
+                                disabled={continuing}
                                 style={globalStyles.mainButton}>
                                 {t('saveAndContinuePastorDetails')}
                               </AppButton>
@@ -1616,7 +1749,7 @@ export default function NewPastorAndChurchScreen() {
                               <View>
                                 <View>
                                   <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
-                                    Prefix
+                                    {t('prefix')}
                                   </Text>
                                   <ElementDropdown
                                     data={prefixOptions.map(p => ({label: p, value: p}))}
@@ -1822,7 +1955,7 @@ export default function NewPastorAndChurchScreen() {
                                     <HelpIcon title={t('language')} message={t('helpUserLanguage')} />
                                   </View>
                                   <ElementDropdown
-                                    data={langOptions}
+                                    data={languageOptions}
                                     value={values.user_language_id as any}
                                     onChange={v => {
                                       setFieldValue('user_language_id', v as any);

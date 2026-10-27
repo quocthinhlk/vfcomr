@@ -126,7 +126,14 @@ export default function ChangeEmailScreen() {
         fieldErrors.password = t('invalidEmailOrPassword');
       }
       if (!showErrors(fieldErrors)) {
-        Alert.alert(t('error'), message);
+        // Errors for fields this form doesn't show (e.g. `email`).
+        const otherMessages = apiErrors
+          ? Object.values(apiErrors)
+              .flat()
+              .map(v => String(v ?? '').trim())
+              .filter(Boolean)
+          : [];
+        Alert.alert(t('error'), otherMessages.join('\n') || message);
       }
     } finally {
       setSubmitting(false);

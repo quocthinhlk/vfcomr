@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { View, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar, StyleSheet } from 'react-native';
+import { ActivityIndicator, View, Alert, ScrollView, KeyboardAvoidingView, Platform, StatusBar, StyleSheet } from 'react-native';
+import { COLORS } from '../../../shared/constants/colors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Layout, Text } from '@ui-kitten/components';
 import { globalStyles } from '../../../shared/styles/global';
@@ -9,7 +10,7 @@ import { BackButton } from '../../../shared/components/BackButton';
 import { Formik } from 'formik';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import api from '../../../config/api';
-import { isSuperAdmin } from '../../../shared/utils/permissions';
+import { isSuperAdmin, resolveRoleIdFromUser } from '../../../shared/utils/permissions';
 import { useTranslation } from '../../../shared/hooks/useTranslation';
 import { useThemedColors } from '../../../shared/styles/theme';
 import { Col, Row, Grid } from 'react-native-easy-grid';
@@ -53,8 +54,9 @@ export default function ChangePasswordForOtherUserScreen() {
       if (!mountedRef.current) {
         return;
       }
-      const r = res?.data?.data?.role?.id;
-      if (typeof r === 'number') setCurrentUserRoleId(r);
+      // Some accounts expose only role_id: reading role.id alone left a Super
+      // Admin treated as a regular user (asked for the other user's old password).
+      setCurrentUserRoleId(resolveRoleIdFromUser(res?.data?.data));
       const meId = Number(res?.data?.data?.id);
       if (Number.isFinite(meId)) setCurrentUserId(meId);
       setLoadError(null);
@@ -85,9 +87,9 @@ export default function ChangePasswordForOtherUserScreen() {
       <SafeAreaView style={[globalStyles.safeAreaView, { backgroundColor: C.background }]} edges={['top','bottom','left','right']}> 
         <Layout style={[globalStyles.layout, { backgroundColor: C.background }]}>
           <BackButton title={t('changePassword')} />
-          <ScrollView>
-            <Text style={{ color: C.textPrimary }}>{t('loading')}</Text>
-          </ScrollView>
+          <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
+            <ActivityIndicator size="large" color={COLORS.mainColor} />
+          </View>
         </Layout>
       </SafeAreaView>
     );
@@ -211,11 +213,18 @@ export default function ChangePasswordForOtherUserScreen() {
                     scrollToField(firstApiKey);
                     return;
                   }
-                  Alert.alert(t('error'), message);
+                  // Errors for fields this form doesn't show (e.g. `password`).
+                  const otherMessages = apiErrors
+                    ? Object.values(apiErrors)
+                        .flat()
+                        .map(v => String(v ?? '').trim())
+                        .filter(Boolean)
+                    : [];
+                  Alert.alert(t('error'), otherMessages.join('\n') || message);
                 }
               }}
             >
-              {({ values, handleBlur, handleSubmit, setFieldValue }) => (
+              {({ values, handleBlur, handleSubmit, setFieldValue, isSubmitting }) => (
                 <Grid>
                   {needsOldPassword && (
                     <Row>
@@ -289,6 +298,8 @@ export default function ChangePasswordForOtherUserScreen() {
                     <Col>
                       <AppButton
                         onPress={() => handleSubmit()}
+                        disabled={isSubmitting}
+                        loading={isSubmitting}
                         variant="primary"
                         style={globalStyles.mainButton}
                       >

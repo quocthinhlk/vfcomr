@@ -1,3 +1,4 @@
+import {PermissionsAndroid, Platform} from 'react-native';
 import RNFS from 'react-native-fs';
 import api from '../../../config/api';
 
@@ -32,10 +33,9 @@ export const REPORT_ENDPOINTS = {
 
 export type ReportEndpoint = keyof typeof REPORT_ENDPOINTS;
 
-/** "file": the report file (file_url). "pdf": its PDF version (pdf_url). */
-export type ReportFileMode = 'file' | 'pdf';
+export type ReportFormat = 'excel' | 'pdf';
 
-export type ReportDownload = {url: string; filename: string; label: 'pdf' | 'excel'};
+export type ReportDownload = {url: string; filename: string; label: ReportFormat};
 
 export type GeneratedReport =
   | {kind: 'files'; files: ReportDownload[]}
@@ -69,19 +69,22 @@ export function getReportCatalog(): Promise<ReportCatalog> {
   return catalogRequest;
 }
 
-/** POST a report request and return the file(s) to open, like the web's generate(). */
+/**
+ * POST a report request and return every format the API produced for it
+ * (Excel from file_url, PDF from pdf_url), so the user picks one to download.
+ * The web picks file_url or pdf_url the same way; the request is identical.
+ */
 export async function generateReport(
   endpoint: ReportEndpoint,
   body: Record<string, unknown>,
   fallbackFilename: string,
-  mode: ReportFileMode = 'file',
 ): Promise<GeneratedReport> {
   const response = await api.post(REPORT_ENDPOINTS[endpoint], body, {timeout: 120000});
   const payload = response.data ?? {};
   if (payload?.success === false) {
     throw {response: {data: payload}};
   }
-  const files = listReportFiles(readReportPayload(payload), mode, fallbackFilename);
+  const files = listReportFiles(readReportPayload(payload), fallbackFilename);
   if (files.length === 0) {
     const message =
       (typeof payload?.message === 'string' && payload.message) || 'Request was successful';
@@ -113,18 +116,72 @@ export function reportErrorMessage(error: unknown): string | null {
 }
 
 export async function downloadReportFile(file: ReportDownload): Promise<string> {
-  const localPath = `${RNFS.CachesDirectoryPath}/${file.filename}`;
-  const exists = await RNFS.exists(localPath);
-  if (!exists) {
-    const download = await RNFS.downloadFile({fromUrl: file.url, toFile: localPath}).promise;
-    if (download.statusCode < 200 || download.statusCode >= 300) {
-      throw new Error(`Could not download the report (${download.statusCode}).`);
-    }
+  // One folder per URL: reports generated with other filters often reuse the
+  // same file name, and a cache keyed by name alone reopened the old file.
+  const dir = `${RNFS.CachesDirectoryPath}/reports/${urlKey(file.url)}`;
+  const localPath = `${dir}/${file.filename}`;
+  if (await RNFS.exists(localPath)) {
+    return localPath;
+  }
+  await RNFS.mkdir(dir);
+  const download = await RNFS.downloadFile({fromUrl: file.url, toFile: localPath}).promise;
+  if (download.statusCode < 200 || download.statusCode >= 300) {
+    await RNFS.unlink(localPath).catch(() => {});
+    throw new Error(`Could not download the report (${download.statusCode}).`);
   }
   return localPath;
 }
 
-type ReportFilePayload = {
+/** Thrown when Android (9 and older) refuses the storage permission. */
+export class StoragePermissionError extends Error {}
+
+/**
+ * Android: saves a report in the public Download folder (visible in the Files /
+ * Downloads apps), unlike downloadReportFile, which keeps it in the app cache to
+ * open it. An existing file of the same name is kept; the copy gets " (1)"…
+ * (iOS saves through the system "Save to Files" sheet instead.)
+ */
+export async function saveReportToDownloads(file: ReportDownload): Promise<string> {
+  const cached = await downloadReportFile(file);
+  if (Number(Platform.Version) < 29) {
+    const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
+    );
+    if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+      throw new StoragePermissionError();
+    }
+  }
+  const dir = RNFS.DownloadDirectoryPath;
+  await RNFS.mkdir(dir);
+  const target = await freePath(dir, file.filename);
+  await RNFS.copyFile(cached, target);
+  // Make it show up in the Downloads / Files apps right away.
+  await RNFS.scanFile(target).catch(() => {});
+  return target;
+}
+
+/** `dir/name.ext`, or `dir/name (n).ext` when that already exists. */
+export async function freePath(dir: string, filename: string): Promise<string> {
+  const dot = filename.lastIndexOf('.');
+  const base = dot > 0 ? filename.slice(0, dot) : filename;
+  const ext = dot > 0 ? filename.slice(dot) : '';
+  let candidate = `${dir}/${filename}`;
+  for (let n = 1; (await RNFS.exists(candidate)) && n < 1000; n++) {
+    candidate = `${dir}/${base} (${n})${ext}`;
+  }
+  return candidate;
+}
+
+/** Short stable key for a URL (djb2), safe as a folder name. */
+function urlKey(url: string): string {
+  let hash = 5381;
+  for (let i = 0; i < url.length; i++) {
+    hash = ((hash << 5) + hash + url.charCodeAt(i)) >>> 0;
+  }
+  return hash.toString(36);
+}
+
+export type ReportFilePayload = {
   file_name?: string;
   file_url?: string;
   file_type?: string;
@@ -139,35 +196,32 @@ function readReportPayload(body: any): ReportFilePayload {
   return body ?? {};
 }
 
-function listReportFiles(
-  data: ReportFilePayload,
-  mode: ReportFileMode,
-  fallbackFilename: string,
-): ReportDownload[] {
+/**
+ * The downloadable formats of a generated report, Excel first:
+ * - file_url: the report file, named file_name (or the URL's last segment);
+ *   usually a spreadsheet, sometimes already a PDF.
+ * - pdf_url: its PDF version, named after file_name with a .pdf extension.
+ */
+export function listReportFiles(data: ReportFilePayload, fallbackFilename: string): ReportDownload[] {
   const pdfUrl = httpUrl(data.pdf_url);
   const fileUrl = httpUrl(data.file_url);
   const fileName = safeFileName(data.file_name);
   const fallback = safeFileName(fallbackFilename) || 'report';
+  const files: ReportDownload[] = [];
 
-  // Web: "pdf" takes pdf_url, named after file_name with a .pdf extension.
-  if (mode === 'pdf' || (!fileUrl && pdfUrl)) {
-    if (!pdfUrl) {
-      return [];
+  if (fileUrl) {
+    let filename = fileName || nameFromUrl(fileUrl) || fallback;
+    const fileType = (data.file_type || '').toLowerCase().replace(/^\./, '');
+    if (!extensionOf(filename)) {
+      filename = `${filename}.${fileType || 'xlsx'}`;
     }
+    files.push({url: fileUrl, filename, label: extensionOf(filename) === 'pdf' ? 'pdf' : 'excel'});
+  }
+  if (pdfUrl && pdfUrl !== fileUrl && !files.some(file => file.label === 'pdf')) {
     const base = (fileName || nameFromUrl(pdfUrl) || fallback).replace(/\.[^.]+$/, '');
-    return [{url: pdfUrl, filename: `${base}.pdf`, label: 'pdf'}];
+    files.push({url: pdfUrl, filename: `${base}.pdf`, label: 'pdf'});
   }
-  if (!fileUrl) {
-    return [];
-  }
-  // Web: "file" takes file_url, named file_name (or the URL's last segment).
-  let filename = fileName || nameFromUrl(fileUrl) || fallback;
-  const fileType = (data.file_type || '').toLowerCase().replace(/^\./, '');
-  if (!extensionOf(filename)) {
-    filename = `${filename}.${fileType || extensionOf(fallback) || 'pdf'}`;
-  }
-  const ext = extensionOf(filename);
-  return [{url: fileUrl, filename, label: ext === 'pdf' ? 'pdf' : 'excel'}];
+  return files.sort((x, y) => (x.label === y.label ? 0 : x.label === 'excel' ? -1 : 1));
 }
 
 function nameFromUrl(url: string): string {

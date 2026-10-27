@@ -1,50 +1,31 @@
 import api, { DEFAULT_PAGE_LIMIT } from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 
-interface ImageUploadResponse {
-  path: string;
-  message?: string;
-}
-
-export async function uploadImage(image: any): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', {
-    uri: image.path,
-    type: image.mime || 'image/jpeg',
-    name: image.path.split('/').pop() || `photo.jpg`,
+/**
+ * Uploads a user photo (images/upload) and returns its stored path. Throws when
+ * the API answers without a path, so callers never save an empty photo silently.
+ */
+export async function uploadUserPhoto(imagePath: string, altText = ''): Promise<string> {
+  const form = new FormData();
+  form.append('file', {
+    uri: imagePath,
+    name: imagePath.split('/').pop() || 'photo.jpg',
+    type: 'image/jpeg',
+  } as any);
+  form.append('entity_type', 'users');
+  form.append('alt_text', altText.trim() || 'user photo');
+  const response = await api.post('images/upload', form, {
+    headers: {'Content-Type': 'multipart/form-data'},
   });
-  formData.append('entity_type', 'users'); // Assuming entity_type for users
-  formData.append('alt_text', 'user photo');
-
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
+  const path = (response.data as any)?.data?.path;
+  if (typeof path !== 'string' || !path) {
+    throw new Error((response.data as any)?.message || '');
   }
-
-  try {
-    const response = await api.post<ImageUploadResponse>(
-      'images/upload',
-      formData,
-      {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-          'Authorization': `Bearer ${token}`,
-        },
-      }
-    );
-    if (response.status === 200 && response.data.path) {
-      return response.data.path;
-    } else {
-      throw new Error(response.data?.message || 'Upload failed');
-    }
-  } catch (err: any) {
-    throw new Error(err?.response?.data?.message || err.message || 'Upload failed');
-  }
+  return path;
 }
 
 export interface AddUserPayload {
   username: string;
-  password?: string; // Password might be optional for updates
+  password?: string;
   prefix: string;
   first_name: string;
   last_name: string;
@@ -62,58 +43,23 @@ export interface AddUserPayload {
   email_address: string;
   credentials: string;
   credentials_number: string;
-  credentials_form: string;
-  credentials_expiry_date: string | Date | null;
-  date_of_birth: string | Date | null;
+  /** Issuing body. The API field is `credentials_from` (GET users/:id returns it). */
+  credentials_from: string;
+  credentials_expiry_date: string | null;
+  date_of_birth: string | null;
   marital_status: string;
   name_of_spouse: string;
   children: { full_name: string }[];
 }
 
-export async function addUser(payload: AddUserPayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    const response = await api.post(
-      '/users',
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error creating user:', error);
-    throw error;
-  }
+export async function addUser(payload: Partial<AddUserPayload>) {
+  const response = await api.post('/users', payload);
+  return response.data;
 }
 
 export async function updateUser(id: number, payload: Partial<AddUserPayload>) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    const response = await api.patch(
-      `/users/${id}`,
-      payload,
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
-        },
-      }
-    );
-    return response.data;
-  } catch (error) {
-    console.error('Error updating user:', error);
-    throw error;
-  }
+  const response = await api.patch(`/users/${id}`, payload);
+  return response.data;
 }
 
 export interface ListUsersParams {
@@ -222,29 +168,19 @@ export async function listUsers(params: ListUsersParams = {}) {
 
   const words = search.trim().split(/\s+/).filter(Boolean);
   if (words.length > 1) {
-    try {
-      return await listUsersMultiWord(params, words);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      throw error;
-    }
+    return listUsersMultiWord(params, words);
   }
 
-  try {
-    const response = await api.get<ListUsersResponse>(`/users`, {
-      params: {
-        page,
-        limit,
-        search,
-        ...(params.sort_by ? { sort_by: params.sort_by } : {}),
-        ...(typeof params.sort_desc === 'boolean' ? { sort_desc: params.sort_desc } : {}),
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching users:', error);
-    throw error;
-  }
+  const response = await api.get<ListUsersResponse>(`/users`, {
+    params: {
+      page,
+      limit,
+      search: search.trim(),
+      ...(params.sort_by ? { sort_by: params.sort_by } : {}),
+      ...(typeof params.sort_desc === 'boolean' ? { sort_desc: params.sort_desc } : {}),
+    },
+  });
+  return response.data;
 }
 
 // Add: get user detail by id
@@ -296,45 +232,17 @@ export interface GetUserResponse {
 }
 
 export async function getUserById(id: number, includePastorChurches?: boolean) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    const params: any = {};
-    if (includePastorChurches) {
-      params.include_pastor_churches = 'true';
-    }
-    const response = await api.get<GetUserResponse>(`/users/${id}`, {
-      params,
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error fetching user detail:', error);
-    throw error;
-  }
+  const response = await api.get<GetUserResponse>(`/users/${id}`, {
+    params: includePastorChurches ? {include_pastor_churches: 'true'} : {},
+  });
+  return response.data;
 }
 
 export async function deleteUser(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    const response = await api.delete(`/users/${id}`, {
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    return response.data;
-  } catch (error) {
-    console.error('Error deleting user:', error);
-    throw error;
-  }
-} 
+  const response = await api.delete(`/users/${id}`);
+  return response.data;
+}
+
 export interface ChangeMyPasswordPayload {
   old_password: string;
   new_password: string;

@@ -2,7 +2,6 @@ import React, {useEffect, useMemo, useState} from 'react';
 import {View} from 'react-native';
 import {
   FieldLabel,
-  FormatChoice,
   HintText,
   ReportDropdown,
   ReportMultiSelect,
@@ -278,15 +277,10 @@ export function MultiChurchPage({catalog}: ReportPageProps) {
   const [countryIds, setCountryIds] = useState<number[]>([]);
   const [year, setYear] = useState(String(CURRENT_YEAR));
   const [selected, setSelected] = useState<string | null>(null);
-  const [format, setFormat] = useState<'pdf' | 'xls'>('pdf');
 
   useEffect(() => {
     setSelected(current => pickValid(current, options));
   }, [options]);
-  // Web: the PDF/XLS choice resets to PDF whenever the report changes.
-  useEffect(() => {
-    setFormat('pdf');
-  }, [selected]);
 
   const isVisits = selected === MULTI_CHURCH_VISITS;
   const toDropdown = (items: {id: number; label: string}[]) =>
@@ -307,8 +301,8 @@ export function MultiChurchPage({catalog}: ReportPageProps) {
     } else {
       body.country_ids = countryIds;
     }
-    const pdf = isVisits && format === 'pdf';
-    void generator.generate('multiChurch', body, `${selected}.${pdf ? 'pdf' : 'xlsx'}`, pdf ? 'pdf' : 'file');
+    // Excel or PDF is chosen after generating, like every other report.
+    void generator.generate('multiChurch', body, `${selected}.xlsx`);
   };
 
   return (
@@ -376,7 +370,6 @@ export function MultiChurchPage({catalog}: ReportPageProps) {
         <SectionTitle title={rt('generateReport.multiChurchTitle')} />
         <ReportRadioList options={options} value={selected} onChange={setSelected} />
       </View>
-      {isVisits ? <FormatChoice value={format} onChange={setFormat} /> : null}
     </ReportFrame>
   );
 }

@@ -69,7 +69,8 @@ export const EditChurchLocationScreen: React.FC = () => {
   useEffect(() => {
     let active = true;
     // Ask for location so we can show user's position on the map.
-    requestLocationPermission({showAlertIfBlocked: true})
+    // Location is optional here (it only centres the map): no settings alert.
+    requestLocationPermission({showAlertIfBlocked: false})
       .then(result => {
         if (active) {
           setLocationGranted(result.granted);
@@ -160,11 +161,10 @@ export const EditChurchLocationScreen: React.FC = () => {
       longitudeDelta: 0.02,
     };
 
+    // Only move the camera: placing the pin here as well put it at the admin's
+    // own position, and Save stored that when they just panned to the church.
     if (!initialCoordinate) {
       mapRef.current?.animateToRegion(region, 600);
-      if (!coordinate) {
-        setCoordinate(userCoord);
-      }
     }
     setHasCenteredOnUser(true);
   };
@@ -183,7 +183,7 @@ export const EditChurchLocationScreen: React.FC = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.screen, {backgroundColor: C.background}]}>
         <View style={styles.header}>
-          <Header title={t('addLocation') || 'Add Location'} showMenu={false} />
+          <Header title={initialCoordinate ? t('editLocation') : t('addLocation')} showMenu={false} />
         </View>
         <View style={styles.container}>
           <MapView
@@ -217,7 +217,7 @@ export const EditChurchLocationScreen: React.FC = () => {
               {backgroundColor: C.surface, borderColor: C.surfaceBorder},
             ]}>
             <Text style={[styles.helperTitle, {color: C.textPrimary}]}>
-              {t('addLocation') || 'Add Location'}
+              {initialCoordinate ? t('editLocation') : t('addLocation')}
             </Text>
             <Text style={[styles.helperText, {color: C.textSecondary}]}>
               {t('omrMapLocationHelper') ||

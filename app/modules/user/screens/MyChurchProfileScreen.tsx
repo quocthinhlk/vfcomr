@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {FlatList} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import api from '../../../config/api';
@@ -81,21 +81,40 @@ export default function MyChurchProfileScreen() {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<unknown>(null);
 
+  // Answers that arrive after Back must not replace or update a closed screen.
+  const aliveRef = useRef(true);
+  useEffect(
+    () => () => {
+      aliveRef.current = false;
+    },
+    [],
+  );
+
   const load = useCallback(async () => {
     setLoading(true);
     setLoadError(null);
     try {
       const list = await loadMyChurches();
+      if (!aliveRef.current) {
+        return;
+      }
       if (list.length === 1) {
         // Nothing to choose: go straight to the church (Back returns past this screen).
         navigation.replace('ChurchDetail', {id: list[0].id});
         return;
       }
-      setChurches(await Promise.all(list.map(loadChurchCard)));
+      const cards = await Promise.all(list.map(loadChurchCard));
+      if (aliveRef.current) {
+        setChurches(cards);
+      }
     } catch (e) {
-      setLoadError(e);
+      if (aliveRef.current) {
+        setLoadError(e);
+      }
     } finally {
-      setLoading(false);
+      if (aliveRef.current) {
+        setLoading(false);
+      }
     }
   }, [navigation]);
 

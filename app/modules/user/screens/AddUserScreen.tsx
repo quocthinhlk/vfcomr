@@ -17,7 +17,7 @@ import {Layout, Text} from '@ui-kitten/components';
 import {Formik, type FormikProps} from 'formik';
 import {globalStyles} from '../../../shared/styles/global';
 import {formStyles, FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
-import {addUser} from '../services/user.service';
+import {addUser, uploadUserPhoto} from '../services/user.service';
 import AppInput from '../../../shared/components/AppInput';
 import AppButton from '../../../shared/components/AppButton';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
@@ -36,12 +36,43 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ws, hs, ms, rs} from '../../../shared/utils/scale';
 import {ROLES} from '../../../shared/utils/permissions';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {useLatestRequest} from '../../church/hooks/useLatestRequest';
+import {
+  fillTemplate,
+  formatYmd,
+  splitApiFieldErrors,
+} from '../../church/utils/churchForm';
 
 /** Sentinel value for credentials dropdown when user has no credential type. */
 const CREDENTIALS_NONE_VALUE = 'No';
 
 const hasCredentialsSelection = (credentials: string) =>
   !!credentials && credentials !== CREDENTIALS_NONE_VALUE;
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/** Fields that show their API error under the input; other API errors go to an alert. */
+const FIELDS_WITH_ERROR_TEXT = new Set([
+  'username',
+  'password',
+  'title',
+  'first_name',
+  'last_name',
+  'role_id',
+  'sensitive_nation',
+  'language_id',
+  'church_id',
+  'country_id',
+  'email_address',
+  'mobile_phone',
+]);
+
+/** Scroll order of the form, for jumping to the first invalid field. */
+const FIELD_ORDER = [
+  'first_name', 'last_name', 'username', 'password', 'title', 'role_id',
+  'sensitive_nation', 'language_id', 'church_id', 'country_id',
+  'email_address', 'mobile_phone',
+];
 
 const countryCodeToFlag = (code: string) => {
   if (!code) {
@@ -101,6 +132,30 @@ export default function AddUserScreen() {
     [credentialOptions, t],
   );
 
+  const prefixDropdownData = useMemo(
+    () => prefixOptions.map(p => ({label: p, value: p})),
+    [prefixOptions],
+  );
+  const roleDropdownData = useMemo(
+    () => roleOptions.map(r => ({label: r.name, value: r.id})),
+    [roleOptions],
+  );
+  const languageDropdownData = useMemo(
+    () => languageOptions.map(o => ({label: o.name, value: o.id})),
+    [languageOptions],
+  );
+  const churchDropdownData = useMemo(
+    () => churchItems.map(c => ({label: c.name, value: c.id})),
+    [churchItems],
+  );
+  const countryDropdownData = useMemo(
+    () => countryItems.map(c => ({label: c.name, value: c.id})),
+    [countryItems],
+  );
+
+  // A retried save reuses the photo already uploaded for the same file.
+  const uploadedPhotoRef = useRef<{source: string; path: string} | null>(null);
+
   const scrollRef = useRef<ScrollView>(null);
   const formikRef = useRef<FormikProps<any> | null>(null);
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
@@ -141,7 +196,7 @@ export default function AddUserScreen() {
       mobile_phone: t('mobilePhone') || 'Mobile Phone',
     };
     const label = labelByKey[key] || key;
-    return `${label} is a required field`;
+    return fillTemplate(t('fieldIsRequired'), {field: label});
   };
 
   const renderFieldError = (key: string) => {
@@ -170,57 +225,112 @@ export default function AddUserScreen() {
   const [churchesError, setChurchesError] = useState<unknown>(null);
   const [countriesError, setCountriesError] = useState<unknown>(null);
 
-  const loadChurches = useCallback(async (page: number, query?: string) => {
-    const isInitial = page === 1 && !query?.trim();
+  // Searches are debounced, and only the latest request per list may update
+  // it: a slow answer for an older query can't replace the newer results.
+  const {begin, debounce} = useLatestRequest();
+  const churchBusyRef = useRef(false);
+  const countryBusyRef = useRef(false);
+
+  const loadChurches = useCallback(async (page: number, query = '') => {
+    const q = query.trim();
+    const isInitial = page === 1 && !q;
+    const isLatest = begin('churches');
+    churchBusyRef.current = true;
     try {
       const data = await getChurchesList({
         page,
         limit: DEFAULT_PAGE_LIMIT,
-        search: query && query.trim() ? query.trim() : undefined,
+        search: q || undefined,
         sort_by: 'name',
         sort_desc: false,
       });
+      if (!isLatest()) {
+        return;
+      }
       const items = (data?.items ?? []).map((c: any) => ({id: c.id, name: c.name}));
-      setChurchItems(prev => (page === 1 ? items : [...prev, ...items]));
+      setChurchItems(prev => {
+        if (page === 1) {
+          return items;
+        }
+        const seen = new Set(prev.map(c => c.id));
+        return [...prev, ...items.filter(c => !seen.has(c.id))];
+      });
       setChurchTotal(data?.total ?? items.length);
       setChurchPage(data?.page ?? page);
       if (isInitial) {
         setChurchesError(null);
       }
     } catch (e) {
-      if (isInitial) {
+      if (isLatest() && isInitial) {
         setChurchesError(e);
       }
+    } finally {
+      if (isLatest()) {
+        churchBusyRef.current = false;
+      }
     }
-  }, []);
+  }, [begin]);
 
-  const loadCountries = useCallback(async (page: number, query?: string) => {
-    const isInitial = page === 1 && !query?.trim();
+  const loadCountries = useCallback(async (page: number, query = '') => {
+    const q = query.trim();
+    const isInitial = page === 1 && !q;
+    const isLatest = begin('countries');
+    countryBusyRef.current = true;
     try {
       const res = await api.get('/countries', {
         params: {
           page,
           limit: DEFAULT_PAGE_LIMIT,
-          name: query && query.trim() ? query.trim() : undefined,
+          name: q || undefined,
           sort_by: 'name',
           sort_desc: false,
         },
       });
+      if (!isLatest()) {
+        return;
+      }
       const data = res?.data?.data;
       const items = Array.isArray(data?.items) ? data.items : [];
-      const mapped = items.map((c: any) => ({id: c.id, name: c.name}));
-      setCountryItems(prev => (page === 1 ? mapped : [...prev, ...mapped]));
+      const mapped: {id: number; name: string}[] = items.map((c: any) => ({id: c.id, name: c.name}));
+      setCountryItems(prev => {
+        if (page === 1) {
+          return mapped;
+        }
+        const seen = new Set(prev.map(c => c.id));
+        return [...prev, ...mapped.filter(c => !seen.has(c.id))];
+      });
       setCountryTotal(data?.total ?? mapped.length);
       setCountryPage(data?.page ?? page);
       if (isInitial) {
         setCountriesError(null);
       }
     } catch (e) {
-      if (isInitial) {
+      if (isLatest() && isInitial) {
         setCountriesError(e);
       }
+    } finally {
+      if (isLatest()) {
+        countryBusyRef.current = false;
+      }
     }
-  }, []);
+  }, [begin]);
+
+  const searchChurches = (text: string) => {
+    setChurchQuery(text);
+    if (!text.trim()) {
+      loadChurches(1);
+      return;
+    }
+    debounce('churchSearch', () => loadChurches(1, text));
+  };
+  const searchCountries = (text: string) => {
+    setCountryQuery(text);
+    if (!text.trim()) {
+      loadCountries(1);
+      return;
+    }
+    debounce('countrySearch', () => loadCountries(1, text));
+  };
 
   // users/form-data (roles) and language-regions feed required fields; if
   // either fails the form can't be submitted, so show a retryable error.
@@ -284,6 +394,8 @@ export default function AddUserScreen() {
     return () => {
       mountedRef.current = false;
     };
+    // Mount only: the loaders are re-run individually by Retry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -340,7 +452,7 @@ export default function AddUserScreen() {
                 mobile_phone: '',
                 credentials: CREDENTIALS_NONE_VALUE,
                 credentials_number: '',
-                credentials_form: '',
+                credentials_from: '',
                 credentials_expiry_date: null as Date | null,
                 church_id: null as number | null,
                 country_id: null as number | null,
@@ -348,21 +460,21 @@ export default function AddUserScreen() {
               onSubmit={async values => {
                 setFieldErrorText({});
                 const sens = !!values.sensitive_nation;
+                const email = values.email_address.trim();
                 const newInvalid: Record<string, boolean> = {};
-                newInvalid.username = !values.username;
+                newInvalid.username = !values.username.trim();
                 newInvalid.password = !values.password;
-                newInvalid.title = !values.title;
-                newInvalid.first_name = !values.first_name;
-                newInvalid.last_name = !values.last_name;
+                newInvalid.title = !values.title.trim();
+                newInvalid.first_name = !values.first_name.trim();
+                newInvalid.last_name = !values.last_name.trim();
                 newInvalid.role_id = values.role_id == null;
                 newInvalid.language_id = values.language_id == null;
                 newInvalid.church_id = values.church_id == null;
                 newInvalid.country_id = values.country_id == null;
                 if (!sens) {
-                  newInvalid.email_address = !values.email_address;
+                  newInvalid.email_address = !email;
                   newInvalid.mobile_phone = !values.mobile_phone;
                 }
-                setInvalid(newInvalid);
 
                 const newFieldErrors: Record<string, string> = {};
                 Object.keys(newInvalid).forEach(k => {
@@ -370,13 +482,14 @@ export default function AddUserScreen() {
                     newFieldErrors[k] = requiredFieldMessageForKey(k);
                   }
                 });
+                if (email && !EMAIL_PATTERN.test(email)) {
+                  newInvalid.email_address = true;
+                  newFieldErrors.email_address = t('invalidEmailFormat');
+                }
+                setInvalid(newInvalid);
                 setFieldErrorText(newFieldErrors);
 
-                const firstInvalidKey = [
-                  'username', 'password', 'title', 'first_name', 'last_name',
-                  'role_id', 'language_id', 'church_id', 'country_id',
-                  'email_address', 'mobile_phone',
-                ].find(k => newInvalid[k]);
+                const firstInvalidKey = FIELD_ORDER.find(k => newInvalid[k]);
                 if (firstInvalidKey) {
                   scrollToField(firstInvalidKey);
                   return;
@@ -387,121 +500,87 @@ export default function AddUserScreen() {
                   return digits ? `+${callingCode}${digits}` : '';
                 })();
 
-                let uploadedUserPhotoPath: string | null = null;
-                try {
-                  if (imagePath) {
-                    const form = new FormData();
-                    const fileName = imagePath.split('/').pop() || 'photo.jpg';
-                    form.append('file', {
-                      uri: imagePath,
-                      name: fileName,
-                      type: 'image/jpeg',
-                    } as any);
-                    form.append('entity_type', 'users');
-                    form.append(
-                      'alt_text',
-                      `${values.first_name || ''} ${values.last_name || ''}`.trim(),
-                    );
-                    const uploadRes = await api.post('images/upload', form, {
-                      headers: {'Content-Type': 'multipart/form-data'},
-                    });
-                    uploadedUserPhotoPath = uploadRes?.data?.data?.path || null;
-                  }
-                } catch {
-                  // ignore upload failure; proceed without photo
-                }
-
+                const withCredentials = hasCredentialsSelection(values.credentials);
                 const payload = {
-                  username: values.username,
+                  username: values.username.trim(),
                   password: values.password,
                   prefix: values.prefix,
-                  title: values.title,
-                  first_name: values.first_name,
-                  last_name: values.last_name,
+                  title: values.title.trim(),
+                  first_name: values.first_name.trim(),
+                  last_name: values.last_name.trim(),
                   role_id: values.role_id,
-                  user_photo: uploadedUserPhotoPath || '',
+                  user_photo: '',
                   sensitive_nation: sens,
                   language_id: values.language_id,
                   church_id: values.church_id,
                   country_id: values.country_id,
-                  email_address: values.email_address,
+                  email_address: email,
                   mobile_phone: formattedPhone,
-                  credentials: hasCredentialsSelection(values.credentials)
-                    ? values.credentials
-                    : '',
-                  credentials_number: hasCredentialsSelection(values.credentials)
-                    ? values.credentials_number
-                    : '',
-                  credentials_form: hasCredentialsSelection(values.credentials)
-                    ? values.credentials_form
-                    : '',
-                  credentials_expiry_date:
-                    hasCredentialsSelection(values.credentials) &&
-                    values.credentials_expiry_date
-                      ? `${values.credentials_expiry_date.getFullYear()}-${String(
-                          values.credentials_expiry_date.getMonth() + 1,
-                        ).padStart(2, '0')}-${String(
-                          values.credentials_expiry_date.getDate(),
-                        ).padStart(2, '0')}`
-                      : null,
-                } as any;
-
-                const navigateAfterSave = () => {
-                  navigation.navigate('UserList');
+                  credentials: withCredentials ? values.credentials : '',
+                  credentials_number: withCredentials ? values.credentials_number.trim() : '',
+                  credentials_from: withCredentials ? values.credentials_from.trim() : '',
+                  credentials_expiry_date: withCredentials
+                    ? formatYmd(values.credentials_expiry_date)
+                    : null,
                 };
 
                 try {
+                  // A photo that fails to upload stops the save (it used to be
+                  // dropped silently, creating the user without it).
+                  if (imagePath && uploadedPhotoRef.current?.source === imagePath) {
+                    payload.user_photo = uploadedPhotoRef.current.path;
+                  } else if (imagePath) {
+                    try {
+                      payload.user_photo = await uploadUserPhoto(
+                        imagePath,
+                        `${payload.first_name} ${payload.last_name}`,
+                      );
+                    } catch (uploadError: any) {
+                      Alert.alert(
+                        t('error'),
+                        uploadError?.response?.data?.message || t('photoUploadFailed'),
+                      );
+                      return;
+                    }
+                    uploadedPhotoRef.current = {source: imagePath, path: payload.user_photo};
+                  }
+
                   const saveResponse = await addUser(payload);
                   markDataChanged('users');
-                  console.log('[AddUserScreen] save response:', saveResponse);
                   const warning =
                     typeof saveResponse?.warning === 'string'
                       ? saveResponse.warning.trim()
                       : '';
-
-                  if (warning) {
-                    Alert.alert(t('success'), warning, [
-                      {text: t('ok') || 'OK', onPress: navigateAfterSave},
-                    ]);
-                    return;
-                  }
-
-                  Alert.alert(t('success'), 'User created successfully!');
-                  navigateAfterSave();
+                  // Back to the list (replacing this form) instead of pushing a
+                  // second list on top of the filled-in form.
+                  const navigateAfterSave = () => navigation.popTo('UserList');
+                  Alert.alert(t('success'), warning || t('userCreatedSuccess'), [
+                    {text: t('ok'), onPress: navigateAfterSave},
+                  ], {cancelable: false});
                 } catch (error: any) {
-                  console.error('[AddUserScreen] save error:', {
-                    message: error?.message,
-                    status: error?.response?.status,
-                    data: error?.response?.data,
-                  });
                   const apiMessage = error?.response?.data?.message;
-                  const apiErrors = error?.response?.data?.errors;
-                  if (apiErrors && typeof apiErrors === 'object') {
-                    const nextInvalid: Record<string, boolean> = {};
-                    const nextFieldErrors: Record<string, string> = {};
-                    Object.entries(apiErrors).forEach(([key, value]) => {
-                      if (typeof value === 'string' && value.trim()) {
-                        nextInvalid[key] = true;
-                        nextFieldErrors[key] = value;
-                      }
-                    });
-                    if (Object.keys(nextFieldErrors).length > 0) {
-                      setInvalid(prev => ({...prev, ...nextInvalid}));
-                      setFieldErrorText(nextFieldErrors);
-                      const firstKey = Object.keys(nextFieldErrors)[0];
-                      if (firstKey) {
-                        scrollToField(firstKey);
-                      }
-                      return;
-                    }
-                  }
-                  Alert.alert(
-                    t('error'),
-                    apiMessage || error?.message || 'Could not create user.',
+                  const {fieldErrors, otherMessages} = splitApiFieldErrors(
+                    error?.response?.data?.errors,
+                    FIELDS_WITH_ERROR_TEXT,
                   );
+                  const fieldKeys = Object.keys(fieldErrors);
+                  if (fieldKeys.length) {
+                    setInvalid(prev => ({
+                      ...prev,
+                      ...Object.fromEntries(fieldKeys.map(k => [k, true])),
+                    }));
+                    setFieldErrorText(fieldErrors);
+                    scrollToField(FIELD_ORDER.find(k => fieldErrors[k]) ?? fieldKeys[0]);
+                  }
+                  if (otherMessages.length || !fieldKeys.length) {
+                    Alert.alert(
+                      t('error'),
+                      otherMessages.join('\n') || apiMessage || t('couldNotCreateUser'),
+                    );
+                  }
                 }
               }}>
-              {({handleChange, handleBlur, handleSubmit, values, setFieldValue}) => (
+              {({handleChange, handleBlur, handleSubmit, values, setFieldValue, isSubmitting}) => (
                 <View style={{gap: ms(12)}}>
 
                   {/* Prefix */}
@@ -510,10 +589,7 @@ export default function AddUserScreen() {
                       {t('prefix')}
                     </Text>
                     <ElementDropdown
-                      data={useMemo(
-                        () => prefixOptions.map(p => ({label: p, value: p})),
-                        [prefixOptions],
-                      )}
+                      data={prefixDropdownData}
                       value={values.prefix as any}
                       onChange={v => setFieldValue('prefix', (v as string) || '')}
                       placeholder={t('selectOption')}
@@ -658,10 +734,7 @@ export default function AddUserScreen() {
                       <HelpIcon title={t('omrStatus')} message={t('helpOmrStatus')} />
                     </View>
                     <ElementDropdown
-                      data={useMemo(
-                        () => roleOptions.map(r => ({label: r.name, value: r.id})),
-                        [roleOptions],
-                      )}
+                      data={roleDropdownData}
                       value={values.role_id as any}
                       onChange={v => {
                         setFieldValue('role_id', (typeof v === 'number' ? v : Number(v)) || null);
@@ -748,10 +821,7 @@ export default function AddUserScreen() {
                       <HelpIcon title={t('language')} message={t('helpUserLanguage')} />
                     </View>
                     <ElementDropdown
-                      data={useMemo(
-                        () => languageOptions.map(o => ({label: o.name, value: o.id})),
-                        [languageOptions],
-                      )}
+                      data={languageDropdownData}
                       value={values.language_id as any}
                       onChange={v => {
                         setFieldValue('language_id', (typeof v === 'number' ? v : Number(v)) || null);
@@ -777,10 +847,7 @@ export default function AddUserScreen() {
                       <HelpIcon title={t('church')} message={t('helpUserChurch')} />
                     </View>
                     <ElementDropdown
-                      data={useMemo(
-                        () => churchItems.map(c => ({label: c.name, value: c.id})),
-                        [churchItems],
-                      )}
+                      data={churchDropdownData}
                       value={values.church_id as any}
                       onChange={v => {
                         setFieldValue('church_id', (typeof v === 'number' ? v : Number(v)) || null);
@@ -793,18 +860,12 @@ export default function AddUserScreen() {
                         backgroundColor: C.inputBg,
                       } as any}
                       error={!!invalid.church_id}
-                      onSearchText={async text => {
-                        setChurchQuery(text);
-                        setChurchItems([]);
-                        setChurchTotal(0);
-                        setChurchPage(1);
-                        await loadChurches(1, text);
-                      }}
-                      onEndReached={async () => {
+                      onSearchText={searchChurches}
+                      onEndReached={() => {
                         const next = churchPage + 1;
                         const maxPages = Math.max(1, Math.ceil(churchTotal / DEFAULT_PAGE_LIMIT));
-                        if (next <= maxPages) {
-                          await loadChurches(next, churchQuery);
+                        if (!churchBusyRef.current && next <= maxPages) {
+                          loadChurches(next, churchQuery);
                         }
                       }}
                     />
@@ -817,10 +878,7 @@ export default function AddUserScreen() {
                       {t('nation') || 'Nation'} <Text style={{color: '#c00000'}}>*</Text>
                     </Text>
                     <ElementDropdown
-                      data={useMemo(
-                        () => countryItems.map(c => ({label: c.name, value: c.id})),
-                        [countryItems],
-                      )}
+                      data={countryDropdownData}
                       value={(values as any).country_id as any}
                       onChange={v => {
                         setFieldValue('country_id', (typeof v === 'number' ? v : Number(v)) || null);
@@ -833,18 +891,12 @@ export default function AddUserScreen() {
                         backgroundColor: C.inputBg,
                       } as any}
                       error={!!invalid.country_id}
-                      onSearchText={async text => {
-                        setCountryQuery(text);
-                        setCountryItems([]);
-                        setCountryTotal(0);
-                        setCountryPage(1);
-                        await loadCountries(1, text);
-                      }}
-                      onEndReached={async () => {
+                      onSearchText={searchCountries}
+                      onEndReached={() => {
                         const next = countryPage + 1;
                         const maxPages = Math.max(1, Math.ceil(countryTotal / DEFAULT_PAGE_LIMIT));
-                        if (next <= maxPages) {
-                          await loadCountries(next, countryQuery);
+                        if (!countryBusyRef.current && next <= maxPages) {
+                          loadCountries(next, countryQuery);
                         }
                       }}
                     />
@@ -974,7 +1026,7 @@ export default function AddUserScreen() {
                         setFieldValue('credentials', next);
                         if (!hasCredentialsSelection(next)) {
                           setFieldValue('credentials_number', '');
-                          setFieldValue('credentials_form', '');
+                          setFieldValue('credentials_from', '');
                           setFieldValue('credentials_expiry_date', null);
                         }
                         clearInvalid('credentials');
@@ -1000,15 +1052,15 @@ export default function AddUserScreen() {
                       </View>
 
                       {/* Credentials From */}
-                      <View onLayout={e => setFieldPos('credentials_form', e.nativeEvent.layout.y)}>
+                      <View onLayout={e => setFieldPos('credentials_from', e.nativeEvent.layout.y)}>
                         <Text style={[formStyles.label, {color: C.textSecondary}]} category="label">
                           {t('credentialsFrom')}
                         </Text>
                         <AppInput
-                          value={values.credentials_form}
+                          value={values.credentials_from}
                           autoCapitalize="none"
-                          onChangeText={handleChange('credentials_form')}
-                          onBlur={handleBlur('credentials_form')}
+                          onChangeText={handleChange('credentials_from')}
+                          onBlur={handleBlur('credentials_from')}
                         />
                       </View>
 
@@ -1029,6 +1081,8 @@ export default function AddUserScreen() {
                   {/* Save Button */}
                   <AppButton
                     onPress={() => handleSubmit()}
+                    disabled={isSubmitting}
+                    loading={isSubmitting}
                     variant="primary"
                     style={globalStyles.mainButton}>
                     {t('save')}
