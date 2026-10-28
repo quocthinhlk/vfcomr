@@ -4,9 +4,7 @@ import {
   ScrollView,
   StyleSheet,
   TouchableOpacity,
-  TextInput,
   Alert,
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
   Modal,
@@ -16,7 +14,6 @@ import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {Header} from '../../../shared/components/Header';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
-import {parseApiError} from '../../../shared/utils/apiErrorHandler';
 import {globalStyles} from '../../../shared/styles/global';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useLanguage} from '../../../shared/context/LanguageContext';
@@ -29,16 +26,22 @@ import {
   WorshipSession,
   ChurchMetrics,
   getWeeklyReport,
-  createOrUpdateWeeklyReport,
   batchCreateOrUpdateWeeklyReports,
-  buildChurchMetricsPayload,
-  buildWorshipSessionsPayload,
 } from '../services/monthlydata.service';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
-  SaveButton,
-  CancelButton,
-} from '../../../shared/components/ActionButtons';
+  applyMetricEdit,
+  applySessionEdit,
+  AttendanceField,
+  buildBatchPayloads,
+  emptyWeek,
+  formatNumber,
+  hasRequiredAdultAttendance,
+  mergeWorshipSessions,
+  parseNumber,
+} from '../utils/monthlyData.utils';
+import {parseYmd} from '../../church/utils/churchForm';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import {SaveButton} from '../../../shared/components/ActionButtons';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import {useMonthlyData} from '../context/MonthlyDataContext';
 import api from '../../../config/api';
@@ -185,35 +188,32 @@ interface RouteParams {
   weekNumbers: number[];
 }
 
-// Helper function to format number with thousand separators
-const formatNumber = (num: number | null | undefined): string => {
-  if (num === null || num === undefined) {return '';}
-  return num.toLocaleString('en-US', {maximumFractionDigits: 0});
-};
-
-// Helper function to parse formatted number string to number
-const parseNumber = (formattedStr: string): number | null => {
-  if (!formattedStr || formattedStr.trim() === '') {return null;}
-  // Remove all non-digit characters
-  const cleanStr = formattedStr.replace(/[^\d]/g, '');
-  if (!cleanStr) {return null;}
-  const num = parseInt(cleanStr, 10);
-  return isNaN(num) ? null : num;
-};
-
 const getAdultAttendanceFieldKey = (sessionId: number) =>
   `worship_session_${sessionId}_attendance`;
 
-const hasRequiredAdultAttendance = (
-  sessions: WorshipSession[] | undefined,
-): boolean => {
-  if (!sessions || sessions.length === 0) {
-    return false;
-  }
-  return sessions.every(
-    session => session.attendance.adult_attendance !== null,
-  );
-};
+const EMPTY_WEEKS: number[] = [];
+
+/** `GET worship services` → empty sessions in service order. */
+function toEmptySessions(listResponse: any): WorshipSession[] {
+  const services = Array.isArray(listResponse?.data)
+    ? listResponse.data
+    : Array.isArray(listResponse?.data?.data)
+      ? listResponse.data.data
+      : [];
+  return services.map((service: any) => ({
+    id: service.id,
+    name: service.name || '',
+    day_name: service.day_name || '',
+    time: service.time || '',
+    attendance: {
+      adult_attendance: null,
+      youth_attendance: null,
+      child_attendance: null,
+      number_of_service_for_children: null,
+      total_attendance: null,
+    },
+  }));
+}
 
 export default function MonthlyDataEntryScreen() {
   const navigation = useNavigation<any>();
@@ -221,199 +221,134 @@ export default function MonthlyDataEntryScreen() {
   const {t} = useTranslation();
   const {selectedLanguage} = useLanguage();
   const C = useThemedColors();
+  // Unsaved edits of a week survive leaving this screen (restored next time
+  // the same church / year / week is opened) until they are saved.
   const {
-    getWeekData,
-    setWeekData: saveWeekDataToContext,
-    removeWeekData: removeWeekDataFromContext,
+    getWeekData: getDraft,
+    setWeekData: saveDraft,
+    removeWeekData: removeDraft,
   } = useMonthlyData();
 
   const params = (route.params ?? {}) as Partial<RouteParams>;
   const routeChurchId = params.churchId ?? null;
   const churchName = params.churchName ?? '';
   const year = typeof params.year === 'number' ? params.year : 0;
-  const weekNumbers = Array.isArray(params.weekNumbers)
-    ? params.weekNumbers
-    : [];
+  const routeWeekNumbers = params.weekNumbers;
+  const weekNumbers = useMemo(
+    () => (Array.isArray(routeWeekNumbers) ? routeWeekNumbers : EMPTY_WEEKS),
+    [routeWeekNumbers],
+  );
 
   const [selectedWeekNumbers, setSelectedWeekNumbers] = useState<number[]>(weekNumbers);
-  const [churchId, setChurchId] = useState<number | null>(
-    routeChurchId || null,
-  );
-  const [displayChurchName, setDisplayChurchName] = useState<string>(
-    churchName || '',
-  );
+  const [churchId, setChurchId] = useState<number | null>(routeChurchId || null);
+  const [displayChurchName, setDisplayChurchName] = useState<string>(churchName || '');
   const [lastReportDate, setLastReportDate] = useState<string>('');
   /** From `GET /churches/:id` → `data.currency_name` (for giving field labels). */
   const [churchCurrencyName, setChurchCurrencyName] = useState<string>('');
-  const dashboardInfoLoadKeyRef = useRef<string | null>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(0);
-  const [weekData, setWeekData] = useState<Map<number, WeeklyReportData>>(
-    new Map(),
-  );
-  const [worshipSessions, setWorshipSessions] = useState<WorshipSession[]>([]);
-  const [loading, setLoading] = useState(true);
-  /** First week could not be fetched (offline / timeout): never show it as an empty, saveable form. */
-  const [initialLoadError, setInitialLoadError] = useState<unknown>(null);
+  /**
+   * The single source of every week's form: the server report, a restored
+   * draft, or an empty form for a week without a report, plus the user's
+   * edits. The form on screen is always `weekData.get(currentWeekNumber)`.
+   */
+  const [weekData, setWeekData] = useState<Map<number, WeeklyReportData>>(new Map());
   const [loadingWeeks, setLoadingWeeks] = useState<Set<number>>(new Set());
+  /** Weeks that could not be loaded (offline, server error): never shown as an empty, saveable form. */
+  const [weekErrors, setWeekErrors] = useState<Map<number, unknown>>(new Map());
   const [saving, setSaving] = useState(false);
-  const [saveOption, setSaveOption] = useState<'continue' | 'goToChurch'>(
-    'continue',
-  );
+  const savingRef = useRef(false);
+  const [saveOption, setSaveOption] = useState<'continue' | 'goToChurch'>('continue');
   const [saveSuccessVisible, setSaveSuccessVisible] = useState(false);
   const [saveSuccessMessage, setSaveSuccessMessage] = useState('');
   const saveSuccessActionRef = useRef<(() => void) | null>(null);
   const [fieldErrors, setFieldErrors] = useState<Set<string>>(new Set());
-  const [completedWeeks, setCompletedWeeks] = useState<Set<number>>(new Set());
   const scrollViewRef = useRef<ScrollView>(null);
-  const scrollAnimRef = useRef<NodeJS.Timeout | null>(null);
+  const scrollAnimRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const scrollToFieldTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const scrollYRef = useRef(0);
   const fieldRefs = useRef<Map<string, any>>(new Map());
-  const loadingQueueRef = useRef<number[]>([]);
-  const loadingWeeksRef = useRef<Set<number>>(new Set());
-  const loadedWeeksRef = useRef<Set<number>>(new Set());
-  const loadWeekDataRef = useRef<(weekNumber: number) => void>(() => {});
-  const worshipServicesRef = useRef<WorshipSession[] | null>(null);
   const {columnLayout, setColumnLayout: setColumnLayoutPreference} =
     useMonthlyDataEntryColumnLayout();
 
-  const sortedWeekNumbers = useMemo(() => {
-    return selectedWeekNumbers.length > 0
-      ? [...selectedWeekNumbers].sort((a, b) => a - b)
-      : [];
-  }, [selectedWeekNumbers]);
-  const currentWeekNumber = useMemo(() => {
-    return sortedWeekNumbers[currentWeekIndex] ?? sortedWeekNumbers[0] ?? 0;
-  }, [sortedWeekNumbers, currentWeekIndex]);
+  const sortedWeekNumbers = useMemo(
+    () => [...selectedWeekNumbers].sort((a, b) => a - b),
+    [selectedWeekNumbers],
+  );
+  const currentWeekNumber =
+    sortedWeekNumbers[currentWeekIndex] ?? sortedWeekNumbers[0] ?? 0;
+  const currentData = weekData.get(currentWeekNumber);
+  const worshipSessions = useMemo(
+    () => currentData?.worship_sessions ?? [],
+    [currentData],
+  );
+  const currentWeekError = currentData ? null : weekErrors.get(currentWeekNumber) ?? null;
+  /** The current week is still being fetched (its form is not shown yet). */
+  const loading = !currentData && !currentWeekError;
+
+  // Latest values for async loaders and the unmount cleanup.
+  const aliveRef = useRef(true);
+  const weekDataRef = useRef(weekData);
+  weekDataRef.current = weekData;
+  const currentWeekRef = useRef(currentWeekNumber);
+  currentWeekRef.current = currentWeekNumber;
+  const churchIdRef = useRef(churchId);
+  churchIdRef.current = churchId;
+  const getDraftRef = useRef(getDraft);
+  getDraftRef.current = getDraft;
+  const saveDraftRef = useRef(saveDraft);
+  saveDraftRef.current = saveDraft;
+  /** Weeks edited since they were loaded / saved. */
+  const dirtyWeeksRef = useRef<Set<number>>(new Set());
+  const loadingRef = useRef<Set<number>>(new Set());
+  const servicesRef = useRef<{churchId: number; promise: Promise<WorshipSession[]>} | null>(null);
+
+  useEffect(() => {
+    aliveRef.current = true;
+    // Same Set for the screen's lifetime (only its contents change).
+    const dirtyWeeks = dirtyWeeksRef.current;
+    return () => {
+      aliveRef.current = false;
+      if (scrollAnimRef.current) {
+        clearTimeout(scrollAnimRef.current);
+      }
+      if (scrollToFieldTimerRef.current) {
+        clearTimeout(scrollToFieldTimerRef.current);
+      }
+      // Keep unsaved edits for the next visit.
+      const cid = churchIdRef.current;
+      if (cid) {
+        dirtyWeeks.forEach(weekNumber => {
+          const week = weekDataRef.current.get(weekNumber);
+          if (week) {
+            saveDraftRef.current(cid, year, weekNumber, week.worship_sessions, week.church_metrics);
+          }
+        });
+      }
+    };
+  }, [year]);
 
   useEffect(() => {
     setSelectedWeekNumbers(weekNumbers);
     setCurrentWeekIndex(0);
   }, [weekNumbers]);
 
-  const removeSelectedWeek = useCallback(
-    (weekNum: number) => {
-      if (!churchId || !year) {
-        return;
-      }
-
-      if (sortedWeekNumbers.length <= 1) {
-        Alert.alert(
-          t('error') || 'Error',
-          t('pleaseSelectAtLeastOneWeek') || 'Please keep at least one week',
-        );
-        return;
-      }
-
-      const removedIndex = sortedWeekNumbers.indexOf(weekNum);
-      const nextWeeks = selectedWeekNumbers.filter(w => w !== weekNum);
-      const nextSorted = [...nextWeeks].sort((a, b) => a - b);
-
-      setSelectedWeekNumbers(nextWeeks);
-
-      // Drop unsaved in-memory data for that week
-      setWeekData(prev => {
-        if (!prev.has(weekNum)) {
-          return prev;
-        }
-        const next = new Map(prev);
-        next.delete(weekNum);
-        return next;
-      });
-
-      setCompletedWeeks(prev => {
-        if (!prev.has(weekNum)) {
-          return prev;
-        }
-        const next = new Set(prev);
-        next.delete(weekNum);
-        return next;
-      });
-
-      setLoadingWeeks(prev => {
-        if (!prev.has(weekNum)) {
-          return prev;
-        }
-        const next = new Set(prev);
-        next.delete(weekNum);
-        return next;
-      });
-
-      loadedWeeksRef.current.delete(weekNum);
-      loadingWeeksRef.current.delete(weekNum);
-      loadingQueueRef.current = loadingQueueRef.current.filter(w => w !== weekNum);
-
-      // Remove from context cache too (so it doesn't reappear on tab switch)
-      removeWeekDataFromContext(churchId, year, weekNum);
-
-      // Keep current week index valid + load the new active week if needed
-      setCurrentWeekIndex(prevIdx => {
-        const maxIndex = Math.max(0, nextSorted.length - 1);
-        const nextIdx =
-          removedIndex === -1
-            ? Math.min(prevIdx, maxIndex)
-            : removedIndex < prevIdx
-              ? Math.max(0, prevIdx - 1)
-              : removedIndex === prevIdx
-                ? Math.min(prevIdx, maxIndex)
-                : Math.min(prevIdx, maxIndex);
-
-        const nextWeek = nextSorted[nextIdx];
-        if (nextWeek && nextWeek !== currentWeekNumber) {
-          loadWeekDataRef.current(nextWeek);
-        }
-
-        return nextIdx;
-      });
-    },
-    [
-      churchId,
-      currentWeekNumber,
-      removeWeekDataFromContext,
-      selectedWeekNumbers,
-      sortedWeekNumbers,
-      t,
-      year,
-    ],
-  );
-
-  const renderRowLabel = (text: string, required = false) => (
-    <Text
-      style={[
-        styles.rowLabel,
-        columnLayout === 'single' && styles.rowLabelInline,
-        {color: C.textSecondary},
-      ]}
-      category="label">
-      {text}
-      {required ? <Text style={styles.requiredMark}> *</Text> : null}
-    </Text>
-  );
-  const currentData = useMemo(
-    () => weekData.get(currentWeekNumber),
-    [weekData, currentWeekNumber],
-  );
-
   // Resolve church_id (prefer route param for correctness and speed)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        if (routeChurchId && mounted) {
+        if (routeChurchId) {
           setChurchId(routeChurchId);
           await AsyncStorage.setItem('selectedChurchId', String(routeChurchId));
           return;
         }
         const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        if (savedChurchId) {
-          const id = parseInt(savedChurchId, 10);
-          if (!isNaN(id) && mounted) {
-            setChurchId(id);
-          }
+        const id = savedChurchId ? parseInt(savedChurchId, 10) : NaN;
+        if (mounted && !isNaN(id)) {
+          setChurchId(id);
         }
-      } catch (error) {
-        console.error('Error loading church ID from AsyncStorage:', error);
-        // Fallback to route param on error
-        if (routeChurchId) {
+      } catch {
+        if (routeChurchId && mounted) {
           setChurchId(routeChurchId);
         }
       }
@@ -423,70 +358,75 @@ export default function MonthlyDataEntryScreen() {
     };
   }, [routeChurchId]);
 
+  // A different church: everything loaded belongs to the previous one.
   useEffect(() => {
+    servicesRef.current = null;
     setChurchCurrencyName('');
+    setWeekData(new Map());
+    setWeekErrors(new Map());
+    dirtyWeeksRef.current.clear();
   }, [churchId]);
 
-  // Church currency label for monthly giving fields (`data.currency_name` on church detail)
+  // Church currency label for monthly giving fields (`data.currency_name` on
+  // church detail), and the church name when none was passed or saved.
   useEffect(() => {
     if (!churchId) {
       return;
     }
     let cancelled = false;
-    void (async () => {
-      try {
-        const data = await getChurchDetail(churchId);
+    getChurchDetail(churchId)
+      .then(data => {
         if (cancelled) {
           return;
         }
-        const name = String(data?.currency_name ?? '').trim();
-        if (name) {
-          setChurchCurrencyName(name);
+        const currency = String(data?.currency_name ?? '').trim();
+        if (currency) {
+          setChurchCurrencyName(currency);
         }
-      } catch {
-        // ignore — labels work without suffix
-      }
-    })();
+        const name = String(data?.name ?? '').trim();
+        if (name) {
+          setDisplayChurchName(prev => prev || name);
+        }
+      })
+      .catch(() => {
+        // Labels work without the currency suffix.
+      });
     return () => {
       cancelled = true;
     };
   }, [churchId]);
 
-  // Resolve church name for display (route param -> AsyncStorage -> dashboard API)
+  // Church name (route param, else the saved one) and the last report date,
+  // from one dashboard request.
   useEffect(() => {
     if (churchName) {
       setDisplayChurchName(churchName);
     }
+    if (!churchId) {
+      return;
+    }
     let mounted = true;
     (async () => {
       try {
-        const savedChurchName = await AsyncStorage.getItem(
-          'selectedChurchName',
-        );
-        if (mounted && savedChurchName) {
-          setDisplayChurchName(savedChurchName);
+        if (!churchName) {
+          const savedChurchName = await AsyncStorage.getItem('selectedChurchName');
+          if (mounted && savedChurchName) {
+            setDisplayChurchName(savedChurchName);
+          }
+        }
+        const response = await api.get('dashboard', {params: {church_id: churchId}});
+        const dashboardInfo = response.data?.data?.dashboard_info;
+        if (!mounted) {
           return;
         }
-
-        if (mounted && churchId) {
-          const response = await api.get('dashboard', {
-            params: {church_id: churchId},
-          });
-          const dashboardInfo = response.data?.data?.dashboard_info;
-          const dashboardChurchName = dashboardInfo?.church_name;
-          if (dashboardInfo?.last_report_date) {
-            setLastReportDate(String(dashboardInfo.last_report_date));
-          }
-          if (dashboardChurchName) {
-            setDisplayChurchName(dashboardChurchName);
-            await AsyncStorage.setItem(
-              'selectedChurchName',
-              String(dashboardChurchName),
-            );
-          }
+        if (dashboardInfo?.last_report_date) {
+          setLastReportDate(String(dashboardInfo.last_report_date));
         }
-      } catch (error) {
-        console.error('Error loading church name:', error);
+        if (!churchName && dashboardInfo?.church_name) {
+          setDisplayChurchName(String(dashboardInfo.church_name));
+        }
+      } catch {
+        // The name / date line is informative only.
       }
     })();
     return () => {
@@ -494,43 +434,20 @@ export default function MonthlyDataEntryScreen() {
     };
   }, [churchName, churchId]);
 
-  // Always attempt to load last report date when we have churchId
-  useEffect(() => {
-    if (!churchId) {return;}
-    const key = String(churchId);
-    if (dashboardInfoLoadKeyRef.current === key) {return;}
-    dashboardInfoLoadKeyRef.current = key;
-    (async () => {
-      try {
-        const response = await api.get('dashboard', {params: {church_id: churchId}});
-        const dashboardInfo = response.data?.data?.dashboard_info;
-        if (dashboardInfo?.last_report_date) {
-          setLastReportDate(String(dashboardInfo.last_report_date));
-        }
-      } catch {
-        // ignore
-      }
-    })();
-  }, [churchId]);
-
-  const localeMap: Record<string, string> = {
-    en: 'en',
-    pt: 'pt',
-    es: 'es',
-    fr: 'fr',
-    zh: 'zh',
-    ms: 'ms',
-    ja: 'ja',
-  };
   const formatLastRecord = useCallback(
     (dateString: string) => {
-      if (!dateString) {return '-';}
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {return '-';}
-      const locale = localeMap[selectedLanguage as string] || 'en';
-      const month = new Intl.DateTimeFormat(locale, {month: 'short'}).format(date);
-      const year = date.getFullYear();
-      return `${month} ${year}`;
+      // parseYmd: `new Date('2026-05-01')` is UTC midnight, still April west of UTC.
+      const date = parseYmd(dateString);
+      if (!date) {
+        return '-';
+      }
+      let month: string;
+      try {
+        month = new Intl.DateTimeFormat(selectedLanguage || 'en', {month: 'short'}).format(date);
+      } catch {
+        month = new Intl.DateTimeFormat('en', {month: 'short'}).format(date);
+      }
+      return `${month} ${date.getFullYear()}`;
     },
     [selectedLanguage],
   );
@@ -545,618 +462,139 @@ export default function MonthlyDataEntryScreen() {
     return churchCurrencyName ? `${base} (${churchCurrencyName})` : base;
   }, [t, churchCurrencyName]);
 
-  // Load worship sessions structure and first week data
-  useEffect(() => {
-    if (churchId) {
-      loadInitialData();
+  /** The church's worship services, fetched once per church (retried after a failure). */
+  const getServices = useCallback((): Promise<WorshipSession[]> => {
+    if (!churchId) {
+      return Promise.resolve([]);
     }
-  }, [churchId, sortedWeekNumbers]);
-
-  const fetchWorshipServices = useCallback(
-    /**
-     * `strict`: throw instead of returning []. Forms built from server data need
-     * the full service list; without it, sessions would silently go missing.
-     */
-    async (force = false, strict = false): Promise<WorshipSession[]> => {
-      if (!churchId) {return [];}
-      if (!force && worshipServicesRef.current) {
-        return worshipServicesRef.current;
+    if (servicesRef.current?.churchId === churchId) {
+      return servicesRef.current.promise;
+    }
+    const entry = {
+      churchId,
+      promise: listWorshipServicesByChurch(churchId).then(toEmptySessions),
+    };
+    servicesRef.current = entry;
+    entry.promise.catch(() => {
+      if (servicesRef.current === entry) {
+        servicesRef.current = null;
       }
-      try {
-        const listResponse = await listWorshipServicesByChurch(churchId);
-        const services = Array.isArray(listResponse?.data)
-          ? listResponse.data
-          : Array.isArray((listResponse as any)?.data?.data)
-          ? (listResponse as any).data.data
-          : [];
-        const mapped = services.map((service: any) => ({
-          id: service.id,
-          name: service.name || '',
-          day_name: service.day_name || '',
-          time: service.time || '',
-          attendance: {
-            adult_attendance: null,
-            youth_attendance: null,
-            child_attendance: null,
-            number_of_service_for_children: null,
-            total_attendance: null,
-          },
-        }));
-        worshipServicesRef.current = mapped;
-        return mapped;
-      } catch (error) {
-        console.error('Error loading worship services:', error);
-        if (strict) {
-          throw error;
-        }
-        return [];
-      }
-    },
-    [churchId],
-  );
-
-  useEffect(() => {
-    worshipServicesRef.current = null;
+    });
+    return entry.promise;
   }, [churchId]);
 
-  const mergeWorshipSessions = useCallback(
-    (base: WorshipSession[], reported?: WorshipSession[]) => {
-      if (!base.length && reported && reported.length > 0) {return reported;}
-      const reportMap = new Map(
-        (reported || []).map(session => [session.id, session]),
-      );
-      const merged = base.map(service => {
-        const report = reportMap.get(service.id);
-        if (!report) {return service;}
-        return {
-          ...service,
-          attendance: report.attendance ?? service.attendance,
-        };
-      });
-      (reported || []).forEach(session => {
-        if (!merged.some(existing => existing.id === session.id)) {
-          merged.push(session);
-        }
-      });
-      return merged;
-    },
-    [],
-  );
-
-  useEffect(() => {
-    let mounted = true;
-    (async () => {
-      if (!churchId) {return;}
-      const services = await fetchWorshipServices(true);
-      if (!mounted || services.length === 0) {return;}
-      setWorshipSessions(prev => mergeWorshipSessions(services, prev));
-      if (currentWeekNumber) {
-        setWeekData(prev => {
-          const current = prev.get(currentWeekNumber);
-          if (!current) {return prev;}
-          const merged = mergeWorshipSessions(
-            services,
-            current.worship_sessions || [],
-          );
-          return new Map(prev).set(currentWeekNumber, {
-            ...current,
-            worship_sessions: merged,
-          });
-        });
+  /**
+   * Loads one week into `weekData` (once): an unsaved draft first, else the
+   * server report merged with the church's services, else (404) an empty form.
+   * Any other failure is kept as that week's error. It only ever writes its
+   * own week, so a slow answer can't change the form of another week.
+   */
+  const loadWeek = useCallback(
+    async (weekNumber: number) => {
+      if (!churchId || !year || !weekNumber) {
+        return;
       }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [churchId, currentWeekNumber, fetchWorshipServices, mergeWorshipSessions]);
-
-  const loadInitialData = async () => {
-    if (!churchId) {return;}
-    setLoading(true);
-    setInitialLoadError(null);
-    try {
-      const firstWeekNumber = sortedWeekNumbers[0];
-
-      if (firstWeekNumber) {
-        // Use shared loader to reuse cached/context data
-        await loadSingleWeek(firstWeekNumber, true);
-
-        // Preload next week in background for smooth navigation
-        if (sortedWeekNumbers.length > 1) {
-          const nextWeekNumber = sortedWeekNumbers[1];
-          loadSingleWeek(nextWeekNumber, false).catch(() => {});
-        }
-      } else {
-        setLoading(false);
+      if (weekDataRef.current.has(weekNumber) || loadingRef.current.has(weekNumber)) {
+        return;
       }
-    } catch (error: any) {
-      console.error('Error loading initial data:', error);
-      // Even if API fails, show form with empty state
-      setLoading(false);
-    }
-  };
-
-  // Load a single week and show immediately if it's the first week
-  const loadSingleWeek = useCallback(
-    async (weekNumber: number, isFirstWeek: boolean = false) => {
-      if (!churchId) {return;}
-
-      // Check if already loaded using ref for immediate synchronous check
-      if (loadedWeeksRef.current.has(weekNumber)) {
-        // Already loaded, just show it if it's the first week
-        if (isFirstWeek) {
-          const existingData = weekData.get(weekNumber);
-          if (existingData) {
-            const baseServices = await fetchWorshipServices();
-            const mergedSessions = mergeWorshipSessions(
-              baseServices,
-              existingData.worship_sessions || [],
-            );
-            if (mergedSessions.length > 0) {
-              setWorshipSessions(mergedSessions);
-            }
-            if (
-              mergedSessions.length !==
-              (existingData.worship_sessions || []).length
-            ) {
-              setWeekData(prev =>
-                new Map(prev).set(weekNumber, {
-                  ...existingData,
-                  worship_sessions: mergedSessions,
-                }),
-              );
-            }
-          }
-          setLoading(false);
-        }
-        return; // Already loaded, exit early
-      }
-
-      // Check if already loading using ref
-      if (loadingWeeksRef.current.has(weekNumber)) {
-        return; // Already loading, exit early
-      }
-
-      // Mark as loading
-      loadingWeeksRef.current.add(weekNumber);
+      const requestChurchId = churchId;
+      loadingRef.current.add(weekNumber);
       setLoadingWeeks(prev => new Set(prev).add(weekNumber));
-
-      // Only the first week has the error screen; a failed background
-      // preload is simply not cached and is re-fetched on switch.
-      const showWeekError = (cause: unknown) => {
-        if (isFirstWeek) {
-          setInitialLoadError(cause);
-          setLoading(false);
+      setWeekErrors(prev => {
+        if (!prev.has(weekNumber)) {
+          return prev;
         }
-      };
-      let reportLoaded = false;
-
+        const next = new Map(prev);
+        next.delete(weekNumber);
+        return next;
+      });
       try {
-        // Check context first
-        const contextData = getWeekData(churchId, year, weekNumber);
-        if (contextData) {
-          // Restore from context
-          const baseServices = await fetchWorshipServices();
-          const mergedSessions = mergeWorshipSessions(
-            baseServices,
-            contextData.worshipSessions,
-          );
-          const restoredData: WeeklyReportData = {
+        let week: WeeklyReportData;
+        const draft = getDraftRef.current(churchId, year, weekNumber);
+        if (draft) {
+          const services = await getServices().catch(() => [] as WorshipSession[]);
+          week = {
             church_id: churchId,
             year,
             week_number: weekNumber,
-            worship_sessions: mergedSessions,
-            church_metrics: contextData.churchMetrics,
+            worship_sessions: mergeWorshipSessions(services, draft.worshipSessions),
+            church_metrics: draft.churchMetrics ?? ({} as ChurchMetrics),
           };
-          setWeekData(prev => {
-            if (prev.has(weekNumber)) {return prev;} // Already loaded
-            loadedWeeksRef.current.add(weekNumber);
-            return new Map(prev).set(weekNumber, restoredData);
-          });
-
-          // If this is the first week, show it immediately
-          if (isFirstWeek) {
-            setWorshipSessions(mergedSessions);
-            setLoading(false);
-          }
         } else {
-          // Load from API
-          const data = await getWeeklyReport(churchId, year, weekNumber);
-          reportLoaded = true;
-          const baseServices = await fetchWorshipServices(false, true);
-          const worshipSessionsForWeek = mergeWorshipSessions(
-            baseServices,
-            data.worship_sessions || [],
-          );
-          const mergedData = {
-            ...data,
-            worship_sessions: worshipSessionsForWeek,
-          };
-          setWeekData(prev => {
-            if (prev.has(weekNumber)) {return prev;} // Already loaded
-            loadedWeeksRef.current.add(weekNumber);
-            return new Map(prev).set(weekNumber, mergedData);
-          });
-
-          // If this is the first week, show it immediately
-          if (isFirstWeek) {
-            if (worshipSessionsForWeek && worshipSessionsForWeek.length > 0) {
-              setWorshipSessions(worshipSessionsForWeek);
+          let report: WeeklyReportData | null = null;
+          try {
+            report = await getWeeklyReport(churchId, year, weekNumber);
+          } catch (error: any) {
+            const cause = error?.cause ?? error;
+            // 404 "No weekly report found": a new week. Anything else (offline,
+            // server error) must not become an empty form that would be saved
+            // over the real report.
+            if (cause?.response?.status !== 404) {
+              throw cause;
             }
-            setLoading(false);
           }
+          // Needed either way: a form without the services would drop sessions.
+          const services = await getServices();
+          week = report
+            ? {...report, worship_sessions: mergeWorshipSessions(services, report.worship_sessions || [])}
+            : emptyWeek(churchId, year, weekNumber, services);
         }
-      } catch (error: any) {
-        // Offline / timed out, or the report loaded but its services didn't:
-        // the report may well exist, so an empty form would risk overwriting it.
-        const cause = error?.cause ?? error;
-        const parsed = parseApiError(cause);
-        if (reportLoaded || parsed.isNetworkError || parsed.isTimeout) {
-          showWeekError(cause);
+        if (!aliveRef.current || churchIdRef.current !== requestChurchId) {
           return;
         }
-        // If report doesn't exist, create empty structure from the church's services
-        let worshipSessionsForWeek: WorshipSession[];
-        try {
-          worshipSessionsForWeek = await fetchWorshipServices(false, true);
-        } catch (servicesError) {
-          showWeekError(servicesError);
-          return;
+        if (draft) {
+          dirtyWeeksRef.current.add(weekNumber);
         }
-        const emptyData: WeeklyReportData = {
-          church_id: churchId,
-          year,
-          week_number: weekNumber,
-          worship_sessions: worshipSessionsForWeek,
-          church_metrics: {} as ChurchMetrics,
-        };
-        setWeekData(prev => {
-          if (prev.has(weekNumber)) {return prev;} // Already loaded
-          loadedWeeksRef.current.add(weekNumber);
-          return new Map(prev).set(weekNumber, emptyData);
-        });
-
-        // If this is the first week, show it immediately
-        if (isFirstWeek) {
-          if (worshipSessionsForWeek.length > 0) {
-            setWorshipSessions(worshipSessionsForWeek);
-          }
-          setLoading(false);
+        setWeekData(prev => (prev.has(weekNumber) ? prev : new Map(prev).set(weekNumber, week)));
+      } catch (error) {
+        if (aliveRef.current && churchIdRef.current === requestChurchId) {
+          setWeekErrors(prev => new Map(prev).set(weekNumber, error));
         }
       } finally {
-        loadingWeeksRef.current.delete(weekNumber);
-        setLoadingWeeks(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(weekNumber);
-          return newSet;
-        });
+        loadingRef.current.delete(weekNumber);
+        if (aliveRef.current) {
+          setLoadingWeeks(prev => {
+            const next = new Set(prev);
+            next.delete(weekNumber);
+            return next;
+          });
+        }
       }
     },
-    [
-      churchId,
-      year,
-      getWeekData,
-      fetchWorshipServices,
-      mergeWorshipSessions,
-      weekData,
-    ],
+    [churchId, year, getServices],
   );
 
-  // Preload next week when user is on current week (for smooth navigation)
-  const preloadNextWeek = useCallback(() => {
-    if (!churchId) {return;}
-    const nextIndex = currentWeekIndex + 1;
-    if (nextIndex < sortedWeekNumbers.length) {
-      const nextWeekNumber = sortedWeekNumbers[nextIndex];
-      // Only preload if not already loaded or loading
-      if (
-        !weekData.has(nextWeekNumber) &&
-        !loadingWeeksRef.current.has(nextWeekNumber)
-      ) {
-        loadSingleWeek(nextWeekNumber, false).catch(() => {});
-      }
-    }
-  }, [churchId, currentWeekIndex, sortedWeekNumbers, weekData, loadSingleWeek]);
-
-  // Load data for a specific week when switching to it
-  const loadWeekData = useCallback(
-    async (weekNumber: number) => {
-      if (!churchId) {return;}
-      // Check if already loaded
-      if (weekData.has(weekNumber)) {
-        const data = weekData.get(weekNumber);
-        if (data) {
-          const baseServices = await fetchWorshipServices();
-          const mergedSessions = mergeWorshipSessions(
-            baseServices,
-            data.worship_sessions || [],
-          );
-          if (mergedSessions.length > 0) {
-            setWorshipSessions(mergedSessions);
-          }
-          if (mergedSessions.length !== (data.worship_sessions || []).length) {
-            setWeekData(prev =>
-              new Map(prev).set(weekNumber, {
-                ...data,
-                worship_sessions: mergedSessions,
-              }),
-            );
-          }
-        }
-        return;
-      }
-
-      // Check if already loading to avoid duplicate requests
-      if (loadingWeeks.has(weekNumber)) {
-        return;
-      }
-
-      // Check context first
-      const contextData = getWeekData(churchId, year, weekNumber);
-      if (contextData) {
-        const restoredData: WeeklyReportData = {
-          church_id: churchId,
-          year,
-          week_number: weekNumber,
-          worship_sessions: contextData.worshipSessions,
-          church_metrics: contextData.churchMetrics,
-        };
-        setWeekData(prev => new Map(prev).set(weekNumber, restoredData));
-        setWorshipSessions(contextData.worshipSessions);
-        return;
-      }
-
-      // Load from API
-      setInitialLoadError(null);
-      setLoadingWeeks(prev => new Set(prev).add(weekNumber));
-      let reportLoaded = false;
-      try {
-        const data = await getWeeklyReport(churchId, year, weekNumber);
-        reportLoaded = true;
-        const baseServices = await fetchWorshipServices(false, true);
-        const worshipSessionsForWeek = mergeWorshipSessions(
-          baseServices,
-          data.worship_sessions || [],
-        );
-        const mergedData = {
-          ...data,
-          worship_sessions: worshipSessionsForWeek,
-        };
-        setWeekData(prev => new Map(prev).set(weekNumber, mergedData));
-        if (worshipSessionsForWeek && worshipSessionsForWeek.length > 0) {
-          setWorshipSessions(worshipSessionsForWeek);
-        }
-      } catch (error: any) {
-        // Offline / timed out, or the report loaded but its services didn't:
-        // don't show an incomplete or empty form that could overwrite an
-        // existing report; show the retryable error for this week instead.
-        const cause = error?.cause ?? error;
-        const parsed = parseApiError(cause);
-        if (reportLoaded || parsed.isNetworkError || parsed.isTimeout) {
-          setInitialLoadError(cause);
-          return;
-        }
-        // If report doesn't exist, create empty structure from the church's services
-        let worshipSessionsForWeek: WorshipSession[];
-        try {
-          worshipSessionsForWeek = await fetchWorshipServices(false, true);
-        } catch (servicesError) {
-          setInitialLoadError(servicesError);
-          return;
-        }
-        const emptyData: WeeklyReportData = {
-          church_id: churchId,
-          year,
-          week_number: weekNumber,
-          worship_sessions: worshipSessionsForWeek,
-          church_metrics: {} as ChurchMetrics,
-        };
-        setWeekData(prev => new Map(prev).set(weekNumber, emptyData));
-        if (worshipSessionsForWeek.length > 0) {
-          setWorshipSessions(worshipSessionsForWeek);
-        }
-      } finally {
-        setLoadingWeeks(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(weekNumber);
-          return newSet;
-        });
-      }
-    },
-    [
-      churchId,
-      year,
-      weekData,
-      getWeekData,
-      loadingWeeks,
-      fetchWorshipServices,
-      mergeWorshipSessions,
-    ],
-  );
-
+  // Load the week on screen and the next one (for a smooth Next).
   useEffect(() => {
-    loadWeekDataRef.current = (weekNumber: number) => {
-      loadWeekData(weekNumber).catch(() => {});
-    };
-  }, [loadWeekData]);
-
-  const updateWorshipSession = useCallback(
-    (sessionId: number, field: string, value: string) => {
-      if (!churchId) {return;}
-      const currentChurchId = churchId; // Store for use in callback
-      // Parse the input value (remove formatting, only keep digits)
-      const numValue = parseNumber(value);
-      setWorshipSessions(prev => {
-        const updated = prev.map(session =>
-          session.id === sessionId
-            ? {
-                ...session,
-                attendance: {
-                  ...session.attendance,
-                  [field]: numValue,
-                  total_attendance:
-                    field === 'adult_attendance' ||
-                    field === 'youth_attendance' ||
-                    field === 'child_attendance'
-                      ? calculateTotalAttendance({
-                          ...session.attendance,
-                          [field]: numValue,
-                        })
-                      : session.attendance.total_attendance,
-                },
-              }
-            : session,
-        );
-
-        // Save to context
-        const currentMetrics =
-          currentData?.church_metrics || ({} as ChurchMetrics);
-        saveWeekDataToContext(
-          currentChurchId,
-          year,
-          currentWeekNumber,
-          updated,
-          currentMetrics,
-        );
-
-        // Clear error when Adults has a value
-        setFieldErrors(prev => {
-          const newSet = new Set(prev);
-          const target = updated.find(session => session.id === sessionId);
-          if (target?.attendance.adult_attendance !== null) {
-            newSet.delete(getAdultAttendanceFieldKey(sessionId));
-          }
-          return newSet;
-        });
-
-        return updated;
-      });
-    },
-    [churchId, year, currentWeekNumber, currentData, saveWeekDataToContext],
-  );
-
-  const calculateTotalAttendance = useCallback(
-    (attendance: any): number | null => {
-      const adult = attendance.adult_attendance || 0;
-      const youth = attendance.youth_attendance || 0;
-      const child = attendance.child_attendance || 0;
-      const total = adult + youth + child;
-      return total > 0 ? total : null;
-    },
-    [],
-  );
-
-  const updateChurchMetrics = useCallback(
-    (field: keyof ChurchMetrics, value: string) => {
-      if (!churchId) {return;}
-      // Parse the input value (remove formatting, only keep digits)
-      const numValue = parseNumber(value);
-      setWeekData(prev => {
-        const currentData = prev.get(currentWeekNumber);
-        const currentMetrics =
-          currentData?.church_metrics || ({} as ChurchMetrics);
-        const updatedMetrics = {
-          ...currentMetrics,
-          [field]: numValue,
-        };
-        const updatedData: WeeklyReportData = {
-          ...(currentData || {
-            church_id: churchId,
-            year,
-            week_number: currentWeekNumber,
-            worship_sessions: [],
-            church_metrics: {} as ChurchMetrics,
-          }),
-          church_metrics: updatedMetrics,
-        };
-
-        // Save to context
-        saveWeekDataToContext(
-          churchId,
-          year,
-          currentWeekNumber,
-          worshipSessions,
-          updatedMetrics,
-        );
-
-        return new Map(prev).set(currentWeekNumber, updatedData);
-      });
-
-      // Clear error only when value is set
-      if (numValue !== null) {
-        setFieldErrors(prev => {
-          const newSet = new Set(prev);
-          newSet.delete(`church_metrics.${field}`);
-          return newSet;
-        });
-      }
-    },
-    [churchId, year, currentWeekNumber, worshipSessions, saveWeekDataToContext],
-  );
-
-  // Check if a week has all required fields filled
-  const checkWeekCompleted = useCallback(
-    (weekNum: number, data: WeeklyReportData | undefined): boolean => {
-      if (!data) {return false;}
-      return hasRequiredAdultAttendance(data.worship_sessions);
-    },
-    [],
-  );
-
-  // Validate current week data
-  const validateCurrentWeek = (): {
-    isValid: boolean;
-    firstErrorField?: string;
-  } => {
-    const errors = new Set<string>();
-    let firstErrorField: string | undefined;
-
-    if (worshipSessions.length === 0) {
-      const fieldKey = 'worship_sessions';
-      errors.add(fieldKey);
-      if (!firstErrorField) {firstErrorField = fieldKey;}
-    } else {
-      worshipSessions.forEach(session => {
-        if (session.attendance.adult_attendance === null) {
-          const fieldKey = getAdultAttendanceFieldKey(session.id);
-          errors.add(fieldKey);
-          if (!firstErrorField) {firstErrorField = fieldKey;}
-        }
-      });
+    if (!churchId || !currentWeekNumber) {
+      return;
     }
+    loadWeek(currentWeekNumber);
+    const nextWeek = sortedWeekNumbers[currentWeekIndex + 1];
+    if (nextWeek) {
+      loadWeek(nextWeek);
+    }
+  }, [churchId, currentWeekNumber, currentWeekIndex, sortedWeekNumbers, loadWeek]);
 
-    setFieldErrors(errors);
-    return {isValid: errors.size === 0, firstErrorField};
-  };
-
-
-  // Scroll to field with error
-  const scrollToField = (fieldKey: string) => {
-    setTimeout(() => {
-      const fieldRef = fieldRefs.current.get(fieldKey);
-      if (fieldRef && scrollViewRef.current) {
-        try {
-          (fieldRef as any).measureLayout(
-            scrollViewRef.current as any,
-            (x: number, y: number) => {
-              scrollViewRef.current?.scrollTo({
-                y: Math.max(0, y - 100),
-                animated: true,
-              });
-            },
-            () => {},
-          );
-        } catch (error) {
-          console.error('Error scrolling to field:', error);
-        }
-      }
-    }, 100);
-  };
+  const checkWeekCompleted = useCallback(
+    (_weekNum: number, data: WeeklyReportData | undefined): boolean =>
+      !!data && hasRequiredAdultAttendance(data.worship_sessions),
+    [],
+  );
+  const completedWeeks = useMemo(
+    () =>
+      new Set(
+        sortedWeekNumbers.filter(weekNum => checkWeekCompleted(weekNum, weekData.get(weekNum))),
+      ),
+    [sortedWeekNumbers, weekData, checkWeekCompleted],
+  );
 
   const smoothScrollToTop = (duration = 350) => {
-    if (!scrollViewRef.current) return;
+    if (!scrollViewRef.current) {
+      return;
+    }
     if (scrollAnimRef.current) {
-      clearInterval(scrollAnimRef.current);
+      clearTimeout(scrollAnimRef.current);
       scrollAnimRef.current = null;
     }
     const start = Date.now();
@@ -1165,272 +603,251 @@ export default function MonthlyDataEntryScreen() {
       const elapsed = Date.now() - start;
       const progress = Math.min(elapsed / duration, 1);
       const eased = 1 - Math.pow(1 - progress, 3);
-      const y = Math.max(0, startY * (1 - eased));
-      scrollViewRef.current?.scrollTo({y, animated: false});
-      if (progress < 1) {
-        scrollAnimRef.current = setTimeout(step, 16);
-      } else {
-        scrollAnimRef.current = null;
-      }
+      scrollViewRef.current?.scrollTo({y: Math.max(0, startY * (1 - eased)), animated: false});
+      scrollAnimRef.current = progress < 1 ? setTimeout(step, 16) : null;
     };
     scrollAnimRef.current = setTimeout(step, 16);
   };
 
-  const persistCurrentWeekData = useCallback((): WeeklyReportData | null => {
-    if (!churchId || !currentWeekNumber) {
-      return null;
+  // Scroll to field with error
+  const scrollToField = (fieldKey: string) => {
+    if (scrollToFieldTimerRef.current) {
+      clearTimeout(scrollToFieldTimerRef.current);
     }
+    scrollToFieldTimerRef.current = setTimeout(() => {
+      const fieldRef = fieldRefs.current.get(fieldKey);
+      if (!fieldRef || !scrollViewRef.current) {
+        return;
+      }
+      try {
+        fieldRef.measureLayout(
+          scrollViewRef.current as any,
+          (_x: number, y: number) => {
+            scrollViewRef.current?.scrollTo({y: Math.max(0, y - 100), animated: true});
+          },
+          () => {},
+        );
+      } catch {
+        // Field not laid out yet.
+      }
+    }, 100);
+  };
 
-    const currentMetrics =
-      currentData?.church_metrics || ({} as ChurchMetrics);
-    const updatedData: WeeklyReportData = {
-      ...(currentData || {
-        church_id: churchId,
-        year,
-        week_number: currentWeekNumber,
-        worship_sessions: [],
-        church_metrics: {} as ChurchMetrics,
-      }),
-      worship_sessions: worshipSessions,
-      church_metrics: currentMetrics,
-    };
+  /** Missing Adults of `sessions` as field errors (and the first one, to scroll to). */
+  const attendanceErrors = (sessions: WorshipSession[]) => {
+    const errors = new Set<string>();
+    if (sessions.length === 0) {
+      errors.add('worship_sessions');
+    }
+    sessions.forEach(session => {
+      if (session.attendance.adult_attendance === null || session.attendance.adult_attendance === undefined) {
+        errors.add(getAdultAttendanceFieldKey(session.id));
+      }
+    });
+    return {errors, firstErrorField: errors.values().next().value as string | undefined};
+  };
 
-    setWeekData(prev => new Map(prev).set(currentWeekNumber, updatedData));
-    saveWeekDataToContext(
-      churchId,
-      year,
-      currentWeekNumber,
-      worshipSessions,
-      currentMetrics,
-    );
+  // Validate current week data
+  const validateCurrentWeek = (): {isValid: boolean; firstErrorField?: string} => {
+    const {errors, firstErrorField} = attendanceErrors(worshipSessions);
+    setFieldErrors(errors);
+    return {isValid: errors.size === 0, firstErrorField};
+  };
 
-    return updatedData;
-  }, [
-    churchId,
-    year,
-    currentWeekNumber,
-    currentData,
-    worshipSessions,
-    saveWeekDataToContext,
-  ]);
-
-  const handleSave = async () => {
-    if (!currentWeekNumber || !churchId) {return;}
-
-    setSaving(true);
-    try {
-      const data = persistCurrentWeekData();
-      const metrics = data?.church_metrics || ({} as ChurchMetrics);
-
-      const payload = {
-        year,
-        week_number: currentWeekNumber,
-        worship_sessions: buildWorshipSessionsPayload(worshipSessions),
-        church_metrics: buildChurchMetricsPayload(metrics),
-      };
-
-      await createOrUpdateWeeklyReport(churchId, payload);
-
-      // Update local data
-      const updatedData: WeeklyReportData = {
-        church_id: churchId,
-        year,
-        week_number: currentWeekNumber,
-        currency_id: data?.currency_id,
-        worship_sessions: worshipSessions,
-        church_metrics: metrics,
-      };
-      setWeekData(prev => new Map(prev).set(currentWeekNumber, updatedData));
-
-      setSaveSuccessMessage(
-        t('dataSavedSuccessfully') || 'Data saved successfully',
-      );
-      saveSuccessActionRef.current = null;
-      setSaveSuccessVisible(true);
-    } catch (error: any) {
-      console.error('Error saving data:', error);
-      Alert.alert(
-        t('error') || 'Error',
-        error?.message || t('failedToSaveData') || 'Failed to save data',
-      );
-    } finally {
-      setSaving(false);
+  const goToWeek = (index: number, scrollToTop = false) => {
+    if (index < 0 || index >= sortedWeekNumbers.length || index === currentWeekIndex) {
+      return;
+    }
+    setCurrentWeekIndex(index);
+    setFieldErrors(new Set());
+    if (scrollToTop) {
+      smoothScrollToTop(1500);
     }
   };
 
+  /** Applies an edit to the week on screen (never to a week that is still loading). */
+  const editCurrentWeek = useCallback((change: (week: WeeklyReportData) => WeeklyReportData) => {
+    const weekNumber = currentWeekRef.current;
+    if (!weekDataRef.current.has(weekNumber)) {
+      return;
+    }
+    dirtyWeeksRef.current.add(weekNumber);
+    setWeekData(prev => {
+      const week = prev.get(weekNumber);
+      return week ? new Map(prev).set(weekNumber, change(week)) : prev;
+    });
+  }, []);
+
+  const updateWorshipSession = useCallback(
+    (sessionId: number, field: string, value: string) => {
+      const numValue = parseNumber(value);
+      editCurrentWeek(week => applySessionEdit(week, sessionId, field as AttendanceField, numValue));
+      if (field === 'adult_attendance' && numValue !== null) {
+        setFieldErrors(prev => {
+          const key = getAdultAttendanceFieldKey(sessionId);
+          if (!prev.has(key)) {
+            return prev;
+          }
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+    },
+    [editCurrentWeek],
+  );
+
+  const updateChurchMetrics = useCallback(
+    (field: keyof ChurchMetrics, value: string) => {
+      const numValue = parseNumber(value);
+      editCurrentWeek(week => applyMetricEdit(week, field, numValue));
+      if (numValue !== null) {
+        setFieldErrors(prev => {
+          const key = `church_metrics.${field}`;
+          if (!prev.has(key)) {
+            return prev;
+          }
+          const next = new Set(prev);
+          next.delete(key);
+          return next;
+        });
+      }
+    },
+    [editCurrentWeek],
+  );
+
+  const removeSelectedWeek = (weekNum: number) => {
+    if (!churchId || !year) {
+      return;
+    }
+    if (sortedWeekNumbers.length <= 1) {
+      Alert.alert(t('error'), t('pleaseSelectAtLeastOneWeek'));
+      return;
+    }
+    const removedIndex = sortedWeekNumbers.indexOf(weekNum);
+    const remaining = sortedWeekNumbers.filter(w => w !== weekNum);
+    setSelectedWeekNumbers(prev => prev.filter(w => w !== weekNum));
+    setWeekData(prev => {
+      if (!prev.has(weekNum)) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.delete(weekNum);
+      return next;
+    });
+    setWeekErrors(prev => {
+      if (!prev.has(weekNum)) {
+        return prev;
+      }
+      const next = new Map(prev);
+      next.delete(weekNum);
+      return next;
+    });
+    dirtyWeeksRef.current.delete(weekNum);
+    // Its unsaved edits are dropped too, so they don't come back later.
+    removeDraft(churchId, year, weekNum);
+    // Stay on the same week (its index shifts when an earlier one goes).
+    const stayOn = removedIndex === currentWeekIndex ? null : currentWeekNumber;
+    const nextIndex =
+      stayOn !== null
+        ? remaining.indexOf(stayOn)
+        : Math.min(currentWeekIndex, remaining.length - 1);
+    setCurrentWeekIndex(Math.max(0, nextIndex));
+    setFieldErrors(new Set());
+  };
+
   const handleSaveAll = async () => {
-    if (!churchId) {return;}
-    // Validate before saving
+    if (!churchId || savingRef.current) {
+      return;
+    }
     const validation = validateCurrentWeek();
     if (!validation.isValid) {
-      Alert.alert(
-        t('error') || 'Error',
-        t('pleaseFillAllRequiredFields') || 'Please fill all required fields',
-      );
+      Alert.alert(t('error'), t('pleaseFillAllRequiredFields'));
       if (validation.firstErrorField) {
         scrollToField(validation.firstErrorField);
       }
       return;
     }
 
+    // Every week is checked, not only the one on screen (a week edited after
+    // going Back could have lost its Adults value).
+    const built = buildBatchPayloads(churchId, year, sortedWeekNumbers, weekDataRef.current);
+    if (!built.ok) {
+      const index = sortedWeekNumbers.indexOf(built.weekNumber);
+      if (built.reason === 'notLoaded') {
+        loadWeek(built.weekNumber);
+        Alert.alert(t('error'), t('weekDataNotLoaded'));
+      } else {
+        Alert.alert(t('error'), t('pleaseFillAllRequiredFields'));
+      }
+      goToWeek(index, true);
+      if (built.reason === 'missingAttendance') {
+        const week = weekDataRef.current.get(built.weekNumber);
+        setFieldErrors(attendanceErrors(week?.worship_sessions ?? []).errors);
+      }
+      return;
+    }
+
+    savingRef.current = true;
     setSaving(true);
     try {
-      const persistedWeek = persistCurrentWeekData();
-      const latestWeekData = new Map(weekData);
-      if (persistedWeek) {
-        latestWeekData.set(currentWeekNumber, persistedWeek);
-      }
-
-      const payloads = sortedWeekNumbers.map(weekNumber => {
-        const data = latestWeekData.get(weekNumber);
-        const metrics = data?.church_metrics || ({} as ChurchMetrics);
-        const sessions =
-          weekNumber === currentWeekNumber
-            ? worshipSessions
-            : data?.worship_sessions || worshipSessions;
-
-        return {
-          church_id: churchId,
-          year,
-          week_number: weekNumber,
-          worship_sessions: sessions,
-          church_metrics: metrics,
-        };
-      });
-
-      await batchCreateOrUpdateWeeklyReports(payloads);
-      const handleSuccess = () => {
+      await batchCreateOrUpdateWeeklyReports(built.payloads);
+      // Saved: the drafts are no longer needed (and must not hide later
+      // changes made elsewhere, e.g. on the web).
+      sortedWeekNumbers.forEach(weekNumber => removeDraft(churchId, year, weekNumber));
+      dirtyWeeksRef.current.clear();
+      saveSuccessActionRef.current = () => {
+        // Back to the screen underneath instead of pushing another copy on top.
         if (saveOption === 'goToChurch') {
-          navigation.navigate('Dashboard');
+          navigation.popTo('Dashboard');
         } else {
-          navigation.navigate('MonthlyDataSelect', { resetKey: Date.now() });
+          navigation.popTo('MonthlyDataSelect', {resetKey: Date.now()});
         }
       };
-      setSaveSuccessMessage(
-        t('allDataSavedSuccessfully') || 'All data saved successfully',
-      );
-      saveSuccessActionRef.current = handleSuccess;
+      setSaveSuccessMessage(t('allDataSavedSuccessfully'));
       setSaveSuccessVisible(true);
     } catch (error: any) {
-      console.error('Error saving all data:', error);
-      Alert.alert(
-        t('error') || 'Error',
-        error?.message || t('failedToSaveData') || 'Failed to save data',
-      );
+      Alert.alert(t('error'), error?.message || t('failedToSaveData'));
     } finally {
-      setSaving(false);
+      savingRef.current = false;
+      if (aliveRef.current) {
+        setSaving(false);
+      }
     }
   };
 
   const handleNextWeek = () => {
-    if (!churchId) {return;}
-    if (currentWeekIndex < sortedWeekNumbers.length - 1) {
-      // Validate before moving to next week
-      const validation = validateCurrentWeek();
-      if (!validation.isValid) {
-        if (validation.firstErrorField) {
-          scrollToField(validation.firstErrorField);
-        }
-        return;
-      }
-
-      // Save current week data before switching
-      const updatedData = persistCurrentWeekData();
-      if (!updatedData) {
-        return;
-      }
-
-      // Mark week as completed
-      if (checkWeekCompleted(currentWeekNumber, updatedData)) {
-        setCompletedWeeks(prev => new Set(prev).add(currentWeekNumber));
-      }
-
-      // Switch to next week
-      const nextIndex = currentWeekIndex + 1;
-      setCurrentWeekIndex(nextIndex);
-      const nextWeekNumber = sortedWeekNumbers[nextIndex];
-      smoothScrollToTop(1500);
-
-      // Load next week data (should be preloaded, but load if not)
-      if (!weekData.has(nextWeekNumber)) {
-        loadWeekData(nextWeekNumber);
-      } else {
-        // Data already loaded, just update UI
-        const nextData = weekData.get(nextWeekNumber);
-        if (nextData?.worship_sessions) {
-          setWorshipSessions(nextData.worship_sessions);
-        }
-      }
-
-      // Preload week after next for smooth navigation
-      if (nextIndex + 1 < sortedWeekNumbers.length) {
-        const weekAfterNext = sortedWeekNumbers[nextIndex + 1];
-        if (
-          !weekData.has(weekAfterNext) &&
-          !loadingWeeksRef.current.has(weekAfterNext)
-        ) {
-          loadSingleWeek(weekAfterNext, false).catch(() => {});
-        }
-      }
-
-      setFieldErrors(new Set()); // Clear errors when switching weeks
+    if (!churchId || currentWeekIndex >= sortedWeekNumbers.length - 1) {
+      return;
     }
+    const validation = validateCurrentWeek();
+    if (!validation.isValid) {
+      if (validation.firstErrorField) {
+        scrollToField(validation.firstErrorField);
+      }
+      return;
+    }
+    goToWeek(currentWeekIndex + 1, true);
   };
 
   const handleBackWeek = () => {
-    if (!churchId) {return;}
-    if (currentWeekIndex > 0) {
-      // Save current week data before switching
-      const updatedData = persistCurrentWeekData();
-      if (!updatedData) {
-        return;
-      }
-
-      // Switch to previous week
-      const prevIndex = currentWeekIndex - 1;
-      setCurrentWeekIndex(prevIndex);
-      const prevWeekNumber = sortedWeekNumbers[prevIndex];
-      loadWeekData(prevWeekNumber);
-      smoothScrollToTop(1500);
+    if (churchId && currentWeekIndex > 0) {
+      goToWeek(currentWeekIndex - 1, true);
     }
   };
 
-  // Check if current week is completed based on current form state
-  const isCurrentWeekCompleted = useCallback(() => {
-    return hasRequiredAdultAttendance(worshipSessions);
-  }, [worshipSessions]);
-
-  // Update worship sessions when switching weeks
-  useEffect(() => {
-    if (!churchId) {return;}
-    // Check context first when switching weeks
-    const contextData = getWeekData(churchId, year, currentWeekNumber);
-    if (contextData) {
-      setWorshipSessions(contextData.worshipSessions);
-    } else if (currentData?.worship_sessions) {
-      setWorshipSessions(currentData.worship_sessions);
-    }
-
-    // Check if current week is completed
-    if (currentData) {
-      const isCompleted = checkWeekCompleted(currentWeekNumber, currentData);
-      if (isCompleted) {
-        setCompletedWeeks(prev => new Set(prev).add(currentWeekNumber));
-      }
-    }
-    setFieldErrors(new Set()); // Clear errors when switching weeks
-
-    // Preload next week for smooth navigation
-    preloadNextWeek();
-  }, [
-    currentWeekNumber,
-    currentData,
-    checkWeekCompleted,
-    churchId,
-    year,
-    getWeekData,
-    preloadNextWeek,
-  ]);
+  const renderRowLabel = (text: string, required = false) => (
+    <Text
+      style={[
+        styles.rowLabel,
+        columnLayout === 'single' && styles.rowLabelInline,
+        {color: C.textSecondary},
+      ]}
+      category="label">
+      {text}
+      {required ? <Text style={styles.requiredMark}> *</Text> : null}
+    </Text>
+  );
 
   // Skeleton loading component
   const renderSkeletonLoader = () => (
@@ -1513,18 +930,14 @@ export default function MonthlyDataEntryScreen() {
           <Header
             title={t('addMonthlyData') || 'Add Monthly Data'}
             showMenu={false}
-            onBackPress={() => navigation.navigate('MonthlyDataSelect')}
+            onBackPress={() => navigation.popTo('MonthlyDataSelect')}
           />
         </View>
 
-        {initialLoadError ? (
+        {currentWeekError ? (
           <ApiErrorState
-            error={initialLoadError}
-            onRetry={() =>
-              currentWeekNumber === sortedWeekNumbers[0]
-                ? loadInitialData()
-                : loadWeekData(currentWeekNumber)
-            }
+            error={currentWeekError}
+            onRetry={() => loadWeek(currentWeekNumber)}
           />
         ) : showSkeleton ? (
           <ScrollView
@@ -1567,7 +980,7 @@ export default function MonthlyDataEntryScreen() {
               </Text>
               <Text style={[styles.weekInfo, {color: C.textPrimary}]}>
                 {currentWeekNumber
-                  ? ` (${getIsoWeekDateRangeLabel(year, currentWeekNumber)} ${getIsoWeekDisplayYear(
+                  ? ` (${getIsoWeekDateRangeLabel(year, currentWeekNumber, selectedLanguage)} ${getIsoWeekDisplayYear(
                       year,
                       currentWeekNumber,
                     )})`
@@ -1659,7 +1072,7 @@ export default function MonthlyDataEntryScreen() {
                             if (isLoading) {
                               Alert.alert(
                                 t('error') || 'Error',
-                                t('loading') || 'Week data is still loading',
+                                t('weekDataNotLoaded'),
                               );
                             } else {
                               Alert.alert(
@@ -1670,36 +1083,7 @@ export default function MonthlyDataEntryScreen() {
                             }
                             return;
                           }
-                          // Save current week before switching
-                          const currentMetrics =
-                            currentData?.church_metrics || ({} as ChurchMetrics);
-                          const updatedData: WeeklyReportData = {
-                            ...(currentData || {
-                              church_id: churchId,
-                              year,
-                              week_number: currentWeekNumber,
-                              worship_sessions: [],
-                              church_metrics: {} as ChurchMetrics,
-                            }),
-                            worship_sessions: worshipSessions,
-                            church_metrics: currentMetrics,
-                          };
-                          setWeekData(prev =>
-                            new Map(prev).set(currentWeekNumber, updatedData),
-                          );
-
-                          // Save to context
-                          saveWeekDataToContext(
-                            churchId,
-                            year,
-                            currentWeekNumber,
-                            worshipSessions,
-                            currentMetrics,
-                          );
-
-                          // Switch week
-                          setCurrentWeekIndex(index);
-                          loadWeekData(weekNum);
+                          goToWeek(index);
                         }}>
                         <Text
                           style={[
@@ -1709,7 +1093,7 @@ export default function MonthlyDataEntryScreen() {
                                 isCurrent || isCompleted ? '#fff' : C.textPrimary,
                             },
                           ]}>
-                          {getIsoWeekDateRangeLabel(year, weekNum)}
+                          {getIsoWeekDateRangeLabel(year, weekNum, selectedLanguage)}
                         </Text>
                         <View style={styles.weekNavYearRow}>
                           <Text
@@ -1816,7 +1200,7 @@ export default function MonthlyDataEntryScreen() {
                                   value,
                                 );
                               }}
-                              keyboardType="numeric"
+                              keyboardType="number-pad"
                               placeholder="0"
                               error={
                                 attendanceError &&
@@ -1839,7 +1223,7 @@ export default function MonthlyDataEntryScreen() {
                                   value,
                                 )
                               }
-                              keyboardType="numeric"
+                              keyboardType="number-pad"
                               placeholder="0"
                             />
                           ),
@@ -1865,7 +1249,7 @@ export default function MonthlyDataEntryScreen() {
                                   value,
                                 )
                               }
-                              keyboardType="numeric"
+                              keyboardType="number-pad"
                               placeholder="0"
                             />
                           ),
@@ -1888,7 +1272,7 @@ export default function MonthlyDataEntryScreen() {
                                   value,
                                 )
                               }
-                              keyboardType="numeric"
+                              keyboardType="number-pad"
                               placeholder="0"
                             />
                           ),
@@ -1904,7 +1288,7 @@ export default function MonthlyDataEntryScreen() {
                           value={formatNumber(
                             session.attendance.total_attendance,
                           )}
-                          keyboardType="numeric"
+                          keyboardType="number-pad"
                           editable={false}
                           containerStyle={{backgroundColor: C.bgSelectedOption}}
                         />,
@@ -1941,7 +1325,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('number_of_cell_groups', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.number_of_cell_groups',
@@ -1964,7 +1348,7 @@ export default function MonthlyDataEntryScreen() {
                           value,
                         )
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.cell_group_weekly_attendance',
@@ -1999,7 +1383,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('number_of_prayer_meetings', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.number_of_prayer_meetings',
@@ -2022,7 +1406,7 @@ export default function MonthlyDataEntryScreen() {
                           value,
                         )
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.prayer_meeting_weekly_attendance',
@@ -2084,7 +1468,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('weekly_decisions_made', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.weekly_decisions_made',
@@ -2105,7 +1489,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('being_actively_discipled', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.being_actively_discipled',
@@ -2125,7 +1509,7 @@ export default function MonthlyDataEntryScreen() {
                   onChangeText={value =>
                     updateChurchMetrics('weekly_water_baptism', value)
                   }
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   placeholder="0"
                   error={fieldErrors.has('church_metrics.weekly_water_baptism')}
                 />,
@@ -2144,7 +1528,7 @@ export default function MonthlyDataEntryScreen() {
                   onChangeText={value =>
                     updateChurchMetrics('number_in_an_encounter', value)
                   }
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   placeholder="0"
                   error={fieldErrors.has(
                     'church_metrics.number_in_an_encounter',
@@ -2177,7 +1561,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('number_of_liw_classes', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.number_of_liw_classes',
@@ -2196,7 +1580,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('liw_total_students', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.liw_total_students',
@@ -2222,7 +1606,7 @@ export default function MonthlyDataEntryScreen() {
                       value,
                     )
                   }
-                  keyboardType="numeric"
+                  keyboardType="number-pad"
                   placeholder="0"
                   error={fieldErrors.has(
                     'church_metrics.number_of_leaders_in_training_for_cpm',
@@ -2254,7 +1638,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('giving_in_local_currency', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.giving_in_local_currency',
@@ -2272,7 +1656,7 @@ export default function MonthlyDataEntryScreen() {
                       onChangeText={value =>
                         updateChurchMetrics('mfp_in_local_currency', value)
                       }
-                      keyboardType="numeric"
+                      keyboardType="number-pad"
                       placeholder="0"
                       error={fieldErrors.has(
                         'church_metrics.mfp_in_local_currency',

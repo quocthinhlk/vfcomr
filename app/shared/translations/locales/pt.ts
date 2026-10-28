@@ -1007,6 +1007,8 @@ const pt = {
     reportSaved: "Relatório salvo",
     reportSavedAndroid: "Salvo na pasta Downloads:\n{name}",
     storagePermissionNeeded: "É necessária permissão de armazenamento para salvar o relatório.",
+    // Monthly data
+    weekDataNotLoaded: "Algumas semanas ainda estão carregando. Aguarde um momento e tente novamente.",
 } satisfies TranslationDictionary;
 
 export default pt;

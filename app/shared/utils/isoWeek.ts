@@ -1,9 +1,18 @@
 import {endOfISOWeek, setISOWeek, startOfISOWeek} from 'date-fns';
 
-const formatWeekDayMonth = (date: Date) => {
+const EN_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/** "05 Jan" — month in `language` (an app language code) when given, else English. */
+const formatWeekDayMonth = (date: Date, language?: string) => {
   const day = String(date.getDate()).padStart(2, '0');
-  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  const month = monthNames[date.getMonth()];
+  let month = EN_MONTHS[date.getMonth()];
+  if (language && language !== 'en') {
+    try {
+      month = new Intl.DateTimeFormat(language, {month: 'short'}).format(date);
+    } catch {
+      // Unknown locale: keep English.
+    }
+  }
   return `${day} ${month}`;
 };
 
@@ -17,11 +26,15 @@ const getIsoWeekDate = (isoWeekYear: number, isoWeekNumber: number) => {
   return setISOWeek(base, isoWeekNumber);
 };
 
-export const getIsoWeekDateRangeLabel = (isoWeekYear: number, isoWeekNumber: number): string => {
+export const getIsoWeekDateRangeLabel = (
+  isoWeekYear: number,
+  isoWeekNumber: number,
+  language?: string,
+): string => {
   const weekDate = getIsoWeekDate(isoWeekYear, isoWeekNumber);
   const weekStart = startOfISOWeek(weekDate);
   const weekEnd = endOfISOWeek(weekDate);
-  return `${formatWeekDayMonth(weekStart)} - ${formatWeekDayMonth(weekEnd)}`;
+  return `${formatWeekDayMonth(weekStart, language)} - ${formatWeekDayMonth(weekEnd, language)}`;
 };
 
 export const getIsoWeekDateRangeLabelFull = (isoWeekYear: number, isoWeekNumber: number): string => {

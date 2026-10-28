@@ -1058,6 +1058,8 @@ const es = {
   reportSaved: "Informe guardado",
   reportSavedAndroid: "Guardado en la carpeta Descargas:\n{name}",
   storagePermissionNeeded: "Se necesita permiso de almacenamiento para guardar el informe.",
+  // Monthly data
+  weekDataNotLoaded: "Algunas semanas aún se están cargando. Espera un momento e inténtalo de nuevo.",
 } as const;
 
 export default es;

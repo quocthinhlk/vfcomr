@@ -991,6 +991,8 @@ const zh = {
     reportSaved: "报告已保存",
     reportSavedAndroid: "已保存到“下载”文件夹：\n{name}",
     storagePermissionNeeded: "需要存储权限才能保存报告。",
+    // Monthly data
+    weekDataNotLoaded: "部分周的数据仍在加载，请稍候再试。",
 } satisfies TranslationDictionary;
 
 export default zh;

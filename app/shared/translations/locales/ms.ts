@@ -1007,6 +1007,8 @@ const ms = {
     reportSaved: "Laporan disimpan",
     reportSavedAndroid: "Disimpan dalam folder Muat Turun:\n{name}",
     storagePermissionNeeded: "Kebenaran storan diperlukan untuk menyimpan laporan.",
+    // Monthly data
+    weekDataNotLoaded: "Sesetengah minggu masih dimuatkan. Sila tunggu sebentar dan cuba lagi.",
 } satisfies TranslationDictionary;
 
 export default ms;

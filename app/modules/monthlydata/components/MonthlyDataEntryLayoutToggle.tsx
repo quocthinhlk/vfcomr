@@ -10,7 +10,7 @@ import Svg, {Path} from 'react-native-svg';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {COLORS} from '../../../shared/constants/colors';
-import {fs, hs, ms, rs} from '../../../shared/utils/scale';
+import {hs, ms, rs} from '../../../shared/utils/scale';
 import type {MonthlyDataEntryColumnLayout} from '../constants/monthlyDataEntryLayout';
 
 const ICON = 18;

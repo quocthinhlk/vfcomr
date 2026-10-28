@@ -20,6 +20,7 @@ import {useThemedColors} from '../styles/theme';
 import {useUiTokens} from '../styles/uiTokens';
 import {useTranslation} from '../hooks/useTranslation';
 import {CheckIcon} from './icons/UiIcons';
+import {fixMojibake, stripTreePrefix} from '../utils/displayText';
 import {fs, ws, hs, ms, rs} from '../utils/scale';
 import {FORM_INPUT_HEIGHT} from '../styles/form';
 
@@ -59,6 +60,12 @@ interface ElementDropdownProps {
   values?: Array<string | number>;
   onChangeValues?: (values: Array<string | number>) => void;
   accessibilityLabel?: string;
+}
+
+/** Level of a tree option written with leading dashes ("--- Sarawak" → 3). */
+function treeDepth(label: string): number {
+  const match = /^\s*(-+)\s/.exec(label);
+  return match ? Math.min(match[1].length, 6) : 0;
 }
 
 /** Select field that opens a bottom sheet (search + list), styled like MultiSelectSheet. */
@@ -149,9 +156,9 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
       .filter((item): item is ElementDropdownItem => !!item);
   }, [multiple, selectedValues, data]);
   const hasValue = multiple ? selectedValues.length > 0 : value !== null && value !== undefined && value !== '';
-  const fieldLabel = multiple
-    ? selectedItems.map(item => item.label).join(', ')
-    : null;
+  // Multi-select: the picks are shown as tags inside the field.
+  const chipLabel = (item: ElementDropdownItem) => stripTreePrefix(fixMojibake(item.label));
+  const fieldLabel = multiple ? selectedItems.map(chipLabel).join(', ') : null;
 
   const selectedItem = useMemo(() => {
     if (value === null || value === undefined) {
@@ -263,6 +270,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
 
   const renderRow = ({item}: {item: ElementDropdownItem}) => {
     const checked = multiple ? selectedValues.includes(item.value) : item.value === value;
+    const depth = renderItem ? 0 : treeDepth(item.label);
     const activeBg = activeItemColor || T.brandTint;
     return (
       <Pressable
@@ -272,6 +280,8 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         accessibilityLabel={item.description ? `${item.label}, ${item.description}` : item.label}
         style={({pressed}) => [
           styles.row,
+          // Tree lists ("-- Malaysia", "--- Sarawak"): indent by level instead of dashes.
+          depth ? {paddingLeft: ms(8) + depth * ms(18)} : null,
           optionItemStyle,
           (checked || pressed) && {backgroundColor: activeBg},
         ]}>
@@ -279,17 +289,25 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
           <View style={styles.rowText}>{renderItem(item)}</View>
         ) : (
           <>
-            <View
-              style={[
-                styles.checkbox,
-                {borderColor: checked ? T.brandText : C.border},
-                checked && {backgroundColor: T.brandText},
-              ]}>
-              {checked ? <CheckIcon color={T.sheetBg} size={ws(14)} /> : null}
-            </View>
+            {multiple ? (
+              // Several can be picked: square checkbox.
+              <View
+                style={[
+                  styles.checkbox,
+                  {borderColor: checked ? T.brandText : C.border},
+                  checked && {backgroundColor: T.brandText},
+                ]}>
+                {checked ? <CheckIcon color={T.sheetBg} size={ws(14)} /> : null}
+              </View>
+            ) : (
+              // Only one can be picked: round radio, so it isn't mistaken for a multi-select.
+              <View style={[styles.radio, {borderColor: checked ? T.brandText : C.border}]}>
+                {checked ? <View style={[styles.radioDot, {backgroundColor: T.brandText}]} /> : null}
+              </View>
+            )}
             <View style={styles.rowText}>
               <RNText style={[styles.rowTitle, {color: item.color || C.textPrimary}]}>
-                {item.label}
+                {stripTreePrefix(fixMojibake(item.label))}
               </RNText>
               {item.description ? (
                 <RNText style={[styles.rowPath, {color: C.textSecondary}]}>{item.description}</RNText>
@@ -314,19 +332,37 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
         accessibilityLabel={accessibilityLabel || (multiple ? fieldLabel : selectedItem?.label) || placeholder}
         style={[
           themed.field,
+          multiple && selectedItems.length ? styles.fieldMulti : null,
           error ? {borderColor: C.error || '#ff4444'} : null,
           disabled ? {opacity: 0.6} : null,
           containerStyle,
         ]}>
-        {multiple && fieldLabel ? (
-          <RNText style={themed.selectedText} numberOfLines={1}>
-            {fieldLabel}
-          </RNText>
+        {multiple && selectedItems.length ? (
+          <View style={styles.chips}>
+            {selectedItems.map(item => (
+              <View
+                key={String(item.value)}
+                style={[styles.chip, {backgroundColor: C.surface, borderColor: C.inputBorder}]}>
+                <RNText style={[styles.chipText, {color: C.textPrimary}]} numberOfLines={1}>
+                  {chipLabel(item)}
+                </RNText>
+                {disabled ? null : (
+                  <TouchableOpacity
+                    onPress={() => onChangeValues?.(selectedValues.filter(v => v !== item.value))}
+                    hitSlop={{top: 8, bottom: 8, left: 4, right: 8}}
+                    accessibilityRole="button"
+                    accessibilityLabel={`${t('remove')} ${chipLabel(item)}`}>
+                    <RNText style={[styles.chipRemove, {color: C.textSecondary}]}>×</RNText>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ))}
+          </View>
         ) : !multiple && selectedItem ? (
           <RNText
             style={[themed.selectedText, selectedItem.color ? {color: selectedItem.color} : null]}
             numberOfLines={1}>
-            {selectedItem.label}
+            {fixMojibake(selectedItem.label)}
           </RNText>
         ) : (
           <RNText style={themed.placeholderText} numberOfLines={1}>
@@ -483,6 +519,50 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  fieldMulti: {
+    height: 'auto',
+    minHeight: FORM_INPUT_HEIGHT,
+    paddingVertical: ms(6),
+    paddingLeft: ms(6),
+  },
+  chips: {
+    flex: 1,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: ms(6),
+  },
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    maxWidth: '100%',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderRadius: rs(4),
+    paddingVertical: ms(4),
+    paddingLeft: ms(8),
+    paddingRight: ms(6),
+    gap: ms(4),
+  },
+  chipText: {
+    flexShrink: 1,
+    fontSize: fs(13),
+  },
+  chipRemove: {
+    fontSize: fs(16),
+    lineHeight: fs(17),
+  },
+  radio: {
+    width: ws(22),
+    height: ws(22),
+    borderRadius: ws(11),
+    borderWidth: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  radioDot: {
+    width: ws(11),
+    height: ws(11),
+    borderRadius: ws(6),
   },
   rowText: {
     flex: 1,

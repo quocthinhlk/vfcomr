@@ -1011,6 +1011,8 @@ const fr = {
     reportSaved: "Rapport enregistré",
     reportSavedAndroid: "Enregistré dans le dossier Téléchargements :\n{name}",
     storagePermissionNeeded: "L'autorisation de stockage est nécessaire pour enregistrer le rapport.",
+    // Monthly data
+    weekDataNotLoaded: "Certaines semaines sont encore en cours de chargement. Patientez un instant puis réessayez.",
 } satisfies TranslationDictionary;
 
 export default fr;

@@ -1,5 +1,5 @@
-import React, {createContext, useContext, useState, useCallback} from 'react';
-import {WeeklyReportData, WorshipSession} from '../services/monthlydata.service';
+import React, {createContext, useContext, useState, useCallback, useMemo} from 'react';
+import {WorshipSession} from '../services/monthlydata.service';
 
 interface MonthlyDataState {
   // Key: `${churchId}_${year}_${weekNumber}`
@@ -104,9 +104,14 @@ export const MonthlyDataProvider: React.FC<{children: React.ReactNode}> = ({chil
     });
   }, []);
 
+  // Stable value: the provider wraps the whole app.
+  const value = useMemo(
+    () => ({getWeekData, setWeekData, removeWeekData, clearData}),
+    [getWeekData, setWeekData, removeWeekData, clearData],
+  );
+
   return (
-    <MonthlyDataContext.Provider
-      value={{getWeekData, setWeekData, removeWeekData, clearData}}>
+    <MonthlyDataContext.Provider value={value}>
       {children}
     </MonthlyDataContext.Provider>
   );

@@ -999,6 +999,8 @@ const en = {
     reportSaved: "Report saved",
     reportSavedAndroid: "Saved to the Download folder:\n{name}",
     storagePermissionNeeded: "Storage permission is needed to save the report.",
+    // Monthly data
+    weekDataNotLoaded: "Some weeks are still loading. Please wait a moment and try again.",
 } as const;
 
 export default en;

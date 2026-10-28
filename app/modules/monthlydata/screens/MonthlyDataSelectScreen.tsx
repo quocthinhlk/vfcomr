@@ -27,6 +27,7 @@ import {getWeekInfo, WeekInfo} from '../services/monthlydata.service';
 import {SaveButton} from '../../../shared/components/ActionButtons';
 import api from '../../../config/api';
 import {getIsoWeekDateRangeLabel} from '../../../shared/utils/isoWeek';
+import {parseYmd} from '../../church/utils/churchForm';
 
 const MONTHS = [
   {label: 'January', value: 1},
@@ -62,25 +63,23 @@ export default function MonthlyDataSelectScreen() {
   const [churchLoadError, setChurchLoadError] = useState<unknown>(null);
   const [weeksLoadError, setWeeksLoadError] = useState<unknown>(null);
   const lastWeekLoadKeyRef = useRef<string | null>(null);
+  /** Only the latest week-list request may update the list (fast month changes). */
+  const weekRequestRef = useRef(0);
   const didInitialFocusRef = useRef(false);
-  const localeMap: Record<string, string> = {
-    en: 'en',
-    pt: 'pt',
-    es: 'es',
-    fr: 'fr',
-    zh: 'zh',
-    ms: 'ms',
-    ja: 'ja',
-  };
   const formatLastRecord = useCallback(
     (dateString: string) => {
-      if (!dateString) {return '-';}
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) {return '-';}
-      const locale = localeMap[langCode as string] || 'en';
-      const month = new Intl.DateTimeFormat(locale, {month: 'short'}).format(date);
-      const year = date.getFullYear();
-      return `${month} ${year}`;
+      // parseYmd: `new Date('2026-05-01')` is UTC midnight, still April west of UTC.
+      const date = parseYmd(dateString);
+      if (!date) {
+        return '-';
+      }
+      let month: string;
+      try {
+        month = new Intl.DateTimeFormat(langCode || 'en', {month: 'short'}).format(date);
+      } catch {
+        month = new Intl.DateTimeFormat('en', {month: 'short'}).format(date);
+      }
+      return `${month} ${date.getFullYear()}`;
     },
     [langCode],
   );
@@ -125,7 +124,6 @@ export default function MonthlyDataSelectScreen() {
       if (savedChurchId) {
         const id = parseInt(savedChurchId, 10);
         if (!isNaN(id)) {
-          console.log('Church ID from AsyncStorage:', id);
           setChurchId(id);
           effectiveChurchId = id;
           hasSavedChurchId = true;
@@ -137,24 +135,24 @@ export default function MonthlyDataSelectScreen() {
 
       // If no AsyncStorage (or missing name), get from dashboard API
       if (!hasSavedChurchId || !savedChurchName) {
-        console.log('Fetching dashboard for church info...');
-        const response = await api.get('dashboard');
+        // With a saved church, ask for that church (not the account's default).
+        const response = await api.get(
+          'dashboard',
+          hasSavedChurchId ? {params: {church_id: effectiveChurchId}} : undefined,
+        );
         const dashboardInfo = response.data?.data?.dashboard_info;
         const dashboardChurchId = dashboardInfo?.church_id;
         const dashboardChurchName = dashboardInfo?.church_name;
         const dashboardLastReportDate = dashboardInfo?.last_report_date;
       
-        if (dashboardChurchId) {
-          console.log('Church ID from Dashboard API:', dashboardChurchId);
+        if (dashboardChurchId && !hasSavedChurchId) {
           setChurchId(dashboardChurchId);
           effectiveChurchId = dashboardChurchId;
           await AsyncStorage.setItem('selectedChurchId', String(dashboardChurchId));
-          if (dashboardChurchName) {
-            setChurchName(dashboardChurchName);
-            await AsyncStorage.setItem('selectedChurchName', String(dashboardChurchName));
-          }
-        } else if (!hasSavedChurchId) {
-          console.error('No church_id found in dashboard response');
+        }
+        if (dashboardChurchName && (!hasSavedChurchId || dashboardChurchId === effectiveChurchId)) {
+          setChurchName(dashboardChurchName);
+          await AsyncStorage.setItem('selectedChurchName', String(dashboardChurchName));
         }
 
         if (dashboardLastReportDate) {
@@ -176,7 +174,6 @@ export default function MonthlyDataSelectScreen() {
       }
       setChurchLoadError(null);
     } catch (error) {
-      console.error('Error loading church ID:', error);
       if (!effectiveChurchId) {
         setChurchLoadError(error);
       }
@@ -196,53 +193,74 @@ export default function MonthlyDataSelectScreen() {
     }
   }, [route?.params?.resetKey]);
 
-  // Load week info when year and month are selected
-  const loadWeekNumbers = useCallback(async () => {
-    if (!selectedYear || !selectedMonth || !churchId) return;
-    const loadKey = `${churchId}-${selectedYear}-${selectedMonth}`;
-    if (lastWeekLoadKeyRef.current === loadKey) return;
-
-    setLoadingWeeks(true);
-    try {
-      const weeks = await getWeekInfo(selectedYear, selectedMonth, churchId);
-      setWeekInfos(Array.isArray(weeks) ? weeks : []);
-      setSelectedWeeks(new Set()); // Reset selection when weeks change
-      lastWeekLoadKeyRef.current = loadKey;
-      setWeeksLoadError(null);
-    } catch (error: any) {
-      console.error('Error loading week numbers:', error);
-      // Weeks still on screen belong to a different month: drop them and show
-      // a recoverable error instead of "No weeks available".
-      setWeekInfos([]);
-      setSelectedWeeks(new Set());
-      setWeeksLoadError(error);
-    } finally {
-      setLoadingWeeks(false);
-    }
-  }, [selectedYear, selectedMonth, churchId]);
+  // Load week info when year and month are selected. `force` reloads the same
+  // month (back from the entry screen: the reported ticks may have changed).
+  const loadWeekNumbers = useCallback(
+    async (force = false) => {
+      if (!selectedYear || !selectedMonth || !churchId) {
+        return;
+      }
+      const loadKey = `${churchId}-${selectedYear}-${selectedMonth}`;
+      if (!force && lastWeekLoadKeyRef.current === loadKey) {
+        return;
+      }
+      const requestId = ++weekRequestRef.current;
+      const isLatest = () => requestId === weekRequestRef.current;
+      const sameMonth = lastWeekLoadKeyRef.current === loadKey;
+      setLoadingWeeks(true);
+      try {
+        const weeks = await getWeekInfo(selectedYear, selectedMonth, churchId);
+        if (!isLatest()) {
+          return;
+        }
+        const list = Array.isArray(weeks) ? weeks : [];
+        setWeekInfos(list);
+        // A refresh of the same month keeps the ticked weeks that still exist.
+        setSelectedWeeks(prev =>
+          sameMonth ? new Set([...prev].filter(w => list.some(info => info.week_number === w))) : new Set(),
+        );
+        lastWeekLoadKeyRef.current = loadKey;
+        setWeeksLoadError(null);
+      } catch (error: any) {
+        if (!isLatest()) {
+          return;
+        }
+        // Weeks still on screen belong to a different month: drop them and show
+        // a recoverable error instead of "No weeks available".
+        setWeekInfos([]);
+        setSelectedWeeks(new Set());
+        setWeeksLoadError(error);
+      } finally {
+        if (isLatest()) {
+          setLoadingWeeks(false);
+        }
+      }
+    },
+    [selectedYear, selectedMonth, churchId],
+  );
 
   // Trigger load when year/month change
   useEffect(() => {
     if (selectedYear && selectedMonth && churchId) {
       loadWeekNumbers();
     } else {
+      weekRequestRef.current += 1;
       lastWeekLoadKeyRef.current = null;
+      setLoadingWeeks(false);
       setWeekInfos(prev => (prev.length === 0 ? prev : []));
       setSelectedWeeks(prev => (prev.size === 0 ? prev : new Set()));
     }
   }, [selectedYear, selectedMonth, churchId, loadWeekNumbers]);
 
-  // Reload week data when screen is focused
+  // Back on this screen (e.g. after saving): refresh which weeks are reported.
   useFocusEffect(
     useCallback(() => {
       if (!didInitialFocusRef.current) {
         didInitialFocusRef.current = true;
         return;
       }
-      if (selectedYear && selectedMonth && churchId) {
-        loadWeekNumbers();
-      }
-    }, [selectedYear, selectedMonth, churchId, loadWeekNumbers]),
+      loadWeekNumbers(true);
+    }, [loadWeekNumbers]),
   );
 
   const toggleWeek = (weekNumber: number) => {
@@ -295,7 +313,7 @@ export default function MonthlyDataSelectScreen() {
           <Header
             title={t('addMonthlyData') || 'Add Monthly Data'}
             showMenu={false}
-            onBackPress={() => navigation.navigate('Dashboard')}
+            onBackPress={() => navigation.popTo('Dashboard')}
           />
         </View>
         
@@ -379,13 +397,13 @@ export default function MonthlyDataSelectScreen() {
                   </Text>
                 </View>
               ) : weeksLoadError && weekInfos.length === 0 ? (
-                <ApiErrorState compact error={weeksLoadError} onRetry={loadWeekNumbers} />
+                <ApiErrorState compact error={weeksLoadError} onRetry={() => loadWeekNumbers(true)} />
               ) : weekInfos.length > 0 ? (
                 weekInfos.map((weekInfo) => {
                   const weekNumber = weekInfo.week_number;
                   const isReported = weekInfo.is_reported;
                   const isSelected = selectedWeeks.has(weekNumber);
-                  const weekRange = getIsoWeekDateRangeLabel(selectedYear, weekNumber);
+                  const weekRange = getIsoWeekDateRangeLabel(selectedYear, weekNumber, langCode);
                   
                   return (
                     <TouchableOpacity
