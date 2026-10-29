@@ -1060,6 +1060,15 @@ const es = {
   storagePermissionNeeded: "Se necesita permiso de almacenamiento para guardar el informe.",
   // Monthly data
   weekDataNotLoaded: "Algunas semanas aún se están cargando. Espera un momento e inténtalo de nuevo.",
+  // OMR Map
+  omrMap: "Mapa OMR",
+  allGeographicalRegions: "Todas las regiones geográficas",
+  churchesOnMapCount: "{count} iglesias",
+  churchesOnMapCountOne: "1 iglesia",
+  showAllOnMap: "Mostrar todas",
+  noChurchesOnMap: "No hay iglesias con ubicación en el mapa aquí.",
+  avgAttendanceLast12Weeks: "Asistencia media (últimas 12 semanas)",
+  viewChurchDetails: "Ver detalles de la iglesia",
 } as const;
 
 export default es;

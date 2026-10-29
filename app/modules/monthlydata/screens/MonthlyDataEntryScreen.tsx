@@ -61,10 +61,28 @@ type AppInputProps = React.ComponentProps<typeof AppInput>;
 
 const MONTHLY_DATA_INPUT_FONT_SIZE = fs(15);
 
+/**
+ * Long amounts ("1,234,567,890" VND) don't fit the narrow input at the normal
+ * size and lost their first digits on screen, so the text shrinks with length.
+ */
+const inputFontSize = (value: unknown) => {
+  const length = typeof value === 'string' ? value.length : 0;
+  if (length > 13) {
+    return fs(11);
+  }
+  if (length > 11) {
+    return fs(12);
+  }
+  if (length > 9) {
+    return fs(13);
+  }
+  return MONTHLY_DATA_INPUT_FONT_SIZE;
+};
+
 const MonthlyDataInput = ({style, ...props}: AppInputProps) => (
   <AppInput
     {...props}
-    style={[{fontSize: MONTHLY_DATA_INPUT_FONT_SIZE}, style]}
+    style={[{fontSize: inputFontSize(props.value)}, style]}
   />
 );
 

@@ -1009,6 +1009,15 @@ const ms = {
     storagePermissionNeeded: "Kebenaran storan diperlukan untuk menyimpan laporan.",
     // Monthly data
     weekDataNotLoaded: "Sesetengah minggu masih dimuatkan. Sila tunggu sebentar dan cuba lagi.",
+    // OMR Map
+    omrMap: "Peta OMR",
+    allGeographicalRegions: "Semua wilayah geografi",
+    churchesOnMapCount: "{count} gereja",
+    churchesOnMapCountOne: "1 gereja",
+    showAllOnMap: "Tunjuk semua",
+    noChurchesOnMap: "Tiada gereja dengan lokasi peta di sini.",
+    avgAttendanceLast12Weeks: "Purata kehadiran (12 minggu terakhir)",
+    viewChurchDetails: "Lihat butiran gereja",
 } satisfies TranslationDictionary;
 
 export default ms;

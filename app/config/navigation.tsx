@@ -52,6 +52,7 @@ export type RootStackParamList = {
   PushReportConfig: { userId: number; name?: string };
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: { report?: string; group?: string } | undefined;
+  OmrMap: undefined;
   ChurchesPlantedLast10Years: undefined;
   OverseerChurchAttendanceChart: undefined;
   PastoralVisitsChart: undefined;
@@ -225,6 +226,7 @@ import PushMailSearchScreen from '../modules/pushmail/screens/PushMailSearchScre
 import PushReportConfigScreen from '../modules/pushmail/screens/PushReportConfigScreen';
 import EditOverseerGoalParametersScreen from '../modules/overseergoals/screens/EditOverseerGoalParametersScreen';
 import { GenerateReportsScreen } from '../modules/report/screens/GenerateReportsScreen';
+import OmrMapScreen from '../modules/omrmap/screens/OmrMapScreen';
 import { ChurchesPlantedLast10YearsScreen } from '../modules/dashboard/screens/ChurchesPlantedLast10YearsScreen';
  
 import AddChurchNetworkScreen from '../modules/churchnetwork/screens/AddChurchNetworkScreen';
@@ -467,6 +469,7 @@ export default function Navigation() {
               <Stack.Screen name="PushMailSearch" component={PushMailSearchScreen} />
               <Stack.Screen name="PushReportConfig" component={PushReportConfigScreen} />
               <Stack.Screen name="GenerateReports" component={GenerateReportsScreen} />
+              <Stack.Screen name="OmrMap" component={OmrMapScreen} />
               <Stack.Screen
                 name="ChurchesPlantedLast10Years"
                 component={ChurchesPlantedLast10YearsScreen}

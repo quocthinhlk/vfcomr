@@ -185,6 +185,7 @@ const getSuperAdminMenuItems = (t: TFunc, reportMenu: CommonMenuItem): CommonMen
     ],
   },
   reportMenu,
+  {label: t('omrMap'), routeName: 'OmrMap'},
   {
     label: t('churchNetworks'),
     children: [

@@ -993,6 +993,15 @@ const zh = {
     storagePermissionNeeded: "需要存储权限才能保存报告。",
     // Monthly data
     weekDataNotLoaded: "部分周的数据仍在加载，请稍候再试。",
+    // OMR Map
+    omrMap: "OMR 地图",
+    allGeographicalRegions: "所有地理区域",
+    churchesOnMapCount: "{count} 个教会",
+    churchesOnMapCountOne: "1 个教会",
+    showAllOnMap: "显示全部",
+    noChurchesOnMap: "此处没有带地图位置的教会。",
+    avgAttendanceLast12Weeks: "平均出席人数（最近 12 周）",
+    viewChurchDetails: "查看教会详情",
 } satisfies TranslationDictionary;
 
 export default zh;

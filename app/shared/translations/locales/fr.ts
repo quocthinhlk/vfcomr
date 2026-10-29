@@ -1013,6 +1013,15 @@ const fr = {
     storagePermissionNeeded: "L'autorisation de stockage est nécessaire pour enregistrer le rapport.",
     // Monthly data
     weekDataNotLoaded: "Certaines semaines sont encore en cours de chargement. Patientez un instant puis réessayez.",
+    // OMR Map
+    omrMap: "Carte OMR",
+    allGeographicalRegions: "Toutes les régions géographiques",
+    churchesOnMapCount: "{count} églises",
+    churchesOnMapCountOne: "1 église",
+    showAllOnMap: "Tout afficher",
+    noChurchesOnMap: "Aucune église avec une position sur la carte ici.",
+    avgAttendanceLast12Weeks: "Fréquentation moyenne (12 dernières semaines)",
+    viewChurchDetails: "Voir les détails de l'église",
 } satisfies TranslationDictionary;
 
 export default fr;

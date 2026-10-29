@@ -17,10 +17,10 @@ const APP_LANGUAGE_STORAGE_KEY = 'appLanguage';
 const DEFAULT_LANGUAGE = 'en';
 
 // Admin token
-export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI2NTYsInJvbGUiOiJBZG1pbiIsInJvbGVJRCI6MiwidXNlcklEIjo0ODI1fQ.11_t1FZFBdad3vcBG8_eq5c4LSSkHubeWxMjfx6OA9s";
+// export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI2NTYsInJvbGUiOiJBZG1pbiIsInJvbGVJRCI6MiwidXNlcklEIjo0ODI1fQ.11_t1FZFBdad3vcBG8_eq5c4LSSkHubeWxMjfx6OA9s";
 // Overseer token
 // export const TOKEN_FOR_TEST = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE4MDQwODI3MTUsInJvbGUiOiJHaXZpbmcgT3ZlcnNpZ2h0Iiwicm9sZUlEIjo4LCJ1c2VySUQiOjI0Mn0.JSdjDkonHna9DZVwORfbsLIz70oHRsbehAVR5We3TYY";
-// export const TOKEN_FOR_TEST = '';
+export const TOKEN_FOR_TEST = '';
 
 const api = axios.create({
   baseURL: 'https://tintran.cloud-ip.cc/api/v1/',

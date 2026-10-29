@@ -1001,6 +1001,15 @@ const en = {
     storagePermissionNeeded: "Storage permission is needed to save the report.",
     // Monthly data
     weekDataNotLoaded: "Some weeks are still loading. Please wait a moment and try again.",
+    // OMR Map
+    omrMap: "OMR Map",
+    allGeographicalRegions: "All geographical regions",
+    churchesOnMapCount: "{count} churches",
+    churchesOnMapCountOne: "1 church",
+    showAllOnMap: "Show all",
+    noChurchesOnMap: "No churches with a map location here.",
+    avgAttendanceLast12Weeks: "Avg. attendance (last 12 weeks)",
+    viewChurchDetails: "View church details",
 } as const;
 
 export default en;

@@ -1008,6 +1008,15 @@ const ja = {
     storagePermissionNeeded: "レポートを保存するにはストレージの許可が必要です。",
     // Monthly data
     weekDataNotLoaded: "一部の週のデータを読み込み中です。しばらくしてからもう一度お試しください。",
+    // OMR Map
+    omrMap: "OMRマップ",
+    allGeographicalRegions: "すべての地理的地域",
+    churchesOnMapCount: "{count} 件の教会",
+    churchesOnMapCountOne: "1 件の教会",
+    showAllOnMap: "すべて表示",
+    noChurchesOnMap: "ここには地図上の位置がある教会はありません。",
+    avgAttendanceLast12Weeks: "平均出席者数（直近12週）",
+    viewChurchDetails: "教会の詳細を見る",
 } satisfies TranslationDictionary;
 
 export default ja;

@@ -362,7 +362,7 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
           <RNText
             style={[themed.selectedText, selectedItem.color ? {color: selectedItem.color} : null]}
             numberOfLines={1}>
-            {fixMojibake(selectedItem.label)}
+            {stripTreePrefix(fixMojibake(selectedItem.label))}
           </RNText>
         ) : (
           <RNText style={themed.placeholderText} numberOfLines={1}>
