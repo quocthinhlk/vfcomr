@@ -1,29 +1,27 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {
-  deleteChurchType,
-  getChurchTypeById,
-} from '../services/churchtype.service';
+import {deleteChurchType, getChurchTypeById} from '../services/churchtype.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {returnToList} from '../../../shared/utils/returnToList';
-import {
-  DeleteConfirmView,
-  ScreenContainer,
-} from '../../../shared/components/crud';
+import {DeleteConfirmView, ScreenContainer} from '../../../shared/components/crud';
 
 export const DeleteChurchTypeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const churchTypeId: number | undefined = route.params?.churchTypeId;
+  const churchTypeId = Number(route.params?.churchTypeId) || undefined;
+  const {t} = useTranslation();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
+  const [deleteError, setDeleteError] = useState('');
   const [loading, setLoading] = useState(!!churchTypeId);
+  // Don't ask to confirm deleting a record we couldn't load (or have no id for).
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
-  const {t} = useTranslation();
 
-  // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
   const load = useCallback(async () => {
     if (!churchTypeId) {
       return;
@@ -33,7 +31,7 @@ export const DeleteChurchTypeScreen: React.FC = () => {
     try {
       const res = await getChurchTypeById(churchTypeId);
       if (mountedRef.current) {
-        setName(res?.data?.name || 'this church type');
+        setName(res?.data?.name || `#${churchTypeId}`);
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -55,16 +53,28 @@ export const DeleteChurchTypeScreen: React.FC = () => {
   }, [load]);
 
   const onConfirm = async () => {
-    if (!churchTypeId) return;
+    // A double tap lands before `submitting` disables the button.
+    if (!churchTypeId || submittingRef.current) {
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
+    setDeleteError('');
     try {
-      setSubmitting(true);
       await deleteChurchType(churchTypeId);
-      Alert.alert(t('success') || 'Success', `${t('delete')} ${t('churchType')} ${t('success')}`);
+      markDataChanged('churchTypes');
+      Alert.alert(t('success'), t('churchTypeDeleted'));
       returnToList(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete church type');
+      // Shown on the screen, with the API's reason (e.g. already deleted).
+      if (mountedRef.current) {
+        setDeleteError(getApiErrorMessage(e, t));
+      }
     } finally {
-      setSubmitting(false);
+      submittingRef.current = false;
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -74,13 +84,16 @@ export const DeleteChurchTypeScreen: React.FC = () => {
       scroll
       loading={loading}
       error={loadError}
-      onRetry={load}>
+      errorMessage={churchTypeId ? undefined : t('churchTypeNotFound')}
+      onRetry={churchTypeId ? load : undefined}>
       <DeleteConfirmView
         name={name}
+        message={t('deleteChurchTypeConfirm')}
         onCancel={() => navigation.goBack()}
         onConfirm={onConfirm}
         submitting={submitting}
         disabled={!churchTypeId}
+        errorMessage={deleteError}
       />
     </ScreenContainer>
   );

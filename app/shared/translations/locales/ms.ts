@@ -1019,6 +1019,14 @@ const ms = {
     noChurchesOnMap: "Tiada gereja dengan lokasi peta di sini.",
     avgAttendanceLast12Weeks: "Purata kehadiran (12 minggu terakhir)",
     viewChurchDetails: "Lihat butiran gereja",
+    // Church types
+    churchTypeCreated: "Jenis gereja dicipta.",
+    churchTypeUpdated: "Jenis gereja dikemas kini.",
+    churchTypeDeleted: "Jenis gereja dipadam.",
+    churchTypeNameExists: "Jenis gereja dengan nama ini sudah wujud.",
+    churchTypeNameTooLong: "Nama mestilah tidak melebihi {max} aksara.",
+    churchTypeNotFound: "Jenis gereja tidak ditemui.",
+    deleteChurchTypeConfirm: "\"{name}\" akan dipadam secara kekal. Gereja jenis ini akan tidak mempunyai jenis gereja. Tindakan ini tidak boleh dibatalkan.",
 } satisfies TranslationDictionary;
 
 export default ms;

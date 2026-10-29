@@ -1018,6 +1018,14 @@ const ja = {
     noChurchesOnMap: "ここには地図上の位置がある教会はありません。",
     avgAttendanceLast12Weeks: "平均出席者数（直近12週）",
     viewChurchDetails: "教会の詳細を見る",
+    // Church types
+    churchTypeCreated: "教会タイプを作成しました。",
+    churchTypeUpdated: "教会タイプを更新しました。",
+    churchTypeDeleted: "教会タイプを削除しました。",
+    churchTypeNameExists: "この名前の教会タイプは既に存在します。",
+    churchTypeNameTooLong: "名前は{max}文字以内で入力してください。",
+    churchTypeNotFound: "教会タイプが見つかりません。",
+    deleteChurchTypeConfirm: "「{name}」は完全に削除されます。このタイプの教会は教会タイプが未設定になります。この操作は元に戻せません。",
 } satisfies TranslationDictionary;
 
 export default ja;

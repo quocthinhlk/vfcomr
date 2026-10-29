@@ -1070,6 +1070,14 @@ const es = {
   noChurchesOnMap: "No hay iglesias con ubicación en el mapa aquí.",
   avgAttendanceLast12Weeks: "Asistencia media (últimas 12 semanas)",
   viewChurchDetails: "Ver detalles de la iglesia",
+  // Church types
+  churchTypeCreated: "Tipo de iglesia creado.",
+  churchTypeUpdated: "Tipo de iglesia actualizado.",
+  churchTypeDeleted: "Tipo de iglesia eliminado.",
+  churchTypeNameExists: "Ya existe un tipo de iglesia con este nombre.",
+  churchTypeNameTooLong: "El nombre debe tener como máximo {max} caracteres.",
+  churchTypeNotFound: "No se encontró el tipo de iglesia.",
+  deleteChurchTypeConfirm: "\"{name}\" se eliminará permanentemente. Las iglesias de este tipo quedarán sin tipo de iglesia. Esta acción no se puede deshacer.",
 } as const;
 
 export default es;

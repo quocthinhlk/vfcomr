@@ -1019,6 +1019,14 @@ const pt = {
     noChurchesOnMap: "Nenhuma igreja com localização no mapa aqui.",
     avgAttendanceLast12Weeks: "Frequência média (últimas 12 semanas)",
     viewChurchDetails: "Ver detalhes da igreja",
+    // Church types
+    churchTypeCreated: "Tipo de igreja criado.",
+    churchTypeUpdated: "Tipo de igreja atualizado.",
+    churchTypeDeleted: "Tipo de igreja excluído.",
+    churchTypeNameExists: "Já existe um tipo de igreja com este nome.",
+    churchTypeNameTooLong: "O nome deve ter no máximo {max} caracteres.",
+    churchTypeNotFound: "Tipo de igreja não encontrado.",
+    deleteChurchTypeConfirm: "\"{name}\" será removido permanentemente. As igrejas deste tipo ficarão sem tipo de igreja. Esta ação não pode ser desfeita.",
 } satisfies TranslationDictionary;
 
 export default pt;

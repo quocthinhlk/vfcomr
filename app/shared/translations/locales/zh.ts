@@ -1003,6 +1003,14 @@ const zh = {
     noChurchesOnMap: "此处没有带地图位置的教会。",
     avgAttendanceLast12Weeks: "平均出席人数（最近 12 周）",
     viewChurchDetails: "查看教会详情",
+    // Church types
+    churchTypeCreated: "已创建教会类型。",
+    churchTypeUpdated: "已更新教会类型。",
+    churchTypeDeleted: "已删除教会类型。",
+    churchTypeNameExists: "已存在同名的教会类型。",
+    churchTypeNameTooLong: "名称最多 {max} 个字符。",
+    churchTypeNotFound: "找不到该教会类型。",
+    deleteChurchTypeConfirm: "“{name}”将被永久删除。属于此类型的教会将没有教会类型。此操作无法撤销。",
 } satisfies TranslationDictionary;
 
 export default zh;

@@ -26,6 +26,8 @@ type Props = {
   loading?: boolean;
   /** Initial load failed: show a recoverable error state instead of the content. */
   error?: unknown;
+  /** Text for the error state when `error` is not an API error (e.g. a missing id). */
+  errorMessage?: string;
   onRetry?: () => void | Promise<unknown>;
   children?: React.ReactNode;
 };
@@ -38,6 +40,7 @@ export const ScreenContainer: React.FC<Props> = ({
   scroll = false,
   loading = false,
   error,
+  errorMessage,
   onRetry,
   children,
 }) => {
@@ -50,8 +53,8 @@ export const ScreenContainer: React.FC<Props> = ({
         <Header title={title} showMenu={showMenu} onBackPress={onBackPress} />
         {loading ? (
           <CenteredLoader />
-        ) : error ? (
-          <ApiErrorState error={error} onRetry={onRetry} />
+        ) : error || errorMessage ? (
+          <ApiErrorState error={error} message={errorMessage} onRetry={onRetry} />
         ) : scroll ? (
           <KeyboardAvoidingView
             style={styles.flex}

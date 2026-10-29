@@ -1,45 +1,21 @@
-import React, {useState} from 'react';
-import {Alert} from 'react-native';
+import React from 'react';
 import {useNavigation} from '@react-navigation/native';
 import {createChurchType} from '../services/churchtype.service';
+import {MAX_CHURCH_TYPE_NAME_LENGTH} from '../utils/churchType.utils';
+import {useChurchTypeForm} from '../utils/useChurchTypeForm';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import AppInput from '../../../shared/components/AppInput';
-import {
-  FormActions,
-  FormField,
-  ScreenContainer,
-} from '../../../shared/components/crud';
+import {FormActions, FormField, ScreenContainer} from '../../../shared/components/crud';
 
 export const AddChurchTypeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
-  const [name, setName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [nameError, setNameError] = useState('');
   const {t} = useTranslation();
-
-  const onNameChange = (value: string) => {
-    setName(value);
-    if (nameError && value.trim()) {
-      setNameError('');
-    }
-  };
-
-  const onSave = async () => {
-    if (!name.trim()) {
-      setNameError(t('fillRequiredFields') || 'Please fill all required fields.');
-      return;
-    }
-    try {
-      setSubmitting(true);
-      await createChurchType({ name: name.trim() });
-      Alert.alert(t('success') || 'Success', `${t('add')} ${t('churchType')} ${t('success')}`);
-      navigation.navigate('ChurchTypes', { reload: true });
-    } catch (e: any) {
-      Alert.alert(t('error') || 'Error', e?.message || t('failedToCreateChurch') || 'Failed to create church type');
-    } finally {
-      setSubmitting(false);
-    }
-  };
+  const {name, nameError, onNameChange, onSave, submitting} = useChurchTypeForm({
+    save: value => createChurchType({name: value}),
+    successMessage: t('churchTypeCreated'),
+    // Back to the list (replacing this form) instead of pushing another list.
+    onSaved: () => navigation.popTo('ChurchTypes'),
+  });
 
   return (
     <ScreenContainer title={`${t('addNew')} ${t('churchType')}`} scroll>
@@ -50,15 +26,14 @@ export const AddChurchTypeScreen: React.FC = () => {
           placeholder={t('churchType')}
           error={!!nameError}
           editable={!submitting}
+          maxLength={MAX_CHURCH_TYPE_NAME_LENGTH}
+          autoCapitalize="words"
           returnKeyType="done"
+          onSubmitEditing={onSave}
           accessibilityLabel={`${t('name')}, ${t('required')}`}
         />
       </FormField>
-      <FormActions
-        onCancel={() => navigation.goBack()}
-        onSave={onSave}
-        submitting={submitting}
-      />
+      <FormActions onCancel={() => navigation.goBack()} onSave={onSave} submitting={submitting} />
     </ScreenContainer>
   );
 };

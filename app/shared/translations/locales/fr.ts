@@ -1023,6 +1023,14 @@ const fr = {
     noChurchesOnMap: "Aucune église avec une position sur la carte ici.",
     avgAttendanceLast12Weeks: "Fréquentation moyenne (12 dernières semaines)",
     viewChurchDetails: "Voir les détails de l'église",
+    // Church types
+    churchTypeCreated: "Type d'église créé.",
+    churchTypeUpdated: "Type d'église mis à jour.",
+    churchTypeDeleted: "Type d'église supprimé.",
+    churchTypeNameExists: "Un type d'église portant ce nom existe déjà.",
+    churchTypeNameTooLong: "Le nom doit comporter au maximum {max} caractères.",
+    churchTypeNotFound: "Type d'église introuvable.",
+    deleteChurchTypeConfirm: "« {name} » sera définitivement supprimé. Les églises de ce type n'auront plus de type d'église. Cette action est irréversible.",
 } satisfies TranslationDictionary;
 
 export default fr;

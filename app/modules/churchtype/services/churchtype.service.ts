@@ -1,60 +1,8 @@
-import api, { DEFAULT_PAGE_LIMIT } from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../../config/api';
 
 export interface ChurchTypeItem {
   id: number;
   name: string;
-}
-
-export interface ListChurchTypesResponse {
-  success: boolean;
-  data: {
-    items: ChurchTypeItem[];
-    total: number;
-    page: number;
-    limit: number;
-    total_pages: number;
-    has_next: boolean;
-    has_previous: boolean;
-  };
-  message: string;
-}
-
-export interface ListChurchTypesParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-}
-
-export async function listChurchTypes(params: ListChurchTypesParams = {}) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-
-  // API returns a plain array in data; ignore pagination params
-  const response = await api.get(`/church-types`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-
-  const raw = response.data as any;
-  if (Array.isArray(raw?.data)) {
-    const items = raw.data as ChurchTypeItem[];
-    const normalized: ListChurchTypesResponse = {
-      success: !!raw.success,
-      data: {
-        items,
-        total: items.length,
-        page: 1,
-        limit: items.length || DEFAULT_PAGE_LIMIT,
-        total_pages: 1,
-        has_next: false,
-        has_previous: false,
-      },
-      message: raw?.message ?? 'OK',
-    };
-    return normalized;
-  }
-
-  return raw as ListChurchTypesResponse;
 }
 
 export interface GetChurchTypeResponse {
@@ -63,48 +11,44 @@ export interface GetChurchTypeResponse {
   message: string;
 }
 
+export interface ChurchTypePayload {
+  name: string;
+}
+
+/**
+ * GET church-types: every church type (the API has no paging or search; it
+ * ignores page / limit / search), so the list screen pages and searches locally.
+ */
+export async function listChurchTypes(): Promise<ChurchTypeItem[]> {
+  const response = await api.get('church-types');
+  const data = (response.data as any)?.data;
+  const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  return list
+    .map(item => ({id: Number(item?.id), name: String(item?.name ?? '')}))
+    .filter(item => Number.isFinite(item.id));
+}
+
 export async function getChurchTypeById(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.get<GetChurchTypeResponse>(`/church-types/${id}`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  const response = await api.get<GetChurchTypeResponse>(`church-types/${id}`);
   return response.data;
 }
 
-export interface CreateChurchTypePayload { name: string }
-
-export async function createChurchType(payload: CreateChurchTypePayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.post(`/church-types`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+/** POST church-types. The API answers without the new id. */
+export async function createChurchType(payload: ChurchTypePayload) {
+  const response = await api.post('church-types', payload);
   return response.data;
 }
 
-export interface UpdateChurchTypePayload { name: string }
-
-export async function updateChurchType(id: number, payload: UpdateChurchTypePayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.patch(`/church-types/${id}`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+export async function updateChurchType(id: number, payload: ChurchTypePayload) {
+  const response = await api.patch(`church-types/${id}`, payload);
   return response.data;
 }
 
+/**
+ * DELETE church-types/:id. Churches of this type are left without a type
+ * (the API clears it), so the confirmation screen warns about that.
+ */
 export async function deleteChurchType(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.delete(`/church-types/${id}`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  const response = await api.delete(`church-types/${id}`);
   return response.data;
-} 
+}

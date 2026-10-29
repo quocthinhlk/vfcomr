@@ -1011,6 +1011,14 @@ const en = {
     noChurchesOnMap: "No churches with a map location here.",
     avgAttendanceLast12Weeks: "Avg. attendance (last 12 weeks)",
     viewChurchDetails: "View church details",
+    // Church types
+    churchTypeCreated: "Church type created.",
+    churchTypeUpdated: "Church type updated.",
+    churchTypeDeleted: "Church type deleted.",
+    churchTypeNameExists: "A church type with this name already exists.",
+    churchTypeNameTooLong: "Name must be at most {max} characters.",
+    churchTypeNotFound: "Church type not found.",
+    deleteChurchTypeConfirm: "\"{name}\" will be permanently removed. Churches of this type will be left without a church type. This action cannot be undone.",
 } as const;
 
 export default en;
