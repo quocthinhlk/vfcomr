@@ -998,6 +998,7 @@ const en = {
     formatNotAvailable: "Not available for this report",
     reportSaved: "Report saved",
     reportSavedAndroid: "Saved to the Download folder:\n{name}",
+    noAppToOpenReport: "No app on this phone can open this file. It was saved to the Download folder:\n{name}",
     storagePermissionNeeded: "Storage permission is needed to save the report.",
     // Monthly data
     weekDataNotLoaded: "Some weeks are still loading. Please wait a moment and try again.",

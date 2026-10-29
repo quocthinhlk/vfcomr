@@ -23,6 +23,16 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
 
+    <!-- Android 11+ hides other apps unless declared: without this, "is there
+         an app to open this report (xlsx / pdf)?" always answered no, so files
+         could never be opened (react-native-file-viewer uses resolveActivity). -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:mimeType="*/*" />
+        </intent>
+    </queries>
+
     <application
         android:name=".MainApplication"
         android:label="@string/app_name"

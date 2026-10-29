@@ -1005,6 +1005,7 @@ const ja = {
     formatNotAvailable: "このレポートでは利用できません",
     reportSaved: "レポートを保存しました",
     reportSavedAndroid: "ダウンロードフォルダに保存しました：\n{name}",
+    noAppToOpenReport: "この端末にはこのファイルを開けるアプリがありません。ダウンロードフォルダに保存しました：\n{name}",
     storagePermissionNeeded: "レポートを保存するにはストレージの許可が必要です。",
     // Monthly data
     weekDataNotLoaded: "一部の週のデータを読み込み中です。しばらくしてからもう一度お試しください。",

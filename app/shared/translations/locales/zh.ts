@@ -990,6 +990,7 @@ const zh = {
     formatNotAvailable: "此报告不提供该格式",
     reportSaved: "报告已保存",
     reportSavedAndroid: "已保存到“下载”文件夹：\n{name}",
+    noAppToOpenReport: "此手机上没有可以打开该文件的应用，已保存到“下载”文件夹：\n{name}",
     storagePermissionNeeded: "需要存储权限才能保存报告。",
     // Monthly data
     weekDataNotLoaded: "部分周的数据仍在加载，请稍候再试。",

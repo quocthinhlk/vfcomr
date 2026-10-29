@@ -323,11 +323,18 @@ export function useReportGenerator() {
             showAppsSuggestions: true,
           });
         } catch {
-          await Share.share(
-            Platform.OS === 'ios'
-              ? {url: fileUrl, title: file.filename}
-              : {title: file.filename, message: file.filename, url: fileUrl},
-          );
+          if (Platform.OS === 'ios') {
+            // The share sheet offers other apps and "Save to Files".
+            await Share.share({url: fileUrl, title: file.filename});
+          } else {
+            // Android's share sheet can only send text (it showed just the
+            // file name), so keep the file in Download and say where it is.
+            const savedPath = await saveReportToDownloads(file);
+            Alert.alert(
+              t('reportSaved'),
+              t('noAppToOpenReport').replace('{name}', savedPath.split('/').pop() || file.filename),
+            );
+          }
         }
       } catch (error) {
         if (mounted.current) {

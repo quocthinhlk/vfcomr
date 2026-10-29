@@ -1006,6 +1006,7 @@ const ms = {
     formatNotAvailable: "Tidak tersedia untuk laporan ini",
     reportSaved: "Laporan disimpan",
     reportSavedAndroid: "Disimpan dalam folder Muat Turun:\n{name}",
+    noAppToOpenReport: "Tiada aplikasi pada telefon ini boleh membuka fail ini. Ia telah disimpan dalam folder Muat Turun:\n{name}",
     storagePermissionNeeded: "Kebenaran storan diperlukan untuk menyimpan laporan.",
     // Monthly data
     weekDataNotLoaded: "Sesetengah minggu masih dimuatkan. Sila tunggu sebentar dan cuba lagi.",

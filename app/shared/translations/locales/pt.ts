@@ -1006,6 +1006,7 @@ const pt = {
     formatNotAvailable: "Não disponível para este relatório",
     reportSaved: "Relatório salvo",
     reportSavedAndroid: "Salvo na pasta Downloads:\n{name}",
+    noAppToOpenReport: "Nenhum app deste telefone consegue abrir este arquivo. Ele foi salvo na pasta Downloads:\n{name}",
     storagePermissionNeeded: "É necessária permissão de armazenamento para salvar o relatório.",
     // Monthly data
     weekDataNotLoaded: "Algumas semanas ainda estão carregando. Aguarde um momento e tente novamente.",

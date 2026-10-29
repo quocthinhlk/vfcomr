@@ -1010,6 +1010,7 @@ const fr = {
     formatNotAvailable: "Non disponible pour ce rapport",
     reportSaved: "Rapport enregistré",
     reportSavedAndroid: "Enregistré dans le dossier Téléchargements :\n{name}",
+    noAppToOpenReport: "Aucune application de ce téléphone ne peut ouvrir ce fichier. Il a été enregistré dans le dossier Téléchargements :\n{name}",
     storagePermissionNeeded: "L'autorisation de stockage est nécessaire pour enregistrer le rapport.",
     // Monthly data
     weekDataNotLoaded: "Certaines semaines sont encore en cours de chargement. Patientez un instant puis réessayez.",
