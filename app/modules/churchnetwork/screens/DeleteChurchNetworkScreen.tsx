@@ -1,31 +1,28 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {
-  deleteChurchNetwork,
-  getChurchNetworkById,
-} from '../services/churchnetwork.service';
+import {deleteChurchNetwork, getChurchNetworkById} from '../services/churchnetwork.service';
+import {churchesBlockingDelete} from '../utils/churchNetwork.utils';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {returnToList} from '../../../shared/utils/returnToList';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
-import {
-  DeleteConfirmView,
-  ScreenContainer,
-} from '../../../shared/components/crud';
+import {DeleteConfirmView, ScreenContainer} from '../../../shared/components/crud';
 
 export const DeleteChurchNetworkScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const churchNetworkId: number | undefined = route.params?.churchNetworkId;
+  const churchNetworkId = Number(route.params?.churchNetworkId) || undefined;
+  const {t} = useTranslation();
   const [name, setName] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(!!churchNetworkId);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
-  const {t} = useTranslation();
 
-  // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
+  // Don't ask to confirm deleting a record we couldn't load (or have no id for).
   const load = useCallback(async () => {
     if (!churchNetworkId) {
       return;
@@ -33,9 +30,9 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getChurchNetworkById(churchNetworkId);
+      const network = await getChurchNetworkById(churchNetworkId);
       if (mountedRef.current) {
-        setName(res?.data?.name || 'this church network');
+        setName(network?.name || `#${churchNetworkId}`);
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -57,20 +54,34 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
   }, [load]);
 
   const onConfirm = async () => {
-    if (!churchNetworkId) return;
+    // A double tap lands before `submitting` disables the button.
+    if (!churchNetworkId || submittingRef.current) {
+      return;
+    }
+    submittingRef.current = true;
+    setSubmitting(true);
+    setErrorMessage('');
     try {
-      setSubmitting(true);
-      setErrorMessage('');
       await deleteChurchNetwork(churchNetworkId);
-      Alert.alert(t('success') || 'Success', `${t('delete')} ${t('churchNetwork')} ${t('success')}`);
+      markDataChanged('churchNetworks');
+      Alert.alert(t('success'), t('churchNetworkDeleted'));
       returnToList(navigation);
-    } catch (e: any) {
-      const detail = e?.response?.data?.errors?.detail;
+    } catch (e) {
+      if (!mountedRef.current) {
+        return;
+      }
+      // Networks with churches can't be deleted: say so in the app's language.
+      const count = churchesBlockingDelete(e);
       setErrorMessage(
-        (typeof detail === 'string' && detail.trim()) || getApiErrorMessage(e, t),
+        count !== null
+          ? t('churchNetworkInUse').replace('{count}', String(count))
+          : getApiErrorMessage(e, t),
       );
     } finally {
-      setSubmitting(false);
+      submittingRef.current = false;
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
   };
 
@@ -80,7 +91,8 @@ export const DeleteChurchNetworkScreen: React.FC = () => {
       scroll
       loading={loading}
       error={loadError}
-      onRetry={load}>
+      errorMessage={churchNetworkId ? undefined : t('churchNetworkNotFound')}
+      onRetry={churchNetworkId ? load : undefined}>
       <DeleteConfirmView
         name={name}
         onCancel={() => navigation.goBack()}

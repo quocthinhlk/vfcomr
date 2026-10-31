@@ -1011,6 +1011,18 @@ const zh = {
     churchTypeNameTooLong: "名称最多 {max} 个字符。",
     churchTypeNotFound: "找不到该教会类型。",
     deleteChurchTypeConfirm: "“{name}”将被永久删除。属于此类型的教会将没有教会类型。此操作无法撤销。",
+    churchTypeCountOne: "1 个教会类型",
+    churchTypeCount: "{count} 个教会类型",
+    // Church networks
+    churchNetworkCreated: "已创建教会网络。",
+    churchNetworkUpdated: "已更新教会网络。",
+    churchNetworkDeleted: "已删除教会网络。",
+    churchNetworkNameExists: "已存在同名的教会网络。",
+    churchNetworkNameTooLong: "名称最多 {max} 个字符。",
+    churchNetworkNotFound: "找不到该教会网络。",
+    churchNetworkInUse: "无法删除此网络：仍有 {count} 个教会属于该网络。请先将它们移到其他网络。",
+    churchNetworkCountOne: "1 个教会网络",
+    churchNetworkCount: "{count} 个教会网络",
 } satisfies TranslationDictionary;
 
 export default zh;

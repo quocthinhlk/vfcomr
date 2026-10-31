@@ -1027,6 +1027,18 @@ const pt = {
     churchTypeNameTooLong: "O nome deve ter no máximo {max} caracteres.",
     churchTypeNotFound: "Tipo de igreja não encontrado.",
     deleteChurchTypeConfirm: "\"{name}\" será removido permanentemente. As igrejas deste tipo ficarão sem tipo de igreja. Esta ação não pode ser desfeita.",
+    churchTypeCountOne: "1 tipo de igreja",
+    churchTypeCount: "{count} tipos de igreja",
+    // Church networks
+    churchNetworkCreated: "Rede de igrejas criada.",
+    churchNetworkUpdated: "Rede de igrejas atualizada.",
+    churchNetworkDeleted: "Rede de igrejas excluída.",
+    churchNetworkNameExists: "Já existe uma rede de igrejas com este nome.",
+    churchNetworkNameTooLong: "O nome deve ter no máximo {max} caracteres.",
+    churchNetworkNotFound: "Rede de igrejas não encontrada.",
+    churchNetworkInUse: "Esta rede não pode ser excluída: {count} igreja(s) ainda pertencem a ela. Mova-as primeiro para outra rede.",
+    churchNetworkCountOne: "1 rede de igrejas",
+    churchNetworkCount: "{count} redes de igrejas",
 } satisfies TranslationDictionary;
 
 export default pt;

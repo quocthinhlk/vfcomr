@@ -1026,6 +1026,18 @@ const ja = {
     churchTypeNameTooLong: "名前は{max}文字以内で入力してください。",
     churchTypeNotFound: "教会タイプが見つかりません。",
     deleteChurchTypeConfirm: "「{name}」は完全に削除されます。このタイプの教会は教会タイプが未設定になります。この操作は元に戻せません。",
+    churchTypeCountOne: "教会タイプ 1 件",
+    churchTypeCount: "教会タイプ {count} 件",
+    // Church networks
+    churchNetworkCreated: "教会ネットワークを作成しました。",
+    churchNetworkUpdated: "教会ネットワークを更新しました。",
+    churchNetworkDeleted: "教会ネットワークを削除しました。",
+    churchNetworkNameExists: "この名前の教会ネットワークは既に存在します。",
+    churchNetworkNameTooLong: "名前は{max}文字以内で入力してください。",
+    churchNetworkNotFound: "教会ネットワークが見つかりません。",
+    churchNetworkInUse: "このネットワークには{count}件の教会が所属しているため削除できません。先に別のネットワークへ移動してください。",
+    churchNetworkCountOne: "教会ネットワーク 1 件",
+    churchNetworkCount: "教会ネットワーク {count} 件",
 } satisfies TranslationDictionary;
 
 export default ja;

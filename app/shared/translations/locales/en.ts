@@ -1019,6 +1019,18 @@ const en = {
     churchTypeNameTooLong: "Name must be at most {max} characters.",
     churchTypeNotFound: "Church type not found.",
     deleteChurchTypeConfirm: "\"{name}\" will be permanently removed. Churches of this type will be left without a church type. This action cannot be undone.",
+    churchTypeCountOne: "1 church type",
+    churchTypeCount: "{count} church types",
+    // Church networks
+    churchNetworkCreated: "Church network created.",
+    churchNetworkUpdated: "Church network updated.",
+    churchNetworkDeleted: "Church network deleted.",
+    churchNetworkNameExists: "A church network with this name already exists.",
+    churchNetworkNameTooLong: "Name must be at most {max} characters.",
+    churchNetworkNotFound: "Church network not found.",
+    churchNetworkInUse: "This network can't be deleted: {count} church(es) still belong to it. Move them to another network first.",
+    churchNetworkCountOne: "1 church network",
+    churchNetworkCount: "{count} church networks",
 } as const;
 
 export default en;

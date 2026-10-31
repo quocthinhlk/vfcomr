@@ -1027,6 +1027,18 @@ const ms = {
     churchTypeNameTooLong: "Nama mestilah tidak melebihi {max} aksara.",
     churchTypeNotFound: "Jenis gereja tidak ditemui.",
     deleteChurchTypeConfirm: "\"{name}\" akan dipadam secara kekal. Gereja jenis ini akan tidak mempunyai jenis gereja. Tindakan ini tidak boleh dibatalkan.",
+    churchTypeCountOne: "1 jenis gereja",
+    churchTypeCount: "{count} jenis gereja",
+    // Church networks
+    churchNetworkCreated: "Rangkaian gereja dicipta.",
+    churchNetworkUpdated: "Rangkaian gereja dikemas kini.",
+    churchNetworkDeleted: "Rangkaian gereja dipadam.",
+    churchNetworkNameExists: "Rangkaian gereja dengan nama ini sudah wujud.",
+    churchNetworkNameTooLong: "Nama mestilah tidak melebihi {max} aksara.",
+    churchNetworkNotFound: "Rangkaian gereja tidak ditemui.",
+    churchNetworkInUse: "Rangkaian ini tidak boleh dipadam: {count} gereja masih menjadi ahlinya. Pindahkan ke rangkaian lain dahulu.",
+    churchNetworkCountOne: "1 rangkaian gereja",
+    churchNetworkCount: "{count} rangkaian gereja",
 } satisfies TranslationDictionary;
 
 export default ms;

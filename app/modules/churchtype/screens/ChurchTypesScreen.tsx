@@ -118,7 +118,9 @@ export const ChurchTypesScreen: React.FC = () => {
         countText={
           loadError && !allItems.length
             ? undefined
-            : `${view.total} ${t('churchTypes').toLowerCase()}`
+            : view.total === 1
+              ? t('churchTypeCountOne')
+              : t('churchTypeCount').replace('{count}', String(view.total))
         }
         addRoute="AddChurchType"
       />

@@ -1,11 +1,8 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {
-  getChurchNetworkById,
-  updateChurchNetwork,
-} from '../services/churchnetwork.service';
+import {getChurchNetworkById, updateChurchNetwork} from '../services/churchnetwork.service';
+import {useChurchNetworkForm} from '../utils/useChurchNetworkForm';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {ScreenContainer} from '../../../shared/components/crud';
 import {ChurchNetworkForm} from '../components/ChurchNetworkUI';
@@ -13,15 +10,19 @@ import {ChurchNetworkForm} from '../components/ChurchNetworkUI';
 export const EditChurchNetworkScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
-  const churchNetworkId: number | undefined = route.params?.churchNetworkId;
-  const [name, setName] = useState('');
-  const [submitting, setSubmitting] = useState(false);
-  const [pastorLocked, setPastorLocked] = useState(false);
+  const churchNetworkId = Number(route.params?.churchNetworkId) || undefined;
+  const {t} = useTranslation();
   const [loading, setLoading] = useState(!!churchNetworkId);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
-  const [nameError, setNameError] = useState('');
-  const {t} = useTranslation();
+
+  const form = useChurchNetworkForm({
+    selfId: churchNetworkId,
+    save: payload => updateChurchNetwork(churchNetworkId as number, payload),
+    successMessage: t('churchNetworkUpdated'),
+    onSaved: () => returnAfterEdit(navigation),
+  });
+  const {setName, setLocked} = form;
 
   useEffect(() => {
     mountedRef.current = true;
@@ -38,12 +39,11 @@ export const EditChurchNetworkScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getChurchNetworkById(churchNetworkId);
-      if (!mountedRef.current) {
-        return;
+      const network = await getChurchNetworkById(churchNetworkId);
+      if (mountedRef.current) {
+        setName(network?.name ?? '');
+        setLocked(!!network?.pastor_credential_locked);
       }
-      setName(res?.data?.name || '');
-      setPastorLocked(!!res?.data?.pastor_credential_locked);
     } catch (e) {
       // Without the record the form would be blank: show a retryable error.
       if (mountedRef.current) {
@@ -54,47 +54,29 @@ export const EditChurchNetworkScreen: React.FC = () => {
         setLoading(false);
       }
     }
-  }, [churchNetworkId]);
+  }, [churchNetworkId, setName, setLocked]);
 
   useEffect(() => {
     load();
   }, [load]);
 
-  const onNameChange = (value: string) => {
-    setName(value);
-    if (nameError && value.trim()) {
-      setNameError('');
-    }
-  };
-
-  const onSave = async () => {
-    if (!churchNetworkId) return;
-    if (!name.trim()) {
-      setNameError(t('fillRequiredFields') || 'Please fill all required fields.');
-      return;
-    }
-    try {
-      setSubmitting(true);
-      await updateChurchNetwork(churchNetworkId, { name: name.trim(), pastor_credential_locked: pastorLocked });
-      Alert.alert(t('success') || 'Success', `${t('edit')} ${t('churchNetwork')} ${t('success')}`);
-      returnAfterEdit(navigation);
-    } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to update');
-    } finally {
-      setSubmitting(false);
-    }
-  };
-
   return (
-    <ScreenContainer title={`${t('edit')} ${t('churchNetwork')}`} scroll loading={loading} error={loadError} onRetry={load}>
+    <ScreenContainer
+      title={`${t('edit')} ${t('churchNetwork')}`}
+      scroll
+      loading={loading}
+      error={loadError}
+      // No id: an error state, never a blank form whose Save does nothing.
+      errorMessage={churchNetworkId ? undefined : t('churchNetworkNotFound')}
+      onRetry={churchNetworkId ? load : undefined}>
       <ChurchNetworkForm
-        name={name}
-        onNameChange={onNameChange}
-        locked={pastorLocked}
-        onLockedChange={setPastorLocked}
-        nameError={nameError}
-        submitting={submitting}
-        onSave={onSave}
+        name={form.name}
+        onNameChange={form.onNameChange}
+        locked={form.locked}
+        onLockedChange={form.setLocked}
+        nameError={form.nameError}
+        submitting={form.submitting}
+        onSave={form.onSave}
         onCancel={() => navigation.goBack()}
       />
     </ScreenContainer>

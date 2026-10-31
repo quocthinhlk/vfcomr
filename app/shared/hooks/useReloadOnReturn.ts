@@ -10,7 +10,8 @@ export type DataKey =
   | 'roleChangeRequests'
   | 'users'
   | 'churches'
-  | 'churchTypes';
+  | 'churchTypes'
+  | 'churchNetworks';
 
 export function markDataChanged(key: DataKey) {
   dataVersions.set(key, (dataVersions.get(key) ?? 0) + 1);

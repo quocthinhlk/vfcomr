@@ -1,59 +1,10 @@
-import api, { DEFAULT_PAGE_LIMIT } from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import api from '../../../config/api';
 
 export interface ChurchNetworkItem {
   id: number;
   name: string;
+  /** Pastors of churches in this network can't edit their own credentials. */
   pastor_credential_locked: boolean;
-}
-
-export interface ListChurchNetworksResponse {
-  success: boolean;
-  data: {
-    items: ChurchNetworkItem[];
-    total: number;
-    page: number;
-    limit: number;
-    total_pages: number;
-    has_next: boolean;
-    has_previous: boolean;
-  };
-  message: string;
-}
-
-export interface ListChurchNetworksParams {
-  page?: number;
-  limit?: number;
-  search?: string;
-}
-
-export async function listChurchNetworks(params: ListChurchNetworksParams = {}) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-
-  const response = await api.get(`/church-networks`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-
-  const raw = response.data as any;
-  if (Array.isArray(raw?.data)) {
-    const items = raw.data as ChurchNetworkItem[];
-    const normalized: ListChurchNetworksResponse = {
-      success: !!raw.success,
-      data: {
-        items,
-        total: items.length,
-        page: 1,
-        limit: items.length || DEFAULT_PAGE_LIMIT,
-        total_pages: 1,
-        has_next: false,
-        has_previous: false,
-      },
-      message: raw?.message ?? 'OK',
-    };
-    return normalized;
-  }
-  return raw as ListChurchNetworksResponse;
 }
 
 export interface GetChurchNetworkResponse {
@@ -62,54 +13,51 @@ export interface GetChurchNetworkResponse {
   message: string;
 }
 
-export async function getChurchNetworkById(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.get<GetChurchNetworkResponse>(`/church-networks/${id}`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-  return response.data;
-}
-
-export interface CreateChurchNetworkPayload {
+export interface ChurchNetworkPayload {
   name: string;
-  pastor_credential_locked?: boolean;
+  pastor_credential_locked: boolean;
 }
 
-export async function createChurchNetwork(payload: CreateChurchNetworkPayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.post(`/church-networks`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+const toItem = (raw: any): ChurchNetworkItem => ({
+  id: Number(raw?.id),
+  name: String(raw?.name ?? ''),
+  pastor_credential_locked: raw?.pastor_credential_locked === true,
+});
+
+/**
+ * GET church-networks: every network at once (the API has no paging or
+ * search), so the list screen searches and pages locally.
+ */
+export async function listChurchNetworks(): Promise<ChurchNetworkItem[]> {
+  const response = await api.get('church-networks');
+  const data = (response.data as any)?.data;
+  const list: any[] = Array.isArray(data) ? data : Array.isArray(data?.items) ? data.items : [];
+  return list.map(toItem).filter(item => Number.isFinite(item.id));
+}
+
+export async function getChurchNetworkById(id: number): Promise<ChurchNetworkItem | null> {
+  const response = await api.get<GetChurchNetworkResponse>(`church-networks/${id}`);
+  const data = (response.data as any)?.data;
+  return data ? toItem(data) : null;
+}
+
+/** POST church-networks. Fails with 400 "Church network name already exists". */
+export async function createChurchNetwork(payload: ChurchNetworkPayload) {
+  const response = await api.post('church-networks', payload);
   return response.data;
 }
 
-export interface UpdateChurchNetworkPayload {
-  name: string;
-  pastor_credential_locked?: boolean;
-}
-
-export async function updateChurchNetwork(id: number, payload: UpdateChurchNetworkPayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.patch(`/church-networks/${id}`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+export async function updateChurchNetwork(id: number, payload: ChurchNetworkPayload) {
+  const response = await api.patch(`church-networks/${id}`, payload);
   return response.data;
 }
 
+/**
+ * DELETE church-networks/:id. Refused while churches belong to the network
+ * (500, `errors.detail`: "cannot delete church network: N churches are
+ * associated with this network").
+ */
 export async function deleteChurchNetwork(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.delete(`/church-networks/${id}`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  const response = await api.delete(`church-networks/${id}`);
   return response.data;
-} 
+}

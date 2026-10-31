@@ -10,6 +10,7 @@ import {
   StatusBadge,
 } from '../../../shared/components/crud';
 import {LockIcon, UnlockIcon} from '../../../shared/components/icons/UiIcons';
+import {MAX_CHURCH_NETWORK_NAME_LENGTH} from '../utils/churchNetwork.utils';
 
 export const CredentialBadge: React.FC<{locked: boolean}> = ({locked}) => {
   const {t} = useTranslation();
@@ -51,7 +52,10 @@ export const ChurchNetworkForm: React.FC<FormProps> = ({
           placeholder={t('churchNetwork')}
           error={!!nameError}
           editable={!submitting}
+          maxLength={MAX_CHURCH_NETWORK_NAME_LENGTH}
+          autoCapitalize="words"
           returnKeyType="done"
+          onSubmitEditing={onSave}
           accessibilityLabel={`${t('name')}, ${t('required')}`}
         />
       </FormField>
