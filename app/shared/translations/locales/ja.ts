@@ -1038,6 +1038,7 @@ const ja = {
     churchNetworkInUse: "このネットワークには{count}件の教会が所属しているため削除できません。先に別のネットワークへ移動してください。",
     churchNetworkCountOne: "教会ネットワーク 1 件",
     churchNetworkCount: "教会ネットワーク {count} 件",
+    openMenu: "メニューを開く",
 } satisfies TranslationDictionary;
 
 export default ja;

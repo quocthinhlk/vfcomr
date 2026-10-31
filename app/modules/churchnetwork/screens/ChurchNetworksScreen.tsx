@@ -107,6 +107,10 @@ export const ChurchNetworksScreen: React.FC = () => {
     <EntityListCard
       title={item.name || '—'}
       trailingText={`#${item.id}`}
+      // The card is one accessibility element: say the lock state too.
+      accessibilityLabel={`${item.name || '—'}, ${
+        item.pastor_credential_locked ? t('credentialLocked') : t('credentialUnlocked')
+      }, #${item.id}`}
       onPress={() => navigation.navigate('EditChurchNetwork', {churchNetworkId: item.id})}
       onMorePress={() => openActions(item)}>
       <CredentialBadge locked={item.pastor_credential_locked} />

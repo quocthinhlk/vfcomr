@@ -96,15 +96,11 @@ export const EntityListCard = React.memo(function EntityListCard({
   const T = useUiTokens();
   const {t} = useTranslation();
 
+  // The "…" button is a sibling of the pressable card body, not inside it:
+  // a touchable is one accessibility element, so a button nested in it was
+  // unreachable for VoiceOver / TalkBack (and UI tests).
   return (
-    <TouchableOpacity
-      activeOpacity={0.7}
-      onPress={onPress}
-      onLongPress={onMorePress}
-      delayLongPress={300}
-      disabled={!onPress && !onMorePress}
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel ?? title}
+    <View
       style={[
         styles.card,
         {
@@ -113,27 +109,37 @@ export const EntityListCard = React.memo(function EntityListCard({
           shadowOpacity: T.shadowOpacity,
         },
       ]}>
-      <View style={styles.cardBody}>
-        <Text
-          style={[
-            styles.cardTitle,
-            {color: C.textPrimary},
-            !!onMorePress && styles.cardTitleWithMore,
-          ]}
-          numberOfLines={titleLines}>
-          {title}
-        </Text>
-        {(!!children || !!trailingText) && (
-          <View style={styles.cardBottom}>
-            <View style={styles.cardChildren}>{children}</View>
-            {!!trailingText && (
-              <Text style={[styles.trailing, {color: C.textSecondary}]}>
-                {trailingText}
-              </Text>
-            )}
-          </View>
-        )}
-      </View>
+      <TouchableOpacity
+        activeOpacity={0.7}
+        onPress={onPress}
+        onLongPress={onMorePress}
+        delayLongPress={300}
+        disabled={!onPress && !onMorePress}
+        accessibilityRole="button"
+        accessibilityLabel={accessibilityLabel ?? title}
+        style={styles.cardPress}>
+        <View style={styles.cardBody}>
+          <Text
+            style={[
+              styles.cardTitle,
+              {color: C.textPrimary},
+              !!onMorePress && styles.cardTitleWithMore,
+            ]}
+            numberOfLines={titleLines}>
+            {title}
+          </Text>
+          {(!!children || !!trailingText) && (
+            <View style={styles.cardBottom}>
+              <View style={styles.cardChildren}>{children}</View>
+              {!!trailingText && (
+                <Text style={[styles.trailing, {color: C.textSecondary}]}>
+                  {trailingText}
+                </Text>
+              )}
+            </View>
+          )}
+        </View>
+      </TouchableOpacity>
       {!!onMorePress && (
         <TouchableOpacity
           onPress={onMorePress}
@@ -144,7 +150,7 @@ export const EntityListCard = React.memo(function EntityListCard({
           <MoreIcon color={C.textSecondary} />
         </TouchableOpacity>
       )}
-    </TouchableOpacity>
+    </View>
   );
 });
 
@@ -292,11 +298,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(12),
-    paddingVertical: ms(12),
-    paddingHorizontal: ms(16),
     marginBottom: ms(10),
     borderRadius: rs(12),
     borderWidth: StyleSheet.hairlineWidth,
@@ -304,6 +305,14 @@ const styles = StyleSheet.create({
     shadowRadius: rs(6),
     shadowOffset: {width: 0, height: 2},
     elevation: 1,
+  },
+  // Padding lives on the pressable part so the whole card stays tappable.
+  cardPress: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(12),
+    paddingVertical: ms(12),
+    paddingHorizontal: ms(16),
   },
   cardBody: {
     flex: 1,

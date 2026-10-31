@@ -1,0 +1,83 @@
+# Church Networks CRUD (Admin). Run: maestro test e2e/maestro/church_networks.yaml
+# Needs a signed-in Admin. Creates and deletes "ZZ Maestro Net".
+appId: ${APP_ID}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "OVERSEER.*"
+    timeout: 30000
+# Side menu → Church Networks → Add New
+- tapOn: "Open menu"
+- scrollUntilVisible:
+    element: ".*Church Networks.*"
+    direction: DOWN
+- tapOn: ".*Church Networks.*"
+- tapOn: ".*Add New.*"
+- assertVisible: "Add New Church Network"
+
+# Blank name: required error, nothing saved
+- tapOn: "Save"
+- assertVisible: "The Name field is required."
+
+# Duplicate (case-insensitive) of an existing network
+- tapOn: "Church Network"
+- inputText: "other"
+- tapOn: "Save"
+- assertVisible: "A church network with this name already exists."
+
+# Valid name + pastor credential locked
+- tapOn: "Name, Required"
+- eraseText: 10
+- inputText: "ZZ Maestro Net"
+- tapOn: "Pastor credential locked"
+- assertVisible:
+    text: "Pastor credential locked"
+    checked: true
+- tapOn: "Save"
+- assertVisible: "Church network created."
+- tapOn: "OK"
+- assertVisible: "Church Networks"
+
+# Search finds it, with its lock badge
+- tapOn: "Search"
+- inputText: "maestro"
+- assertVisible: "ZZ Maestro Net, Credential Locked, #.*"
+- assertVisible: "1 church network"
+
+# Edit: duplicate blocked, then rename + unlock
+- tapOn: "ZZ Maestro Net, .*"
+- assertVisible: "Edit Church Network"
+- tapOn: "Name, Required"
+- eraseText: 20
+- inputText: "Other"
+- tapOn: "Save"
+- assertVisible: "A church network with this name already exists."
+- tapOn: "Name, Required"
+- eraseText: 10
+- inputText: "ZZ Maestro Net 2"
+- tapOn: "Pastor credential locked"
+- tapOn: "Save"
+- assertVisible: "Church network updated."
+- tapOn: "OK"
+- assertVisible: "ZZ Maestro Net 2, Credential Unlocked, #.*"
+
+# Delete it
+- tapOn: "More actions: ZZ Maestro Net 2"
+- tapOn: "Delete"
+- assertVisible: "Delete Church Network"
+- tapOn: "Delete"
+- assertVisible: "Church network deleted."
+- tapOn: "OK"
+- assertVisible: "No church networks found"
+
+# A network that still has churches can't be deleted
+- tapOn: "Search"
+- eraseText: 10
+- inputText: "vfc network"
+- tapOn: "More actions: VFC Network.*"
+- tapOn: "Delete"
+- tapOn: "Delete"
+- assertVisible: "This network can't be deleted.*"
+- takeScreenshot: church_network_in_use
+- tapOn: "Cancel"

@@ -1031,6 +1031,7 @@ const en = {
     churchNetworkInUse: "This network can't be deleted: {count} church(es) still belong to it. Move them to another network first.",
     churchNetworkCountOne: "1 church network",
     churchNetworkCount: "{count} church networks",
+    openMenu: "Open menu",
 } as const;
 
 export default en;

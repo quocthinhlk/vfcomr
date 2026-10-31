@@ -223,17 +223,25 @@ export const MenuPopup: React.FC<MenuPopupProps> = ({
       animationType="none"
       visible={isMounted}
       onRequestClose={onClose}>
-      <TouchableWithoutFeedback onPress={onClose}>
+      {/* accessible={false}: a Touchable* is one accessibility element by
+          default, so on iOS the whole menu was a single VoiceOver element and
+          its items could not be reached one by one. */}
+      <TouchableWithoutFeedback onPress={onClose} accessible={false}>
         <Animated.View style={[styles.overlay, {opacity: fadeAnim}]}>
-          <TouchableWithoutFeedback onPress={() => {}}>
+          <TouchableWithoutFeedback onPress={() => {}} accessible={false}>
             <Animated.View
+              accessibilityViewIsModal
               style={[
                 styles.menuContainer,
                 {transform: [{translateX: slideAnim}]},
               ]}>
               <SafeAreaView style={styles.safeArea}>
                 {/* Close popup button */}
-                <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+                <TouchableOpacity
+                  style={styles.closeButton}
+                  onPress={onClose}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('close')}>
                   <View style={styles.closeIcon}>
                     <View style={styles.closeLine} />
                     <View style={[styles.closeLine, styles.closeLineReverse]} />

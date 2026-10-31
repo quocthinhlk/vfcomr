@@ -1,0 +1,68 @@
+# Church Types CRUD (Admin). Run: maestro test -e APP_ID=<bundle id> e2e/maestro/church_types.yaml
+# Needs a signed-in Admin. Creates and deletes "ZZ Maestro Type".
+appId: ${APP_ID}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "OVERSEER.*"
+    timeout: 30000
+# Side menu → Church Types → Add New
+- tapOn: "Open menu"
+- scrollUntilVisible:
+    element: ".*Church Types.*"
+    direction: DOWN
+- tapOn: ".*Church Types.*"
+- tapOn: ".*Add New.*"
+- assertVisible: "Add New Church Type"
+
+# Blank name: required error, nothing saved
+- tapOn: "Save"
+- assertVisible: "The Name field is required."
+
+# Duplicate (case-insensitive) of an existing type
+- tapOn: "Name, Required"
+- inputText: "network church"
+- tapOn: "Save"
+- assertVisible: "A church type with this name already exists."
+
+# Valid name
+- tapOn: "Name, Required"
+- eraseText: 20
+- inputText: "ZZ Maestro Type"
+- tapOn: "Save"
+- assertVisible: "Church type created."
+- tapOn: "OK"
+
+# Search finds it
+- tapOn: "Search"
+- inputText: "maestro"
+- assertVisible: "ZZ Maestro Type"
+- assertVisible: "1 church type"
+
+# Edit: duplicate blocked, then rename
+- tapOn: "ZZ Maestro Type"
+- assertVisible: "Edit Church Type"
+- tapOn: "Name, Required"
+- eraseText: 20
+- inputText: "Network Church"
+- tapOn: "Save"
+- assertVisible: "A church type with this name already exists."
+- tapOn: "Name, Required"
+- eraseText: 20
+- inputText: "ZZ Maestro Type 2"
+- tapOn: "Save"
+- assertVisible: "Church type updated."
+- tapOn: "OK"
+- assertVisible: "ZZ Maestro Type 2"
+
+# Delete: the confirmation warns that churches lose this type
+- tapOn: "More actions: ZZ Maestro Type 2"
+- tapOn: "Delete"
+- assertVisible: "Delete Church Type"
+- assertVisible: ".*Churches of this type will be left without a church type.*"
+- takeScreenshot: church_type_delete_warning
+- tapOn: "Delete"
+- assertVisible: "Church type deleted."
+- tapOn: "OK"
+- assertVisible: "No data found"

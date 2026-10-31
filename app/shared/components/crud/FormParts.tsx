@@ -1,5 +1,5 @@
 import React from 'react';
-import {Platform, StyleSheet, Switch, View} from 'react-native';
+import {Platform, StyleSheet, Switch, View, Pressable} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useThemedColors} from '../../styles/theme';
 import {useUiTokens} from '../../styles/uiTokens';
@@ -71,8 +71,16 @@ export const FormSwitchRow: React.FC<SwitchProps> = ({
   description,
 }) => {
   const C = useThemedColors();
+  // The whole row toggles (a bigger target than the switch alone) and is one
+  // "switch" for screen readers, with its on / off state.
   return (
-    <View style={styles.switchRow}>
+    <Pressable
+      style={styles.switchRow}
+      onPress={() => onValueChange(!value)}
+      disabled={disabled}
+      accessibilityRole="switch"
+      accessibilityLabel={label}
+      accessibilityState={{checked: value, disabled: !!disabled}}>
       <View style={styles.switchText}>
         <Text
           style={[
@@ -96,10 +104,11 @@ export const FormSwitchRow: React.FC<SwitchProps> = ({
         disabled={disabled}
         thumbColor={COLORS.white}
         trackColor={{false: C.border, true: COLORS.mainColor}}
-        accessibilityLabel={label}
+        accessible={false}
+        importantForAccessibility="no"
         style={styles.switch}
       />
-    </View>
+    </Pressable>
   );
 };
 

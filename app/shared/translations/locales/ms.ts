@@ -1039,6 +1039,7 @@ const ms = {
     churchNetworkInUse: "Rangkaian ini tidak boleh dipadam: {count} gereja masih menjadi ahlinya. Pindahkan ke rangkaian lain dahulu.",
     churchNetworkCountOne: "1 rangkaian gereja",
     churchNetworkCount: "{count} rangkaian gereja",
+    openMenu: "Buka menu",
 } satisfies TranslationDictionary;
 
 export default ms;

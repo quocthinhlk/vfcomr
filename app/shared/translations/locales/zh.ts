@@ -1023,6 +1023,7 @@ const zh = {
     churchNetworkInUse: "无法删除此网络：仍有 {count} 个教会属于该网络。请先将它们移到其他网络。",
     churchNetworkCountOne: "1 个教会网络",
     churchNetworkCount: "{count} 个教会网络",
+    openMenu: "打开菜单",
 } satisfies TranslationDictionary;
 
 export default zh;

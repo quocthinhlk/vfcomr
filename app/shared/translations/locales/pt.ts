@@ -1039,6 +1039,7 @@ const pt = {
     churchNetworkInUse: "Esta rede não pode ser excluída: {count} igreja(s) ainda pertencem a ela. Mova-as primeiro para outra rede.",
     churchNetworkCountOne: "1 rede de igrejas",
     churchNetworkCount: "{count} redes de igrejas",
+    openMenu: "Abrir menu",
 } satisfies TranslationDictionary;
 
 export default pt;

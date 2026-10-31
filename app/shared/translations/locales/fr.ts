@@ -1043,6 +1043,7 @@ const fr = {
     churchNetworkInUse: "Ce réseau ne peut pas être supprimé : {count} église(s) en font encore partie. Déplacez-les d'abord vers un autre réseau.",
     churchNetworkCountOne: "1 réseau d'églises",
     churchNetworkCount: "{count} réseaux d'églises",
+    openMenu: "Ouvrir le menu",
 } satisfies TranslationDictionary;
 
 export default fr;

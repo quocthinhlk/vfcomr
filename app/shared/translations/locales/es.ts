@@ -1090,6 +1090,7 @@ const es = {
   churchNetworkInUse: "No se puede eliminar esta red: todavía pertenecen {count} iglesia(s). Muévalas primero a otra red.",
   churchNetworkCountOne: "1 red de iglesias",
   churchNetworkCount: "{count} redes de iglesias",
+  openMenu: "Abrir menú",
 } as const;
 
 export default es;
