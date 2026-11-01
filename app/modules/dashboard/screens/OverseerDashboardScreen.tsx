@@ -492,11 +492,6 @@ export default function OverseerDashboardScreen() {
 
   const actionItems: OverseerActionItem[] = [
     {
-      icon: require('../../../../app/assets/images/icon/chart.png'),
-      label: t('monthlyData') || 'Monthly Data',
-      routeName: 'MonthlyDataSelect',
-    },
-    {
       icon: require('../../../../app/assets/images/icon/car.png'),
       label: t('enterVisits') || 'Visits & Events',
       routeName: 'EnterVisits',
@@ -692,10 +687,7 @@ export default function OverseerDashboardScreen() {
               <Text
                 style={{
                   flex: 1,
-                  color:
-                    item.routeName === 'MonthlyDataSelect'
-                      ? COLORS.mainColor
-                      : C.textPrimary,
+                  color: C.textPrimary,
                   fontSize: fs(14),
                 }}>
                 {item.label}

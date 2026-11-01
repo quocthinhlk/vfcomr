@@ -12,7 +12,7 @@ import {
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {useNavigation} from '@react-navigation/native';
-import MapView, {MapPressEvent, Marker, Region} from 'react-native-maps';
+import MapView, {MapPressEvent, Marker, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import api from '../../../config/api';
 import {Header} from '../../../shared/components/Header';
 import ElementDropdown, {ElementDropdownItem} from '../../../shared/components/ElementDropdown';
@@ -279,6 +279,8 @@ export default function OmrMapScreen() {
       <View style={styles.container}>
         <MapView
           ref={mapRef}
+          // Google Maps on both platforms (iOS would default to Apple Maps).
+          provider={PROVIDER_GOOGLE}
           style={StyleSheet.absoluteFill}
           initialRegion={WORLD}
           onMapReady={onMapReady}

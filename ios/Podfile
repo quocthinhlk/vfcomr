@@ -6,6 +6,20 @@ def node_require(script)
     )", __dir__]).strip
 end
 
+def maps_api_key_from_local_config
+  key = ENV['MAPS_API_KEY'].to_s.strip
+  return key unless key.empty?
+  ['../android/local.properties', '.xcode.env.local'].each do |relative|
+    path = File.join(__dir__, relative)
+    next unless File.exist?(path)
+    File.foreach(path) do |line|
+      match = line.match(/^\s*(?:export\s+)?MAPS_API_KEY\s*=\s*["']?([^"'\s]+)/)
+      return match[1] if match
+    end
+  end
+  ''
+end
+
 node_require('react-native/scripts/react_native_pods.rb')
 node_require('react-native-permissions/scripts/setup.rb')
 
@@ -36,7 +50,25 @@ target 'vfcomr' do
     :app_path => "#{Pod::Config.instance.installation_root}/.."
   )
 
+  # Google Maps on iOS too (same look as Android). PROVIDER_GOOGLE needs the
+  # GoogleMaps SDK pod and an API key (see maps_api_key below).
+  pod 'react-native-google-maps', :path => '../node_modules/react-native-maps'
+
   post_install do |installer|
+    # Google Maps API key, kept out of git: env MAPS_API_KEY, else the same key
+    # Android uses (android/local.properties). Written to the app's Pods
+    # xcconfigs (git-ignored) and read through Info.plist GMSApiKey.
+    maps_api_key = maps_api_key_from_local_config
+    if maps_api_key.empty?
+      Pod::UI.warn 'MAPS_API_KEY not set (env or android/local.properties): Google Maps will not load on iOS.'
+    end
+    installer.aggregate_targets.each do |aggregate_target|
+      aggregate_target.xcconfigs.each do |config_name, xcconfig|
+        xcconfig.attributes['MAPS_API_KEY'] = maps_api_key
+        xcconfig.save_as(aggregate_target.xcconfig_path(config_name))
+      end
+    end
+
     # https://github.com/facebook/react-native/blob/main/packages/react-native/scripts/react_native_pods.rb#L197-L202
     react_native_post_install(
       installer,

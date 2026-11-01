@@ -3,7 +3,6 @@ import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {
   ActivityIndicator,
   Alert,
-  Platform,
   StyleSheet,
   TouchableOpacity,
   View,
@@ -15,6 +14,7 @@ import MapView, {
   LatLng,
   MapPressEvent,
   Marker,
+  PROVIDER_GOOGLE,
   Region,
   UserLocationChangeEvent,
 } from 'react-native-maps';
@@ -188,13 +188,15 @@ export const EditChurchLocationScreen: React.FC = () => {
         <View style={styles.container}>
           <MapView
             ref={mapRef}
+            // Google Maps on both platforms (iOS would default to Apple Maps).
+            provider={PROVIDER_GOOGLE}
             style={StyleSheet.absoluteFill}
             initialRegion={initialRegion}
             onPress={onMapPress}
             userInterfaceStyle={theme}
             showsUserLocation={locationGranted}
             onUserLocationChange={onUserLocationChange}
-            showsMyLocationButton={locationGranted && Platform.OS === 'android'}
+            showsMyLocationButton={locationGranted}
             mapPadding={{top: helperHeight ? helperHeight + ms(12) : 0, right: 0, bottom: 0, left: 0}}
             showsCompass
             showsScale>

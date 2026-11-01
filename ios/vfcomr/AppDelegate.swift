@@ -3,6 +3,7 @@ import React
 import React_RCTAppDelegate
 import ReactAppDependencyProvider
 import FirebaseCore
+import GoogleMaps
 
 @main
 class AppDelegate: RCTAppDelegate {
@@ -12,6 +13,13 @@ class AppDelegate: RCTAppDelegate {
     if FirebaseApp.app() == nil,
        Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil {
       FirebaseApp.configure()
+    }
+
+    // Google Maps (MapView provider="google"). The key comes from the build
+    // setting MAPS_API_KEY (see Podfile); unset, it stays "$(MAPS_API_KEY)" or "".
+    if let mapsKey = Bundle.main.object(forInfoDictionaryKey: "GMSApiKey") as? String,
+       !mapsKey.isEmpty, !mapsKey.hasPrefix("$(") {
+      GMSServices.provideAPIKey(mapsKey)
     }
 
     self.moduleName = "vfcomr"
