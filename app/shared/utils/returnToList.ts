@@ -70,7 +70,7 @@ export function returnAfterEdit(navigation: {
   popTo?: (name: string, params?: object) => void;
   navigate: (name: string, params?: object) => void;
   goBack: () => void;
-}) {
+}, extraParams?: object) {
   const state = navigation.getState?.();
   const routes = state?.routes ?? [];
   const currentIndex = state?.index ?? routes.length - 1;
@@ -83,6 +83,7 @@ export function returnAfterEdit(navigation: {
 
   const params = {
     ...(target.params ?? {}),
+    ...(extraParams ?? {}),
     reload: true,
     refresh: true,
     refetchKey: Date.now(),

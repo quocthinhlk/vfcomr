@@ -11,13 +11,15 @@ import {
   View,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
-import {useNavigation} from '@react-navigation/native';
-import MapView, {MapPressEvent, Marker, PROVIDER_GOOGLE, Region} from 'react-native-maps';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import MapView, {LongPressEvent, MapPressEvent, Marker, PROVIDER_GOOGLE, Region} from 'react-native-maps';
 import api from '../../../config/api';
 import {Header} from '../../../shared/components/Header';
 import ElementDropdown, {ElementDropdownItem} from '../../../shared/components/ElementDropdown';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
+import {PlusIcon} from '../../../shared/components/icons/UiIcons';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -58,9 +60,12 @@ function flattenRegions(nodes: any[], depth = 0): ElementDropdownItem[] {
  * fetched from churches/map-locations as the map moves; churches close
  * together on screen are grouped (tap to zoom in, or to list them when they
  * share a spot). Tapping a church shows its details and opens its page.
+ * "Add location" (or holding the map down) picks a church and places it;
+ * after saving, the map moves to that church.
  */
 export default function OmrMapScreen() {
   const navigation = useNavigation<any>();
+  const route = useRoute<any>();
   const {t} = useTranslation();
   const C = useThemedColors();
   const T = useUiTokens();
@@ -83,6 +88,9 @@ export default function OmrMapScreen() {
   const pendingFitRef = useRef<ChurchMapLocation[] | null>(null);
   /** While all churches of the filter load, map moves don't fetch their area. */
   const loadingAllRef = useRef(false);
+  const mapRegionRef = useRef<Region>(WORLD);
+  /** Set when the filter is cleared to show a focused church: skip that filter's fit-all. */
+  const skipFilterLoadRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -151,6 +159,10 @@ export default function OmrMapScreen() {
   }, [begin, cancel, fitTo]);
 
   useEffect(() => {
+    if (skipFilterLoadRef.current) {
+      skipFilterLoadRef.current = false;
+      return;
+    }
     loadAndFit();
   }, [geoRegionId, loadAndFit]);
 
@@ -183,8 +195,83 @@ export default function OmrMapScreen() {
     [begin],
   );
 
+  /** After a location was saved from here: show that church (zoomed in, details open). */
+  const focusChurch = useCallback(
+    async (churchId: number) => {
+      cancel('area');
+      const isLatest = begin('map');
+      loadingAllRef.current = true;
+      setLoading(true);
+      setError(null);
+      setSelected(null);
+      try {
+        let list = await getChurchMapLocations({geographicalRegionId: geoRegionIdRef.current});
+        if (!list.some(c => c.id === churchId) && geoRegionIdRef.current != null) {
+          // Outside the region filter: show all regions instead.
+          list = await getChurchMapLocations();
+          if (isLatest()) {
+            skipFilterLoadRef.current = true;
+            geoRegionIdRef.current = null;
+            setGeoRegionId(null);
+          }
+        }
+        if (!isLatest()) {
+          return;
+        }
+        setLocations(list);
+        const church = list.find(c => c.id === churchId);
+        if (church) {
+          setSelected([church]);
+          fitTo([church]);
+        }
+      } catch (e) {
+        if (isLatest()) {
+          setError(e);
+        }
+      } finally {
+        if (isLatest()) {
+          loadingAllRef.current = false;
+          setLoading(false);
+        }
+      }
+    },
+    [begin, cancel, fitTo],
+  );
+
+  // Back from EditChurchLocation (Save → focusChurchId) or any church change.
+  const focusChurchIdRef = useRef<number | null>(null);
+  focusChurchIdRef.current = Number(route.params?.focusChurchId) || null;
+  useReloadOnReturn(
+    () => {
+      const churchId = focusChurchIdRef.current;
+      if (churchId) {
+        focusChurch(churchId);
+      } else {
+        // The church in the card may have moved or lost its location.
+        setSelected(null);
+        loadArea(mapRegionRef.current);
+      }
+    },
+    {
+      dataKey: 'churches',
+      reload: route.params?.refetchKey,
+      clearReload: () =>
+        navigation.setParams({focusChurchId: undefined, refetchKey: undefined, reload: undefined, refresh: undefined}),
+    },
+  );
+
+  const openAddLocation = (point?: {latitude: number; longitude: number}) => {
+    setSelected(null);
+    navigation.navigate('OmrMapChurchPicker', point ?? {});
+  };
+
+  const onMapLongPress = (event: LongPressEvent) => {
+    openAddLocation(event.nativeEvent.coordinate);
+  };
+
   const onRegionChangeComplete = (rawRegion: Region) => {
     const region = normalizeRegion(rawRegion);
+    mapRegionRef.current = region;
     setMapRegion(region);
     if (!loadingAllRef.current) {
       debounce('area', () => loadArea(region), 450);
@@ -259,12 +346,27 @@ export default function OmrMapScreen() {
             </TouchableOpacity>
           ) : null}
         </View>
-        <TouchableOpacity
-          style={[styles.detailButton, {backgroundColor: T.brandTint}]}
-          onPress={() => navigation.navigate('ChurchDetail', {id: church.id})}
-          accessibilityRole="button">
-          <Text style={[styles.detailButtonText, {color: T.brandText}]}>{t('viewChurchDetails')}</Text>
-        </TouchableOpacity>
+        <View style={styles.actionRow}>
+          <TouchableOpacity
+            style={[styles.detailButton, {backgroundColor: T.brandTint}]}
+            onPress={() => navigation.navigate('ChurchDetail', {id: church.id})}
+            accessibilityRole="button">
+            <Text style={[styles.detailButtonText, {color: T.brandText}]}>{t('viewChurchDetails')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.detailButton, {borderWidth: 1, borderColor: C.border}]}
+            onPress={() =>
+              navigation.navigate('EditChurchLocation', {
+                id: church.id,
+                latitude: church.latitude,
+                longitude: church.longitude,
+              })
+            }
+            accessibilityRole="button"
+            accessibilityLabel={`${t('editLocation')}: ${fixMojibake(church.name)}`}>
+            <Text style={[styles.detailButtonText, {color: C.textPrimary}]}>{t('editLocation')}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     );
   };
@@ -286,6 +388,7 @@ export default function OmrMapScreen() {
           onMapReady={onMapReady}
           onRegionChangeComplete={onRegionChangeComplete}
           onPress={onMapPress}
+          onLongPress={onMapLongPress}
           userInterfaceStyle={theme}
           rotateEnabled={false}
           showsCompass={false}
@@ -343,6 +446,19 @@ export default function OmrMapScreen() {
             </View>
           ) : null}
         </View>
+
+        {!selected ? (
+          <TouchableOpacity
+            style={[styles.addButton, {backgroundColor: COLORS.mainColor}]}
+            onPress={() => openAddLocation()}
+            activeOpacity={0.85}
+            accessibilityRole="button"
+            accessibilityLabel={t('addChurchLocation')}
+            accessibilityHint={t('addChurchLocationHint')}>
+            <PlusIcon size={ms(18)} color="#fff" />
+            <Text style={styles.addButtonText}>{t('addLocation')}</Text>
+          </TouchableOpacity>
+        ) : null}
 
         {selected ? (
           <View style={[styles.sheet, {backgroundColor: T.sheetBg, borderColor: C.border}]}>
@@ -420,6 +536,23 @@ const styles = StyleSheet.create({
   churchMeta: {fontSize: fs(13), lineHeight: fs(18)},
   contactRow: {flexDirection: 'row', flexWrap: 'wrap', columnGap: ms(14), rowGap: ms(2), marginTop: ms(2)},
   link: {fontSize: fs(13), fontWeight: '600'},
-  detailButton: {marginTop: ms(8), alignSelf: 'flex-start', borderRadius: rs(8), paddingVertical: ms(7), paddingHorizontal: ms(12)},
+  actionRow: {flexDirection: 'row', flexWrap: 'wrap', gap: ms(8), marginTop: ms(8)},
+  detailButton: {borderRadius: rs(8), paddingVertical: ms(7), paddingHorizontal: ms(12)},
+  addButton: {
+    position: 'absolute',
+    right: ms(16),
+    bottom: ms(28),
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: ms(6),
+    borderRadius: rs(24),
+    paddingVertical: ms(11),
+    paddingHorizontal: ms(16),
+    ...Platform.select({
+      ios: {shadowColor: '#000', shadowOpacity: 0.2, shadowRadius: 6, shadowOffset: {width: 0, height: 2}},
+      android: {elevation: 5},
+    }),
+  },
+  addButtonText: {color: '#fff', fontSize: fs(14), fontWeight: '700'},
   detailButtonText: {fontSize: fs(13), fontWeight: '700'},
 });

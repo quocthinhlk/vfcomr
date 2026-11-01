@@ -103,7 +103,8 @@ export const EditChurchLocationScreen: React.FC = () => {
       Alert.alert(t('success'), t('locationSaved') || 'Location saved.', [
         {
           text: t('ok'),
-          onPress: () => returnAfterEdit(navigation),
+          // The OMR Map moves to the church it just placed.
+          onPress: () => returnAfterEdit(navigation, {focusChurchId: churchId}),
         },
       ]);
     } catch (error: any) {

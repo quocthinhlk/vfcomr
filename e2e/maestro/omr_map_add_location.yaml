@@ -1,0 +1,65 @@
+# OMR Map → Add location (admin): pick a church without a location, place it,
+# check the map moves to it, then remove the location again (staging data
+# unchanged). Uses #5198 "Victory Family Centre - Adelaide 2nd Service".
+# Run: maestro test -e APP_ID=org.vfc-omr.app-- e2e/maestro/omr_map_add_location.yaml
+appId: ${APP_ID}
+---
+- launchApp:
+    stopApp: true
+- extendedWaitUntil:
+    visible: "Open menu"
+    timeout: 60000
+- tapOn: "Open menu"
+- scrollUntilVisible:
+    element: ".*OMR Map.*"
+    direction: DOWN
+- tapOn: ".*OMR Map.*"
+- extendedWaitUntil:
+    visible: "Show all"
+    timeout: 20000
+- tapOn: "Add church location"
+- extendedWaitUntil:
+    visible: "Choose a church to add or change its map location."
+    timeout: 10000
+- tapOn: "Search"
+- inputText: "adelaide 2nd"
+- extendedWaitUntil:
+    visible: "Victory Family Centre - Adelaide 2nd Service, No location, #5198"
+    timeout: 15000
+- tapOn: "Victory Family Centre - Adelaide 2nd Service, No location, #5198"
+- extendedWaitUntil:
+    visible: "Remove location|Save"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 5000
+- tapOn:
+    point: "50%,55%"
+- tapOn: "Save"
+- extendedWaitUntil:
+    visible: "OK"
+    timeout: 15000
+- tapOn: "OK"
+- extendedWaitUntil:
+    visible: "Victory Family Centre - Adelaide 2nd Service"
+    timeout: 20000
+- assertVisible: "Church Details"
+- waitForAnimationToEnd:
+    timeout: 6000
+- tapOn: "Edit location: Victory Family Centre - Adelaide 2nd Service"
+- extendedWaitUntil:
+    visible: "Remove location"
+    timeout: 15000
+- tapOn: "Remove location"
+- tapOn: "Remove"
+- extendedWaitUntil:
+    visible: "OK"
+    timeout: 15000
+- tapOn: "OK"
+- extendedWaitUntil:
+    visible: "Show all"
+    timeout: 15000
+- waitForAnimationToEnd:
+    timeout: 5000
+- assertNotVisible: "Church Details"
+- assertVisible: "Add church location"
+- takeScreenshot: omr_map_after_remove

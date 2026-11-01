@@ -52,7 +52,9 @@ export type RootStackParamList = {
   PushReportConfig: { userId: number; name?: string };
   EditOverseerGoals: { goalPeriodId: number } | undefined;
   GenerateReports: { report?: string; group?: string } | undefined;
-  OmrMap: undefined;
+  OmrMap: {focusChurchId?: number; refetchKey?: number} | undefined;
+  /** latitude / longitude: the point held down on the map (the church is placed there). */
+  OmrMapChurchPicker: {latitude?: number; longitude?: number} | undefined;
   ChurchesPlantedLast10Years: undefined;
   OverseerChurchAttendanceChart: undefined;
   PastoralVisitsChart: undefined;
@@ -227,6 +229,7 @@ import PushReportConfigScreen from '../modules/pushmail/screens/PushReportConfig
 import EditOverseerGoalParametersScreen from '../modules/overseergoals/screens/EditOverseerGoalParametersScreen';
 import { GenerateReportsScreen } from '../modules/report/screens/GenerateReportsScreen';
 import OmrMapScreen from '../modules/omrmap/screens/OmrMapScreen';
+import OmrMapChurchPickerScreen from '../modules/omrmap/screens/OmrMapChurchPickerScreen';
 import { ChurchesPlantedLast10YearsScreen } from '../modules/dashboard/screens/ChurchesPlantedLast10YearsScreen';
  
 import AddChurchNetworkScreen from '../modules/churchnetwork/screens/AddChurchNetworkScreen';
@@ -470,6 +473,7 @@ export default function Navigation() {
               <Stack.Screen name="PushReportConfig" component={PushReportConfigScreen} />
               <Stack.Screen name="GenerateReports" component={GenerateReportsScreen} />
               <Stack.Screen name="OmrMap" component={OmrMapScreen} />
+              <Stack.Screen name="OmrMapChurchPicker" component={OmrMapChurchPickerScreen} />
               <Stack.Screen
                 name="ChurchesPlantedLast10Years"
                 component={ChurchesPlantedLast10YearsScreen}
