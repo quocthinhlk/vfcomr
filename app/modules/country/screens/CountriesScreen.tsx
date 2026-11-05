@@ -1,9 +1,10 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {View, FlatList, RefreshControl, Platform} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {View, FlatList, RefreshControl, Platform, StyleSheet} from 'react-native';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {listCountries, CountryItem} from '../services/country.service';
-import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
@@ -27,72 +28,90 @@ export const CountriesScreen: React.FC = () => {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedCountry, setSelectedCountry] = useState<CountryItem | null>(null);
+  // Only the newest request may write. Before, a request started while
+  // another was running was dropped (the list kept the old search), and
+  // answers arriving out of order could show the wrong page.
+  const requestRef = useRef(0);
+  const pageRef = useRef(1);
 
   const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
+    async (targetPage: number) => {
+      const requestId = ++requestRef.current;
+      const isCurrent = () => requestId === requestRef.current;
+      setLoading(true);
       try {
-        if (loading) {
-          return;
-        }
-        setLoading(true);
         const res = await listCountries({
           page: targetPage,
           limit: DEFAULT_PAGE_LIMIT,
           search: query,
         });
-        const nextItems = res?.data?.items ?? [];
-        setTotalPages(res?.data?.total_pages ?? 1);
+        if (!isCurrent()) {
+          return;
+        }
+        const pages = Math.max(1, res?.data?.total_pages ?? 1);
+        // A page past the end (e.g. the last item of the last page was
+        // deleted): show the new last page instead of an empty list.
+        if (targetPage > pages && (res?.data?.total ?? 0) > 0) {
+          fetchData(pages);
+          return;
+        }
+        setItems(res?.data?.items ?? []);
+        setTotalPages(pages);
         setTotal(res?.data?.total ?? 0);
         setPage(res?.data?.page ?? targetPage);
-        setItems(reset ? nextItems : [...items, ...nextItems]);
+        pageRef.current = res?.data?.page ?? targetPage;
         setLoadError(null);
       } catch (e) {
-        console.error(e);
-        // A failed load shows a recoverable error, never the empty state.
-        setLoadError(e);
+        if (isCurrent()) {
+          console.error(e);
+          // A failed load shows a recoverable error, never the empty state.
+          setLoadError(e);
+        }
       } finally {
-        setLoading(false);
+        if (isCurrent()) {
+          setLoading(false);
+        }
       }
     },
-    [loading, query, items],
+    [query],
   );
 
+  // New search: back to page 1.
   useEffect(() => {
-    setItems([]);
-    fetchData(1, true);
-  }, [query]);
+    fetchData(1);
+  }, [fetchData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        // Clear the reload flag
-        navigation.setParams({reload: undefined});
-        setItems([]);
-        fetchData(1, true);
-      }
-    }, [route.params?.reload]),
+  useEffect(
+    () => () => {
+      requestRef.current += 1;
+    },
+    [],
   );
+
+  // Back from add / edit / delete: reload the page the user was on.
+  useReloadOnReturn(() => fetchData(pageRef.current), {
+    dataKey: 'countries',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
+    await fetchData(page);
     setRefreshing(false);
   };
 
   const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {
+    if (targetPage < 1 || targetPage > totalPages) {
       return;
     }
-    setItems([]);
-    fetchData(targetPage, true);
+    fetchData(targetPage);
   };
 
   const handleEdit = (item: CountryItem) => {
@@ -111,7 +130,7 @@ export const CountriesScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: CountryItem}) => (
     <EntityListCard
-      title={item.name}
+      title={item.name?.trim() || `#${item.id}`}
       trailingText={`#${item.id}`}
       onPress={() => handleEdit(item)}
       onMorePress={() => openActions(item)}
@@ -120,6 +139,8 @@ export const CountriesScreen: React.FC = () => {
 
   const keyExtractor = (item: CountryItem) => String(item.id);
 
+  // Spinner only before anything was shown; later loads keep the old page
+  // on screen instead of flashing an empty list.
   const isInitialLoading = loading && items.length === 0 && !refreshing;
 
   return (
@@ -137,10 +158,9 @@ export const CountriesScreen: React.FC = () => {
         value={query}
         onChangeText={setQuery}
         placeholder={t('search')}
-        onSubmitEditing={() => goToPage(1)}
       />
 
-      <View style={{flex: 1, minHeight: 0}}>
+      <View style={styles.listWrap}>
         <PaginatedListPager
           page={page}
           totalPages={totalPages}
@@ -150,8 +170,12 @@ export const CountriesScreen: React.FC = () => {
             keyExtractor={keyExtractor}
             renderItem={renderItem}
             nestedScrollEnabled={Platform.OS === 'android'}
-            style={{flex: 1}}
+            style={styles.list}
             contentContainerStyle={listContentStyle}
+            // With the search keyboard open the first tap on a card only
+            // closed the keyboard (Android).
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
@@ -161,7 +185,7 @@ export const CountriesScreen: React.FC = () => {
                 <ListLoadState
                   loading={isInitialLoading}
                   error={loadError}
-                  onRetry={() => fetchData(1, true)}>
+                  onRetry={() => fetchData(page)}>
                   <ListEmptyState
                     title={t('noDataFound')}
                     hint={query ? undefined : t('emptyListHint')}
@@ -209,3 +233,12 @@ export const CountriesScreen: React.FC = () => {
   );
 };
 
+const styles = StyleSheet.create({
+  listWrap: {
+    flex: 1,
+    minHeight: 0,
+  },
+  list: {
+    flex: 1,
+  },
+});

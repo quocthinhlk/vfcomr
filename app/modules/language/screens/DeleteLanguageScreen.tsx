@@ -4,7 +4,11 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {
   deleteLanguage,
   getLanguageById,
+  getLanguageFaqCount,
 } from '../services/language.service';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {returnToList} from '../../../shared/utils/returnToList';
 import {
@@ -20,6 +24,11 @@ export const DeleteLanguageScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!languageId);
   const [loadError, setLoadError] = useState<unknown>(null);
+  // The API deletes a language its FAQs still use and leaves them without
+  // one, so that is blocked here.
+  const [faqCount, setFaqCount] = useState(0);
+  const [deleteError, setDeleteError] = useState('');
+  const submitOnce = useSubmitOnce();
   const mountedRef = useRef(true);
   const {t} = useTranslation();
 
@@ -31,9 +40,13 @@ export const DeleteLanguageScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getLanguageById(languageId);
+      const [res, faqs] = await Promise.all([
+        getLanguageById(languageId),
+        getLanguageFaqCount(languageId),
+      ]);
       if (mountedRef.current) {
-        setName(res?.data?.name || 'this language');
+        setName(res?.data?.name?.trim() || `#${languageId}`);
+        setFaqCount(faqs);
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -54,19 +67,28 @@ export const DeleteLanguageScreen: React.FC = () => {
     };
   }, [load]);
 
-  const onConfirm = async () => {
-    if (!languageId) return;
+  const onConfirm = submitOnce(async () => {
+    if (!languageId || faqCount) {
+      return;
+    }
     try {
       setSubmitting(true);
+      setDeleteError('');
       await deleteLanguage(languageId);
+      markDataChanged('languages');
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('language')} ${t('success')}`);
       returnToList(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete language');
+      // In the page, with the API's reason (was a fixed English text).
+      if (mountedRef.current) {
+        setDeleteError(getApiErrorMessage(e, t));
+      }
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -77,10 +99,16 @@ export const DeleteLanguageScreen: React.FC = () => {
       onRetry={load}>
       <DeleteConfirmView
         name={name}
+        message={`${t('deleteConfirmMessage')} ${t('languageChurchesNotChecked')}`}
         onCancel={() => navigation.goBack()}
         onConfirm={onConfirm}
         submitting={submitting}
-        disabled={!languageId}
+        disabled={!languageId || faqCount > 0}
+        errorMessage={
+          faqCount > 0
+            ? t('languageInUse').replace('{faqs}', String(faqCount))
+            : deleteError || undefined
+        }
       />
     </ScreenContainer>
   );

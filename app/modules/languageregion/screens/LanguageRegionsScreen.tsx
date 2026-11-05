@@ -1,18 +1,20 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {View, FlatList, RefreshControl, Platform} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {View, FlatList, RefreshControl, Platform, StyleSheet} from 'react-native';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {
   listLanguageRegions,
   LanguageRegionItem,
 } from '../services/languageregion.service';
-import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import ActionSheetModal, {
   ActionItem,
 } from '../../../shared/components/ActionSheetModal';
 import SearchInput from '../../../shared/components/SearchInput';
 import {PaginatedListPager} from '../../../shared/components/PaginatedListPager';
 import {
+  CardMeta,
   EntityListCard,
   ListEmptyState,
   ListLoadState,
@@ -22,92 +24,94 @@ import {
   StatusBadge,
   listContentStyle,
 } from '../../../shared/components/crud';
+import {filterRegions, parentNames, regionName} from '../utils/languageRegion.utils';
 
 export const LanguageRegionsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const {t} = useTranslation();
-  const [items, setItems] = useState<LanguageRegionItem[]>([]);
+  const [allItems, setAllItems] = useState<LanguageRegionItem[]>([]);
   const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [query, setQuery] = useState('');
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedRegion, setSelectedRegion] = useState<LanguageRegionItem | null>(null);
+  // Only the newest load may write (pull-to-refresh vs. return from a save).
+  const requestRef = useRef(0);
 
-  const fetchData = useCallback(
-    async (targetPage: number, reset = false) => {
-      try {
-        if (loading) {
-          return;
-        }
-        setLoading(true);
-        const res = await listLanguageRegions();
-        const full = res?.data?.items ?? [];
-        const filtered = query
-          ? full.filter((i: LanguageRegionItem) =>
-              i.name?.toLowerCase().includes(query.trim().toLowerCase()),
-            )
-          : full;
-        const total = filtered.length;
-        const totalPages = Math.max(
-          1,
-          Math.ceil(total / DEFAULT_PAGE_LIMIT),
-        );
-        const validPage = Math.min(Math.max(1, targetPage), totalPages);
-        const start = (validPage - 1) * DEFAULT_PAGE_LIMIT;
-        const end = start + DEFAULT_PAGE_LIMIT;
-        const pageSlice = filtered.slice(start, end);
-
-        setTotalPages(totalPages);
-        setTotal(total);
-        setPage(validPage);
-        setItems(pageSlice);
-        setLoadError(null);
-      } catch (e) {
+  /**
+   * The API returns every region at once: load once, then search and page
+   * locally. Before, every keystroke re-fetched all regions and a keystroke
+   * typed while a fetch was running was dropped (stale results).
+   */
+  const fetchData = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    setLoading(true);
+    try {
+      const res = await listLanguageRegions();
+      if (!isCurrent()) {
+        return;
+      }
+      setAllItems(res?.data?.items ?? []);
+      setLoadError(null);
+    } catch (e) {
+      if (isCurrent()) {
         console.error(e);
         // A failed load shows a recoverable error, never the empty state.
         setLoadError(e);
-      } finally {
+      }
+    } finally {
+      if (isCurrent()) {
         setLoading(false);
       }
-    },
-    [loading, query],
-  );
+    }
+  }, []);
 
   useEffect(() => {
-    setItems([]);
-    fetchData(1, true);
-  }, [query]);
+    fetchData();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [fetchData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        // Clear the reload flag
-        navigation.setParams({reload: undefined});
-        setItems([]);
-        fetchData(1, true);
-      }
-    }, [route.params?.reload]),
+  // Back from add / edit / delete: reload, staying on the same page.
+  useReloadOnReturn(fetchData, {
+    dataKey: 'languageRegions',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
+
+  const parents = useMemo(() => parentNames(allItems), [allItems]);
+  const filtered = useMemo(
+    () => filterRegions(allItems, query, parents),
+    [allItems, query, parents],
   );
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / DEFAULT_PAGE_LIMIT));
+  const currentPage = Math.min(page, totalPages);
+  const items = useMemo(
+    () => filtered.slice((currentPage - 1) * DEFAULT_PAGE_LIMIT, currentPage * DEFAULT_PAGE_LIMIT),
+    [filtered, currentPage],
+  );
+
+  const onQueryChange = (text: string) => {
+    setQuery(text);
+    setPage(1);
+  };
 
   const onRefresh = async () => {
     setRefreshing(true);
-    setItems([]);
-    await fetchData(1, true);
+    await fetchData();
     setRefreshing(false);
   };
 
   const goToPage = (targetPage: number) => {
-    if (targetPage < 1 || targetPage > totalPages || loading) {
-      return;
+    if (targetPage >= 1 && targetPage <= totalPages) {
+      setPage(targetPage);
     }
-    setItems([]);
-    fetchData(targetPage, true);
   };
 
   const handleEdit = (item: LanguageRegionItem) => {
@@ -126,10 +130,16 @@ export const LanguageRegionsScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: LanguageRegionItem}) => (
     <EntityListCard
-      title={item.name}
+      // Broken UTF-8 repaired; a name of spaces shows the id.
+      title={regionName(item)}
       trailingText={`#${item.id}`}
       onPress={() => handleEdit(item)}
       onMorePress={() => openActions(item)}>
+      {parents.get(item.id) ? (
+        <CardMeta>
+          {t('geoRegionsUnder')}: {parents.get(item.id)}
+        </CardMeta>
+      ) : null}
       {item.disabled ? (
         <StatusBadge label={t('disabled')} tone="neutral" />
       ) : (
@@ -140,13 +150,13 @@ export const LanguageRegionsScreen: React.FC = () => {
 
   const keyExtractor = (item: LanguageRegionItem) => String(item.id);
 
-  const isInitialLoading = loading && items.length === 0 && !refreshing;
+  const isInitialLoading = loading && allItems.length === 0 && !refreshing;
 
   return (
     <ScreenContainer title={t('languageRegions')} showMenu>
       <ListToolbar
         countText={
-          loadError && !total
+          loadError && !allItems.length
             ? undefined
             : `${total} ${t('languageRegions').toLowerCase()}`
         }
@@ -155,14 +165,15 @@ export const LanguageRegionsScreen: React.FC = () => {
 
       <SearchInput
         value={query}
-        onChangeText={setQuery}
+        onChangeText={onQueryChange}
+        // Local search: show matches at once.
+        debounce={false}
         placeholder={t('search')}
-        onSubmitEditing={() => goToPage(1)}
       />
 
-      <View style={{flex: 1, minHeight: 0}}>
+      <View style={styles.listWrap}>
         <PaginatedListPager
-          page={page}
+          page={currentPage}
           totalPages={totalPages}
           onPageChange={goToPage}>
           <FlatList
@@ -170,8 +181,12 @@ export const LanguageRegionsScreen: React.FC = () => {
             keyExtractor={keyExtractor}
             renderItem={renderItem}
             nestedScrollEnabled={Platform.OS === 'android'}
-            style={{flex: 1}}
+            style={styles.list}
             contentContainerStyle={listContentStyle}
+            // With the search keyboard open the first tap on a card only
+            // closed the keyboard (Android).
+            keyboardShouldPersistTaps="handled"
+            keyboardDismissMode="on-drag"
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
             }
@@ -181,7 +196,7 @@ export const LanguageRegionsScreen: React.FC = () => {
                 <ListLoadState
                   loading={isInitialLoading}
                   error={loadError}
-                  onRetry={() => fetchData(1, true)}>
+                  onRetry={fetchData}>
                   <ListEmptyState
                     title={t('noDataFound')}
                     hint={query ? undefined : t('emptyListHint')}
@@ -194,7 +209,7 @@ export const LanguageRegionsScreen: React.FC = () => {
       </View>
 
       <ListPageBar
-        page={page}
+        page={currentPage}
         totalPages={totalPages}
         loading={loading}
         onPageChange={goToPage}
@@ -202,7 +217,7 @@ export const LanguageRegionsScreen: React.FC = () => {
 
       <ActionSheetModal
         visible={actionsVisible}
-        title={selectedRegion?.name || t('languageRegions')}
+        title={(selectedRegion && regionName(selectedRegion)) || t('languageRegions')}
         onRequestClose={closeActions}
         actions={((): ActionItem[] => {
           const go = (target: string) => () => {
@@ -228,5 +243,15 @@ export const LanguageRegionsScreen: React.FC = () => {
     </ScreenContainer>
   );
 };
+
+const styles = StyleSheet.create({
+  listWrap: {
+    flex: 1,
+    minHeight: 0,
+  },
+  list: {
+    flex: 1,
+  },
+});
 
 export default LanguageRegionsScreen;

@@ -6,14 +6,21 @@ import {
   getChurchRegionById,
   updateChurchRegion,
   getChurchRegionHierarchy,
+  uploadChurchRegionLogo,
 } from '../services/churchregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {
+  REGION_NAME_MAX,
+  buildParentOptions,
+  validateRegionName,
+} from '../utils/churchRegion.utils';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ElementDropdown, {
   ElementDropdownItem,
 } from '../../../shared/components/ElementDropdown';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
-import api from '../../../config/api';
 import AppInput from '../../../shared/components/AppInput';
 import {
   FormActions,
@@ -28,6 +35,9 @@ export const EditChurchRegionScreen: React.FC = () => {
   const churchRegionId: number | undefined = route.params?.churchRegionId;
   const [name, setName] = useState('');
   const [parentId, setParentId] = useState<number | null>(null);
+  // Parent saved on the server: the API ignores parent_id null, so removing
+  // a parent is checked after saving.
+  const [savedParentId, setSavedParentId] = useState<number | null>(null);
   const [options, setOptions] = useState<ElementDropdownItem[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!churchRegionId);
@@ -39,13 +49,12 @@ export const EditChurchRegionScreen: React.FC = () => {
   const [imageRemoved, setImageRemoved] = useState(false);
   const {t} = useTranslation();
   const {imagePath, handleImagePick, clearImage} = useImagePicker();
+  // One save at a time: a fast double tap sent the update (and upload) twice.
+  const submitOnce = useSubmitOnce();
 
-  // Reset imageRemoved flag when user picks a new image
-  useEffect(() => {
-    if (imagePath) {
-      setImageRemoved(false);
-    }
-  }, [imagePath]);
+  // imageRemoved stays set after picking a new image: if that image is then
+  // cleared too, the tile is empty and saving must remove the old logo (it
+  // used to be kept).
 
   useEffect(() => {
     mountedRef.current = true;
@@ -68,7 +77,8 @@ export const EditChurchRegionScreen: React.FC = () => {
       }
       const data = res?.data?.data || res?.data;
       setName(data?.name || '');
-      setParentId(data?.parent_id ?? null);
+      setParentId(data?.parent_id || null);
+      setSavedParentId(data?.parent_id || null);
       const logoUrl = data?.logo_url || null;
       setExistingLogoUrl(logoUrl);
       setOriginalLogoUrl(logoUrl);
@@ -96,17 +106,8 @@ export const EditChurchRegionScreen: React.FC = () => {
     setOptionsError(null);
     try {
       const resp = await getChurchRegionHierarchy();
-      const tree = (resp?.data ?? resp) as any[];
-      const out: ElementDropdownItem[] = [];
-      const walk = (nodes: any[], depth: number) => {
-        nodes?.forEach(n => {
-          out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
-          if (n.children && n.children.length) {
-            walk(n.children, depth + 1);
-          }
-        });
-      };
-      walk(tree || [], 0);
+      // Not itself or a region under it: that parent would make a loop.
+      const out = buildParentOptions(resp?.data ?? resp, churchRegionId);
       if (mountedRef.current) {
         setOptions(out);
       }
@@ -119,7 +120,7 @@ export const EditChurchRegionScreen: React.FC = () => {
         setOptionsLoading(false);
       }
     }
-  }, []);
+  }, [churchRegionId]);
 
   useEffect(() => {
     fetchHierarchy();
@@ -132,53 +133,56 @@ export const EditChurchRegionScreen: React.FC = () => {
     }
   };
 
-  const onSave = async () => {
-    if (!churchRegionId) return;
-    if (!name.trim()) {
+  const onSave = submitOnce(async () => {
+    if (!churchRegionId) {
+      return;
+    }
+    if (validateRegionName(name)) {
       setNameError(t('fillRequiredFields') || 'Please fill all required fields.');
       return;
     }
     try {
       setSubmitting(true);
 
-      const updateData: any = {
+      const updateData: {name: string; parent_id: number | null; logo_path?: string} = {
         name: name.trim(),
-        parent_id: parentId ?? null
+        parent_id: parentId ?? null,
       };
-
-      // Determine if image was changed
-      const imageChanged = imagePath || (imageRemoved && !existingLogoUrl);
-
-      if (imageChanged) {
-        if (imagePath) {
-          // User uploaded a new image
-          const form = new FormData();
-          const fileName = imagePath.split('/').pop() || 'logo.jpg';
-          form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
-          form.append('entity_type', 'all');
-          form.append('alt_text', name.trim());
-          const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-          const uploadedPath = uploadRes?.data?.data?.path;
-          if (!uploadedPath) {
-            throw new Error(t('apiErrorUnexpected'));
-          }
-          updateData.logo_path = uploadedPath;
-        } else if (imageRemoved && !existingLogoUrl) {
-          // User removed the image without uploading a new one
-          updateData.logo_path = '';
-        }
+      if (imagePath) {
+        // A new logo was picked.
+        updateData.logo_path = await uploadChurchRegionLogo(imagePath, name.trim());
+      } else if (imageRemoved && originalLogoUrl) {
+        // The saved logo was removed.
+        updateData.logo_path = '';
       }
-      // If no image change, don't include logo_path in update
+      // Otherwise logo_path is left out and the saved logo is kept.
 
       await updateChurchRegion(churchRegionId, updateData);
+      markDataChanged('churchRegions');
+
+      if (savedParentId && !parentId) {
+        // The API answers success but keeps the parent when it gets null.
+        const check = await getChurchRegionById(churchRegionId).catch(() => null);
+        const keptParent = (check?.data?.data || check?.data)?.parent_id;
+        if (keptParent) {
+          if (mountedRef.current) {
+            setParentId(keptParent);
+          }
+          Alert.alert(t('error') || 'Error', t('churchRegionParentNotRemoved'));
+          return;
+        }
+      }
+
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('edit')} ${t('success')}`);
       returnAfterEdit(navigation);
     } catch (e) {
       Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -199,6 +203,7 @@ export const EditChurchRegionScreen: React.FC = () => {
           placeholder={t('churchRegion') || t('churchApostolicRegions')}
           error={!!nameError}
           editable={!submitting}
+          maxLength={REGION_NAME_MAX}
           accessibilityLabel={`${t('name')}, ${t('required')}`}
         />
       </FormField>
@@ -206,11 +211,7 @@ export const EditChurchRegionScreen: React.FC = () => {
         <ElementDropdown
           data={options}
           value={parentId}
-          onChange={v =>
-            setParentId(
-              (typeof v === 'number' ? v : Number(v)) || null,
-            )
-          }
+          onChange={v => setParentId(v == null ? null : Number(v) || null)}
           placeholder={t('churchParent')}
         />
       </FormField>

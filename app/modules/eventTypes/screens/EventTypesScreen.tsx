@@ -1,7 +1,9 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {View, FlatList, RefreshControl, StyleSheet} from 'react-native';
-import {listEventTypes, EventTypeItem, resolveEventMeetingType} from '../services/eventType.service';
-import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
+import {listEventTypes, EventTypeItem} from '../services/eventType.service';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
+import {safeColor, strictMeetingType} from '../utils/eventType.utils';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
@@ -24,64 +26,65 @@ export const EventTypesScreen: React.FC = () => {
   const C = useThemedColors();
   const {t} = useTranslation();
   const meetingTypeLabel = (value?: string | null) => {
-    const resolved = resolveEventMeetingType(value);
+    const resolved = strictMeetingType(value);
     if (resolved === 'meeting_with') {
       return t('eventMeetingWith') || 'Meeting With';
     }
     if (resolved === 'attendance') {
       return t('eventAttendance') || 'Attendance';
     }
+    // An unknown saved value is shown as it is, not as "Attendance".
     return value || '-';
   };
   const [items, setItems] = useState<EventTypeItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState<EventTypeItem | null>(null);
 
-  const fetchData = useCallback(
-    async (reset = false) => {
-      try {
-        if (loading) {
-          return;
-        }
-        setLoading(true);
-        const res = await listEventTypes();
-        console.log('EventTypes API Response:', res);
-        const eventTypes = res?.data ?? [];
-        console.log('EventTypes parsed:', eventTypes);
-        setItems(eventTypes);
-        setLoadError(null);
-      } catch (e) {
+  // Only the newest load may write (pull-to-refresh vs. return from a save).
+  const requestRef = useRef(0);
+  const fetchData = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    setLoading(true);
+    try {
+      const res = await listEventTypes();
+      if (!isCurrent()) {
+        return;
+      }
+      setItems(res?.data ?? []);
+      setLoadError(null);
+    } catch (e) {
+      if (isCurrent()) {
         console.error('Error fetching event types:', e);
         setLoadError(e);
-      } finally {
+      }
+    } finally {
+      if (isCurrent()) {
         setLoading(false);
       }
-    },
-    [loading],
-  );
-
-  const reload = useCallback(() => fetchData(true), [fetchData]);
-
-  useEffect(() => {
-    fetchData(true);
+    }
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        navigation.setParams({reload: undefined});
-        fetchData(true);
-      }
-    }, [route.params?.reload, fetchData]),
-  );
+  useEffect(() => {
+    fetchData();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [fetchData]);
+
+  // Back from add / edit / delete (also an edit made from the detail screen).
+  useReloadOnReturn(fetchData, {
+    dataKey: 'eventTypes',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchData(true);
+    await fetchData();
     setRefreshing(false);
   };
 
@@ -101,7 +104,7 @@ export const EventTypesScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: EventTypeItem}) => (
     <EntityListCard
-      title={item.name}
+      title={item.name?.trim() || `#${item.id}`}
       trailingText={`#${item.id}`}
       onPress={() => handleView(item)}
       onMorePress={() => openActions(item)}>
@@ -109,13 +112,13 @@ export const EventTypesScreen: React.FC = () => {
         <View
           style={[
             styles.swatch,
-            {backgroundColor: item.color, borderColor: C.inputBorder},
+            {backgroundColor: safeColor(item.color), borderColor: C.inputBorder},
           ]}
         />
         <View
           style={[
             styles.swatch,
-            {backgroundColor: item.cell_color, borderColor: C.inputBorder},
+            {backgroundColor: safeColor(item.cell_color), borderColor: C.inputBorder},
           ]}
         />
         <View style={styles.metaText}>
@@ -144,7 +147,7 @@ export const EventTypesScreen: React.FC = () => {
         data={items}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
-        style={{flex: 1}}
+        style={styles.list}
         contentContainerStyle={listContentStyle}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -154,7 +157,7 @@ export const EventTypesScreen: React.FC = () => {
             <ListLoadState
               loading={isInitialLoading}
               error={loadError}
-              onRetry={reload}>
+              onRetry={fetchData}>
               <ListEmptyState
                 title={t('noDataFound') || 'No data found'}
                 hint={t('emptyListHint')}
@@ -193,6 +196,9 @@ export const EventTypesScreen: React.FC = () => {
 };
 
 const styles = StyleSheet.create({
+  list: {
+    flex: 1,
+  },
   metaRow: {
     flexDirection: 'row',
     alignItems: 'center',

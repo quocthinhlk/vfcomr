@@ -3,16 +3,23 @@ import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {
+  LANGUAGE_NAME_MAX,
   getLanguageById,
+  listAllLanguages,
   updateLanguage,
 } from '../services/language.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import AppInput from '../../../shared/components/AppInput';
 import {
   FormActions,
   FormField,
   ScreenContainer,
 } from '../../../shared/components/crud';
+import {cleanLanguageName, validateLanguageName} from '../utils/language.utils';
+import {useLanguageNameMessage} from '../utils/useLanguageNameMessage';
 
 export const EditLanguageScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -22,8 +29,12 @@ export const EditLanguageScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!languageId);
   const [loadError, setLoadError] = useState<unknown>(null);
+  const [nameError, setNameError] = useState('');
   const mountedRef = useRef(true);
   const {t} = useTranslation();
+  const messageFor = useLanguageNameMessage();
+  // One save at a time: a fast double tap sent the update twice.
+  const submitOnce = useSubmitOnce();
 
   useEffect(() => {
     mountedRef.current = true;
@@ -41,10 +52,9 @@ export const EditLanguageScreen: React.FC = () => {
     setLoadError(null);
     try {
       const res = await getLanguageById(languageId);
-      if (!mountedRef.current) {
-        return;
+      if (mountedRef.current) {
+        setName(res?.data?.name || '');
       }
-      setName(res?.data?.name || '');
     } catch (e) {
       // Without the record the form would be blank: show a retryable error.
       if (mountedRef.current) {
@@ -61,33 +71,64 @@ export const EditLanguageScreen: React.FC = () => {
     load();
   }, [load]);
 
-  const onSave = async () => {
-    if (!languageId) return;
-    if (!name.trim()) {
-      Alert.alert(t('validation') || 'Validation', t('fillRequiredFields') || 'Please fill all required fields.');
+  const onNameChange = (value: string) => {
+    setName(value);
+    if (nameError) {
+      setNameError('');
+    }
+  };
+
+  const onSave = submitOnce(async () => {
+    if (!languageId) {
+      return;
+    }
+    const local = validateLanguageName(name);
+    if (local) {
+      setNameError(messageFor(local));
       return;
     }
     try {
       setSubmitting(true);
-      await updateLanguage(languageId, { name: name.trim() });
+      // The API does not check duplicates on update (a rename to "English"
+      // saved a second English).
+      const duplicate = validateLanguageName(name, await listAllLanguages(), languageId);
+      if (duplicate) {
+        setNameError(messageFor(duplicate));
+        return;
+      }
+      await updateLanguage(languageId, {name: cleanLanguageName(name)});
+      markDataChanged('languages');
       Alert.alert(t('success') || 'Success', `${t('edit')} ${t('language')} ${t('success')}`);
       returnAfterEdit(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to update language');
+      // The API's reason instead of a fixed English text.
+      Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
-    <ScreenContainer title={`${t('edit')} ${t('language')}`} scroll loading={loading} error={loadError} onRetry={load}>
-      <FormField label={t('name')} required>
+    <ScreenContainer
+      title={`${t('edit')} ${t('language')}`}
+      scroll
+      loading={loading}
+      error={loadError}
+      errorMessage={!languageId ? t('noDataFound') : undefined}
+      onRetry={load}>
+      <FormField label={t('name')} required error={nameError}>
         <AppInput
           value={name}
-          onChangeText={setName}
+          onChangeText={onNameChange}
           placeholder={t('language')}
+          error={!!nameError}
           editable={!submitting}
+          maxLength={LANGUAGE_NAME_MAX}
+          autoCapitalize="words"
           returnKeyType="done"
+          onSubmitEditing={onSave}
           accessibilityLabel={`${t('name')}, ${t('required')}`}
         />
       </FormField>

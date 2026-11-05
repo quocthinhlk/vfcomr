@@ -1,5 +1,11 @@
-import api, { DEFAULT_PAGE_LIMIT } from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
+
+// Auth and language headers come from the api interceptor. These calls used to
+// read the token from AsyncStorage themselves, which overrode the
+// interceptor's choice and threw "No authentication token found" when the
+// session token lived elsewhere (e.g. the dev test token).
+
+export const LANGUAGE_REGION_NAME_MAX = 255;
 
 export interface LanguageRegionItem {
   id: number;
@@ -22,14 +28,9 @@ export interface ListLanguageRegionsResponse {
   message: string;
 }
 
+/** Every language region (the API returns a plain array). */
 export async function listLanguageRegions() {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-
-  const response = await api.get(`/language-regions`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
-
+  const response = await api.get(`/language-regions`);
   const raw = response.data as any;
   if (Array.isArray(raw?.data)) {
     const items = raw.data as LanguageRegionItem[];
@@ -58,11 +59,7 @@ export interface GetLanguageRegionResponse {
 }
 
 export async function getLanguageRegionById(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.get<GetLanguageRegionResponse>(`/language-regions/${id}`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  const response = await api.get<GetLanguageRegionResponse>(`/language-regions/${id}`);
   return response.data;
 }
 
@@ -73,14 +70,7 @@ export interface CreateLanguageRegionPayload {
 }
 
 export async function createLanguageRegion(payload: CreateLanguageRegionPayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.post(`/language-regions`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+  const response = await api.post(`/language-regions`, payload);
   return response.data;
 }
 
@@ -91,22 +81,11 @@ export interface UpdateLanguageRegionPayload {
 }
 
 export async function updateLanguageRegion(id: number, payload: UpdateLanguageRegionPayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.patch(`/language-regions/${id}`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+  const response = await api.patch(`/language-regions/${id}`, payload);
   return response.data;
 }
 
 export async function deleteLanguageRegion(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) throw new Error('No authentication token found.');
-  const response = await api.delete(`/language-regions/${id}`, {
-    headers: { 'Authorization': `Bearer ${token}` },
-  });
+  const response = await api.delete(`/language-regions/${id}`);
   return response.data;
-} 
+}

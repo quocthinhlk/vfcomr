@@ -1,8 +1,9 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
-import {View, StyleSheet} from 'react-native';
+import {View, StyleSheet, Platform} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {getEventTypeById, EventTypeItem, resolveEventMeetingType} from '../services/eventType.service';
+import {getEventTypeById, EventTypeItem} from '../services/eventType.service';
+import {safeColor, strictMeetingType} from '../utils/eventType.utils';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs} from '../../../shared/utils/scale';
@@ -21,7 +22,7 @@ const ColorValue: React.FC<{color?: string | null}> = ({color}) => {
       <View
         style={[
           styles.colorBox,
-          {backgroundColor: color || undefined, borderColor: C.inputBorder},
+          {backgroundColor: safeColor(color), borderColor: C.inputBorder},
         ]}
       />
       <Text style={[styles.colorValue, {color: C.textPrimary}]}>
@@ -87,7 +88,7 @@ export const EventTypeDetailScreen: React.FC = () => {
         <ListEmptyState title={t('noDataFound') || 'No data found'} />
       ) : (
         <>
-          <DetailCard title={eventType.name}>
+          <DetailCard title={eventType.name?.trim() || `#${eventType.id}`}>
             <DetailRow label={t('textColour') || 'Text Colour'}>
               <ColorValue color={eventType.color} />
             </DetailRow>
@@ -97,9 +98,11 @@ export const EventTypeDetailScreen: React.FC = () => {
             <DetailRow
               label={t('meetingType') || 'Meeting Type'}
               value={
-                resolveEventMeetingType(eventType.meeting_type) === 'meeting_with'
+                strictMeetingType(eventType.meeting_type) === 'meeting_with'
                   ? t('eventMeetingWith') || 'Meeting With'
-                  : t('eventAttendance') || 'Attendance'
+                  : strictMeetingType(eventType.meeting_type) === 'attendance'
+                    ? t('eventAttendance') || 'Attendance'
+                    : eventType.meeting_type || '-'
               }
             />
           </DetailCard>
@@ -129,7 +132,8 @@ const styles = StyleSheet.create({
   colorValue: {
     fontSize: fs(14),
     fontWeight: '500',
-    fontFamily: 'monospace',
+    // "monospace" does not exist on iOS ("Unrecognized font family").
+    fontFamily: Platform.select({ios: 'Menlo', android: 'monospace'}),
   },
 });
 

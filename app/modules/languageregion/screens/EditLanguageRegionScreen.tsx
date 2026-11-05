@@ -3,46 +3,49 @@ import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {
-  getLanguageRegionById,
-  updateLanguageRegion,
-  listLanguageRegions,
   LanguageRegionItem,
+  getLanguageRegionById,
+  listLanguageRegions,
+  updateLanguageRegion,
 } from '../services/languageregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
-import AppInput from '../../../shared/components/AppInput';
-import ElementDropdown, {
-  ElementDropdownItem,
-} from '../../../shared/components/ElementDropdown';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import {fixMojibake} from '../../../shared/utils/displayText';
+import {ScreenContainer} from '../../../shared/components/crud';
+import LanguageRegionForm, {
+  LanguageRegionFormValues,
+} from '../components/LanguageRegionForm';
 import {
-  FormActions,
-  FormDivider,
-  FormField,
-  FormSwitchRow,
-  ScreenContainer,
-} from '../../../shared/components/crud';
+  RegionNameError,
+  cleanRegionName,
+  parentOptions,
+  validateRegionName,
+} from '../utils/languageRegion.utils';
 
 export const EditLanguageRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const languageRegionId: number | undefined = route.params?.languageRegionId;
-  const [name, setName] = useState('');
-  const [parentId, setParentId] = useState<number | null>(null);
-  const [disabled, setDisabled] = useState(false);
-  const [options, setOptions] = useState<ElementDropdownItem[]>([]);
+  const {t} = useTranslation();
+  const [values, setValues] = useState<LanguageRegionFormValues>({
+    name: '',
+    parentId: null,
+    disabled: false,
+  });
+  const [saved, setSaved] = useState<LanguageRegionItem | null>(null);
+  const [regions, setRegions] = useState<LanguageRegionItem[]>([]);
+  const [nameError, setNameError] = useState<RegionNameError | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!languageRegionId);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
-  const {t} = useTranslation();
+  // One save at a time: a fast double tap sent the update twice.
+  const submitOnce = useSubmitOnce();
 
-  useEffect(() => {
-    mountedRef.current = true;
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
-
-  // Named so the error state's "Try again" can re-run it.
+  // Record and parent list together: without the list the saved parent
+  // showed blank and could be lost on save (it failed silently before).
   const load = useCallback(async () => {
     if (!languageRegionId) {
       return;
@@ -50,14 +53,25 @@ export const EditLanguageRegionScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getLanguageRegionById(languageRegionId);
+      const [res, list] = await Promise.all([
+        getLanguageRegionById(languageRegionId),
+        listLanguageRegions(),
+      ]);
       if (!mountedRef.current) {
         return;
       }
       const data = res?.data;
-      setName(data?.name || '');
-      setParentId(data?.parent_id ?? null);
-      setDisabled(!!data?.disabled);
+      if (!data) {
+        throw new Error('');
+      }
+      setSaved(data);
+      setRegions(list?.data?.items ?? []);
+      setValues({
+        // Broken UTF-8 repaired, so saving does not keep "PortuguÃªs".
+        name: fixMojibake(data.name || ''),
+        parentId: data.parent_id || null,
+        disabled: !!data.disabled,
+      });
     } catch (e) {
       // Without the record the form would be blank: show a retryable error.
       if (mountedRef.current) {
@@ -71,50 +85,63 @@ export const EditLanguageRegionScreen: React.FC = () => {
   }, [languageRegionId]);
 
   useEffect(() => {
+    mountedRef.current = true;
     load();
+    return () => {
+      mountedRef.current = false;
+    };
   }, [load]);
 
-  useEffect(() => {
-    let mounted = true;
-    const fetchParents = async () => {
-      try {
-        const resp = await listLanguageRegions();
-        const all = resp?.data?.items ?? [];
-        const roots = all.filter(
-          (r: LanguageRegionItem) => r.parent_id === null,
-        );
-        const out: ElementDropdownItem[] = roots.map(r => ({
-          label: r.name,
-          value: r.id,
-        }));
-        if (mounted) {
-          setOptions(out);
-        }
-      } catch {}
-    };
-    fetchParents();
-    return () => {
-      mounted = false;
-    };
-  }, []);
+  const onChange = useCallback(
+    <K extends keyof LanguageRegionFormValues>(key: K, value: LanguageRegionFormValues[K]) => {
+      setValues(prev => ({...prev, [key]: value}));
+      if (key === 'name') {
+        setNameError(null);
+      }
+    },
+    [],
+  );
 
-  const onSave = async () => {
-    if (!languageRegionId) return;
-    if (!name.trim()) {
-      Alert.alert(t('validation') || 'Validation', t('fillRequiredFields') || 'Please fill all required fields.');
+  const onSave = submitOnce(async () => {
+    if (!languageRegionId || !saved) {
+      return;
+    }
+    const error = validateRegionName(values.name, regions, languageRegionId, saved.name);
+    if (error) {
+      setNameError(error);
       return;
     }
     try {
       setSubmitting(true);
-      await updateLanguageRegion(languageRegionId, { name: name.trim(), parent_id: parentId ?? null, disabled });
+      await updateLanguageRegion(languageRegionId, {
+        name: cleanRegionName(values.name),
+        parent_id: values.parentId,
+        disabled: values.disabled,
+      });
+      markDataChanged('languageRegions');
+      if (saved.parent_id && !values.parentId) {
+        // The API answers success but keeps the parent when it gets null.
+        const check = await getLanguageRegionById(languageRegionId).catch(() => null);
+        const kept = check?.data?.parent_id;
+        if (kept) {
+          if (mountedRef.current) {
+            setValues(prev => ({...prev, parentId: kept}));
+          }
+          Alert.alert(t('error') || 'Error', t('churchRegionParentNotRemoved'));
+          return;
+        }
+      }
       Alert.alert(t('success') || 'Success', `${t('edit')} ${t('languageRegion')} ${t('success')}`);
       returnAfterEdit(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to update language region');
+      // The API's reason instead of a fixed English text.
+      Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -122,39 +149,16 @@ export const EditLanguageRegionScreen: React.FC = () => {
       scroll
       loading={loading}
       error={loadError}
+      errorMessage={!languageRegionId ? t('noDataFound') : undefined}
       onRetry={load}>
-      <FormField label={t('name')} required>
-        <AppInput
-          value={name}
-          onChangeText={setName}
-          placeholder={t('languageRegion')}
-          editable={!submitting}
-          accessibilityLabel={`${t('name')}, ${t('required')}`}
-        />
-      </FormField>
-      <FormField label={t('churchParent')}>
-        <ElementDropdown
-          data={options}
-          value={parentId}
-          onChange={v =>
-            setParentId(
-              (typeof v === 'number' ? v : Number(v)) || null,
-            )
-          }
-          placeholder={t('churchParent')}
-        />
-      </FormField>
-      <FormDivider />
-      <FormSwitchRow
-        label={t('disabled')}
-        value={disabled}
-        onValueChange={setDisabled}
-        disabled={submitting}
-      />
-      <FormActions
-        onCancel={() => navigation.goBack()}
-        onSave={onSave}
+      <LanguageRegionForm
+        values={values}
+        onChange={onChange}
+        nameError={nameError}
+        parentOptions={parentOptions(regions, languageRegionId, saved?.parent_id)}
         submitting={submitting}
+        onSave={onSave}
+        onCancel={() => navigation.goBack()}
       />
     </ScreenContainer>
   );

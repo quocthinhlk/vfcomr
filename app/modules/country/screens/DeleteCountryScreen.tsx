@@ -1,8 +1,15 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {deleteCountry, getCountryById} from '../services/country.service';
+import {
+  deleteCountry,
+  getCountryById,
+  getCountryUsage,
+} from '../services/country.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {returnToList} from '../../../shared/utils/returnToList';
 import {
   DeleteConfirmView,
@@ -17,6 +24,12 @@ export const DeleteCountryScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!countryId);
   const [loadError, setLoadError] = useState<unknown>(null);
+  // The API deletes a country that churches / cities still use and leaves
+  // them pointing at a missing country, so it is blocked here.
+  const [usage, setUsage] = useState({churches: 0, cities: 0});
+  const [deleteError, setDeleteError] = useState('');
+  const submitOnce = useSubmitOnce();
+  const inUse = usage.churches > 0 || usage.cities > 0;
   const mountedRef = useRef(true);
   const {t} = useTranslation();
 
@@ -28,9 +41,13 @@ export const DeleteCountryScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getCountryById(countryId);
+      const [res, used] = await Promise.all([
+        getCountryById(countryId),
+        getCountryUsage(countryId),
+      ]);
       if (mountedRef.current) {
-        setName(res?.data?.name || 'this country');
+        setName(res?.data?.name?.trim() || `#${countryId}`);
+        setUsage(used);
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -51,19 +68,28 @@ export const DeleteCountryScreen: React.FC = () => {
     };
   }, [load]);
 
-  const onConfirm = async () => {
-    if (!countryId) return;
+  const onConfirm = submitOnce(async () => {
+    if (!countryId || inUse) {
+      return;
+    }
     try {
       setSubmitting(true);
+      setDeleteError('');
       await deleteCountry(countryId);
+      markDataChanged('countries');
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('country')} ${t('success')}`);
       returnToList(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete country');
+      // In the page, with the API's reason (was a fixed English text).
+      if (mountedRef.current) {
+        setDeleteError(getApiErrorMessage(e, t));
+      }
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -77,7 +103,14 @@ export const DeleteCountryScreen: React.FC = () => {
         onCancel={() => navigation.goBack()}
         onConfirm={onConfirm}
         submitting={submitting}
-        disabled={!countryId}
+        disabled={!countryId || inUse}
+        errorMessage={
+          inUse
+            ? t('countryInUse')
+                .replace('{churches}', String(usage.churches))
+                .replace('{cities}', String(usage.cities))
+            : deleteError || undefined
+        }
       />
     </ScreenContainer>
   );

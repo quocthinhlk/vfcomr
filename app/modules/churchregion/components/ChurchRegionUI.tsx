@@ -42,6 +42,9 @@ export const ChurchRegionLogoField: React.FC<LogoFieldProps> = ({
             />
             <TouchableOpacity
               onPress={onClear}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('delete')} ${t('logo')}`}
               style={formStyles.avatarClose as any}>
               <Text style={styles.closeText}>✗</Text>
             </TouchableOpacity>

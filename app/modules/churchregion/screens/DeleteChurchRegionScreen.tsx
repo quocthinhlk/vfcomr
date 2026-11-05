@@ -4,8 +4,12 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {
   deleteChurchRegion,
   getChurchRegionById,
+  getChurchRegionChildren,
 } from '../services/churchregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {returnToList} from '../../../shared/utils/returnToList';
 import {
   DeleteConfirmView,
@@ -20,6 +24,11 @@ export const DeleteChurchRegionScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(!!churchRegionId);
   const [loadError, setLoadError] = useState<unknown>(null);
+  // The API deletes a region that has sub-regions and leaves them pointing
+  // at a parent that no longer exists, so it is blocked here.
+  const [childCount, setChildCount] = useState(0);
+  const [deleteError, setDeleteError] = useState('');
+  const submitOnce = useSubmitOnce();
   const mountedRef = useRef(true);
   const {t} = useTranslation();
 
@@ -31,10 +40,14 @@ export const DeleteChurchRegionScreen: React.FC = () => {
     setLoading(true);
     setLoadError(null);
     try {
-      const res = await getChurchRegionById(churchRegionId);
+      const [res, children] = await Promise.all([
+        getChurchRegionById(churchRegionId),
+        getChurchRegionChildren(churchRegionId),
+      ]);
       if (mountedRef.current) {
         const data = res?.data?.data || res?.data;
-        setName(data?.name || 'this region');
+        setName(data?.name?.trim() || `#${churchRegionId}`);
+        setChildCount(children.length);
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -55,19 +68,28 @@ export const DeleteChurchRegionScreen: React.FC = () => {
     };
   }, [load]);
 
-  const onConfirm = async () => {
-    if (!churchRegionId) return;
+  const onConfirm = submitOnce(async () => {
+    if (!churchRegionId || childCount) {
+      return;
+    }
     try {
       setSubmitting(true);
+      setDeleteError('');
       await deleteChurchRegion(churchRegionId);
+      markDataChanged('churchRegions');
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('churchApostolicRegions')} ${t('success')}`);
       returnToList(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete church region');
+      // Shown in the page with the reason from the API (was a fixed English text).
+      if (mountedRef.current) {
+        setDeleteError(getApiErrorMessage(e, t));
+      }
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -81,7 +103,12 @@ export const DeleteChurchRegionScreen: React.FC = () => {
         onCancel={() => navigation.goBack()}
         onConfirm={onConfirm}
         submitting={submitting}
-        disabled={!churchRegionId}
+        disabled={!churchRegionId || childCount > 0}
+        errorMessage={
+          childCount > 0
+            ? t('churchRegionHasChildren').replace('{count}', String(childCount))
+            : deleteError || undefined
+        }
       />
     </ScreenContainer>
   );

@@ -10,16 +10,19 @@ export interface EventTypeItem {
   meeting_type: EventMeetingType;
 }
 
+/**
+ * Meeting type for the visit forms (attendance or "meeting with" fields).
+ * Case-insensitive, with the web's old names ("1-1", "Pastors List"); "Both"
+ * falls back to attendance so those forms always show an input.
+ */
 export function resolveEventMeetingType(
   meetingType?: string | null,
 ): EventMeetingType | null {
-  if (meetingType === 'attendance' || meetingType === 'meeting_with') {
-    return meetingType;
-  }
-  if (meetingType === 'Pastors List') {
+  const v = String(meetingType ?? '').trim().toLowerCase();
+  if (v === 'meeting_with' || v === '1-1' || v === 'pastors list') {
     return 'meeting_with';
   }
-  if (meetingType === 'Attendance' || meetingType === 'Both') {
+  if (v === 'attendance' || v === 'both') {
     return 'attendance';
   }
   return null;
@@ -62,14 +65,9 @@ export async function getEventTypeById(id: number) {
 }
 
 export async function createEventType(payload: CreateEventTypePayload) {
-  try {
-    const response = await api.post(`/event-types`, payload);
-    return response.data;
-  } catch (err: any) {
-    const message = err?.response?.data?.message || err?.message || 'Create Event Type failed';
-    console.error('Create Event Type error:', message);
-    throw new Error(message);
-  }
+  // Errors are passed on as they are, so screens can read the API's answer.
+  const response = await api.post(`/event-types`, payload);
+  return response.data;
 }
 
 export async function updateEventType(id: number, payload: UpdateEventTypePayload) {
@@ -82,3 +80,25 @@ export async function deleteEventType(id: number) {
   return response.data;
 }
 
+
+const EVENTS_PAGE = 2000;
+
+/**
+ * Whether any event still uses this type. The API deletes a type in use and
+ * leaves its events without a type (and without report colours); it cannot
+ * filter events by type, so pages are scanned until one is found.
+ */
+export async function isEventTypeInUse(id: number): Promise<boolean> {
+  for (let page = 1; page <= 50; page++) {
+    const res = await api.get('/events', {params: {page, limit: EVENTS_PAGE}});
+    const data = res?.data?.data;
+    const items: {event_type_id?: number}[] = data?.items ?? [];
+    if (items.some(e => e.event_type_id === id)) {
+      return true;
+    }
+    if (!data?.has_next || items.length === 0) {
+      return false;
+    }
+  }
+  return false;
+}

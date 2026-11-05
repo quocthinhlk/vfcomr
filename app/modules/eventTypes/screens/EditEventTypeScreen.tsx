@@ -2,43 +2,44 @@ import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
-import {updateEventType, getEventTypeById, EventMeetingType, resolveEventMeetingType} from '../services/eventType.service';
-import {useTranslation} from '../../../shared/hooks/useTranslation';
-import {useThemedColors} from '../../../shared/styles/theme';
-import AppInput from '../../../shared/components/AppInput';
-import ElementDropdown from '../../../shared/components/ElementDropdown';
-import ColorPicker from '../../../shared/components/ColorPicker';
-import {FORM_INPUT_HEIGHT} from '../../../shared/styles/form';
 import {
-  FormActions,
-  FormField,
-  ScreenContainer,
-} from '../../../shared/components/crud';
+  getEventTypeById,
+  listEventTypes,
+  updateEventType,
+} from '../services/eventType.service';
+import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
+import {ScreenContainer} from '../../../shared/components/crud';
+import EventTypeForm from '../components/EventTypeForm';
+import {
+  EventTypeFormErrors,
+  EventTypeFormValues,
+  buildEventTypePayload,
+  strictMeetingType,
+  validateEventTypeForm,
+} from '../utils/eventType.utils';
 
 export const EditEventTypeScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const eventTypeId: number | undefined = route.params?.eventTypeId;
-  const [name, setName] = useState('');
-  const [color, setColor] = useState('#808080');
-  const [cellColor, setCellColor] = useState('#D9D9D9');
-  const [meetingType, setMeetingType] = useState<EventMeetingType | null>(null);
+  const {t} = useTranslation();
+  const [values, setValues] = useState<EventTypeFormValues>({
+    name: '',
+    color: '',
+    cellColor: '',
+    meetingType: null,
+  });
+  const [errors, setErrors] = useState<EventTypeFormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
-  const {t} = useTranslation();
-  const C = useThemedColors();
-
-  const clearInvalid = (key: string) =>
-    setInvalid(prev => ({...prev, [key]: false}));
-
-  const meetingTypeOptions = [
-    {label: t('eventAttendance') || 'Attendance', value: 'attendance' as const},
-    {label: t('eventMeetingWith') || 'Meeting With', value: 'meeting_with' as const},
-  ];
-
   const [loadError, setLoadError] = useState<unknown>(null);
   const requestRef = useRef(0);
+  const mountedRef = useRef(true);
+  // One save at a time: a fast double tap sent the update twice.
+  const submitOnce = useSubmitOnce();
 
   const loadEventType = useCallback(async () => {
     const requestId = ++requestRef.current;
@@ -46,19 +47,25 @@ export const EditEventTypeScreen: React.FC = () => {
       setLoading(false);
       return;
     }
+    setLoading(true);
+    setLoadError(null);
     try {
       const res = await getEventTypeById(eventTypeId);
       if (requestId !== requestRef.current) {
         return;
       }
-      const eventType = res?.data;
-      if (eventType) {
-        setName(eventType.name || '');
-        setColor(eventType.color || '#808080');
-        setCellColor(eventType.cell_color || '#D9D9D9');
-        setMeetingType(resolveEventMeetingType(eventType.meeting_type));
+      const item = res?.data;
+      if (!item) {
+        throw new Error('');
       }
-      setLoadError(null);
+      // Saved values as they are: a bad colour shows as the invalid text
+      // (to fix) instead of being replaced by grey without telling the user.
+      setValues({
+        name: item.name || '',
+        color: item.color || '',
+        cellColor: item.cell_color || '',
+        meetingType: strictMeetingType(item.meeting_type),
+      });
     } catch (e) {
       if (requestId === requestRef.current) {
         console.error('Error fetching event type:', e);
@@ -73,43 +80,54 @@ export const EditEventTypeScreen: React.FC = () => {
   }, [eventTypeId]);
 
   useEffect(() => {
+    mountedRef.current = true;
     loadEventType();
     return () => {
+      mountedRef.current = false;
       requestRef.current += 1;
     };
   }, [loadEventType]);
 
-  const onSave = async () => {
-    if (!eventTypeId || loadError) return;
-    
-    const newInvalid: Record<string, boolean> = {};
-    newInvalid.name = !name.trim();
-    newInvalid.color = !color.trim();
-    newInvalid.cellColor = !cellColor.trim();
-    newInvalid.meetingType = !meetingType;
+  const onChange = useCallback(
+    <K extends keyof EventTypeFormValues>(key: K, value: EventTypeFormValues[K]) => {
+      setValues(prev => ({...prev, [key]: value}));
+      setErrors(prev => (prev[key] ? {...prev, [key]: undefined} : prev));
+    },
+    [],
+  );
 
-    setInvalid(newInvalid);
-
-    if (newInvalid.name || newInvalid.color || newInvalid.cellColor || newInvalid.meetingType) {
+  const onSave = submitOnce(async () => {
+    if (!eventTypeId || loadError) {
       return;
     }
-
+    const local = validateEventTypeForm(values);
+    setErrors(local);
+    if (Object.keys(local).length) {
+      return;
+    }
     try {
       setSubmitting(true);
-      await updateEventType(eventTypeId, {
-        name: name.trim(),
-        color: color.trim(),
-        cell_color: cellColor.trim(),
-        meeting_type: meetingType as EventMeetingType,
-      });
-      Alert.alert(t('success') || 'Success', `${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'} ${t('success') || 'success'}`);
+      const existing = (await listEventTypes())?.data ?? [];
+      const withDuplicates = validateEventTypeForm(values, existing, eventTypeId);
+      if (withDuplicates.name) {
+        setErrors(withDuplicates);
+        return;
+      }
+      await updateEventType(eventTypeId, buildEventTypePayload(values));
+      markDataChanged('eventTypes');
+      Alert.alert(
+        t('success') || 'Success',
+        `${t('edit') || 'Edit'} ${t('eventType') || 'Event Type'} ${t('success') || 'success'}`,
+      );
       returnAfterEdit(navigation);
-    } catch (e: any) {
-      Alert.alert(t('error') || 'Error', e?.message || 'Failed to update Event Type');
+    } catch (e) {
+      Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -117,75 +135,15 @@ export const EditEventTypeScreen: React.FC = () => {
       scroll
       loading={loading}
       error={loadError}
+      errorMessage={!loading && !eventTypeId ? t('noDataFound') : undefined}
       onRetry={loadEventType}>
-      <FormField
-        label={t('eventTypeName') || 'Event Type Name'}
-        required
-        error={invalid.name ? t('required') : undefined}>
-        <AppInput
-          value={name}
-          onChangeText={(text) => {
-            setName(text);
-            clearInvalid('name');
-          }}
-          placeholder={t('eventTypeName') || 'Event Type Name'}
-          error={!!invalid.name}
-          editable={!submitting}
-        />
-      </FormField>
-      <FormField
-        label={t('textColour') || 'Text Colour'}
-        required
-        error={invalid.color ? t('required') : undefined}>
-        <ColorPicker
-          value={color}
-          onChange={(val) => {
-            setColor(val);
-            clearInvalid('color');
-          }}
-          height={FORM_INPUT_HEIGHT}
-          error={!!invalid.color}
-        />
-      </FormField>
-      <FormField
-        label={t('reportCellColour') || 'Report Cell Colour'}
-        required
-        error={invalid.cellColor ? t('required') : undefined}>
-        <ColorPicker
-          value={cellColor}
-          onChange={(val) => {
-            setCellColor(val);
-            clearInvalid('cellColor');
-          }}
-          height={FORM_INPUT_HEIGHT}
-          error={!!invalid.cellColor}
-        />
-      </FormField>
-      <FormField
-        label={t('meetingType') || 'Meeting Type'}
-        required
-        error={invalid.meetingType ? t('required') : undefined}>
-        <ElementDropdown
-          data={meetingTypeOptions}
-          value={meetingType as any}
-          onChange={v => {
-            setMeetingType(v as EventMeetingType);
-            clearInvalid('meetingType');
-          }}
-          placeholder={t('selectOption') || 'Select Meeting Type'}
-          error={!!invalid.meetingType}
-          containerStyle={
-            {
-              backgroundColor: C.inputBg,
-              borderColor: invalid.meetingType ? '#db2d2d' : C.inputBorder,
-            } as any
-          }
-        />
-      </FormField>
-      <FormActions
-        onCancel={() => navigation.goBack()}
-        onSave={onSave}
+      <EventTypeForm
+        values={values}
+        errors={errors}
+        onChange={onChange}
         submitting={submitting}
+        onSave={onSave}
+        onCancel={() => navigation.goBack()}
       />
     </ScreenContainer>
   );

@@ -1,5 +1,11 @@
-import api, { DEFAULT_PAGE_LIMIT } from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import api, {DEFAULT_PAGE_LIMIT} from '../../../config/api';
+
+// Auth and language headers come from the api interceptor. These calls used to
+// read the token from AsyncStorage themselves, which overrode the
+// interceptor's choice and threw "No authentication token found" when the
+// session token lived elsewhere (e.g. the dev test token).
+
+export const COUNTRY_NAME_MAX = 255;
 
 export interface CountryItem {
   id: number;
@@ -26,21 +32,14 @@ export interface ListCountriesParams {
   search?: string;
 }
 
+/** The API searches by name, ignoring case and accents ("cote" finds Côte d'Ivoire). */
 export async function listCountries(params: ListCountriesParams = {}) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-
   const page = params.page ?? 1;
   const limit = params.limit ?? DEFAULT_PAGE_LIMIT;
-  const name = params.search ?? '';
+  const name = (params.search ?? '').trim();
 
   const response = await api.get<ListCountriesResponse>(`/countries`, {
-    params: { page, limit, name },
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
+    params: {page, limit, name},
   });
   return response.data;
 }
@@ -52,38 +51,17 @@ export interface GetCountryResponse {
 }
 
 export async function getCountryById(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  const response = await api.get<GetCountryResponse>(`/countries/${id}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+  const response = await api.get<GetCountryResponse>(`/countries/${id}`);
   return response.data;
 }
 
-export interface CreateCountryPayload { name: string }
+export interface CreateCountryPayload {
+  name: string;
+}
 
 export async function createCountry(payload: CreateCountryPayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  try {
-    const response = await api.post(`/countries`, payload, {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-      },
-    });
-    return response.data;
-  } catch (err: any) {
-    const message = err?.response?.data?.message || err?.message || 'Create country failed';
-    console.error('Create country error:', message);
-    throw new Error(message);
-  }
+  const response = await api.post(`/countries`, payload);
+  return response.data;
 }
 
 export interface UpdateCountryPayload {
@@ -91,28 +69,44 @@ export interface UpdateCountryPayload {
 }
 
 export async function updateCountry(id: number, payload: UpdateCountryPayload) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  const response = await api.patch(`/countries/${id}`, payload, {
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+  const response = await api.patch(`/countries/${id}`, payload);
   return response.data;
 }
 
 export async function deleteCountry(id: number) {
-  const token = await AsyncStorage.getItem('token');
-  if (!token) {
-    throw new Error('No authentication token found.');
-  }
-  const response = await api.delete(`/countries/${id}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-    },
-  });
+  const response = await api.delete(`/countries/${id}`);
   return response.data;
-} 
+}
+
+const sameName = (a: string, b: string) =>
+  a.trim().replace(/\s+/g, ' ').toLowerCase() === b.trim().replace(/\s+/g, ' ').toLowerCase();
+
+/**
+ * Another country with this name (case-insensitive). Create is checked by the
+ * API, but PATCH is not: renaming a country to "Vietnam" made a second Vietnam.
+ */
+export async function findCountryByName(
+  name: string,
+  excludeId?: number,
+): Promise<CountryItem | null> {
+  const res = await listCountries({page: 1, limit: 100, search: name});
+  return (
+    (res?.data?.items ?? []).find(c => c.id !== excludeId && sameName(c.name, name)) ?? null
+  );
+}
+
+/**
+ * Churches and cities still using the country. The API deletes a country in
+ * use and leaves those records pointing at a missing country.
+ */
+export async function getCountryUsage(id: number): Promise<{churches: number; cities: number}> {
+  const [churchesRes, citiesRes] = await Promise.all([
+    api.get('churches', {params: {country_id: id, page: 1, limit: 1}}),
+    api.get(`cities/country/${id}`),
+  ]);
+  const cities = citiesRes?.data?.data;
+  return {
+    churches: Number(churchesRes?.data?.data?.total) || 0,
+    cities: Array.isArray(cities) ? cities.length : 0,
+  };
+}

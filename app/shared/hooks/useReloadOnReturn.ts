@@ -12,7 +12,12 @@ export type DataKey =
   | 'churches'
   | 'churchTypes'
   | 'churchNetworks'
-  | 'churchPlantingProjections';
+  | 'churchPlantingProjections'
+  | 'churchRegions'
+  | 'countries'
+  | 'eventTypes'
+  | 'languages'
+  | 'languageRegions';
 
 export function markDataChanged(key: DataKey) {
   dataVersions.set(key, (dataVersions.get(key) ?? 0) + 1);

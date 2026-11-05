@@ -1,22 +1,32 @@
-import React, {useState, useRef, useEffect} from 'react';
+import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {
-  View,
+  GestureResponderEvent,
+  LayoutChangeEvent,
+  Modal,
+  PanResponder,
+  Platform,
+  ScrollView,
+  StyleSheet,
   Text,
   TouchableOpacity,
-  Modal,
-  StyleSheet,
-  PanResponder,
-  Dimensions,
+  View,
 } from 'react-native';
-import Svg, {Defs, LinearGradient, Stop, Rect} from 'react-native-svg';
+import Svg, {Defs, LinearGradient, Rect, Stop} from 'react-native-svg';
 import {useThemedColors} from '../styles/theme';
-import {fs, ms, rs, ws, hs} from '../utils/scale';
+import {fs, ms, rs, ws} from '../utils/scale';
 import AppInput from './AppInput';
 import {useTranslation} from '../hooks/useTranslation';
+import {COLORS} from '../constants/colors';
 
-const {width: SCREEN_WIDTH} = Dimensions.get('window');
-const GRADIENT_SIZE = SCREEN_WIDTH * 0.85;
-const HUE_SLIDER_HEIGHT = 30;
+const HUE_HEIGHT = 28;
+const THUMB = 18;
+
+/** The web's swatches (event types). */
+const DEFAULT_SWATCHES = [
+  '#000000', '#434343', '#666666', '#999999', '#B7B7B7', '#CCCCCC', '#D9D9D9', '#FFFFFF',
+  '#FF4D4F', '#FF7A45', '#FA8C16', '#F9A825', '#FADB14', '#A0D911', '#52C41A', '#19E7AD',
+  '#13C2C2', '#1677FF', '#3E76C8', '#2F54EB', '#722ED1', '#BE19E7', '#EB2F96', '#F759AB',
+];
 
 interface ColorPickerProps {
   value: string;
@@ -24,72 +34,112 @@ interface ColorPickerProps {
   label?: string;
   height?: number;
   error?: boolean;
+  swatches?: string[];
+  accessibilityLabel?: string;
 }
 
-// Helper functions for color conversion
-const hexToHsv = (hex: string): [number, number, number] => {
-  const r = parseInt(hex.slice(1, 3), 16) / 255;
-  const g = parseInt(hex.slice(3, 5), 16) / 255;
-  const b = parseInt(hex.slice(5, 7), 16) / 255;
-  
+type Hsv = [number, number, number];
+
+/** "#abc" / "abc" / "#aabbcc" → "#AABBCC", or null. */
+export function normalizeHexColor(input: string | null | undefined): string | null {
+  const raw = String(input ?? '').trim().replace(/^#/, '');
+  if (/^[0-9a-f]{3}$/i.test(raw)) {
+    return `#${raw.split('').map(c => c + c).join('')}`.toUpperCase();
+  }
+  if (/^[0-9a-f]{6}$/i.test(raw)) {
+    return `#${raw}`.toUpperCase();
+  }
+  return null;
+}
+
+export function hexToHsv(hex: string): Hsv | null {
+  const n = normalizeHexColor(hex);
+  if (!n) {
+    return null;
+  }
+  const r = parseInt(n.slice(1, 3), 16) / 255;
+  const g = parseInt(n.slice(3, 5), 16) / 255;
+  const b = parseInt(n.slice(5, 7), 16) / 255;
   const max = Math.max(r, g, b);
   const min = Math.min(r, g, b);
-  const delta = max - min;
-  
+  const d = max - min;
   let h = 0;
-  if (delta !== 0) {
+  if (d !== 0) {
     if (max === r) {
-      h = ((g - b) / delta) % 6;
+      h = ((g - b) / d) % 6;
     } else if (max === g) {
-      h = (b - r) / delta + 2;
+      h = (b - r) / d + 2;
     } else {
-      h = (r - g) / delta + 4;
+      h = (r - g) / d + 4;
+    }
+    h *= 60;
+    if (h < 0) {
+      h += 360;
     }
   }
-  h = Math.round(h * 60);
-  if (h < 0) h += 360;
-  
-  const s = max === 0 ? 0 : delta / max;
-  const v = max;
-  
-  return [h, s, v];
-};
+  return [h, max === 0 ? 0 : d / max, max];
+}
 
-const hsvToHex = (h: number, s: number, v: number): string => {
+export function hsvToHex(h: number, s: number, v: number): string {
+  const hue = ((h % 360) + 360) % 360;
   const c = v * s;
-  const x = c * (1 - Math.abs(((h / 60) % 2) - 1));
+  const x = c * (1 - Math.abs(((hue / 60) % 2) - 1));
   const m = v - c;
-  
-  let r = 0, g = 0, b = 0;
-  
-  if (h >= 0 && h < 60) {
-    r = c; g = x; b = 0;
-  } else if (h >= 60 && h < 120) {
-    r = x; g = c; b = 0;
-  } else if (h >= 120 && h < 180) {
-    r = 0; g = c; b = x;
-  } else if (h >= 180 && h < 240) {
-    r = 0; g = x; b = c;
-  } else if (h >= 240 && h < 300) {
-    r = x; g = 0; b = c;
-  } else if (h >= 300 && h < 360) {
-    r = c; g = 0; b = x;
+  let rgb: [number, number, number];
+  if (hue < 60) {
+    rgb = [c, x, 0];
+  } else if (hue < 120) {
+    rgb = [x, c, 0];
+  } else if (hue < 180) {
+    rgb = [0, c, x];
+  } else if (hue < 240) {
+    rgb = [0, x, c];
+  } else if (hue < 300) {
+    rgb = [x, 0, c];
+  } else {
+    rgb = [c, 0, x];
   }
-  
-  r = Math.round((r + m) * 255);
-  g = Math.round((g + m) * 255);
-  b = Math.round((b + m) * 255);
-  
-  return `#${[r, g, b].map(x => x.toString(16).padStart(2, '0')).join('')}`;
-};
+  return `#${rgb
+    .map(n => Math.round((n + m) * 255).toString(16).padStart(2, '0'))
+    .join('')}`.toUpperCase();
+}
 
-const hsvToRgb = (h: number, s: number, v: number): [number, number, number] => {
-  const hex = hsvToHex(h, s, v);
-  const r = parseInt(hex.slice(1, 3), 16);
-  const g = parseInt(hex.slice(3, 5), 16);
-  const b = parseInt(hex.slice(5, 7), 16);
-  return [r, g, b];
-};
+const clamp = (n: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, n));
+
+/**
+ * Drag handler over a box. The position comes from pageX/pageY minus the box's
+ * page offset (taken at touch start): locationX is relative to whichever child
+ * is touched (the thumb), which made the colour jump, mostly on Android.
+ */
+function useDrag(onMove: (x: number, y: number) => void, onActive: (active: boolean) => void) {
+  const origin = useRef({x: 0, y: 0});
+  const moveRef = useRef(onMove);
+  moveRef.current = onMove;
+  const activeRef = useRef(onActive);
+  activeRef.current = onActive;
+  return useMemo(
+    () =>
+      PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: () => true,
+        // Keep the drag when the finger moves vertically (no ScrollView takeover).
+        onPanResponderTerminationRequest: () => false,
+        onPanResponderGrant: (e: GestureResponderEvent) => {
+          const {pageX, pageY, locationX, locationY} = e.nativeEvent;
+          origin.current = {x: pageX - locationX, y: pageY - locationY};
+          activeRef.current(true);
+          moveRef.current(locationX, locationY);
+        },
+        onPanResponderMove: (e: GestureResponderEvent) => {
+          const {pageX, pageY} = e.nativeEvent;
+          moveRef.current(pageX - origin.current.x, pageY - origin.current.y);
+        },
+        onPanResponderRelease: () => activeRef.current(false),
+        onPanResponderTerminate: () => activeRef.current(false),
+      }),
+    [],
+  );
+}
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({
   value,
@@ -97,274 +147,271 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
   label,
   height,
   error = false,
+  swatches = DEFAULT_SWATCHES,
+  accessibilityLabel,
 }) => {
-  const [modalVisible, setModalVisible] = useState(false);
-  const [customHex, setCustomHex] = useState(value || '');
   const C = useThemedColors();
   const {t} = useTranslation();
-  
-  // Initialize HSV from hex value
-  const getInitialHsv = (hex: string): [number, number, number] => {
-    if (!hex || hex === '') return [0, 1, 1];
-    try {
-      return hexToHsv(hex);
-    } catch {
-      return [0, 1, 1];
-    }
+  const [open, setOpen] = useState(false);
+  // Edits stay in a draft until Apply; closing (✕, Cancel, Back) keeps the
+  // saved colour. Before, dragging changed the field at once and ✕ could not undo it.
+  const [draft, setDraft] = useState<Hsv>([0, 1, 1]);
+  const [hexText, setHexText] = useState('');
+  const [planeWidth, setPlaneWidth] = useState(0);
+  const [dragging, setDragging] = useState(false);
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+
+  const savedHex = normalizeHexColor(value);
+  const planeHeight = Math.round(Math.min(Math.max(planeWidth * 0.55, 120), 220));
+
+  const openSheet = () => {
+    const hsv = (savedHex && hexToHsv(savedHex)) || [0, 1, 1];
+    setDraft(hsv as Hsv);
+    setHexText(savedHex ?? '');
+    setOpen(true);
   };
-  
-  const [hsv, setHsv] = useState<[number, number, number]>(getInitialHsv(value || ''));
-  
+
   useEffect(() => {
-    if (value && value !== '') {
-      setHsv(getInitialHsv(value));
-      setCustomHex(value);
+    if (!open) {
+      setDragging(false);
     }
-  }, [value]);
+  }, [open]);
 
-  const updateColor = (newHsv: [number, number, number]) => {
-    setHsv(newHsv);
-    const hex = hsvToHex(newHsv[0], newHsv[1], newHsv[2]);
-    setCustomHex(hex);
-    onChange(hex);
+  const setFromHsv = (hsv: Hsv) => {
+    setDraft(hsv);
+    setHexText(hsvToHex(...hsv));
   };
 
-  const handleGradientPress = (event: any, gradientSize: number) => {
-    const {locationX, locationY} = event.nativeEvent;
-    const saturation = Math.max(0, Math.min(1, locationX / gradientSize));
-    const value = Math.max(0, Math.min(1, 1 - locationY / gradientSize));
-    updateColor([hsv[0], saturation, value]);
-  };
+  const plane = useDrag(
+    (x, y) => {
+      if (!planeWidth) {
+        return;
+      }
+      const [h] = draftRef.current; // latest hue, not the one at first render
+      setFromHsv([h, clamp(x / planeWidth, 0, 1), clamp(1 - y / planeHeight, 0, 1)]);
+    },
+    setDragging,
+  );
+  const hue = useDrag(
+    x => {
+      if (!planeWidth) {
+        return;
+      }
+      const [, s, v] = draftRef.current;
+      setFromHsv([clamp(x / planeWidth, 0, 1) * 359.9, s, v]);
+    },
+    setDragging,
+  );
 
-  const handleHuePress = (event: any, sliderWidth: number) => {
-    const {locationX} = event.nativeEvent;
-    const hue = Math.max(0, Math.min(360, (locationX / sliderWidth) * 360));
-    updateColor([hue, hsv[1], hsv[2]]);
-  };
-
-  const handleCustomHexChange = (hex: string) => {
-    setCustomHex(hex);
-    const hexPattern = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
-    if (hexPattern.test(hex)) {
-      const newHsv = hexToHsv(hex);
-      setHsv(newHsv);
-      onChange(hex);
-    }
-  };
-
-  const handleApply = () => {
-    if (customHex && customHex !== '') {
-      onChange(customHex);
-      setModalVisible(false);
+  const onHexChange = (text: string) => {
+    setHexText(text);
+    const hsv = hexToHsv(text);
+    if (hsv) {
+      setDraft(hsv);
     }
   };
 
-  const displayValue = value || '';
-  const previewColor = value || '#FFFFFF';
-  const currentHueColor = hsvToHex(hsv[0], 1, 1);
-  const [r, g, b] = hsvToRgb(hsv[0], hsv[1], hsv[2]);
+  const draftHex = hsvToHex(...draft);
+  const hexValid = !!normalizeHexColor(hexText);
+  const apply = () => {
+    onChange(normalizeHexColor(hexText) ?? draftHex);
+    setOpen(false);
+  };
 
-  // PanResponder for gradient area
-  const gradientPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        handleGradientPress(evt, GRADIENT_SIZE);
-      },
-      onPanResponderMove: (evt) => {
-        handleGradientPress(evt, GRADIENT_SIZE);
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
-
-  // PanResponder for hue slider
-  const huePanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: (evt) => {
-        handleHuePress(evt, GRADIENT_SIZE);
-      },
-      onPanResponderMove: (evt) => {
-        handleHuePress(evt, GRADIENT_SIZE);
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
+  const onPlaneLayout = (e: LayoutChangeEvent) =>
+    setPlaneWidth(Math.round(e.nativeEvent.layout.width));
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(draftHex.slice(i, i + 2), 16));
 
   return (
     <View>
-      {label && (
-        <Text style={[styles.label, {color: C.textSecondary, marginBottom: ms(4)}]}>
-          {label}
-        </Text>
-      )}
+      {label ? (
+        <Text style={[styles.label, {color: C.textSecondary}]}>{label}</Text>
+      ) : null}
       <TouchableOpacity
         style={[
-          styles.colorButton,
-          {
-            backgroundColor: C.inputBg,
-            borderColor: error ? '#db2d2d' : C.inputBorder,
-          },
-          height ? {height, paddingVertical: 0} : {},
+          styles.field,
+          {backgroundColor: C.inputBg, borderColor: error ? '#db2d2d' : C.inputBorder},
+          height ? {height, paddingVertical: 0} : null,
         ]}
-        onPress={() => {
-          setCustomHex(value || '#FFFFFF');
-          setModalVisible(true);
-        }}>
-        <View style={[styles.colorPreview, {backgroundColor: previewColor, borderColor: C.inputBorder}]} />
-        <Text style={[styles.colorText, {color: C.textPrimary}]}>
-          {displayValue}
+        onPress={openSheet}
+        accessibilityRole="button"
+        accessibilityLabel={`${accessibilityLabel || label || t('selectColor') || 'Select color'}${
+          value ? `, ${value}` : ''
+        }`}>
+        <View
+          style={[
+            styles.fieldSwatch,
+            {backgroundColor: savedHex ?? 'transparent', borderColor: C.inputBorder},
+          ]}>
+          {!savedHex && value ? <Text style={styles.badSwatch}>?</Text> : null}
+        </View>
+        <Text
+          style={[styles.fieldText, {color: value ? C.textPrimary : C.textSecondary}]}
+          numberOfLines={1}>
+          {value || t('selectColor') || 'Select color'}
         </Text>
       </TouchableOpacity>
 
       <Modal
-        visible={modalVisible}
+        visible={open}
         transparent
         animationType="slide"
-        onRequestClose={() => setModalVisible(false)}>
-        <View style={[styles.modalOverlay, {backgroundColor: C.overlay}]}>
-          <View style={[styles.modalContent, {backgroundColor: C.surface}]}>
-            <View style={[styles.modalHeader, {borderBottomColor: C.surfaceBorder}]}>
-              <Text style={[styles.modalTitle, {color: C.textPrimary}]}>
-              {t('selectColor') || 'Select color'}
+        onRequestClose={() => setOpen(false)}>
+        <View style={[styles.overlay, {backgroundColor: C.overlay}]}>
+          <TouchableOpacity
+            style={styles.backdrop}
+            onPress={() => setOpen(false)}
+            accessibilityLabel={t('cancel') || 'Cancel'}
+          />
+          <View style={[styles.sheet, {backgroundColor: C.surface}]}>
+            <View style={[styles.header, {borderBottomColor: C.surfaceBorder}]}>
+              <Text style={[styles.title, {color: C.textPrimary}]}>
+                {label || t('selectColor') || 'Select color'}
               </Text>
               <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                style={styles.closeButton}>
-                <Text style={[styles.closeButtonText, {color: C.textPrimary}]}>✕</Text>
+                onPress={() => setOpen(false)}
+                hitSlop={10}
+                accessibilityRole="button"
+                accessibilityLabel={t('close') || 'Close'}>
+                <Text style={[styles.close, {color: C.textPrimary}]}>✕</Text>
               </TouchableOpacity>
             </View>
 
-            <View style={styles.colorPickerContainer}>
-              {/* Color Preview and Gradient Area */}
-              <View style={styles.mainColorArea}>
-                <View style={[styles.colorPreviewBox, {backgroundColor: previewColor, borderColor: C.inputBorder}]} />
-                
-                {/* Saturation/Lightness Gradient */}
-                <View 
-                  style={[styles.gradientContainer, {borderColor: C.inputBorder}]}
-                  {...gradientPanResponder.panHandlers}>
-                  <View style={StyleSheet.absoluteFill}>
-                    <Svg width={GRADIENT_SIZE} height={GRADIENT_SIZE}>
-                      <Defs>
-                        {/* Horizontal gradient (saturation: white to hue) */}
-                        <LinearGradient id={`satGradient-${hsv[0]}`} x1="0%" y1="0%" x2="100%" y2="0%">
-                          <Stop offset="0%" stopColor="#ffffff" />
-                          <Stop offset="100%" stopColor={currentHueColor} />
-                        </LinearGradient>
-                      </Defs>
-                      {/* Base saturation gradient (horizontal) */}
-                      <Rect width={GRADIENT_SIZE} height={GRADIENT_SIZE} fill={`url(#satGradient-${hsv[0]})`} />
-                    </Svg>
-                  </View>
-                  
-                  {/* Vertical gradient overlay for lightness (black overlay) */}
-                  <View style={StyleSheet.absoluteFill}>
-                    <Svg width={GRADIENT_SIZE} height={GRADIENT_SIZE}>
-                      <Defs>
-                        <LinearGradient id={`lightGradient-${hsv[0]}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                          <Stop offset="0%" stopColor="rgba(0,0,0,0)" stopOpacity="0" />
-                          <Stop offset="100%" stopColor="#000000" stopOpacity="1" />
-                        </LinearGradient>
-                      </Defs>
-                      <Rect width={GRADIENT_SIZE} height={GRADIENT_SIZE} fill={`url(#lightGradient-${hsv[0]})`} />
-                    </Svg>
-                  </View>
-                  
-                  {/* Indicator */}
-                  <View
-                    style={[
-                      styles.gradientIndicator,
-                      {
-                        left: hsv[1] * GRADIENT_SIZE - 8,
-                        top: (1 - hsv[2]) * GRADIENT_SIZE - 8,
-                      },
-                    ]}
+            {/* Scrolls on small phones: the old sheet had no scroll and the
+                Apply button fell off the bottom of 720×1280 screens. */}
+            <ScrollView
+              scrollEnabled={!dragging}
+              keyboardShouldPersistTaps="handled"
+              contentContainerStyle={styles.body}>
+              <View style={styles.hexRow}>
+                <View
+                  style={[styles.preview, {backgroundColor: draftHex, borderColor: C.inputBorder}]}
+                />
+                <View style={styles.hexInput}>
+                  <AppInput
+                    value={hexText}
+                    onChangeText={onHexChange}
+                    placeholder="#000000"
+                    autoCapitalize="characters"
+                    autoCorrect={false}
+                    maxLength={7}
+                    error={!!hexText && !hexValid}
+                    accessibilityLabel="HEX"
                   />
                 </View>
-              </View>
-
-              {/* Hue Slider */}
-              <View style={[styles.hueSliderContainer, {borderColor: C.inputBorder}]} {...huePanResponder.panHandlers}>
-                <Svg width={GRADIENT_SIZE} height={HUE_SLIDER_HEIGHT}>
-                  <Defs>
-                    <LinearGradient id="hueGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                      <Stop offset="0%" stopColor="#ff0000" />
-                      <Stop offset="16.67%" stopColor="#ffff00" />
-                      <Stop offset="33.33%" stopColor="#00ff00" />
-                      <Stop offset="50%" stopColor="#00ffff" />
-                      <Stop offset="66.67%" stopColor="#0000ff" />
-                      <Stop offset="83.33%" stopColor="#ff00ff" />
-                      <Stop offset="100%" stopColor="#ff0000" />
-                    </LinearGradient>
-                  </Defs>
-                  <Rect width={GRADIENT_SIZE} height={HUE_SLIDER_HEIGHT} fill="url(#hueGradient)" rx={4} />
-                </Svg>
-                <View
-                  style={[
-                    styles.hueIndicator,
-                    {
-                      left: (hsv[0] / 360) * GRADIENT_SIZE - 8,
-                    },
-                  ]}
-                />
-              </View>
-
-              {/* Color Values */}
-              <View style={styles.colorValuesContainer}>
-                <View style={styles.colorValueRow}>
-                  <Text style={[styles.colorValueLabel, {color: C.textSecondary}]}>HEX</Text>
-                  <View style={styles.colorValueInputRow}>
-                    <AppInput
-                      value={customHex}
-                      onChangeText={handleCustomHexChange}
-                      placeholder="#000000"
-                      style={styles.colorValueInput}
-                    />
-                    <TouchableOpacity
-                      style={styles.copyButton}
-                      onPress={() => {
-                        // Copy to clipboard - would need Clipboard API
-                      }}>
-                      <Text style={[styles.copyButtonText, {color: C.textPrimary}]}>📋</Text>
-                    </TouchableOpacity>
-                  </View>
-                </View>
-
-                <View style={styles.colorValueRow}>
-                  <Text style={[styles.colorValueLabel, {color: C.textSecondary}]}>RGB</Text>
-                  <Text style={[styles.colorValueText, {color: C.textPrimary}]}>
-                    {r}, {g}, {b}
-                  </Text>
-                </View>
-
-                <View style={styles.colorValueRow}>
-                  <Text style={[styles.colorValueLabel, {color: C.textSecondary}]}>HSV</Text>
-                  <Text style={[styles.colorValueText, {color: C.textPrimary}]}>
-                    {Math.round(hsv[0])}°, {Math.round(hsv[1] * 100)}%, {Math.round(hsv[2] * 100)}%
-                  </Text>
-                </View>
-
-                <View style={styles.colorValueRow}>
-                  <Text style={[styles.colorValueLabel, {color: C.textSecondary}]}>HSL</Text>
-                  <Text style={[styles.colorValueText, {color: C.textPrimary}]}>
-                    {Math.round(hsv[0])}°, {Math.round(hsv[1] * 100)}%, {Math.round(hsv[2] * 100)}%
-                  </Text>
-                </View>
-              </View>
-
-              {/* Apply Button */}
-              <TouchableOpacity
-                style={[styles.applyButton, {backgroundColor: C.textPrimary}]}
-                onPress={handleApply}>
-                <Text style={[styles.applyButtonText, {color: C.background}]}>
-                {t('apply') || 'Apply'}
+                <Text style={[styles.rgb, {color: C.textSecondary}]}>
+                  RGB {r}, {g}, {b}
                 </Text>
-              </TouchableOpacity>
-            </View>
+              </View>
+
+              <View style={styles.swatches}>
+                {swatches.map(sw => {
+                  const selected = draftHex === sw;
+                  return (
+                    <TouchableOpacity
+                      key={sw}
+                      onPress={() => {
+                        const hsv = hexToHsv(sw);
+                        if (hsv) {
+                          setDraft(hsv);
+                          setHexText(sw);
+                        }
+                      }}
+                      accessibilityRole="button"
+                      accessibilityLabel={sw}
+                      accessibilityState={{selected}}
+                      style={[
+                        styles.swatch,
+                        {backgroundColor: sw, borderColor: selected ? C.textPrimary : C.inputBorder},
+                        selected && styles.swatchSelected,
+                      ]}
+                    />
+                  );
+                })}
+              </View>
+
+              <View
+                style={[styles.plane, {height: planeHeight, borderColor: C.inputBorder}]}
+                onLayout={onPlaneLayout}
+                {...plane.panHandlers}>
+                {planeWidth > 0 ? (
+                  <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                    <Svg width={planeWidth} height={planeHeight}>
+                      <Defs>
+                        <LinearGradient id="cpSat" x1="0" y1="0" x2="1" y2="0">
+                          <Stop offset="0" stopColor="#FFFFFF" />
+                          <Stop offset="1" stopColor={hsvToHex(draft[0], 1, 1)} />
+                        </LinearGradient>
+                        <LinearGradient id="cpVal" x1="0" y1="0" x2="0" y2="1">
+                          <Stop offset="0" stopColor="#000000" stopOpacity="0" />
+                          <Stop offset="1" stopColor="#000000" stopOpacity="1" />
+                        </LinearGradient>
+                      </Defs>
+                      <Rect width={planeWidth} height={planeHeight} fill="url(#cpSat)" />
+                      <Rect width={planeWidth} height={planeHeight} fill="url(#cpVal)" />
+                    </Svg>
+                    <View
+                      style={[
+                        styles.thumb,
+                        {
+                          left: draft[1] * planeWidth - THUMB / 2,
+                          top: (1 - draft[2]) * planeHeight - THUMB / 2,
+                          backgroundColor: draftHex,
+                        },
+                      ]}
+                    />
+                  </View>
+                ) : null}
+              </View>
+
+              <View
+                style={[styles.hue, {borderColor: C.inputBorder}]}
+                accessibilityLabel="Hue"
+                {...hue.panHandlers}>
+                {planeWidth > 0 ? (
+                  <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+                    <Svg width={planeWidth} height={HUE_HEIGHT}>
+                      <Defs>
+                        <LinearGradient id="cpHue" x1="0" y1="0" x2="1" y2="0">
+                          {['#FF0000', '#FFFF00', '#00FF00', '#00FFFF', '#0000FF', '#FF00FF', '#FF0000'].map(
+                            (c, i) => (
+                              <Stop key={i} offset={String(i / 6)} stopColor={c} />
+                            ),
+                          )}
+                        </LinearGradient>
+                      </Defs>
+                      <Rect width={planeWidth} height={HUE_HEIGHT} fill="url(#cpHue)" />
+                    </Svg>
+                    <View
+                      style={[styles.hueThumb, {left: (draft[0] / 360) * planeWidth - 4}]}
+                    />
+                  </View>
+                ) : null}
+              </View>
+
+              <View style={styles.actions}>
+                <TouchableOpacity
+                  style={[styles.button, {borderColor: C.inputBorder}]}
+                  onPress={() => setOpen(false)}
+                  accessibilityRole="button">
+                  <Text style={[styles.buttonText, {color: C.textPrimary}]}>
+                    {t('cancel') || 'Cancel'}
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.button,
+                    styles.applyButton,
+                    {opacity: hexText && !hexValid ? 0.5 : 1},
+                  ]}
+                  disabled={!!hexText && !hexValid}
+                  onPress={apply}
+                  accessibilityRole="button">
+                  <Text style={[styles.buttonText, styles.applyText]}>{t('apply') || 'Apply'}</Text>
+                </TouchableOpacity>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -376,186 +423,161 @@ const styles = StyleSheet.create({
   label: {
     fontSize: fs(14),
     fontWeight: '600',
+    marginBottom: ms(4),
   },
-  colorButton: {
+  field: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
     borderRadius: rs(3),
     paddingHorizontal: ms(12),
     paddingVertical: ms(8),
-    gap: ms(8),
+    gap: ms(10),
   },
-  colorPreview: {
-    width: ws(30),
-    height: hs(30),
+  fieldSwatch: {
+    width: ws(26),
+    height: ws(26),
     borderRadius: rs(4),
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
-  colorText: {
-    fontSize: fs(14),
+  badSwatch: {
+    fontSize: fs(12),
+    color: '#db2d2d',
+    fontWeight: '700',
+  },
+  fieldText: {
     flex: 1,
+    fontSize: fs(14),
+    fontFamily: Platform.select({ios: 'Menlo', android: 'monospace'}),
   },
-  modalOverlay: {
+  overlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    borderTopLeftRadius: rs(20),
-    borderTopRightRadius: rs(20),
-    paddingTop: ms(20),
-    paddingBottom: ms(40),
-    maxHeight: '90%',
+  backdrop: {
+    flex: 1,
   },
-  modalHeader: {
+  sheet: {
+    borderTopLeftRadius: rs(16),
+    borderTopRightRadius: rs(16),
+    maxHeight: '92%',
+  },
+  header: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: ms(20),
-    paddingBottom: ms(16),
-    borderBottomWidth: 1,
+    paddingHorizontal: ms(16),
+    paddingVertical: ms(12),
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  modalTitle: {
-    fontSize: fs(18),
+  title: {
+    fontSize: fs(17),
     fontWeight: '700',
+    flex: 1,
   },
-  closeButton: {
-    padding: ms(8),
-  },
-  closeButtonText: {
-    fontSize: fs(24),
+  close: {
+    fontSize: fs(20),
     fontWeight: '600',
   },
-  colorPickerContainer: {
-    paddingHorizontal: ms(20),
-    paddingTop: ms(20),
+  body: {
+    padding: ms(16),
+    paddingBottom: ms(28),
+    gap: ms(14),
   },
-  mainColorArea: {
-    flexDirection: 'row',
-    marginBottom: ms(20),
-    gap: ms(16),
-  },
-  colorPreviewBox: {
-    width: ws(80),
-    height: ws(80),
-    borderRadius: rs(8),
-    borderWidth: 1,
-  },
-  gradientContainer: {
-    flex: 1,
-    height: GRADIENT_SIZE,
-    borderRadius: rs(8),
-    overflow: 'hidden',
-    borderWidth: 1,
-    position: 'relative',
-  },
-  gradientIndicator: {
-    position: 'absolute',
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  hueSliderContainer: {
-    marginBottom: ms(20),
-    borderRadius: rs(8),
-    overflow: 'hidden',
-    borderWidth: 1,
-    position: 'relative',
-    height: HUE_SLIDER_HEIGHT,
-  },
-  hueIndicator: {
-    position: 'absolute',
-    top: -4,
-    width: 16,
-    height: HUE_SLIDER_HEIGHT + 8,
-    borderRadius: 2,
-    borderWidth: 2,
-    borderColor: '#ffffff',
-    shadowColor: '#000',
-    shadowOffset: {width: 0, height: 2},
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-  },
-  colorValuesContainer: {
-    marginBottom: ms(20),
-    gap: ms(12),
-  },
-  colorValueRow: {
+  hexRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: ms(12),
+    gap: ms(10),
   },
-  colorValueLabel: {
-    fontSize: fs(14),
-    fontWeight: '600',
-    width: ws(50),
+  preview: {
+    width: ws(44),
+    height: ws(44),
+    borderRadius: rs(8),
+    borderWidth: 1,
   },
-  colorValueInputRow: {
+  hexInput: {
+    width: ws(120),
+  },
+  rgb: {
     flex: 1,
+    fontSize: fs(12),
+    textAlign: 'right',
+  },
+  swatches: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: ms(8),
   },
-  colorValueInput: {
-    flex: 1,
-    fontSize: fs(14),
-  },
-  copyButton: {
-    padding: ms(8),
-  },
-  copyButtonText: {
-    fontSize: fs(18),
-  },
-  colorValueText: {
-    flex: 1,
-    fontSize: fs(14),
-  },
-  customColorSection: {
-    paddingHorizontal: ms(20),
-    paddingTop: ms(16),
-    borderTopWidth: 1,
-    borderTopColor: '#eee',
-  },
-  customColorLabel: {
-    fontSize: fs(14),
-    marginBottom: ms(8),
-  },
-  customColorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: ms(8),
-  },
-  colorPreviewSmall: {
-    width: ws(40),
-    height: hs(40),
+  swatch: {
+    width: ws(30),
+    height: ws(30),
     borderRadius: rs(6),
     borderWidth: 1,
-    borderColor: '#ddd',
   },
-  customColorInputContainer: {
+  swatchSelected: {
+    borderWidth: 3,
+  },
+  plane: {
+    width: '100%',
+    borderRadius: rs(8),
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  thumb: {
+    position: 'absolute',
+    width: THUMB,
+    height: THUMB,
+    borderRadius: THUMB / 2,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.35,
+    shadowRadius: 2,
+    shadowOffset: {width: 0, height: 1},
+  },
+  hue: {
+    width: '100%',
+    height: HUE_HEIGHT,
+    borderRadius: rs(6),
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  hueThumb: {
+    position: 'absolute',
+    top: 0,
+    width: 8,
+    height: HUE_HEIGHT,
+    borderRadius: 3,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    elevation: 4,
+  },
+  actions: {
+    flexDirection: 'row',
+    gap: ms(12),
+    marginTop: ms(4),
+  },
+  button: {
     flex: 1,
-  },
-  customColorInput: {
-    fontSize: fs(14),
+    alignItems: 'center',
+    paddingVertical: ms(12),
+    borderRadius: rs(6),
+    borderWidth: 1,
   },
   applyButton: {
-    paddingHorizontal: ms(16),
-    paddingVertical: ms(10),
-    borderRadius: rs(6),
+    backgroundColor: COLORS.mainColor,
+    borderColor: COLORS.mainColor,
   },
-  applyButtonText: {
-    fontSize: fs(14),
+  buttonText: {
+    fontSize: fs(15),
     fontWeight: '600',
+  },
+  applyText: {
+    color: '#FFFFFF',
   },
 });
 
 export default ColorPicker;
-

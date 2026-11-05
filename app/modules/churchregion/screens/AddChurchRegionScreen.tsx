@@ -4,21 +4,28 @@ import {useNavigation} from '@react-navigation/native';
 import {
   createChurchRegion,
   getChurchRegionHierarchy,
+  uploadChurchRegionLogo,
 } from '../services/churchregion.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import ElementDropdown, {
   ElementDropdownItem,
 } from '../../../shared/components/ElementDropdown';
 import AppInput from '../../../shared/components/AppInput';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
-import api from '../../../config/api';
 import {
   FormActions,
   FormField,
   ScreenContainer,
 } from '../../../shared/components/crud';
 import {ChurchRegionLogoField} from '../components/ChurchRegionUI';
+import {
+  REGION_NAME_MAX,
+  buildParentOptions,
+  validateRegionName,
+} from '../utils/churchRegion.utils';
 
 export const AddChurchRegionScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -29,6 +36,8 @@ export const AddChurchRegionScreen: React.FC = () => {
   const [nameError, setNameError] = useState('');
   const {t} = useTranslation();
   const {imagePath, handleImagePick, clearImage} = useImagePicker();
+  // One save at a time: a fast double tap created the region twice.
+  const submitOnce = useSubmitOnce();
 
   // Parent list failed (e.g. offline): show a retryable error, not an empty dropdown.
   const [optionsLoading, setOptionsLoading] = useState(true);
@@ -46,19 +55,8 @@ export const AddChurchRegionScreen: React.FC = () => {
     setOptionsError(null);
     try {
       const resp = await getChurchRegionHierarchy();
-      const tree = (resp?.data ?? resp) as any[];
-      const out: ElementDropdownItem[] = [];
-      const walk = (nodes: any[], depth: number) => {
-        nodes?.forEach(n => {
-          out.push({label: `${'— '.repeat(depth)}${n.name}`, value: n.id});
-          if (n.children && n.children.length) {
-            walk(n.children, depth + 1);
-          }
-        });
-      };
-      walk(tree || [], 0);
       if (mountedRef.current) {
-        setOptions(out);
+        setOptions(buildParentOptions(resp?.data ?? resp));
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -82,42 +80,40 @@ export const AddChurchRegionScreen: React.FC = () => {
     }
   };
 
-  const onSave = async () => {
-    if (!name.trim()) {
+  const onSave = submitOnce(async () => {
+    if (validateRegionName(name)) {
       setNameError(t('fillRequiredFields') || 'Please fill all required fields.');
       return;
     }
     try {
       setSubmitting(true);
-
-      // Upload image first if selected
-      let uploadedLogoPath: string | null = null;
-      if (imagePath) {
-        const form = new FormData();
-        const fileName = imagePath.split('/').pop() || 'logo.jpg';
-        form.append('file', { uri: imagePath, name: fileName, type: 'image/jpeg' } as any);
-        form.append('entity_type', 'all');
-        form.append('alt_text', name.trim());
-        const uploadRes = await api.post('images/upload', form, { headers: { 'Content-Type': 'multipart/form-data' } });
-        uploadedLogoPath = uploadRes?.data?.data?.path || null;
-        if (!uploadedLogoPath) {
-          throw new Error(t('apiErrorUnexpected'));
-        }
-      }
-
+      const logoPath = imagePath ? await uploadChurchRegionLogo(imagePath, name.trim()) : '';
       await createChurchRegion({
         name: name.trim(),
         parent_id: parentId ?? null,
-        logo_path: uploadedLogoPath ?? '',
-      } as any);
+        logo_path: logoPath,
+      });
       Alert.alert(t('success') || 'Success', `${t('churchApostolicRegions')}: ${t('add')} ${t('success')}`);
-      navigation.navigate('ChurchRegions', { reload: true });
+      markDataChanged('churchRegions');
+      // React Navigation 7's navigate pushes a second list on top, so Back
+      // reopened the filled form (and a second Save made a duplicate).
+      const params = {reload: true};
+      const routes: {name: string}[] = navigation.getState?.()?.routes ?? [];
+      if (routes.some(r => r.name === 'ChurchRegions') && navigation.popTo) {
+        navigation.popTo('ChurchRegions', params);
+      } else if (navigation.replace) {
+        navigation.replace('ChurchRegions', params);
+      } else {
+        navigation.navigate('ChurchRegions', params);
+      }
     } catch (e: any) {
       Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -133,6 +129,7 @@ export const AddChurchRegionScreen: React.FC = () => {
           placeholder={t('churchRegion') || t('churchApostolicRegions')}
           error={!!nameError}
           editable={!submitting}
+          maxLength={REGION_NAME_MAX}
           accessibilityLabel={`${t('name')}, ${t('required')}`}
         />
       </FormField>
@@ -140,11 +137,7 @@ export const AddChurchRegionScreen: React.FC = () => {
         <ElementDropdown
           data={options}
           value={parentId}
-          onChange={v =>
-            setParentId(
-              (typeof v === 'number' ? v : Number(v)) || null,
-            )
-          }
+          onChange={v => setParentId(v == null ? null : Number(v) || null)}
           placeholder={t('churchParent')}
         />
       </FormField>
