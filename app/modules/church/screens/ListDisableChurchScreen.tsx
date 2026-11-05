@@ -243,7 +243,7 @@ export const ChurchesListScreen: React.FC = () => {
             list.push({ label: t('churchDetail'), icon: 'view', onPress: () => { if (selectedChurch) navigation.navigate('ChurchDetail', { id: selectedChurch.id }); setActionsVisible(false); setSelectedChurch(null); } });
             list.push({ label: t('editChurch'), icon: 'edit', onPress: () => { if (selectedChurch) navigation.navigate('EditChurch', { id: selectedChurch.id }); setActionsVisible(false); setSelectedChurch(null); } });
             if (isSuperAdmin(roleId)) {
-              list.push({ label: t('enableChurch') || 'Enable Church', type: 'danger', onPress: () => { if (selectedChurch) navigation.navigate('EnableChurch', { id: selectedChurch.id }); setActionsVisible(false); setSelectedChurch(null); } });
+              list.push({ label: t('enableChurch') || 'Enable Church', onPress: () => { if (selectedChurch) navigation.navigate('EnableChurch', { id: selectedChurch.id }); setActionsVisible(false); setSelectedChurch(null); } });
             }
             return list;
           })()}

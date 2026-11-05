@@ -28,6 +28,8 @@ import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {getChurchDetail, removeChurchLocation} from '../services/church.service';
 import {fillTemplate, parseYmd} from '../utils/churchForm';
+import {getChurchMscFlags} from '../utils/churchListOrder';
+import {socialUrl} from '../utils/socialLinks';
 
 const blankChurch = require('../../../assets/images/church.png');
 const zoomOutIcon = require('../../../assets/icons/zoom-out.png');
@@ -155,20 +157,26 @@ export default function ChurchDetailScreen() {
   const churchBirthday = formatDateWithAge(data?.date_of_birth, selectedLanguage, age =>
     fillTemplate(t('yearsOld'), {age: String(age)}),
   );
+  const mscFlags = getChurchMscFlags(data);
   const attributeItems = [
     data?.is_mother_church ? {key: 'mother', label: t('mother')} : null,
-    data?.is_msc ? {key: 'msc', label: t('msc')} : null,
+    // Same flags as the list badges: First MSC is an MSC too.
+    mscFlags.is_first_msc
+      ? {key: 'msc', label: t('firstMsc')}
+      : mscFlags.is_msc
+        ? {key: 'msc', label: t('msc')}
+        : null,
     // Pinned through Edit Location = coordinates, which count as "on map" too.
     omrMapUrl || (data?.latitude != null && data?.longitude != null)
       ? {key: 'map', label: t('onMap')}
       : null,
   ].filter(Boolean) as Array<{key: 'mother' | 'msc' | 'map'; label: string}>;
   const socialItems = [
-    {label: 'f', url: normalizeUrl(data?.facebook)},
-    {label: 'ig', url: normalizeUrl(data?.instagram)},
-    {label: 'x', url: normalizeUrl(data?.twitter)},
-    {label: 'yt', url: normalizeUrl(data?.youtube)},
-    {label: 'tt', url: normalizeUrl(data?.tiktok)},
+    {label: 'f', name: 'Facebook', url: socialUrl('facebook', data?.facebook)},
+    {label: 'ig', name: 'Instagram', url: socialUrl('instagram', data?.instagram)},
+    {label: 'x', name: 'X', url: socialUrl('twitter', data?.twitter)},
+    {label: 'yt', name: 'YouTube', url: socialUrl('youtube', data?.youtube)},
+    {label: 'tt', name: 'TikTok', url: socialUrl('tiktok', data?.tiktok)},
   ].filter(item => !!item.url);
 
   const hasCoordinates =
@@ -310,6 +318,9 @@ export default function ChurchDetailScreen() {
                         styles.zoomBtn,
                         {backgroundColor: C.surface},
                       ]}
+                      hitSlop={HIT_SLOP}
+                      accessibilityRole="button"
+                      accessibilityLabel={t('viewPhoto')}
                       onPress={() => setImageModalVisible(true)}>
                       <Image source={zoomOutIcon} style={styles.zoomIcon} resizeMode="contain" />
                     </TouchableOpacity>
@@ -325,6 +336,9 @@ export default function ChurchDetailScreen() {
                 </View>
                 <TouchableOpacity
                   style={[styles.iconBtn, styles.editBtn]}
+                  hitSlop={HIT_SLOP}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('editChurch')}
                   onPress={() => navigation.navigate('EditChurch', {id: churchId})}>
                   <Image source={editIcon} style={styles.iconImg} resizeMode="contain" />
                 </TouchableOpacity>
@@ -364,7 +378,7 @@ export default function ChurchDetailScreen() {
               </View>
 
               <View style={[styles.table, {borderColor: C.border}]}>
-                {renderRow(t('pastor'), data.pastor_name || '-', {
+                {renderRow(t('pastor'), data.pastor_name?.trim() || '-', {
                   press: data.pastor_id
                     ? () =>
                         navigation.navigate('User' as any, {
@@ -392,6 +406,9 @@ export default function ChurchDetailScreen() {
                         <TouchableOpacity
                           key={item.label}
                           onPress={() => openLink(item.url)}
+                          hitSlop={HIT_SLOP}
+                          accessibilityRole="link"
+                          accessibilityLabel={item.name}
                           style={[styles.socialChip, {borderColor: C.border}]}>
                           <Text style={[styles.socialLabel, {color: C.textPrimary}]}>
                             {item.label}
@@ -399,7 +416,7 @@ export default function ChurchDetailScreen() {
                         </TouchableOpacity>
                       ))
                     ) : (
-                      <Text style={[styles.rowValue, {color: C.textPrimary}]}>-</Text>
+                      <Text style={[styles.rowValue, styles.normalValue, styles.noMargin, {color: C.textPrimary}]}>-</Text>
                     )}
                   </View>
                 </View>
@@ -447,7 +464,7 @@ export default function ChurchDetailScreen() {
                         </Text>
                       ))
                     ) : (
-                      <Text style={[styles.rowValue, styles.normalValue, {color: C.textPrimary}]}>-</Text>
+                      <Text style={[styles.rowValue, styles.normalValue, styles.noMargin, {color: C.textPrimary}]}>-</Text>
                     )}
                   </View>
                 </View>
@@ -477,6 +494,9 @@ export default function ChurchDetailScreen() {
                     {isSuperAdminUser && hasLocation ? (
                       <TouchableOpacity
                         style={styles.locationEditChip}
+                        hitSlop={HIT_SLOP}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('editLocation')}
                         onPress={() =>
                           navigation.navigate('EditChurchLocation' as any, {
                             id: churchId,
@@ -492,6 +512,7 @@ export default function ChurchDetailScreen() {
                     {isSuperAdminUser && hasLocation ? (
                       <TouchableOpacity
                         style={styles.locationEditChip}
+                        hitSlop={HIT_SLOP}
                         disabled={removingLocation}
                         accessibilityRole="button"
                         accessibilityLabel={t('removeLocation')}
@@ -754,11 +775,15 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'flex-start',
-    gap: ms(8),
+    // Edit and Remove sit apart so a tap can't land on the wrong one.
+    gap: ms(16),
+  },
+  noMargin: {
+    marginLeft: 0,
   },
   locationEditChip: {
-    paddingHorizontal: ms(4),
-    paddingVertical: ms(2),
+    paddingHorizontal: ms(6),
+    paddingVertical: ms(4),
     borderRadius: rs(8),
   },
   locationEditChipText: {
@@ -862,6 +887,9 @@ function getAge(date: Date): number {
   }
   return age > 0 ? age : 0;
 }
+
+/** Small icon buttons get a ~44pt touch area. */
+const HIT_SLOP = {top: 12, bottom: 12, left: 12, right: 12};
 
 function normalizeUrl(value?: string): string {
   const raw = String(value || '').trim();

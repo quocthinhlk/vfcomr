@@ -568,6 +568,8 @@ const pt = {
     addNewChurch: 'Adicionar Nova Igreja',
     churchPicture: 'Imagem da Igreja',
     editChurch: 'Editar Igreja',
+    viewPhoto: "Ver foto",
+    citiesLoadFailed: "Não foi possível carregar as cidades desta nação.",
     disableChurch: 'Desabilitar Igreja',
     enableChurch: 'Habilitar Igreja',
 

@@ -562,6 +562,8 @@ const zh = {
     addNewChurch: '添加新教会',
     churchPicture: '教会图片',
     editChurch: '编辑教会',
+    viewPhoto: "查看照片",
+    citiesLoadFailed: "无法加载该国家的城市。",
     disableChurch: '禁用教会',
     enableChurch: '启用教会',
 

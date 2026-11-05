@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
-import {View, StyleSheet, Alert} from 'react-native';
+import {View, StyleSheet, Alert, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -9,13 +9,14 @@ import {globalStyles} from '../../../shared/styles/global';
 import {getChurchDetail, enableChurch} from '../services/church.service';
 import {
   CancelButton,
-  DeleteButton,
+  SaveButton,
 } from '../../../shared/components/ActionButtons';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnToList} from '../../../shared/utils/returnToList';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {fillTemplate} from '../utils/churchForm';
 
 const EnableChurchScreen: React.FC = () => {
@@ -28,6 +29,9 @@ const EnableChurchScreen: React.FC = () => {
   const [submitting, setSubmitting] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
+  /** The name is shown in the question: confirm only once it is loaded. */
+  const [loaded, setLoaded] = useState(false);
+  const submittingRef = useRef(false);
 
   const loadDetail = useCallback(async () => {
     if (!churchId) {
@@ -40,6 +44,7 @@ const EnableChurchScreen: React.FC = () => {
       }
       setName(d?.name || t('thisChurch'));
       setLoadError(null);
+      setLoaded(true);
     } catch (e) {
       // Don't ask to confirm an action on a church we couldn't load.
       if (mountedRef.current) {
@@ -61,16 +66,18 @@ const EnableChurchScreen: React.FC = () => {
   };
 
   const onEnable = async () => {
-    if (!churchId) return;
+    if (!churchId || !loaded || submittingRef.current) return;
+    submittingRef.current = true;
     try {
       setSubmitting(true);
       await enableChurch(churchId);
       markDataChanged('churches');
       Alert.alert(t('success'), t('churchEnabledSuccess'));
       returnToList(navigation);
-    } catch (e: any) {
-      Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('failedToEnableChurch'));
+    } catch (e) {
+      Alert.alert(t('error'), getApiErrorMessage(e, t) || t('failedToEnableChurch'));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -83,6 +90,8 @@ const EnableChurchScreen: React.FC = () => {
         <Header title={t('enableChurch')} />
         {loadError ? (
           <ApiErrorState error={loadError} onRetry={loadDetail} />
+        ) : !loaded ? (
+          <ActivityIndicator style={{marginTop: ms(24)}} color={C.textSecondary} />
         ) : (
         <>
         <Text style={[styles.desc, {color: C.textSecondary}]}>
@@ -90,7 +99,8 @@ const EnableChurchScreen: React.FC = () => {
         </Text>
         <View style={styles.row}>
           <CancelButton label={t('cancel')} onPress={onCancel} disabled={submitting} />
-          <DeleteButton
+          {/* Enabling is not destructive: not the red delete style. */}
+          <SaveButton
             label={t('enableChurch')}
             onPress={onEnable}
             disabled={submitting}

@@ -107,11 +107,9 @@ export const EditChurchLocationScreen: React.FC = () => {
           onPress: () => returnAfterEdit(navigation, {focusChurchId: churchId}),
         },
       ]);
-    } catch (error: any) {
-      Alert.alert(
-        t('error'),
-        error?.message || t('saveFailed') || 'Failed to save location.',
-      );
+    } catch (error) {
+      // The API's own message, not axios' "Request failed with status code …".
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
     } finally {
       setSaving(false);
     }

@@ -574,6 +574,8 @@ const en = {
     churchesList: 'List of Churches',
     disableChurchesList: 'Disable Churches List',
     editChurch: 'Edit Church',
+    viewPhoto: "View photo",
+    citiesLoadFailed: "Couldn't load the cities of this nation.",
     disableChurch: 'Disable Church',
     enableChurch: 'Enable Church',
 

@@ -571,6 +571,8 @@ const fr = {
     addNewChurch: 'Ajouter Nouvelle Église',
     churchPicture: 'Image de l\'Église',
     editChurch: 'Modifier Église',
+    viewPhoto: "Voir la photo",
+    citiesLoadFailed: "Impossible de charger les villes de cette nation.",
     disableChurch: 'Désactiver Église',
     enableChurch: 'Activer Église',
 

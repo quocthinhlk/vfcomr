@@ -571,6 +571,8 @@ const ja = {
     addNewChurch: '新しい教会を追加',
     churchPicture: '教会の写真',
     editChurch: '教会を編集',
+    viewPhoto: "写真を見る",
+    citiesLoadFailed: "この国の都市を読み込めませんでした。",
     disableChurch: '教会を無効化',
     enableChurch: '教会を有効化',
 

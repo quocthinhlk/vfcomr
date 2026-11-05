@@ -570,6 +570,8 @@ const ms = {
     addNewChurch: 'Tambah Gereja Baru',
     churchPicture: 'Gambar Gereja',
     editChurch: 'Edit Gereja',
+    viewPhoto: "Lihat foto",
+    citiesLoadFailed: "Tidak dapat memuatkan bandar negara ini.",
     disableChurch: 'Lumpuhkan Gereja',
     enableChurch: 'Aktifkan Gereja',
 

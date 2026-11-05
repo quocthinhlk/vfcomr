@@ -8,7 +8,6 @@ import {
   Alert,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
   BackHandler,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -28,6 +27,8 @@ import {AddChurchFormValues, useFormOptions} from './utils/addChurch.utils';
 import {CountryPicker} from 'react-native-country-codes-picker';
 import {useFocusEffect} from '@react-navigation/native';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
 import {useLatestRequest} from '../hooks/useLatestRequest';
 import {fillTemplate, formatYmd, splitApiFieldErrors} from '../utils/churchForm';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
@@ -43,6 +44,8 @@ import {ROLES} from '../../../shared/utils/permissions';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {createCity} from '../services/city.service';
 import {COLORS} from '../../../shared/constants/colors';
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /** Sentinel value for credentials dropdown when user has no credential type. */
 const CREDENTIALS_NONE_VALUE = 'No';
@@ -117,6 +120,10 @@ export default function NewPastorAndChurchScreen() {
   const {t} = useTranslation();
   const C = useThemedColors();
   const scrollRef = useRef<ScrollView>(null);
+  // One save at a time: a fast double tap ran onSubmit twice (two churches / cities).
+  const submitOnce = useSubmitOnce();
+  // Android 15+: keep the focused field above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
@@ -232,7 +239,16 @@ export default function NewPastorAndChurchScreen() {
       }
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
-    } catch {}
+    } catch {
+      // Not silently empty: the user would think the nation has no cities
+      // and add one that already exists.
+      if (isLatest()) {
+        Alert.alert(t('error'), t('citiesLoadFailed'), [
+          {text: t('cancel'), style: 'cancel'},
+          {text: t('tryAgain'), onPress: () => loadCities(countryId)},
+        ]);
+      }
+    }
   };
 
   const PAGE_LIMIT = DEFAULT_PAGE_LIMIT;
@@ -307,7 +323,15 @@ export default function NewPastorAndChurchScreen() {
     } catch {}
   };
 
+  /** Pages of the pastor's Nation list; a newer search wins over an older answer. */
+  const userCountriesLoadingRef = useRef(false);
   const loadUserCountries = async (page: number, name?: string) => {
+    if (page > 1 && userCountriesLoadingRef.current) {
+      // A fast scroll asked for the same next page twice (duplicate rows).
+      return;
+    }
+    const isLatest = begin('userCountries');
+    userCountriesLoadingRef.current = true;
     try {
       const res = await api.get('/countries', {
         params: {
@@ -321,10 +345,18 @@ export default function NewPastorAndChurchScreen() {
       const data = res?.data?.data;
       const items = Array.isArray(data?.items) ? data.items : [];
       const mapped = items.map((c: any) => ({id: c.id, name: c.name}));
+      if (!isLatest()) {
+        return;
+      }
       setUserCountryItems(prev => (page === 1 ? mapped : [...prev, ...mapped]));
       setUserCountryPage(data?.page ?? page);
       setUserCountryTotal(data?.total ?? mapped.length);
-    } catch {}
+    } catch {
+    } finally {
+      if (isLatest()) {
+        userCountriesLoadingRef.current = false;
+      }
+    }
   };
 
   const userCountryDropdownData = useMemo(
@@ -703,12 +735,11 @@ export default function NewPastorAndChurchScreen() {
           />
         ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-          keyboardVerticalOffset={
-            Platform.OS === 'ios'
-              ? hs(64)
-              : (StatusBar.currentHeight || 0) + hs(50)
-          }
+          // Padding on Android too: with edge-to-edge (Android 15+) the window
+          // no longer resizes for the keyboard. Offset 0 there: the old
+          // status-bar + 50 offset left a blank band above the keyboard.
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
           style={{flex: 1, backgroundColor: C.background}}>
           <ScrollView
             ref={scrollRef}
@@ -722,7 +753,7 @@ export default function NewPastorAndChurchScreen() {
               <Formik<CombinedFormValues>
                 innerRef={formikRef}
                 initialValues={initialValues}
-                onSubmit={async (values, {setFieldValue: setFormValue}) => {
+                onSubmit={submitOnce(async (values, {setFieldValue: setFormValue}) => {
                   try {
                     setFieldErrorText({});
                     const newInvalid: Record<string, boolean> = {};
@@ -738,12 +769,23 @@ export default function NewPastorAndChurchScreen() {
                     if (isAddingNewCity) {
                       newInvalid.new_city_name = !values.new_city_name?.trim();
                     }
+                    // A mistyped email is caught here, before a city is created
+                    // or photos are uploaded.
+                    const badEmailKeys = ['email_address', 'user_email_address'].filter(k => {
+                      const v = String((values as any)[k] ?? '').trim();
+                      return !!v && !EMAIL_PATTERN.test(v);
+                    });
+                    badEmailKeys.forEach(k => {
+                      newInvalid[k] = true;
+                    });
                     setInvalid(newInvalid);
 
                     const newFieldErrors: Record<string, string> = {};
                     Object.keys(newInvalid).forEach(k => {
                       if (newInvalid[k]) {
-                        newFieldErrors[k] = requiredFieldMessageForKey(k);
+                        newFieldErrors[k] = badEmailKeys.includes(k)
+                          ? t('invalidEmailFormat')
+                          : requiredFieldMessageForKey(k);
                       }
                     });
                     setFieldErrorText(newFieldErrors);
@@ -782,6 +824,22 @@ export default function NewPastorAndChurchScreen() {
                         setIsAddingNewCity(false);
                         setFormValue('city_id', cityValue);
                         setFormValue('new_city_name', '');
+                        // The saved draft must not turn "add new city" back on
+                        // (reopening the form would create the city again).
+                        try {
+                          const raw = await AsyncStorage.getItem(CHURCH_DRAFT_KEY);
+                          if (raw) {
+                            await AsyncStorage.setItem(
+                              CHURCH_DRAFT_KEY,
+                              JSON.stringify({
+                                ...JSON.parse(raw),
+                                city_id: cityValue,
+                                new_city_name: '',
+                                isAddingNewCity: false,
+                              }),
+                            );
+                          }
+                        } catch {}
                       } catch (cityErr: any) {
                         Alert.alert(
                           t('error'),
@@ -974,6 +1032,9 @@ export default function NewPastorAndChurchScreen() {
                             return 'user_mobile_phone';
                           case 'sensitive_nation':
                             return 'user_sensitive_nation';
+                          case 'country_id':
+                            // Not the church's Nation (same key without the prefix).
+                            return 'user_country_id';
                           default:
                             return userKey; // username, password, first_name, last_name, title, prefix, etc.
                         }
@@ -1026,7 +1087,7 @@ export default function NewPastorAndChurchScreen() {
                       e?.response?.data?.message || e?.message || t('failedToCreateChurch'),
                     );
                   }
-                }}>
+                })}>
                 {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
                   <Grid>
                     <Row>
@@ -1051,6 +1112,7 @@ export default function NewPastorAndChurchScreen() {
                                     <HelpIcon title={t('churchName')} message={t('helpChurchName')} />
                                   </View>
                                   <AppInput
+                                    maxLength={255}
                                     value={values.name}
                                     autoCapitalize="words"
                                     onChangeText={text => {
@@ -1075,6 +1137,7 @@ export default function NewPastorAndChurchScreen() {
                                     </Text>
                                   </View>
                                   <AppInput
+                                    maxLength={10}
                                     autoCapitalize="none"
                                     value={values.short_name}
                                     onChangeText={text =>
@@ -1618,6 +1681,9 @@ export default function NewPastorAndChurchScreen() {
                                     </Text>
                                   </View>
                                   <AppInput
+                                    keyboardType="email-address"
+                                    autoComplete="email"
+                                    autoCorrect={false}
                                     autoCapitalize="none"
                                     value={values.email_address}
                                     onChangeText={text => {
@@ -1642,6 +1708,8 @@ export default function NewPastorAndChurchScreen() {
                                     <HelpIcon title={t('website')} message={t('helpWebsite')} />
                                   </View>
                                   <AppInput
+                                    keyboardType="url"
+                                    autoCorrect={false}
                                     autoCapitalize="none"
                                     value={values.website}
                                     onChangeText={handleChange('website')}
@@ -1660,6 +1728,7 @@ export default function NewPastorAndChurchScreen() {
                                     <HelpIcon title={t('facebook')} message={t('helpFacebook')} />
                                   </View>
                                   <AppInput
+                                    autoCorrect={false}
                                     autoCapitalize="none"
                                     value={values.facebook}
                                     onChangeText={handleChange('facebook')}
@@ -1678,6 +1747,7 @@ export default function NewPastorAndChurchScreen() {
                                     <HelpIcon title="Instagram" message={t('helpInstagram')} />
                                   </View>
                                   <AppInput
+                                    autoCorrect={false}
                                     autoCapitalize="none"
                                     value={values.instagram}
                                     onChangeText={handleChange('instagram')}
@@ -1696,6 +1766,7 @@ export default function NewPastorAndChurchScreen() {
                                     <HelpIcon title="X" message={t('helpX')} />
                                   </View>
                                   <AppInput
+                                    autoCorrect={false}
                                     autoCapitalize="none"
                                     value={values.twitter}
                                     onChangeText={handleChange('twitter')}
@@ -2118,6 +2189,8 @@ export default function NewPastorAndChurchScreen() {
                                   setShowUserCountryPicker(false);
                                 }}
                                 onBackdropPress={() => setShowUserCountryPicker(false)}
+                                // Android Back closes it too.
+                                onRequestClose={() => setShowUserCountryPicker(false)}
                                 inputPlaceholderTextColor={C.textSecondary}
                                 style={{
                                   backdrop: {backgroundColor: C.overlay},

@@ -1,5 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
 import {
   ActivityIndicator,
   ScrollView,
@@ -9,7 +11,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
@@ -25,7 +26,7 @@ import HelpIcon from '../../../shared/components/HelpIcon';
 import api from '../../../config/api';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {addChurch, getChurchDetail} from '../services/church.service';
-import {createCity} from '../services/city.service';
+import {createCity, findCityIdByName} from '../services/city.service';
 import {useImagePicker} from '../../church/hooks/useImagePicker';
 import {AddChurchFormValues, useFormOptions} from './utils/addChurch.utils';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -70,6 +71,10 @@ export const AddCloneChurchScreen: React.FC = () => {
   const C = useThemedColors();
   const sourceId: number | null = route?.params?.id ?? null;
   const scrollRef = useRef<ScrollView>(null);
+  // One save at a time: a fast double tap ran onSubmit twice (two churches / cities).
+  const submitOnce = useSubmitOnce();
+  // Android 15+: keep the focused field above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
@@ -158,7 +163,16 @@ export const AddCloneChurchScreen: React.FC = () => {
       }
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
-    } catch {}
+    } catch {
+      // Not silently empty: the user would think the nation has no cities
+      // and add one that already exists.
+      if (isLatest()) {
+        Alert.alert(t('error'), t('citiesLoadFailed'), [
+          {text: t('cancel'), style: 'cancel'},
+          {text: t('tryAgain'), onPress: () => loadCities(countryId)},
+        ]);
+      }
+    }
   };
 
   // Pastor list: first page from the options hook, then server search / paging
@@ -223,6 +237,8 @@ export const AddCloneChurchScreen: React.FC = () => {
   // Source church failed to load: show a retryable error instead of a blank clone form.
   const [loadError, setLoadError] = useState<unknown>(null);
   const loadTokenRef = useRef(0);
+  /** Source fields the form has no inputs for, copied as they are. */
+  const sourceExtrasRef = useRef({service_venue: '', mailing_address_street: '', property: ''});
 
   const loadSource = async () => {
       if (!sourceId) {
@@ -239,6 +255,22 @@ export const AddCloneChurchScreen: React.FC = () => {
           setLoadError(new Error(t('noDataFound')));
           return;
         }
+        if (!d.city_id && d.city_name && d.country_id) {
+          // The detail has the city's name only: find its id, or the clone
+          // was created without a city.
+          const cityId = await findCityIdByName(d.country_id, d.city_name);
+          if (token !== loadTokenRef.current) {
+            return;
+          }
+          if (cityId) {
+            d.city_id = cityId;
+          }
+        }
+        sourceExtrasRef.current = {
+          service_venue: d.service_venue || '',
+          mailing_address_street: d.mailing_address_street || '',
+          property: d.property || '',
+        };
         setLoadError(null);
         const name = (d.name || '').trim();
         const shortName = (d.short_name || '').trim();
@@ -332,12 +364,11 @@ export const AddCloneChurchScreen: React.FC = () => {
           <ActivityIndicator color={COLORS.mainColor} style={{marginTop: ms(40)}} />
         ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-          keyboardVerticalOffset={
-            Platform.OS === 'ios'
-              ? hs(64)
-              : (StatusBar.currentHeight || 0) + hs(50)
-          }
+          // Padding on Android too: with edge-to-edge (Android 15+) the window
+          // no longer resizes for the keyboard. Offset 0 there: the old
+          // status-bar + 50 offset left a blank band above the keyboard.
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
           style={{flex: 1}}>
           <ScrollView
             ref={scrollRef}
@@ -350,7 +381,7 @@ export const AddCloneChurchScreen: React.FC = () => {
             <Formik<AddChurchFormValues>
               enableReinitialize
               initialValues={{...initialFormValues}}
-              onSubmit={async (values, {setFieldValue: setFormValue}) => {
+              onSubmit={submitOnce(async (values, {setFieldValue: setFormValue}) => {
                 try {
                   setFieldErrorText({});
                   const newInvalid: Record<string, boolean> = {};
@@ -509,11 +540,11 @@ export const AddCloneChurchScreen: React.FC = () => {
                     // Local calendar date: toISOString() shifted it to the previous
                     // day east of UTC (e.g. Vietnam).
                     date_of_birth: formatYmd(values.date_of_birth) ?? undefined,
-                    service_venue: '',
+                    service_venue: sourceExtrasRef.current.service_venue,
                     church_planting_projection_id: 0,
                     photo_dir: toStr(values.photo_dir),
-                    mailing_address_street: '',
-                    property: '',
+                    mailing_address_street: sourceExtrasRef.current.mailing_address_street,
+                    property: sourceExtrasRef.current.property,
                   };
                   const payload: any = Object.fromEntries(
                     Object.entries(raw).filter(([_, v]) => v !== undefined),
@@ -548,7 +579,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                     );
                   }
                 }
-              }}>
+              })}>
               {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
                 <Grid>
                   <Row>
@@ -567,6 +598,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <HelpIcon title={t('churchName')} message={t('helpChurchName')} />
                         </View>
                         <AppInput
+                          maxLength={255}
                           autoCapitalize="words"
                           value={values.name}
                           onChangeText={v => {
@@ -1213,6 +1245,8 @@ export const AddCloneChurchScreen: React.FC = () => {
                           </Text>
                         </View>
                         <AppInput
+                          autoComplete="email"
+                          autoCorrect={false}
                           value={values.email_address}
                           keyboardType="email-address"
                           autoCapitalize="none"
@@ -1238,6 +1272,8 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <HelpIcon title={t('website')} message={t('helpWebsite')} />
                         </View>
                         <AppInput
+                          keyboardType="url"
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.website}
                           onChangeText={handleChange('website')}
@@ -1256,6 +1292,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <HelpIcon title={t('facebook')} message={t('helpFacebook')} />
                         </View>
                         <AppInput
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.facebook}
                           onChangeText={handleChange('facebook')}
@@ -1274,6 +1311,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <HelpIcon title="Instagram" message={t('helpInstagram')} />
                         </View>
                         <AppInput
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.instagram}
                           onChangeText={handleChange('instagram')}
@@ -1292,6 +1330,7 @@ export const AddCloneChurchScreen: React.FC = () => {
                           <HelpIcon title="X" message={t('helpX')} />
                         </View>
                         <AppInput
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.twitter}
                           onChangeText={handleChange('twitter')}

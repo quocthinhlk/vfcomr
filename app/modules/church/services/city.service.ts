@@ -32,3 +32,28 @@ export async function createCity(payload: CreateCityPayload): Promise<CityItem> 
     throw error;
   }
 }
+
+/**
+ * GET churches/{id} returns only `city_name`, not `city_id`: finds the id of
+ * that city in the church's nation so Edit / Clone keep it selected. Null when
+ * there is no exact (case-insensitive) match or the lookup fails.
+ */
+export async function findCityIdByName(
+  countryId: number | string,
+  cityName: string,
+): Promise<number | null> {
+  const wanted = cityName.trim().toLowerCase();
+  if (!wanted || !countryId) {
+    return null;
+  }
+  try {
+    const res = await api.get(`cities/country/${countryId}`, {
+      params: {sort_by: 'name', sort_desc: false},
+    });
+    const list: any[] = Array.isArray(res.data?.data) ? res.data.data : [];
+    const match = list.find(c => String(c?.name ?? '').trim().toLowerCase() === wanted);
+    return match?.id != null ? Number(match.id) : null;
+  } catch {
+    return null;
+  }
+}

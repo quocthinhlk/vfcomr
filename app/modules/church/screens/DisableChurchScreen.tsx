@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
-import {View, StyleSheet, Alert} from 'react-native';
+import {View, StyleSheet, Alert, ActivityIndicator} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
@@ -16,6 +16,7 @@ import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {returnToList} from '../../../shared/utils/returnToList';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import AppInput from '../../../shared/components/AppInput';
 import {FormField} from '../../../shared/components/crud';
 
@@ -31,6 +32,9 @@ const DisableChurchScreen: React.FC = () => {
   const [reasonInvalid, setReasonInvalid] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
+  /** The name is shown in the question: confirm only once it is loaded. */
+  const [loaded, setLoaded] = useState(false);
+  const submittingRef = useRef(false);
 
   const loadDetail = useCallback(async () => {
     if (!churchId) {
@@ -43,6 +47,7 @@ const DisableChurchScreen: React.FC = () => {
       }
       setName(d?.name || t('thisChurch'));
       setLoadError(null);
+      setLoaded(true);
     } catch (e) {
       // Don't ask to confirm an action on a church we couldn't load.
       if (mountedRef.current) {
@@ -64,20 +69,22 @@ const DisableChurchScreen: React.FC = () => {
   };
 
   const onDisable = async () => {
-    if (!churchId) return;
+    if (!churchId || !loaded || submittingRef.current) return;
     if (!reason.trim()) {
       setReasonInvalid(true);
       return;
     }
+    submittingRef.current = true;
     try {
       setSubmitting(true);
       await disableChurch(churchId, reason);
       markDataChanged('churches');
       Alert.alert(t('success'), t('churchDisabledSuccess'));
       returnToList(navigation);
-    } catch (e: any) {
-      Alert.alert(t('error'), e?.response?.data?.message || e?.message || t('failedToDisableChurch'));
+    } catch (e) {
+      Alert.alert(t('error'), getApiErrorMessage(e, t) || t('failedToDisableChurch'));
     } finally {
+      submittingRef.current = false;
       setSubmitting(false);
     }
   };
@@ -90,6 +97,8 @@ const DisableChurchScreen: React.FC = () => {
         <Header title={t('disableChurch')} />
         {loadError ? (
           <ApiErrorState error={loadError} onRetry={loadDetail} />
+        ) : !loaded ? (
+          <ActivityIndicator style={{marginTop: ms(24)}} color={C.textSecondary} />
         ) : (
         <View style={[styles.container, {backgroundColor: C.background}]}>
           <Text style={[styles.desc, {color: C.textSecondary}]}>
@@ -139,7 +148,7 @@ const DisableChurchScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {flex: 1, padding: 0},
   title: {marginTop: ms(16), marginBottom: ms(8)},
-  desc: {color: '#555', fontSize: fs(14)},
+  desc: {fontSize: fs(14), marginTop: ms(12)},
   reasonField: {marginTop: ms(16)},
   reasonInput: {
     height: undefined,

@@ -162,7 +162,7 @@ export const CloneChurchScreen: React.FC = () => {
 
         <ListToolbar
           countText={
-            loadError && !total ? undefined : `${total} ${t('churches').toLowerCase()}`
+            loadError && !total ? undefined : `${total} ${(total === 1 ? t('church') : t('churches')).toLowerCase()}`
           }
         />
 
@@ -182,6 +182,8 @@ export const CloneChurchScreen: React.FC = () => {
               data={items}
               keyExtractor={keyExtractor}
               renderItem={renderItem}
+              // One tap picks a church while the search keyboard is open.
+              keyboardShouldPersistTaps="handled"
               nestedScrollEnabled={Platform.OS === 'android'}
               style={{flex: 1}}
               contentContainerStyle={styles.listContent}

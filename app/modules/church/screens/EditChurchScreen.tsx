@@ -1,5 +1,7 @@
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
 import {
   ActivityIndicator,
   ScrollView,
@@ -8,7 +10,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
   StyleSheet,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
@@ -26,7 +27,7 @@ import ElementDropdown from '../../../shared/components/ElementDropdown';
 import HelpIcon from '../../../shared/components/HelpIcon';
 import api from '../../../config/api';
 import {getChurchDetail, updateChurch} from '../services/church.service';
-import {createCity} from '../services/city.service';
+import {createCity, findCityIdByName} from '../services/city.service';
 import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {Alert} from 'react-native';
@@ -153,6 +154,10 @@ export default function EditChurchScreen() {
 
   // Validation + scroll to first invalid
   const scrollRef = useRef<ScrollView>(null);
+  // One save at a time: a fast double tap ran onSubmit twice (two churches / cities).
+  const submitOnce = useSubmitOnce();
+  // Android 15+: keep the focused field above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
   // Prefill (church detail) failed: show a retryable error instead of a blank, savable form.
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
@@ -285,7 +290,16 @@ export default function EditChurchScreen() {
         value: String(x.id),
       }));
       setCityOptions(withSelected(list, keep ?? null));
-    } catch {}
+    } catch {
+      // Not silently empty: the user would think the nation has no cities
+      // and add one that already exists.
+      if (isLatest()) {
+        Alert.alert(t('error'), t('citiesLoadFailed'), [
+          {text: t('cancel'), style: 'cancel'},
+          {text: t('tryAgain'), onPress: () => loadCities(countryId, keep)},
+        ]);
+      }
+    }
   };
 
   const prependOptionIfMissing = (
@@ -449,6 +463,17 @@ export default function EditChurchScreen() {
             // Nothing to edit: show the retryable error, not an endless spinner.
             setLoadError(new Error(t('noDataFound')));
             return;
+          }
+          if (!d.city_id && d.city_name && d.country_id) {
+            // The detail has the city's name only; without its id the City
+            // field opened empty.
+            const cityId = await findCityIdByName(d.country_id, d.city_name);
+            if (!mountedRef.current) {
+              return;
+            }
+            if (cityId) {
+              d.city_id = cityId;
+            }
           }
           setLoadError(null);
           applyLocation(d);
@@ -666,12 +691,11 @@ export default function EditChurchScreen() {
           <ActivityIndicator color={COLORS.mainColor} style={{marginTop: ms(40)}} />
         ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-          keyboardVerticalOffset={
-            Platform.OS === 'ios'
-              ? hs(64)
-              : (StatusBar.currentHeight || 0) + hs(50)
-          }
+          // Padding on Android too: with edge-to-edge (Android 15+) the window
+          // no longer resizes for the keyboard. Offset 0 there: the old
+          // status-bar + 50 offset left a blank band above the keyboard.
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
           style={{flex: 1}}>
           <ScrollView
             ref={scrollRef}
@@ -684,7 +708,7 @@ export default function EditChurchScreen() {
             <Formik<AddChurchFormValues>
               key={editId ? `edit-${editId}` : 'edit'}
               initialValues={initialFormValues}
-              onSubmit={async (values, {setFieldValue: setFormValue}) => {
+              onSubmit={submitOnce(async (values, {setFieldValue: setFormValue}) => {
                 try {
                   if (!editId) {
                     Alert.alert(t('error'), t('missingChurchId'));
@@ -879,7 +903,7 @@ export default function EditChurchScreen() {
                     );
                   }
                 }
-              }}>
+              })}>
               {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
                 <Grid>
                   <Row>
@@ -897,6 +921,7 @@ export default function EditChurchScreen() {
                           <HelpIcon title={t('churchName')} message={t('helpChurchName')} />
                         </View>
                         <AppInput
+                          maxLength={255}
                           autoCapitalize="words"
                           value={values.name}
                           onChangeText={v => {
@@ -921,6 +946,7 @@ export default function EditChurchScreen() {
                           </Text>
                         </View>
                         <AppInput
+                          maxLength={10}
                           autoCapitalize="none"
                           value={values.short_name}
                           onChangeText={handleChange('short_name')}
@@ -1644,6 +1670,8 @@ export default function EditChurchScreen() {
                           <HelpIcon title={t('emailAddress')} message={t('infoEmailAddress')} />
                         </View>
                         <AppInput
+                          autoComplete="email"
+                          autoCorrect={false}
                           autoCapitalize="none"
                           keyboardType="email-address"
                           value={values.email_address}
@@ -1669,6 +1697,8 @@ export default function EditChurchScreen() {
                           <HelpIcon title={t('website')} message={t('helpWebsite')} />
                         </View>
                         <AppInput
+                          keyboardType="url"
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.website}
                           onChangeText={handleChange('website')}
@@ -1687,6 +1717,7 @@ export default function EditChurchScreen() {
                           <HelpIcon title={t('facebook')} message={t('helpFacebook')} />
                         </View>
                         <AppInput
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.facebook}
                           onChangeText={handleChange('facebook')}
@@ -1705,6 +1736,7 @@ export default function EditChurchScreen() {
                           <HelpIcon title="Instagram" message={t('helpInstagram')} />
                         </View>
                         <AppInput
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.instagram}
                           onChangeText={handleChange('instagram')}
@@ -1723,6 +1755,7 @@ export default function EditChurchScreen() {
                           <HelpIcon title="X" message={t('helpX')} />
                         </View>
                         <AppInput
+                          autoCorrect={false}
                           autoCapitalize="none"
                           value={values.twitter}
                           onChangeText={handleChange('twitter')}

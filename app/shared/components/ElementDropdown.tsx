@@ -122,14 +122,21 @@ const ElementDropdown: React.FC<ElementDropdownProps> = ({
     }
     const showEvt = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
     const hideEvt = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
-    const showSub = Keyboard.addListener(showEvt, e => setKeyboardH(e?.endCoordinates?.height ?? 0));
+    const showSub = Keyboard.addListener(showEvt, e => {
+      const end = e?.endCoordinates;
+      // From the keyboard's top to the bottom of the screen: with edge-to-edge
+      // (Android 15+) the navigation bar below the keyboard is not part of its
+      // height, and the sheet's last rows stayed hidden behind it.
+      const fromTop = end?.screenY ? screenH - end.screenY : 0;
+      setKeyboardH(Math.max(end?.height ?? 0, fromTop));
+    });
     const hideSub = Keyboard.addListener(hideEvt, () => setKeyboardH(0));
     return () => {
       showSub.remove();
       hideSub.remove();
       setKeyboardH(0);
     };
-  }, [open]);
+  }, [open, screenH]);
 
   useEffect(() => {
     if (!open) {
@@ -496,6 +503,8 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: rs(10),
     paddingHorizontal: ms(12),
+    // Android's default vertical padding cut the typed text in a fixed height.
+    paddingVertical: 0,
     fontSize: fs(15),
   },
   list: {

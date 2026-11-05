@@ -1,5 +1,7 @@
 import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
 import {
   ScrollView,
   View,
@@ -7,7 +9,6 @@ import {
   Image,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
 } from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Layout, Text} from '@ui-kitten/components';
@@ -162,6 +163,10 @@ export default function AddChurchScreen() {
 
   // Validation + scroll to first invalid
   const scrollRef = useRef<ScrollView>(null);
+  // One save at a time: a fast double tap ran onSubmit twice (two churches / cities).
+  const submitOnce = useSubmitOnce();
+  // Android 15+: keep the focused field above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
   const [fieldY, setFieldY] = useState<Record<string, number>>({});
   const [invalid, setInvalid] = useState<Record<string, boolean>>({});
   const [fieldErrorText, setFieldErrorText] = useState<Record<string, string>>({});
@@ -221,7 +226,16 @@ export default function AddChurchScreen() {
       }
       const list = Array.isArray(res.data?.data) ? res.data.data : [];
       setCityOptions(list.map((x: any) => ({label: x.name, value: String(x.id)})));
-    } catch {}
+    } catch {
+      // Not silently empty: the user would think the nation has no cities
+      // and add one that already exists.
+      if (isLatest()) {
+        Alert.alert(t('error'), t('citiesLoadFailed'), [
+          {text: t('cancel'), style: 'cancel'},
+          {text: t('tryAgain'), onPress: () => loadCities(countryId)},
+        ]);
+      }
+    }
   };
 
   /** Paginated language search only; does not replace `languageOptions` baseline. */
@@ -500,8 +514,11 @@ export default function AddChurchScreen() {
           <ApiErrorState error={optionsError} onRetry={retryInitialLoad} />
         ) : (
         <KeyboardAvoidingView
-          behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : ((StatusBar.currentHeight || 0) + 50)}
+          // Padding on Android too: with edge-to-edge (Android 15+) the window
+          // no longer resizes for the keyboard. Offset 0 there: the old
+          // status-bar + 50 offset left a blank band above the keyboard.
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}
           style={{ flex: 1 }}
         >
           <ScrollView
@@ -515,7 +532,7 @@ export default function AddChurchScreen() {
           <Formik<AddChurchFormValues>
             innerRef={formikRef}
             initialValues={initialFormValues}
-            onSubmit={async (values, {setFieldValue: setFormValue}) => {
+            onSubmit={submitOnce(async (values, {setFieldValue: setFormValue}) => {
               try {
                 setFieldErrorText({});
                 const newInvalid: Record<string, boolean> = {};
@@ -694,7 +711,7 @@ export default function AddChurchScreen() {
                   );
                 }
               }
-            }}>
+            })}>
             {({values, handleChange, handleBlur, handleSubmit, setFieldValue, isSubmitting}) => (
               <Grid>
                 <Row>
@@ -716,6 +733,7 @@ export default function AddChurchScreen() {
                       />
                     </View>
                     <AppInput
+                      maxLength={255}
                       autoCapitalize="words"
                       value={values.name}
                       onChangeText={(t: string) => {
@@ -1626,6 +1644,9 @@ export default function AddChurchScreen() {
                       </Text>
                     </View>
                     <AppInput
+                      keyboardType="email-address"
+                      autoComplete="email"
+                      autoCorrect={false}
                       autoCapitalize="none"
                       value={values.email_address}
                       onChangeText={(t: string) => {
@@ -1654,6 +1675,8 @@ export default function AddChurchScreen() {
                       />
                     </View>
                     <AppInput
+                      keyboardType="url"
+                      autoCorrect={false}
                       autoCapitalize="none"
                       value={values.website}
                       onChangeText={handleChange('website')}
@@ -1675,6 +1698,7 @@ export default function AddChurchScreen() {
                       />
                     </View>
                     <AppInput
+                      autoCorrect={false}
                       autoCapitalize="none"
                       value={values.facebook}
                       onChangeText={handleChange('facebook')}
@@ -1696,6 +1720,7 @@ export default function AddChurchScreen() {
                       />
                     </View>
                     <AppInput
+                      autoCorrect={false}
                       autoCapitalize="none"
                       value={values.instagram}
                       onChangeText={handleChange('instagram')}
@@ -1717,6 +1742,7 @@ export default function AddChurchScreen() {
                       />
                     </View>
                     <AppInput
+                      autoCorrect={false}
                       autoCapitalize="none"
                       value={values.twitter}
                       onChangeText={handleChange('twitter')}

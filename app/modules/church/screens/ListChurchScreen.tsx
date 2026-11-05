@@ -229,6 +229,21 @@ export const ChurchesListScreen: React.FC = () => {
     fetchPage(1, {force: true});
   }, [fetchPage]);
 
+  /** After an add / edit / disable: drop the cache but stay on the page on screen. */
+  const reloadCurrentPage = useCallback(() => {
+    fetchTokenRef.current += 1;
+    inFlightRef.current.clear();
+    setPages({});
+    setPageLoading({});
+    setCacheEpoch(epoch => epoch + 1);
+    fetchPage(pageRef.current, {force: true});
+  }, [fetchPage]);
+
+  /** Retry loads the page that failed, not page 1. */
+  const retryPage = useCallback(() => {
+    fetchPage(pageRef.current, {force: true});
+  }, [fetchPage]);
+
   // Search change → reset cache and fetch page 1 (a trailing space is not a new search)
   useEffect(() => {
     queryRef.current = query;
@@ -259,7 +274,7 @@ export const ChurchesListScreen: React.FC = () => {
 
   // Reload when coming back after a church was added / edited / enabled /
   // disabled (a `reload` param or markDataChanged('churches')); a plain Back keeps the list.
-  useReloadOnReturn(resetAndLoad, {
+  useReloadOnReturn(reloadCurrentPage, {
     dataKey: 'churches',
     reload: route?.params?.refresh || route?.params?.reload,
     clearReload: () => navigation.setParams({refresh: false, reload: undefined}),
@@ -279,6 +294,8 @@ export const ChurchesListScreen: React.FC = () => {
 
   const goToPage = (targetPage: number) => {
     if (targetPage < 1 || targetPage > totalPages || targetPage === page) {return;}
+    // An error belonged to the page we leave; a cached page shows at once.
+    setLoadError(null);
     setPage(targetPage);
     fetchPage(targetPage);
   };
@@ -347,7 +364,7 @@ export const ChurchesListScreen: React.FC = () => {
       );
     }
     return (
-      <ListLoadState error={loadError} onRetry={resetAndLoad}>
+      <ListLoadState error={loadError} onRetry={retryPage}>
         <ListEmptyState
           icon={ChurchIcon}
           title={searchKey ? t('noResultsFound') : t('noChurchesFound')}
@@ -418,13 +435,6 @@ export const ChurchesListScreen: React.FC = () => {
             onSubmitEditing={() => goToPage(1)}
           />
 
-          {/* Pagination loading overlay */}
-          {loading && !isInitialLoad && !refreshing && (
-            <View style={[styles.loadingOverlay, {backgroundColor: C.background + 'CC'}]}>
-              <ActivityIndicator size="small" color={COLORS.mainColor} />
-            </View>
-          )}
-
           <View style={styles.listScrollWrap}>
             <PaginatedListPager
               page={page}
@@ -433,6 +443,15 @@ export const ChurchesListScreen: React.FC = () => {
               renderPage={renderPage}
               pagerRemountKey={searchKey}
             />
+            {/* Paging spinner over the list only; touches pass through (search,
+                pager and page bar stay usable). */}
+            {loading && !isInitialLoad && !refreshing && (
+              <View
+                pointerEvents="none"
+                style={[styles.loadingOverlay, {backgroundColor: C.background + 'CC'}]}>
+                <ActivityIndicator size="small" color={COLORS.mainColor} />
+              </View>
+            )}
           </View>
 
           {!isInitialLoad && (
@@ -601,11 +620,7 @@ const styles = StyleSheet.create({
   },
   // Loading overlay (paginating)
   loadingOverlay: {
-    position: 'absolute',
-    top: ms(120),
-    left: 0,
-    right: 0,
-    bottom: 0,
+    ...StyleSheet.absoluteFillObject,
     zIndex: 10,
     alignItems: 'center',
     paddingTop: ms(60),

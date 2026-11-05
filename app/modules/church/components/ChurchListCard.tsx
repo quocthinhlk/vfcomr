@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Image, Pressable, StyleSheet, TouchableOpacity, View} from 'react-native';
+import {Image, Platform, Pressable, StyleSheet, TouchableOpacity, View} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useThemeMode} from '../../../shared/context/ThemeContext';
@@ -85,9 +85,9 @@ export const ChurchListCard: React.FC<Props> = ({
               {metaParts.join(', ')}
             </Text>
           )}
-          {!!item.pastor_name && (
+          {!!item.pastor_name?.trim() && (
             <Text style={[styles.pastor, {color: C.textSecondary}]} numberOfLines={1}>
-              {item.pastor_name}
+              {item.pastor_name.trim()}
             </Text>
           )}
           <View style={styles.badgeIdRow}>
@@ -120,7 +120,8 @@ export const ChurchListCard: React.FC<Props> = ({
 
 const styles = StyleSheet.create({
   itemCol: {flex: 1},
-  name: {fontSize: fs(13.5), fontWeight: '600', marginBottom: ms(2)},
+  // Android has no 600 weight for the system font (it drew regular text).
+  name: {fontSize: fs(13.5), fontWeight: Platform.OS === 'android' ? '700' : '600', marginBottom: ms(2)},
   nameWithMore: {paddingRight: 32},
   meta: {fontSize: fs(12), marginBottom: ms(1)},
   pastor: {fontSize: fs(12), marginBottom: ms(4)},

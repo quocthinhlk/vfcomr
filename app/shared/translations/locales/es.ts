@@ -600,6 +600,8 @@ const es = {
   churchesList: 'Lista de iglesias',
   disableChurchesList: 'Lista de iglesias deshabilitadas',
   editChurch: 'Editar iglesia',
+  viewPhoto: "Ver foto",
+  citiesLoadFailed: "No se pudieron cargar las ciudades de esta nación.",
   disableChurch: 'Deshabilitar iglesia',
   enableChurch: 'Habilitar iglesia',
   mother: 'Madre',
