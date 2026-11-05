@@ -8,10 +8,12 @@ export interface ChurchPlantingProjectionItem {
   proposed_church_name: string;
   proposed_leader_name: string;
   population: number | null;
-  start_date_preparation: string;
-  start_date_preparation_original: string;
-  start_date_pioneering: string;
-  start_date_pioneering_original: string;
+  // Null on records created on the web until they are edited (only the
+  // *_original dates are set).
+  start_date_preparation: string | null;
+  start_date_preparation_original: string | null;
+  start_date_pioneering: string | null;
+  start_date_pioneering_original: string | null;
   distance_to_town: string;
   distance_to_town_unit: string;
   user_id: number;
@@ -247,10 +249,10 @@ export interface UpdateChurchPlantingProjectionPayload {
   proposed_church_name: string;
   proposed_leader_name: string;
   population?: number | null;
-  start_date_preparation: string;
-  start_date_preparation_original: string;
-  start_date_pioneering: string;
-  start_date_pioneering_original: string;
+  start_date_preparation: string | null;
+  start_date_preparation_original: string | null;
+  start_date_pioneering: string | null;
+  start_date_pioneering_original: string | null;
   distance_to_town: string;
   distance_to_town_unit: string;
   user_id?: number;
@@ -271,17 +273,45 @@ export interface UpdateStepsChartPayload {
   [key: string]: any; // For all step fields
 }
 
+/** Page size for the list; the web loads the church's projections in one 500 page too. */
+export const PROJECTION_LIST_LIMIT = 500;
+
+/**
+ * All projections of a church. The API pages by 10 by default, so the app
+ * only ever showed the first 10 (church 25 has 13); fetch every page.
+ */
 export async function listChurchPlantingProjections(churchId: number, completedSteps?: boolean) {
-  const response = await api.get<ListChurchPlantingProjectionsResponse>(
-    `/church-planting-projections`,
-    {
-      params: {
-        church_id: churchId,
-        completed_steps: completedSteps !== undefined ? completedSteps : true,
+  const items: ChurchPlantingProjectionItem[] = [];
+  let page = 1;
+  let last: ListChurchPlantingProjectionsResponse | null = null;
+  // Bounded: a backend that always answers has_next must not loop forever.
+  for (; page <= 20; page++) {
+    const response = await api.get<ListChurchPlantingProjectionsResponse>(
+      `/church-planting-projections`,
+      {
+        params: {
+          church_id: churchId,
+          completed_steps: completedSteps !== undefined ? completedSteps : true,
+          page,
+          limit: PROJECTION_LIST_LIMIT,
+        },
       },
+    );
+    last = response.data;
+    items.push(...(last?.data?.items ?? []));
+    if (!last?.data?.has_next) {
+      break;
+    }
+  }
+  return {
+    ...(last as ListChurchPlantingProjectionsResponse),
+    data: {
+      ...(last?.data as ListChurchPlantingProjectionsResponse['data']),
+      items,
+      total: last?.data?.total ?? items.length,
+      has_next: false,
     },
-  );
-  return response.data;
+  };
 }
 
 export async function getChurchPlantingProjectionById(id: number) {

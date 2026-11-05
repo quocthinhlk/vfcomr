@@ -6,7 +6,6 @@ import {
   ScrollView,
   KeyboardAvoidingView,
   Platform,
-  StatusBar,
   TouchableOpacity,
 } from 'react-native';
 import {Text} from '@ui-kitten/components';
@@ -21,11 +20,20 @@ import {
 } from '../services/churchPlantingProjection.service';
 import api from '../../../config/api';
 import {FormActions, ScreenContainer} from '../../../shared/components/crud';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms, rs, hs, ws} from '../../../shared/utils/scale';
 import AppInput from '../../../shared/components/AppInput';
 import DateTripleDropdown from '../../../shared/components/DateTripleDropdown';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {
+  buildStepsPayload,
+  formatApiDate,
+  parseApiDate,
+  stepKey,
+} from '../utils/projection.utils';
 
 export const EditStepsChartScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -40,6 +48,11 @@ export const EditStepsChartScreen: React.FC = () => {
 
   const [loadError, setLoadError] = useState<unknown>(null);
   const requestRef = useRef(0);
+  const mountedRef = useRef(true);
+  const scrollRef = useRef<ScrollView>(null);
+  // Android 15+ (edge-to-edge): keep the focused value above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
+  const submitOnce = useSubmitOnce();
 
   // Named so the error state's "Try again" can re-run it.
   const loadStepsChart = useCallback(async () => {
@@ -87,108 +100,50 @@ export const EditStepsChartScreen: React.FC = () => {
   }, [projectionId]);
 
   useEffect(() => {
+    mountedRef.current = true;
     loadStepsChart();
     return () => {
+      mountedRef.current = false;
       requestRef.current += 1;
     };
   }, [loadStepsChart]);
 
-  const formatDateForAPI = (date: Date | null): string | null => {
-    if (!date) return null;
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
+  const formatDateForAPI = formatApiDate;
+  const parseDateFromAPI = parseApiDate;
 
-  const parseDateFromAPI = (dateString: string | null): Date | null => {
-    if (!dateString) return null;
-    try {
-      return new Date(dateString);
-    } catch {
-      return null;
-    }
+  // Functional update: two calls in one handler used to overwrite each other
+  // (the date proposed was lost), and fast typing could drop characters.
+  const setChartField = (key: string, value: string | null | boolean) => {
+    setStepsChart(prev => (prev ? ({...prev, [key]: value} as StepsChartItem) : prev));
   };
-
   const updateStepField = (
     stepNum: number,
     field: string,
-    value: string | Date | null | boolean,
-  ) => {
-    if (!stepsChart) return;
-    const key = `step${stepNum}_${field}` as keyof StepsChartItem;
-    setStepsChart({
-      ...stepsChart,
-      [key]: value,
-    });
-  };
+    value: string | null | boolean,
+  ) => setChartField(stepKey(stepNum, field), value);
 
-  const onSave = async () => {
+  // One save at a time: a fast double tap sent the steps twice.
+  const onSave = submitOnce(async () => {
     if (!projectionId || !stepsChart) return;
 
     try {
       setSubmitting(true);
-      const payload: any = {
-        date_proposed: stepsChart.date_proposed,
-        date_completed: stepsChart.date_completed,
-        row1_title: stepsChart.row1_title,
-        row2_title: stepsChart.row2_title,
-        row3_title: stepsChart.row3_title,
-        row4_title: stepsChart.row4_title,
-        row5_title: stepsChart.row5_title,
-        row6_title: stepsChart.row6_title,
-        row7_title: stepsChart.row7_title,
-        row8_title: stepsChart.row8_title,
-        row9_title: stepsChart.row9_title,
-      };
-
-      // Add all step fields
-      for (let stepNum = 1; stepNum <= 6; stepNum++) {
-        const dateProposed = stepsChart[`step${stepNum}_date_proposed` as keyof StepsChartItem] as
-          | string
-          | null;
-        const dateProposedOriginal = stepsChart[
-          `step${stepNum}_date_proposed_original` as keyof StepsChartItem
-        ] as string | null;
-        const dateCompleted = stepsChart[
-          `step${stepNum}_date_completed` as keyof StepsChartItem
-        ] as string | null;
-
-        payload[`step${stepNum}_date_proposed`] = dateProposed;
-        payload[`step${stepNum}_date_proposed_original`] = dateProposedOriginal || dateProposed;
-        payload[`step${stepNum}_date_completed`] = dateCompleted;
-
-        for (let rowNum = 1; rowNum <= 9; rowNum++) {
-          const valueKey = `step${stepNum}_row${rowNum}_value` as keyof StepsChartItem;
-          const completedKey = `step${stepNum}_row${rowNum}_completed` as keyof StepsChartItem;
-          payload[`step${stepNum}_row${rowNum}_value`] =
-            stepsChart[valueKey] as string | null;
-          payload[`step${stepNum}_row${rowNum}_completed`] =
-            stepsChart[completedKey] as boolean | null;
-        }
-      }
-
-      // Add step 7-9 completed fields
-      for (let stepNum = 7; stepNum <= 9; stepNum++) {
-        for (let rowNum = 1; rowNum <= 9; rowNum++) {
-          const completedKey = `step${stepNum}_row${rowNum}_completed` as keyof StepsChartItem;
-          payload[`step${stepNum}_row${rowNum}_completed`] =
-            stepsChart[completedKey] as boolean | null;
-        }
-      }
-
+      const payload = buildStepsPayload(stepsChart);
       await updateStepsChart(projectionId, payload);
       Alert.alert(
         t('success') || 'Success',
         `${t('edit') || 'Edit'} ${t('stepsChart') || 'Steps Chart'} ${t('success') || 'success'}`,
       );
+      markDataChanged('churchPlantingProjections');
       returnAfterEdit(navigation);
     } catch (e: any) {
       Alert.alert(t('error') || 'Error', e?.message || t('failedToUpdateStepsChart') || 'Failed to update Steps Chart');
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   if (loading || loadError || !stepsChart) {
     return (
@@ -224,16 +179,16 @@ export const EditStepsChartScreen: React.FC = () => {
       ) : null}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'padding'}
-        keyboardVerticalOffset={
-          Platform.OS === 'ios'
-            ? hs(64)
-            : (StatusBar.currentHeight || 0) + hs(50)
-        }
+        // Offset 0 on Android: status bar + 50 left a blank band above the
+        // keyboard that hid the value being typed.
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? hs(64) : 0}
         style={styles.flex}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
-          keyboardShouldPersistTaps="handled">
+          keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets>
           <View style={styles.form}>
             {/* Row Titles */}
             <View style={[styles.section, {backgroundColor: C.surface, borderColor: C.border, shadowColor: '#000'}]}>
@@ -251,13 +206,8 @@ export const EditStepsChartScreen: React.FC = () => {
                   </Text>
                   <AppInput
                     value={row.title}
-                    onChangeText={text => {
-                      const key = `${row.key}_title` as keyof StepsChartItem;
-                      setStepsChart({
-                        ...stepsChart,
-                        [key]: text,
-                      });
-                    }}
+                    onChangeText={text => setChartField(`${row.key}_title`, text)}
+                    maxLength={255}
                     placeholder={t('rowTitle') || 'Row Title'}
                   />
                 </View>
@@ -285,11 +235,11 @@ export const EditStepsChartScreen: React.FC = () => {
                         `step${stepNum}_date_proposed` as keyof StepsChartItem
                       ] as string | null,
                     )}
-                    onChange={date => {
-                      const dateStr = formatDateForAPI(date);
-                      updateStepField(stepNum, 'date_proposed', dateStr);
-                      updateStepField(stepNum, 'date_proposed_original', dateStr);
-                    }}
+                    // Only the current date: *_date_proposed_original is the first
+                    // plan and is kept (as on the web).
+                    onChange={date =>
+                      updateStepField(stepNum, 'date_proposed', formatDateForAPI(date))
+                    }
                     yearRange={50}
                     startYear={new Date().getFullYear()}
                   />
@@ -309,10 +259,9 @@ export const EditStepsChartScreen: React.FC = () => {
                         `step${stepNum}_date_completed` as keyof StepsChartItem
                       ] as string | null,
                     )}
-                    onChange={date => {
-                      const dateStr = formatDateForAPI(date);
-                      updateStepField(stepNum, 'date_completed', dateStr);
-                    }}
+                    onChange={date =>
+                      updateStepField(stepNum, 'date_completed', formatDateForAPI(date))
+                    }
                     yearRange={50}
                     startYear={new Date().getFullYear()}
                   />
@@ -341,6 +290,10 @@ export const EditStepsChartScreen: React.FC = () => {
                           {row.title}:
                         </Text>
                         <TouchableOpacity
+                          accessibilityRole="checkbox"
+                          accessibilityState={{checked: completed}}
+                          accessibilityLabel={`${t('step') || 'Step'} ${stepNum} - ${row.title}`}
+                          hitSlop={8}
                           style={[
                             styles.checkbox,
                             {
@@ -364,7 +317,9 @@ export const EditStepsChartScreen: React.FC = () => {
                         placeholder={t('value') || 'Value'}
                         multiline
                         numberOfLines={2}
-                        style={{textAlignVertical: 'top'}}
+                        // AppInput has a fixed one-line height: multi-line
+                        // values were cut off (Android shows no scroll hint).
+                        style={styles.multiline}
                       />
                     </View>
                   );
@@ -435,6 +390,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  multiline: {
+    height: undefined,
+    minHeight: hs(64),
+    maxHeight: hs(160),
+    paddingTop: ms(8),
+    textAlignVertical: 'top',
   },
   checkboxText: {
     fontSize: fs(16),

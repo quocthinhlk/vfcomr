@@ -5,7 +5,9 @@ import {
   deleteChurchPlantingProjection,
   getChurchPlantingProjectionById,
 } from '../services/churchPlantingProjection.service';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
 import {returnToList} from '../../../shared/utils/returnToList';
 import {
   DeleteConfirmView,
@@ -21,6 +23,7 @@ export const DeleteChurchPlantingProjectionScreen: React.FC = () => {
   const [loading, setLoading] = useState(!!projectionId);
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
+  const submitOnce = useSubmitOnce();
   const {t} = useTranslation();
 
   // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
@@ -54,8 +57,12 @@ export const DeleteChurchPlantingProjectionScreen: React.FC = () => {
     };
   }, [load]);
 
-  const onConfirm = async () => {
-    if (!projectionId) return;
+  // One delete at a time: a double tap sent a second DELETE that failed
+  // ("not found") and showed an error after the success.
+  const onConfirm = submitOnce(async () => {
+    if (!projectionId) {
+      return;
+    }
     try {
       setSubmitting(true);
       await deleteChurchPlantingProjection(projectionId);
@@ -63,6 +70,7 @@ export const DeleteChurchPlantingProjectionScreen: React.FC = () => {
         t('success') || 'Success',
         `${t('delete') || 'Delete'} ${t('churchPlantingProjection') || 'Church Planting Projection'} ${t('success') || 'success'}`,
       );
+      markDataChanged('churchPlantingProjections');
       returnToList(navigation);
     } catch (e) {
       Alert.alert(
@@ -70,9 +78,11 @@ export const DeleteChurchPlantingProjectionScreen: React.FC = () => {
         t('failedToDeleteProjection') || 'Failed to delete Church Planting Projection',
       );
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer

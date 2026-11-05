@@ -11,7 +11,8 @@ export type DataKey =
   | 'users'
   | 'churches'
   | 'churchTypes'
-  | 'churchNetworks';
+  | 'churchNetworks'
+  | 'churchPlantingProjections';
 
 export function markDataChanged(key: DataKey) {
   dataVersions.set(key, (dataVersions.get(key) ?? 0) + 1);

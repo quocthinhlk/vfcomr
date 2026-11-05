@@ -1,11 +1,12 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {FlatList, RefreshControl, StyleSheet, Alert} from 'react-native';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
+import {FlatList, RefreshControl, StyleSheet} from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {
   listChurchPlantingProjections,
   ChurchPlantingProjectionItem,
 } from '../services/churchPlantingProjection.service';
-import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
@@ -24,100 +25,92 @@ import {
   ScreenContainer,
   listContentStyle,
 } from '../../../shared/components/crud';
+import {
+  completedStepsOf,
+  filterProjections,
+  formatDisplayDate,
+  preparationDateOf,
+} from '../utils/projection.utils';
 
 export const ChurchPlantingProjectionsScreen: React.FC = () => {
   const navigation = useNavigation<any>();
   const route = useRoute<any>();
   const C = useThemedColors();
   const {t} = useTranslation();
-  const [items, setItems] = useState<ChurchPlantingProjectionItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [allItems, setAllItems] = useState<ChurchPlantingProjectionItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedProjection, setSelectedProjection] =
     useState<ChurchPlantingProjectionItem | null>(null);
-  const [churchId, setChurchId] = useState<number | null>(null);
   const [churchName, setChurchName] = useState<string>('');
   const [query, setQuery] = useState('');
+  // Only the newest load may write (pull-to-refresh vs. return from a save).
+  const requestRef = useRef(0);
 
-  const fetchChurchInfo = useCallback(async (id: number) => {
+  /**
+   * Load every projection of the selected church once; search filters them
+   * locally. Before, each keystroke re-fetched the list and a keystroke typed
+   * while a fetch was running was dropped (the filter kept the old text).
+   */
+  const fetchData = useCallback(async () => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    setLoading(true);
     try {
-      const res = await api.get(`churches/${id}`);
-      const churchData = res?.data?.data;
-      if (churchData?.name) {
-        setChurchName(churchData.name);
+      const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+      const id = savedChurchId ? parseInt(savedChurchId, 10) : NaN;
+      if (isNaN(id)) {
+        // Shown in the list as a retryable state instead of an Alert.
+        throw new Error(
+          savedChurchId
+            ? t('invalidChurchId') || 'Invalid Church ID'
+            : t('churchIdNotFound') || 'Church ID not found',
+        );
       }
+      const [res, churchRes] = await Promise.all([
+        listChurchPlantingProjections(id, true),
+        api.get(`churches/${id}`).catch(() => null),
+      ]);
+      if (!isCurrent()) {
+        return;
+      }
+      setAllItems(res?.data?.items ?? []);
+      setChurchName(churchRes?.data?.data?.name || '');
+      setLoadError(null);
     } catch (e) {
-      console.error('Error fetching church info:', e);
-    }
-  }, []);
-
-  const fetchData = useCallback(
-    async (reset = false) => {
-      try {
-        if (loading) {
-          return;
-        }
-        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        if (!savedChurchId) {
-          Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
-          return;
-        }
-        const id = parseInt(savedChurchId, 10);
-        if (isNaN(id)) {
-          Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
-          return;
-        }
-        setChurchId(id);
-        setLoading(true);
-        const res = await listChurchPlantingProjections(id, true);
-        console.log('ChurchPlantingProjections API Response:', res);
-        const allProjections = res?.data?.items ?? [];
-        console.log('ChurchPlantingProjections parsed:', allProjections);
-        
-        // Filter by search query
-        const filtered = query.trim()
-          ? allProjections.filter((p: ChurchPlantingProjectionItem) =>
-              p.proposed_church_name?.toLowerCase().includes(query.trim().toLowerCase()) ||
-              p.town?.toLowerCase().includes(query.trim().toLowerCase()) ||
-              p.proposed_leader_name?.toLowerCase().includes(query.trim().toLowerCase())
-            )
-          : allProjections;
-        
-        setItems(filtered);
-        setLoadError(null);
-        await fetchChurchInfo(id);
-      } catch (e) {
+      if (isCurrent()) {
         console.error('Error fetching church planting projections:', e);
-        // Shown as a recoverable error state in the list (not an Alert + empty list).
         setLoadError(e);
-      } finally {
+      }
+    } finally {
+      if (isCurrent()) {
         setLoading(false);
       }
-    },
-    [loading, t, fetchChurchInfo, query],
-  );
+    }
+  }, [t]);
 
-  const reload = useCallback(() => fetchData(true), [fetchData]);
+  const items = useMemo(() => filterProjections(allItems, query), [allItems, query]);
 
   useEffect(() => {
-    fetchData(true);
-  }, [query]);
+    fetchData();
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [fetchData]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        navigation.setParams({reload: undefined});
-        fetchData(true);
-      }
-    }, [route.params?.reload, fetchData]),
-  );
+  // Back from add / delete ({reload: true}) or after an edit / steps save made
+  // from the detail screen (markDataChanged), so names and steps are current.
+  useReloadOnReturn(fetchData, {
+    dataKey: 'churchPlantingProjections',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchData(true);
+    await fetchData();
     setRefreshing(false);
   };
 
@@ -128,16 +121,6 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
   const openActions = (item: ChurchPlantingProjectionItem) => {
     setSelectedProjection(item);
     setActionsVisible(true);
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '-';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString();
-    } catch {
-      return dateString;
-    }
   };
 
   const renderItem = ({item}: {item: ChurchPlantingProjectionItem}) => (
@@ -151,14 +134,18 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
       </CardMeta>
       <CardMeta>
         {t('startDatePreparation') || 'Start Date Preparation'}:{' '}
-        {formatDate(item.start_date_preparation)}
+        {formatDisplayDate(preparationDateOf(item))}
+      </CardMeta>
+      <CardMeta>
+        {t('stepsCompleted') || 'Steps Completed'}: {completedStepsOf(item).done} /{' '}
+        {completedStepsOf(item).total}
       </CardMeta>
     </EntityListCard>
   );
 
   const keyExtractor = (item: ChurchPlantingProjectionItem) => String(item.id);
 
-  const isInitialLoading = loading && items.length === 0 && !refreshing;
+  const isInitialLoading = loading && allItems.length === 0 && !refreshing;
 
   return (
     <ScreenContainer
@@ -172,7 +159,7 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
 
       <ListToolbar
         countText={
-          loadError && items.length === 0
+          loadError && allItems.length === 0
             ? undefined
             : `${items.length} ${(
                 t('churchPlantingProjections') || 'Church Planting Projections'
@@ -184,6 +171,8 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
       <SearchInput
         value={query}
         onChangeText={setQuery}
+        // Filtering is local now: no request to wait for, show matches at once.
+        debounce={false}
         placeholder={t('search') || 'Search...'}
       />
 
@@ -193,6 +182,10 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
         renderItem={renderItem}
         style={styles.list}
         contentContainerStyle={listContentStyle}
+        // With the search keyboard open, the first tap on a card only closed
+        // the keyboard (Android): let taps through and close it on scroll.
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
@@ -201,7 +194,7 @@ export const ChurchPlantingProjectionsScreen: React.FC = () => {
             <ListLoadState
               loading={isInitialLoading}
               error={loadError}
-              onRetry={reload}>
+              onRetry={fetchData}>
               <ListEmptyState hint={query ? undefined : t('emptyListHint')} />
             </ListLoadState>
           ) : null

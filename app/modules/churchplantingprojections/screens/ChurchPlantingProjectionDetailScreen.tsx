@@ -20,6 +20,13 @@ import {
   ScreenContainer,
 } from '../../../shared/components/crud';
 import api from '../../../config/api';
+import {
+  completedStepsOf,
+  formatDisplayDate,
+  normalizeLineBreaks,
+  pioneeringDateOf,
+  preparationDateOf,
+} from '../utils/projection.utils';
 
 export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -86,15 +93,7 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
     };
   }, [loadProjection, route.params?.refetchKey]);
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return '-';
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString();
-    } catch {
-      return dateString;
-    }
-  };
+  const formatDate = formatDisplayDate;
 
   const renderStepsTable = () => {
     if (!stepsChart) return null;
@@ -123,6 +122,9 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
           const dateProposed = formatDate(
             stepsChart[`step${stepNum}_date_proposed` as keyof StepsChartItem] as string | null,
           );
+          const dateCompleted = formatDate(
+            stepsChart[`step${stepNum}_date_completed` as keyof StepsChartItem] as string | null,
+          );
           
           return (
             <View 
@@ -138,6 +140,11 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
                 {dateProposed && dateProposed !== '-' && (
                   <Text style={[styles.stepDate, {color: C.textSecondary}]}>
                     {t('dateProposed') || 'Date Proposed'}: {dateProposed}
+                  </Text>
+                )}
+                {dateCompleted !== '-' && (
+                  <Text style={[styles.stepDate, {color: C.textSecondary}]}>
+                    {t('dateCompleted') || 'Date Completed'}: {dateCompleted}
                   </Text>
                 )}
               </View>
@@ -168,7 +175,7 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
                           styles.stepRowValueText,
                           {color: completed ? C.textPrimary : C.textSecondary}
                         ]}>
-                          {value || '-'}
+                          {normalizeLineBreaks(value) || '-'}
                         </Text>
                         {completed && (
                           <Text style={[styles.completedBadge, {color: C.textPrimary}]}>
@@ -219,23 +226,27 @@ export const ChurchPlantingProjectionDetailScreen: React.FC = () => {
               />
               <DetailRow
                 label={t('population') || 'Population'}
-                value={projection.population ? projection.population.toLocaleString() : '-'}
+                value={projection.population != null ? projection.population.toLocaleString() : '-'}
               />
               <DetailRow
                 label={t('startDatePreparation') || 'Start Date Preparation'}
-                value={formatDate(projection.start_date_preparation)}
+                value={formatDate(preparationDateOf(projection))}
               />
               <DetailRow
                 label={t('startDatePioneering') || 'Start Date Pioneering'}
-                value={formatDate(projection.start_date_pioneering)}
+                value={formatDate(pioneeringDateOf(projection))}
               />
               <DetailRow
                 label={t('distanceToTown') || 'Distance to Town'}
-                value={`${projection.distance_to_town} ${projection.distance_to_town_unit}`}
+                value={
+                  projection.distance_to_town
+                    ? `${projection.distance_to_town} ${projection.distance_to_town_unit || ''}`.trim()
+                    : '-'
+                }
               />
               <DetailRow
                 label={t('stepsCompleted') || 'Steps Completed'}
-                value={`${projection.steps_completed.filter(Boolean).length} / ${projection.steps_completed.length}`}
+                value={`${completedStepsOf(projection).done} / ${completedStepsOf(projection).total}`}
               />
             </DetailCard>
             <DetailActions
@@ -326,6 +337,7 @@ const styles = StyleSheet.create({
     fontSize: fs(12),
     fontWeight: '500',
     flex: 1,
+    paddingRight: ms(8),
   },
   stepRowValue: {
     flex: 1,
@@ -338,6 +350,9 @@ const styles = StyleSheet.create({
     minHeight: hs(24),
   },
   stepRowValueText: {
+    // Long values overflowed the row (cut off on Android) without shrinking.
+    flexShrink: 1,
+    textAlign: 'right',
     fontSize: fs(12),
     fontWeight: '500',
     marginRight: ms(4),
