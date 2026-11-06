@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   Alert,
   FlatList,
@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import {Text} from '@ui-kitten/components';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
+import {markDataChanged, useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import SearchInput from '../../../shared/components/SearchInput';
 import ApiErrorState from '../../../shared/components/ApiErrorState';
 import ActionSheetModal, {
@@ -36,24 +36,9 @@ import {
   listResources,
   resolveResourceMediaUrl,
   ResourceListItem,
+  getResourceById,
 } from '../services/resource.service';
-
-function stripHtml(value?: string | null): string {
-  if (!value) {
-    return '';
-  }
-  return value
-    .replace(/<br\s*\/?>/gi, ' ')
-    .replace(/<\/p>/gi, ' ')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&rsquo;/g, "'")
-    .replace(/&ldquo;/g, '"')
-    .replace(/&rdquo;/g, '"')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
+import {stripHtml} from '../utils/resource.utils';
 
 export default function SearchResourcesScreen() {
   const navigation = useNavigation<any>();
@@ -89,7 +74,12 @@ export default function SearchResourcesScreen() {
     };
   }, []);
 
+  // Only the newest search may write: answers arriving out of order
+  // showed the results of an older search.
+  const requestRef = useRef(0);
   const fetchData = useCallback(async (showSpinner = true) => {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
     try {
       setLoadError(null);
       if (showSpinner) {
@@ -99,13 +89,19 @@ export default function SearchResourcesScreen() {
       const res = await listResources(
         name ? {name} : {root_only: true},
       );
-      setItems(res.data ?? []);
+      if (isCurrent()) {
+        setItems(res.data ?? []);
+      }
     } catch (error) {
-      console.error(error);
-      setItems([]);
-      setLoadError(error);
+      if (isCurrent()) {
+        console.error(error);
+        setItems([]);
+        setLoadError(error);
+      }
     } finally {
-      setLoading(false);
+      if (isCurrent()) {
+        setLoading(false);
+      }
     }
   }, [query]);
 
@@ -134,19 +130,39 @@ export default function SearchResourcesScreen() {
     navigation.navigate('EditResource', {resourceId: item.id});
   };
 
-  const handleDelete = (item: ResourceListItem) => {
+  const deletingRef = useRef(false);
+  const handleDelete = async (item: ResourceListItem) => {
+    // The API deletes a folder and leaves its children pointing at a missing
+    // parent; the list does not say whether there are any, so ask the detail.
+    try {
+      const childCount = (await getResourceById(item.id)).data?.children?.length ?? 0;
+      if (childCount > 0) {
+        Alert.alert(t('error'), t('resourceHasChildren').replace('{count}', String(childCount)));
+        return;
+      }
+    } catch (error) {
+      Alert.alert(t('error'), getApiErrorMessage(error, t));
+      return;
+    }
     Alert.alert(t('delete'), t('resourceConfirmDelete'), [
       {text: t('cancel'), style: 'cancel'},
       {
         text: t('delete'),
         style: 'destructive',
         onPress: async () => {
+          if (deletingRef.current) {
+            return;
+          }
+          deletingRef.current = true;
           try {
             await deleteResource(item.id);
+            markDataChanged('resources');
             Alert.alert(t('success'), t('resourceDeleted'));
-            fetchData();
+            fetchData(false);
           } catch (error) {
             Alert.alert(t('error'), getApiErrorMessage(error, t));
+          } finally {
+            deletingRef.current = false;
           }
         },
       },
@@ -282,10 +298,14 @@ export default function SearchResourcesScreen() {
       {loading && !refreshing ? (
         <CenteredLoader />
       ) : loadError && items.length === 0 ? (
-        <ApiErrorState error={loadError} onRetry={fetchData} />
+        <ApiErrorState error={loadError} onRetry={() => fetchData()} />
       ) : (
         <FlatList
           data={items}
+          // With the search keyboard open the first tap on a card only
+          // closed the keyboard (Android).
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
           keyExtractor={item => String(item.id)}
           renderItem={renderItem}
           contentContainerStyle={listContentStyle}

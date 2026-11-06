@@ -276,6 +276,8 @@ const getSuperAdminMenuItems = (t: TFunc, reportMenu: CommonMenuItem): CommonMen
       {label: t('bibleVerse'), routeName: 'SettingsBibleVerse'},
     ],
   },
+  // Open to every role on the web (no permission); the admin menu had no way in.
+  {label: t('omrSupport'), routeName: 'OmrSupport'},
 ];
 
 // Only the Overseer role uses this menu (roles: Pastor, Super Admin, Overseer).

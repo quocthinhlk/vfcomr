@@ -1095,6 +1095,8 @@ const es = {
   churchNetworkNameTooLong: "El nombre debe tener como máximo {max} caracteres.",
   churchNetworkNotFound: "No se encontró la red de iglesias.",
   churchNetworkInUse: "No se puede eliminar esta red: todavía pertenecen {count} iglesia(s). Muévalas primero a otra red.",
+  resourceHasChildren: "No se puede eliminar este recurso: tiene {count} recurso(s) hijo(s). Muévalos o elimínelos primero.",
+  resourceFileNameReadOnly: "El nombre del archivo no se puede cambiar aquí; vuelva a subir el archivo con otro nombre.",
   languageRegionNameExists: "Ya existe una región lingüística con este nombre.",
   languageRegionChurchesNotChecked: "Las iglesias de esta región lingüística quedarán sin región; la aplicación no puede comprobarlas.",
   languageNameExists: "Ya existe un idioma con este nombre.",

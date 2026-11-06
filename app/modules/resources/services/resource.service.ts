@@ -106,11 +106,11 @@ export interface UpdateResourceFilePayload {
   part_no: number;
   lang: string;
   /**
-   * Whether this file is AI translated.
-   * API expects a truthy flag (1/0 or \"1\"/\"0\"), see Postman:
-   * POST /api/v1/resources/files/upload -> is_ai_translated: Text(1|0)
+   * PATCH /resources/files/{id} takes a JSON boolean: 1/0 or "1"/"0" are
+   * rejected ("cannot unmarshal number ... of type bool"). Only the upload
+   * form field is the text "1"/"0".
    */
-  is_ai_translated: boolean | number | string;
+  is_ai_translated: boolean;
 }
 
 export interface UploadResourceFileInput {
@@ -179,12 +179,13 @@ function buildListQuery(params: ListResourcesParams = {}): Record<string, unknow
 export async function listResources(
   params: ListResourcesParams = {},
 ): Promise<ListResourcesResponse> {
+  let raw: ListResourcesResponse;
   try {
     const response = await api.get<ListResourcesResponse>('/resources/', {
       params: buildListQuery(params),
       paramsSerializer: {indexes: null},
     });
-    return {
+    raw = {
       success: response.data?.success ?? true,
       data: normalizeResourceList(response.data),
       message: response.data?.message ?? '',
@@ -192,6 +193,47 @@ export async function listResources(
   } catch (error) {
     throwApiError(error, 'List resources failed');
   }
+  const items = await withSavedFields(raw.data);
+  const name = (params.name ?? '').trim();
+  return {...raw, data: name ? items.filter(item => matchesName(item.name, name)) : items};
+}
+
+const fold = (s: string) =>
+  s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+const matchesName = (value: string, query: string) => fold(value ?? '').includes(fold(query));
+
+/**
+ * The list endpoint shows another resource's text for resources that have
+ * no translation row: every resource created since (and #22 "Sermon") is
+ * listed as "Discipleship Foundations (EN)" / "Foundations for growth (EN)",
+ * and its search matches them on that text. The detail endpoint is right, so
+ * name, description, graphic and languages are taken from it (a few small
+ * requests in parallel); a failed detail keeps the listed values.
+ */
+async function withSavedFields(items: ResourceListItem[]): Promise<ResourceListItem[]> {
+  const out = [...items];
+  let next = 0;
+  const worker = async () => {
+    while (next < out.length) {
+      const index = next++;
+      try {
+        const detail = (await api.get<GetResourceResponse>(`/resources/${out[index].id}`)).data?.data;
+        if (detail) {
+          out[index] = {
+            ...out[index],
+            name: detail.name,
+            short_description: detail.short_description,
+            graphic_path: detail.graphic_path,
+            available_languages: detail.available_languages ?? out[index].available_languages,
+          };
+        }
+      } catch {
+        // Keep the listed values.
+      }
+    }
+  };
+  await Promise.all(Array.from({length: Math.min(6, out.length)}, worker));
+  return out;
 }
 
 export async function getResourceById(id: number): Promise<GetResourceResponse> {
@@ -323,24 +365,18 @@ export async function uploadResourceFile(
   }
 }
 
+/**
+ * Part number, language and the AI flag. The API answers success for a new
+ * filename but keeps the old one, so the name is sent unchanged.
+ */
 export async function updateResourceFile(
   fileId: number,
   payload: UpdateResourceFilePayload,
 ): Promise<ResourceMutationResponse> {
   try {
-    const body: UpdateResourceFilePayload & {is_ai_translated: number | string} = {
-      ...payload,
-      // Normalise bool -> 1/0 like the upload endpoint
-      is_ai_translated:
-        typeof payload.is_ai_translated === 'boolean'
-          ? payload.is_ai_translated
-            ? 1
-            : 0
-          : payload.is_ai_translated,
-    };
     const response = await api.patch<ResourceMutationResponse>(
       `/resources/files/${fileId}`,
-      body,
+      {...payload, is_ai_translated: Boolean(payload.is_ai_translated)},
     );
     return response.data;
   } catch (error) {
@@ -359,4 +395,39 @@ export async function deleteResourceFile(
   } catch (error) {
     throwApiError(error, 'Delete resource file failed');
   }
+}
+
+/**
+ * PATCH body from a saved resource. file_ids / child_ids replace the
+ * resource's files and child resources: a list missing an id detaches that
+ * file or child, so they must come from a fresh read.
+ */
+export function payloadFromDetail(detail: ResourceDetailItem): UpdateResourcePayload {
+  return {
+    name: detail.name,
+    parent_id: detail.parent_id ?? null,
+    short_description: detail.short_description ?? '',
+    graphic_path: detail.graphic_path ?? '',
+    available_languages: detail.available_languages ?? [],
+    sort_order: detail.sort_order ?? 1,
+    file_ids: (detail.files ?? []).map(f => f.id),
+    child_ids: (detail.children ?? []).map(c => c.id),
+  };
+}
+
+/**
+ * Move a resource to the top level. The API ignores parent_id: null, so the
+ * resource is removed from its parent's child_ids instead (which is what
+ * the API does honour), keeping the parent's other fields as saved.
+ */
+export async function detachFromParent(parentId: number, childId: number): Promise<void> {
+  const parent = (await getResourceById(parentId)).data;
+  if (!parent) {
+    return;
+  }
+  const payload = payloadFromDetail(parent);
+  await updateResource(parentId, {
+    ...payload,
+    child_ids: payload.child_ids.filter(id => id !== childId),
+  });
 }

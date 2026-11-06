@@ -1044,6 +1044,8 @@ const pt = {
     churchNetworkNameTooLong: "O nome deve ter no máximo {max} caracteres.",
     churchNetworkNotFound: "Rede de igrejas não encontrada.",
     churchNetworkInUse: "Esta rede não pode ser excluída: {count} igreja(s) ainda pertencem a ela. Mova-as primeiro para outra rede.",
+    resourceHasChildren: "Este recurso não pode ser excluído: ele tem {count} recurso(s) filho(s). Mova-os ou exclua-os primeiro.",
+    resourceFileNameReadOnly: "O nome do arquivo não pode ser alterado aqui; envie o arquivo novamente com outro nome.",
     languageRegionNameExists: "Já existe uma região linguística com este nome.",
     languageRegionChurchesNotChecked: "As igrejas desta região linguística ficarão sem região; o aplicativo não consegue verificá-las.",
     languageNameExists: "Já existe um idioma com este nome.",

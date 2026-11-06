@@ -1036,6 +1036,8 @@ const en = {
     churchNetworkNameTooLong: "Name must be at most {max} characters.",
     churchNetworkNotFound: "Church network not found.",
     churchNetworkInUse: "This network can't be deleted: {count} church(es) still belong to it. Move them to another network first.",
+    resourceHasChildren: "This resource can't be deleted: it has {count} child resource(s). Move or delete them first.",
+    resourceFileNameReadOnly: "The file name can't be changed here; upload the file again under a new name.",
     languageRegionNameExists: "A language region with this name already exists.",
     languageRegionChurchesNotChecked: "Churches in this language region will be left without one; the app cannot check them.",
     languageNameExists: "A language with this name already exists.",

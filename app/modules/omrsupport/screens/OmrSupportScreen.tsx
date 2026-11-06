@@ -1,5 +1,15 @@
-import React, {useCallback, useEffect, useState} from 'react';
-import {ActivityIndicator, Alert, ScrollView, StyleSheet, View} from 'react-native';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import {SafeAreaView} from 'react-native-safe-area-context';
 import {Text} from '@ui-kitten/components';
 import {Header} from '../../../shared/components/Header';
@@ -7,99 +17,231 @@ import ApiErrorState from '../../../shared/components/ApiErrorState';
 import {globalStyles} from '../../../shared/styles/global';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
 import {fs, hs, ms, rs} from '../../../shared/utils/scale';
 import AppInput from '../../../shared/components/AppInput';
 import {SaveButton} from '../../../shared/components/ActionButtons';
+import {FormField} from '../../../shared/components/crud';
 import {COLORS} from '../../../shared/constants/colors';
-import {createOmrSupportRequest, getOmrSupportIntro} from '../services/omrsupport.service';
+import {
+  createOmrSupportRequest,
+  getOmrSupportIntro,
+  getSupportContact,
+} from '../services/omrsupport.service';
+import {useNavigation} from '@react-navigation/native';
 import {
   getApiErrorMessage,
   getApiValidationErrors,
 } from '../../../shared/utils/apiErrorHandler';
+import {
+  SupportErrors,
+  SupportField,
+  SupportValues,
+  buildSupportPayload,
+  contactFromProfile,
+  shouldShowEditEmail,
+  validateSupport,
+} from '../utils/omrSupport.utils';
+
+const FIELDS: SupportField[] = ['name', 'email', 'subject', 'message'];
 
 export const OmrSupportScreen = () => {
   const C = useThemedColors();
-  const {t} = useTranslation();
-  const [title, setTitle] = useState('OMR Support');
+  const navigation = useNavigation<any>();
+  const {t, selectedLanguage} = useTranslation();
+  const [title, setTitle] = useState('');
   const [introMessage, setIntroMessage] = useState('');
   const [loadingIntro, setLoadingIntro] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
-  const [name, setName] = useState('');
-  const [subject, setSubject] = useState('');
-  const [message, setMessage] = useState('');
-  const [fieldErrors, setFieldErrors] = useState<{
-    name?: string;
-    subject?: string;
-    message?: string;
-  }>({});
-
   const [introError, setIntroError] = useState<unknown>(null);
+  const [submitting, setSubmitting] = useState(false);
+  const [values, setValues] = useState<SupportValues>({
+    name: '',
+    email: '',
+    subject: '',
+    message: '',
+  });
+  const [errors, setErrors] = useState<SupportErrors>({});
+  // Server-side messages (already translated by the API) per field.
+  const [serverErrors, setServerErrors] = useState<Partial<Record<SupportField, string>>>({});
+  const scrollRef = useRef<ScrollView>(null);
+  const inputRefs = useRef<Partial<Record<SupportField, TextInput | null>>>({});
+  const fieldY = useRef<Partial<Record<SupportField, number>>>({});
+  const mountedRef = useRef(true);
+  // Signed-in user, for the server's "edit your e-mail" link.
+  const userIdRef = useRef<number | null>(null);
+  const [showEditEmail, setShowEditEmail] = useState(false);
+  // Android 15+ (edge-to-edge): keep the focused field above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
+  // One request at a time: a fast double tap sent two support e-mails.
+  const submitOnce = useSubmitOnce();
 
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
+
+  // The welcome text comes translated from the API: reload it when the app
+  // language changes (it stayed in the old language).
   const loadIntro = useCallback(async () => {
     try {
       setLoadingIntro(true);
       const data = await getOmrSupportIntro();
-      if (data?.title) {
-        setTitle(data.title);
+      if (!mountedRef.current) {
+        return;
       }
+      setTitle(data?.title || '');
       setIntroMessage(data?.message || '');
       setIntroError(null);
     } catch (error) {
-      console.error('Failed to load OMR support intro:', error);
-      setIntroMessage('');
-      setIntroError(error);
+      if (mountedRef.current) {
+        setIntroMessage('');
+        setIntroError(error);
+      }
     } finally {
-      setLoadingIntro(false);
+      if (mountedRef.current) {
+        setLoadingIntro(false);
+      }
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedLanguage]);
 
   useEffect(() => {
     loadIntro();
   }, [loadIntro]);
 
-  const onSubmit = async () => {
-    const nextErrors: {[key: string]: string} = {};
-    if (!name.trim()) {
-      nextErrors.name = 'Name is a required field';
+  // Prefill the name from the profile, as the web does. The e-mail is typed
+  // by the user and checked by the server against the OMR records.
+  useEffect(() => {
+    getSupportContact()
+      .then(user => {
+        const contact = contactFromProfile(user);
+        userIdRef.current = contact.id;
+        if (mountedRef.current) {
+          setValues(prev => ({...prev, name: prev.name || contact.name}));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const openEditProfile = async () => {
+    let id = userIdRef.current;
+    if (id == null) {
+      id = await getSupportContact()
+        .then(user => contactFromProfile(user).id)
+        .catch(() => null);
+      userIdRef.current = id;
     }
-    if (!subject.trim()) {
-      nextErrors.subject = 'Subject is a required field';
-    }
-    if (!message.trim()) {
-      nextErrors.message = 'Message is a required field';
-    }
-    if (Object.keys(nextErrors).length > 0) {
-      setFieldErrors(nextErrors);
+    if (id == null) {
+      Alert.alert(t('error') || 'Error', t('unknownError'));
       return;
     }
+    navigation.navigate('EditProfile', {id});
+  };
 
-    try {
-      setSubmitting(true);
-      setFieldErrors({});
-      await createOmrSupportRequest({
-        name: name.trim(),
-        subject: subject.trim(),
-        message: message.trim(),
-      });
-      Alert.alert(t('success') || 'Success', t('omrSupportSendSuccess'));
-      setName('');
-      setSubject('');
-      setMessage('');
-    } catch (error: any) {
-      const validationErrors = getApiValidationErrors(error);
-      if (validationErrors) {
-        setFieldErrors({
-          name: validationErrors.name,
-          subject: validationErrors.subject,
-          message: validationErrors.message,
-        });
-        return;
-      }
-      Alert.alert(t('error') || 'Error', getApiErrorMessage(error, t) || t('omrSupportSendFailed'));
-    } finally {
-      setSubmitting(false);
+  const setField = (field: SupportField) => (text: string) => {
+    setValues(prev => ({...prev, [field]: text}));
+    setErrors(prev => (prev[field] ? {...prev, [field]: undefined} : prev));
+    setServerErrors(prev => (prev[field] ? {...prev, [field]: undefined} : prev));
+    if (field === 'email') {
+      setShowEditEmail(false);
     }
   };
+
+  const labels: Record<SupportField, string> = {
+    name: t('omrSupportNameLabel'),
+    email: t('email'),
+    subject: t('omrSupportSubjectLabel'),
+    message: t('omrSupportMessageLabel'),
+  };
+  const errorText = (field: SupportField) =>
+    serverErrors[field] ||
+    (errors[field] === 'required'
+      ? t('fieldIsRequired').replace('{field}', labels[field])
+      : undefined);
+
+  const scrollToField = (field: SupportField) => {
+    const y = fieldY.current[field];
+    if (y != null) {
+      scrollRef.current?.scrollTo({y: Math.max(0, y - ms(16)), animated: true});
+    }
+  };
+
+  const onSubmit = submitOnce(async () => {
+    const nextErrors = validateSupport(values);
+    setErrors(nextErrors);
+    setServerErrors({});
+    setShowEditEmail(false);
+    const first = FIELDS.find(f => nextErrors[f]);
+    if (first) {
+      // Was hard-coded English ("Name is a required field") with no scroll.
+      scrollToField(first);
+      return;
+    }
+    try {
+      setSubmitting(true);
+      await createOmrSupportRequest(buildSupportPayload(values));
+      Alert.alert(t('success') || 'Success', t('omrSupportSendSuccess'));
+      if (mountedRef.current) {
+        // Keep who is writing; clear the request itself.
+        setValues(prev => ({...prev, subject: '', message: ''}));
+      }
+    } catch (error: any) {
+      const validation = getApiValidationErrors(error) as
+        | Partial<Record<string, string>>
+        | null
+        | undefined;
+      const mapped: Partial<Record<SupportField, string>> = {};
+      FIELDS.forEach(f => {
+        if (validation?.[f]) {
+          mapped[f] = validation[f];
+        }
+      });
+      if (Object.keys(mapped).length) {
+        setServerErrors(mapped);
+        // E-mail not in the OMR records: the server asks for an edit link.
+        setShowEditEmail(!!mapped.email && shouldShowEditEmail(validation));
+        scrollToField(FIELDS.find(f => mapped[f]) as SupportField);
+        return;
+      }
+      // Errors on fields this form does not have used to vanish silently.
+      Alert.alert(
+        t('error') || 'Error',
+        getApiErrorMessage(error, t) || t('omrSupportSendFailed'),
+      );
+    } finally {
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
+    }
+  });
+
+  const renderField = (
+    field: SupportField,
+    props: Partial<React.ComponentProps<typeof AppInput>> = {},
+  ) => (
+    <View
+      key={field}
+      onLayout={e => {
+        fieldY.current[field] = e.nativeEvent.layout.y;
+      }}>
+      <FormField label={labels[field]} required error={errorText(field)}>
+        <AppInput
+          ref={r => {
+            inputRefs.current[field] = r;
+          }}
+          value={values[field]}
+          onChangeText={setField(field)}
+          error={!!errorText(field)}
+          editable={!submitting}
+          accessibilityLabel={`${labels[field]}, ${t('required')}`}
+          {...props}
+        />
+      </FormField>
+    </View>
+  );
 
   return (
     <SafeAreaView
@@ -107,105 +249,88 @@ export const OmrSupportScreen = () => {
       edges={['top', 'bottom', 'left', 'right']}>
       <View style={[styles.container, {backgroundColor: C.background}]}>
         <Header title={t('omrSupport') || title} />
-        <ScrollView
-          style={styles.scroll}
-          contentContainerStyle={styles.scrollContent}
-
-          keyboardShouldPersistTaps="handled">
-          <View style={[styles.card, {borderColor: C.inputBorder, backgroundColor: C.surface}]}>
-            {loadingIntro ? (
-              <View style={styles.loadingWrap}>
-                <ActivityIndicator color={COLORS.mainColor} />
-              </View>
-            ) : introError ? (
-              <ApiErrorState compact error={introError} onRetry={loadIntro} />
-            ) : (
-              <>
-                <Text style={[styles.title, {color: C.textPrimary}]}>
-                  {title || t('omrSupport') || 'OMR Support'}
-                </Text>
-                <Text style={[styles.text, {color: C.textSecondary}]}>
-                  {introMessage || '-'}
-                </Text>
-              </>
-            )}
-          </View>
-
-          <View style={[styles.card, {borderColor: C.inputBorder, backgroundColor: C.surface}]}>
-            <Text style={[styles.formTitle, {color: C.textPrimary}]}>
-              {t('omrSupportContactSupport')}
-            </Text>
-
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.label, {color: C.textSecondary}]}>
-                {t('omrSupportNameLabel')}
-              </Text>
-              <AppInput
-                value={name}
-                onChangeText={value => {
-                  setName(value);
-                  if (value.trim()) {
-                    setFieldErrors(prev => ({...prev, name: undefined}));
-                  }
-                }}
-                autoCapitalize="words"
-                error={!!fieldErrors.name}
-              />
-              {fieldErrors.name ? (
-                <Text style={styles.errorText}>{fieldErrors.name}</Text>
-              ) : null}
+        {/* There was no keyboard handling: on iOS (and Android 15+) the
+            message box and the Send button stayed under the keyboard. */}
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior="padding"
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.flex}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            automaticallyAdjustKeyboardInsets>
+            <View style={[styles.card, {borderColor: C.inputBorder, backgroundColor: C.surface}]}>
+              {loadingIntro ? (
+                <View style={styles.loadingWrap}>
+                  <ActivityIndicator color={COLORS.mainColor} />
+                </View>
+              ) : introError ? (
+                <ApiErrorState compact error={introError} onRetry={loadIntro} />
+              ) : (
+                <>
+                  <Text style={[styles.title, {color: C.textPrimary}]}>
+                    {title || t('omrSupport')}
+                  </Text>
+                  {introMessage ? (
+                    <Text style={[styles.text, {color: C.textSecondary}]}>{introMessage}</Text>
+                  ) : null}
+                </>
+              )}
             </View>
 
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.label, {color: C.textSecondary}]}>
-                {t('omrSupportSubjectLabel')}
+            <View style={[styles.card, {borderColor: C.inputBorder, backgroundColor: C.surface}]}>
+              <Text style={[styles.formTitle, {color: C.textPrimary}]}>
+                {t('omrSupportContactSupport')}
               </Text>
-              <AppInput
-                value={subject}
-                onChangeText={value => {
-                  setSubject(value);
-                  if (value.trim()) {
-                    setFieldErrors(prev => ({...prev, subject: undefined}));
-                  }
-                }}
-                autoCapitalize="sentences"
-                error={!!fieldErrors.subject}
-              />
-              {fieldErrors.subject ? (
-                <Text style={styles.errorText}>{fieldErrors.subject}</Text>
+              {renderField('name', {
+                autoCapitalize: 'words',
+                autoComplete: 'name',
+                returnKeyType: 'next',
+                maxLength: 255,
+                onSubmitEditing: () => inputRefs.current.email?.focus(),
+              })}
+              {renderField('email', {
+                keyboardType: 'email-address',
+                autoCapitalize: 'none',
+                autoCorrect: false,
+                autoComplete: 'email',
+                returnKeyType: 'next',
+                maxLength: 255,
+                onSubmitEditing: () => inputRefs.current.subject?.focus(),
+              })}
+              {showEditEmail ? (
+                <TouchableOpacity
+                  onPress={openEditProfile}
+                  hitSlop={{top: 8, bottom: 8, left: 8, right: 8}}
+                  accessibilityRole="link"
+                  style={styles.editProfileWrap}>
+                  <Text style={styles.editProfileLink}>{t('editProfile')}</Text>
+                </TouchableOpacity>
               ) : null}
-            </View>
+              {renderField('subject', {
+                autoCapitalize: 'sentences',
+                returnKeyType: 'next',
+                maxLength: 255,
+                onSubmitEditing: () => inputRefs.current.message?.focus(),
+              })}
+              {renderField('message', {
+                multiline: true,
+                autoCapitalize: 'sentences',
+                style: styles.messageInput,
+                containerStyle: styles.messageContainer,
+              })}
 
-            <View style={styles.fieldGroup}>
-              <Text style={[styles.label, {color: C.textSecondary}]}>
-                {t('omrSupportMessageLabel')}
-              </Text>
-              <AppInput
-                value={message}
-                onChangeText={value => {
-                  setMessage(value);
-                  if (value.trim()) {
-                    setFieldErrors(prev => ({...prev, message: undefined}));
-                  }
-                }}
-                multiline
-                style={styles.messageInput}
-                autoCapitalize="sentences"
-                error={!!fieldErrors.message}
+              <SaveButton
+                label={submitting ? t('omrSupportSending') : t('omrSupportSendRequest')}
+                onPress={onSubmit}
+                disabled={submitting}
+                style={styles.submitButton}
               />
-              {fieldErrors.message ? (
-                <Text style={styles.errorText}>{fieldErrors.message}</Text>
-              ) : null}
             </View>
-
-            <SaveButton
-              label={submitting ? t('omrSupportSending') : t('omrSupportSendRequest')}
-              onPress={onSubmit}
-              disabled={submitting}
-              style={styles.submitButton}
-            />
-          </View>
-        </ScrollView>
+          </ScrollView>
+        </KeyboardAvoidingView>
       </View>
     </SafeAreaView>
   );
@@ -216,7 +341,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: ms(12),
   },
-  scroll: {
+  flex: {
     flex: 1,
   },
   scrollContent: {
@@ -244,18 +369,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: ms(10),
   },
-  fieldGroup: {
-    marginBottom: ms(12),
-  },
-  label: {
-    fontSize: fs(13),
-    fontWeight: '600',
-    marginBottom: ms(8),
+  messageContainer: {
+    paddingRight: ms(6),
   },
   messageInput: {
-    height: hs(120),
+    // AppInput has a one-line height: grow with the text instead.
+    height: undefined,
+    minHeight: hs(120),
+    maxHeight: hs(260),
     textAlignVertical: 'top',
     paddingTop: ms(10),
+  },
+  editProfileWrap: {
+    alignSelf: 'flex-end',
+    marginTop: -ms(8),
+    marginBottom: ms(12),
+  },
+  editProfileLink: {
+    fontSize: fs(13),
+    fontWeight: '600',
+    color: COLORS.mainColor,
   },
   submitButton: {
     width: '100%',
@@ -264,9 +397,6 @@ const styles = StyleSheet.create({
     fontSize: fs(14),
     lineHeight: fs(20),
   },
-  errorText: {
-    marginTop: ms(6),
-    fontSize: fs(12),
-    color: '#db2d2d',
-  },
 });
+
+export default OmrSupportScreen;

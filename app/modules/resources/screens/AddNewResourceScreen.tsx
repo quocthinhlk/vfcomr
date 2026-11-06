@@ -2,6 +2,7 @@ import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   ScrollView,
@@ -31,11 +32,16 @@ import {fs, ms, rs, ws} from '../../../shared/utils/scale';
 import api from '../../../config/api';
 import {
   createResource,
+  detachFromParent,
   getResourceById,
   listResources,
+  payloadFromDetail,
   resolveResourceMediaUrl,
   updateResource,
 } from '../services/resource.service';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
+import {parentChoices, positiveInt} from '../utils/resource.utils';
 import {
   RESOURCE_LANGUAGE_CODES,
   resourceLanguageLabel,
@@ -76,12 +82,33 @@ export default function AddNewResourceScreen() {
   const [graphicPath, setGraphicPath] = useState('');
   const [languages, setLanguages] = useState<string[]>(['en']);
   const [sortOrder, setSortOrder] = useState('1');
-  const [fileIds, setFileIds] = useState<number[]>([]);
-  const [childIds, setChildIds] = useState<number[]>([]);
+  // Parent as saved, to tell a "move to top level" (API ignores null).
+  const [savedParentId, setSavedParentId] = useState<number | null>(null);
   const [parentOptions, setParentOptions] = useState<{label: string; value: number}[]>(
     [],
   );
   const scrollRef = useRef<ScrollView>(null);
+  // Android 15+ (edge-to-edge): keep the focused field above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
+  // One save at a time: a fast double tap created the resource twice.
+  const submitOnce = useSubmitOnce();
+  // The fixed Cancel / Save bar rose with the keyboard and covered the field
+  // being typed in (small Android phones): hidden while the keyboard is up.
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    const show = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      () => setKeyboardOpen(true),
+    );
+    const hide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => setKeyboardOpen(false),
+    );
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
   const fieldPositions = useRef({name: 0, languages: 0});
 
   useEffect(() => {
@@ -113,18 +140,15 @@ export default function AddNewResourceScreen() {
     return () => {
       mounted = false;
     };
-  }, [navigation, selectedLanguage, roleRetryKey]);
+  }, [navigation, t, roleRetryKey]);
 
   const loadParents = useCallback(async () => {
     try {
       setParentsLoading(true);
       setParentsError(null);
       const res = await listResources();
-      setParentOptions(
-        (res.data ?? [])
-          .filter(item => item.id !== resourceId)
-          .map(item => ({label: item.name, value: item.id})),
-      );
+      // Not itself nor a resource under it (that made a loop).
+      setParentOptions(parentChoices(res.data ?? [], resourceId));
     } catch (error) {
       console.error(error);
       setParentsError(error);
@@ -164,6 +188,7 @@ export default function AddNewResourceScreen() {
         }
         setName(detail.name ?? '');
         setParentId(detail.parent_id ?? null);
+        setSavedParentId(detail.parent_id ?? null);
         setShortDescription(detail.short_description ?? '');
         setGraphicPath(detail.graphic_path ?? '');
         setLanguages(
@@ -173,8 +198,6 @@ export default function AddNewResourceScreen() {
             : ['en'],
         );
         setSortOrder(String(detail.sort_order ?? 1));
-        setFileIds((detail.files ?? []).map(file => file.id));
-        setChildIds((detail.children ?? []).map(child => child.id));
         setLoadError(null);
       } catch (error) {
         // Show a recoverable error instead of a blank edit form that could be saved.
@@ -249,14 +272,15 @@ export default function AddNewResourceScreen() {
     const uploadRes = await api.post('/images/upload', form, {
       headers: {'Content-Type': 'multipart/form-data'},
     });
-    return (
-      uploadRes?.data?.data?.path ||
-      uploadRes?.data?.path ||
-      graphicPath.trim()
-    );
+    const path = uploadRes?.data?.data?.path || uploadRes?.data?.path;
+    if (!path) {
+      // Was: keep the old graphic and report "updated" anyway.
+      throw new Error('');
+    }
+    return path;
   };
 
-  const onSave = async () => {
+  const onSave = submitOnce(async () => {
     const nextInvalid = {
       name: !name.trim(),
       languages: languages.length === 0,
@@ -272,33 +296,43 @@ export default function AddNewResourceScreen() {
           animated: true,
         });
       });
-      Alert.alert(t('error'), t('fillRequiredFields'));
       return;
     }
-    const parsedSort = Number(sortOrder);
-    const sortValue = Number.isFinite(parsedSort) && parsedSort > 0 ? parsedSort : 1;
 
     try {
       setSubmitting(true);
       const uploadedPath = await uploadGraphicIfNeeded();
-      const payload = {
-        name: name.trim(),
+      const fields = {
+        name: name.trim().replace(/\s+/g, ' '),
         parent_id: parentId,
-        short_description: shortDescription.trim() || null,
+        // "" clears it; the API ignores null and kept the old description.
+        short_description: shortDescription.trim(),
         graphic_path: uploadedPath || '',
         available_languages: languages,
-        sort_order: sortValue,
-        file_ids: fileIds,
-        child_ids: childIds,
+        sort_order: positiveInt(sortOrder),
       };
 
       if (isEdit && resourceId) {
-        await updateResource(resourceId, payload);
+        // file_ids / child_ids replace the resource's files and children, so
+        // they are read again now: ids loaded when the form opened would
+        // detach a file uploaded since.
+        const latest = (await getResourceById(resourceId)).data;
+        const current = latest ? payloadFromDetail(latest) : null;
+        await updateResource(resourceId, {
+          ...fields,
+          file_ids: current?.file_ids ?? [],
+          child_ids: current?.child_ids ?? [],
+        });
+        if (savedParentId && parentId == null) {
+          // Top level: the API ignores parent_id null; take it out of the
+          // old parent's children instead.
+          await detachFromParent(savedParentId, resourceId);
+        }
         markDataChanged('resources');
         Alert.alert(t('success'), t('resourceUpdated'));
         returnAfterEdit(navigation);
       } else {
-        const created = await createResource(payload);
+        const created = await createResource({...fields, file_ids: [], child_ids: []});
         markDataChanged('resources');
         const newId = created?.data?.resource_id;
         Alert.alert(t('success'), t('resourceCreated'));
@@ -313,7 +347,7 @@ export default function AddNewResourceScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -322,12 +356,16 @@ export default function AddNewResourceScreen() {
       error={roleError || loadError || parentsError}
       onRetry={retryLoad}>
       <KeyboardAvoidingView
-        style={{flex: 1}}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        style={styles.flex}
+        // Padding on Android too: with edge-to-edge (Android 15+) the window no
+        // longer resizes, and the description was typed behind the keyboard.
+        behavior="padding"
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 64 : 0}>
         <ScrollView
           ref={scrollRef}
           contentContainerStyle={styles.scrollContent}
           keyboardShouldPersistTaps="handled"
+          automaticallyAdjustKeyboardInsets
           showsVerticalScrollIndicator={false}>
           <View
             style={styles.detailsSection}>
@@ -353,6 +391,7 @@ export default function AddNewResourceScreen() {
                   }}
                   placeholder={t('name')}
                   error={invalidFields.name}
+                  maxLength={255}
                 />
               </FormField>
             </View>
@@ -495,6 +534,7 @@ export default function AddNewResourceScreen() {
           </View>
         </ScrollView>
 
+        {keyboardOpen ? null : (
         <View
           style={[
             styles.footer,
@@ -506,12 +546,16 @@ export default function AddNewResourceScreen() {
             submitting={submitting}
           />
         </View>
+        )}
       </KeyboardAvoidingView>
     </ScreenContainer>
   );
 }
 
 const styles = StyleSheet.create({
+  flex: {
+    flex: 1,
+  },
   scrollContent: {
     paddingTop: ms(12),
     paddingBottom: ms(24),

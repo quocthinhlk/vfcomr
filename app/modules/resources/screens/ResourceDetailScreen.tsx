@@ -15,7 +15,7 @@ import {
   View,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
+import {markDataChanged, useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {Text} from '@ui-kitten/components';
 import * as RNFS from 'react-native-fs';
 import FileViewer from 'react-native-file-viewer';
@@ -73,22 +73,8 @@ import {
   updateResourceFile,
   uploadResourceFile,
 } from '../services/resource.service';
-
-function stripHtml(value?: string | null): string {
-  if (!value) {
-    return '';
-  }
-  return value
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/p>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&amp;/g, '&')
-    .replace(/&nbsp;/g, ' ')
-    .replace(/&rsquo;/g, "'")
-    .replace(/&ldquo;/g, '"')
-    .replace(/&rdquo;/g, '"')
-    .trim();
-}
+import {positiveInt, stripHtml} from '../utils/resource.utils';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
 
 const LANGUAGE_NAME_KEYS: Record<string, TranslationKey> = {
   en: 'langEnglish',
@@ -189,7 +175,9 @@ export default function ResourceDetailScreen() {
     };
   }, []);
 
-  const load = useCallback(async () => {
+  // `silent`: refresh after a change without the full-screen spinner, which
+  // unmounted the page and jumped back to the top.
+  const load = useCallback(async (silent = false) => {
     if (!resourceId) {
       setResource(null);
       setLoading(false);
@@ -197,7 +185,9 @@ export default function ResourceDetailScreen() {
     }
     try {
       setLoadError(null);
-      setLoading(true);
+      if (!silent) {
+        setLoading(true);
+      }
       const [detailRes, formatRes] = await Promise.all([
         getResourceById(resourceId),
         listResourceFileFormats().catch(() => ({data: [] as ResourceFileFormatItem[]})),
@@ -206,7 +196,9 @@ export default function ResourceDetailScreen() {
       setFormats(formatRes.data ?? []);
     } catch (error) {
       console.error(error);
-      setResource(null);
+      if (!silent) {
+        setResource(null);
+      }
       setLoadError(error);
     } finally {
       setLoading(false);
@@ -217,7 +209,7 @@ export default function ResourceDetailScreen() {
   }, [load]);
 
   // Back from a sub-folder keeps this screen as is; reload only after an edit / add.
-  useReloadOnReturn(load, {
+  useReloadOnReturn(() => load(true), {
     dataKey: 'resources',
     reload: route.params?.reload,
     clearReload: () => navigation.setParams({reload: undefined}),
@@ -225,7 +217,7 @@ export default function ResourceDetailScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await load();
+    await load(true);
     setRefreshing(false);
   };
 
@@ -245,7 +237,7 @@ export default function ResourceDetailScreen() {
   }, [resource?.children]);
 
   const graphicUrl = resolveResourceMediaUrl(resource?.graphic_path);
-  const description = stripHtml(resource?.short_description);
+  const description = stripHtml(resource?.short_description, '\n');
 
   const handleOpenFile = async (file: ResourceFileItem, url: string) => {
     if (!url || openingFileId != null) {
@@ -258,13 +250,17 @@ export default function ResourceDetailScreen() {
 
     try {
       setOpeningFileId(file.id);
-      const exists = await RNFS.exists(localPath);
-      if (!exists) {
+      const cached =
+        (await RNFS.exists(localPath)) && (await RNFS.stat(localPath)).size > 0;
+      if (!cached) {
         const result = await RNFS.downloadFile({
           fromUrl: url,
           toFile: localPath,
         }).promise;
         if (result.statusCode < 200 || result.statusCode >= 300) {
+          // The error page was saved under the file's name and opened
+          // (broken) from the cache on every later tap.
+          await RNFS.unlink(localPath).catch(() => {});
           throw new Error(`Download failed (${result.statusCode})`);
         }
       }
@@ -284,6 +280,15 @@ export default function ResourceDetailScreen() {
     if (!resourceId) {
       return;
     }
+    // The API deletes the folder and leaves its child resources pointing at
+    // a missing parent (they vanish from the app).
+    if (children.length > 0) {
+      Alert.alert(
+        t('error'),
+        t('resourceHasChildren').replace('{count}', String(children.length)),
+      );
+      return;
+    }
     Alert.alert(t('delete'), t('resourceConfirmDelete'), [
       {text: t('cancel'), style: 'cancel'},
       {
@@ -293,8 +298,17 @@ export default function ResourceDetailScreen() {
           try {
             setBusy(true);
             await deleteResource(resourceId);
+            markDataChanged('resources');
             Alert.alert(t('success'), t('resourceDeleted'));
-            returnToList(navigation);
+            // A sub-folder goes back to its parent folder (which reloads),
+            // not all the way to the top-level list.
+            const routes: {name: string}[] = navigation.getState?.()?.routes ?? [];
+            const previous = routes[routes.length - 2];
+            if (resource?.parent_id && previous?.name === 'ResourceDetail') {
+              navigation.goBack();
+            } else {
+              returnToList(navigation);
+            }
           } catch (error) {
             Alert.alert(t('error'), getApiErrorMessage(error, t));
           } finally {
@@ -421,9 +435,10 @@ export default function ResourceDetailScreen() {
     }
   };
 
-  const submitFileModal = async () => {
-    const parsedPart = Number(partNo);
-    const partValue = Number.isFinite(parsedPart) && parsedPart > 0 ? parsedPart : 1;
+  // One save at a time: a fast double tap uploaded the file twice.
+  const submitOnce = useSubmitOnce();
+  const submitFileModal = submitOnce(async () => {
+    const partValue = positiveInt(partNo);
 
     try {
       setBusy(true);
@@ -444,12 +459,9 @@ export default function ResourceDetailScreen() {
         });
         Alert.alert(t('success'), t('resourceFileUploaded'));
       } else if (editingFile) {
-        if (!fileName.trim()) {
-          Alert.alert(t('error'), t('fillRequiredFields'));
-          return;
-        }
         await updateResourceFile(editingFile.id, {
-          filename: fileName.trim(),
+          // Sent as saved: the API ignores a new name.
+          filename: editingFile.filename,
           part_no: partValue,
           lang: fileLang || 'en',
           is_ai_translated: isAiTranslated,
@@ -457,13 +469,13 @@ export default function ResourceDetailScreen() {
         Alert.alert(t('success'), t('resourceFileUpdated'));
       }
       setFileModalVisible(false);
-      await load();
+      await load(true);
     } catch (error) {
       Alert.alert(t('error'), getApiErrorMessage(error, t));
     } finally {
       setBusy(false);
     }
-  };
+  });
 
   const confirmDeleteFile = (file: ResourceFileItem) => {
     Alert.alert(t('delete'), t('resourceConfirmDelete'), [
@@ -476,7 +488,7 @@ export default function ResourceDetailScreen() {
             setBusy(true);
             await deleteResourceFile(file.id);
             Alert.alert(t('success'), t('resourceFileDeleted'));
-            await load();
+            await load(true);
           } catch (error) {
             Alert.alert(t('error'), getApiErrorMessage(error, t));
           } finally {
@@ -662,7 +674,7 @@ export default function ResourceDetailScreen() {
     return (
       <ScreenContainer title={t('resourceDetailTitle')}>
         {loadError ? (
-          <ApiErrorState error={loadError} onRetry={load} />
+          <ApiErrorState error={loadError} onRetry={() => load()} />
         ) : (
           <ListEmptyState />
         )}
@@ -791,7 +803,8 @@ export default function ResourceDetailScreen() {
         visible={fileModalVisible}
         animationType="slide"
         transparent
-        onRequestClose={() => setFileModalVisible(false)}>
+        // Not while saving: the upload went on behind a closed form.
+        onRequestClose={() => !busy && setFileModalVisible(false)}>
         <KeyboardAvoidingView
           style={styles.modalKeyboardAvoider}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -812,7 +825,12 @@ export default function ResourceDetailScreen() {
                 <Text style={[formStyles.label, {color: C.textPrimary}]}>
                   {t('resourceFileName')}
                 </Text>
-                <AppInput value={fileName} onChangeText={setFileName} />
+                {/* Read-only: the API answered success for a new name but
+                    kept the old one. */}
+                <AppInput value={fileName} editable={false} />
+                <Text style={[styles.fileNameHint, {color: C.textSecondary}]}>
+                  {t('resourceFileNameReadOnly')}
+                </Text>
               </>
             ) : (
               <>
@@ -879,6 +897,7 @@ export default function ResourceDetailScreen() {
             <View style={styles.modalActions}>
               <CancelButton
                 label={t('cancel')}
+                disabled={busy}
                 onPress={() => setFileModalVisible(false)}
                 style={styles.adminButton}
               />
@@ -898,6 +917,10 @@ export default function ResourceDetailScreen() {
 }
 
 const styles = StyleSheet.create({
+  fileNameHint: {
+    fontSize: fs(12),
+    marginTop: ms(6),
+  },
   scrollContent: {
     paddingTop: ms(12),
     paddingBottom: ms(28),

@@ -1043,6 +1043,8 @@ const ja = {
     churchNetworkNameTooLong: "名前は{max}文字以内で入力してください。",
     churchNetworkNotFound: "教会ネットワークが見つかりません。",
     churchNetworkInUse: "このネットワークには{count}件の教会が所属しているため削除できません。先に別のネットワークへ移動してください。",
+    resourceHasChildren: "このリソースは削除できません：子リソースが{count}件あります。先に移動または削除してください。",
+    resourceFileNameReadOnly: "ここではファイル名を変更できません。新しい名前でファイルを再度アップロードしてください。",
     languageRegionNameExists: "この名前の言語地域はすでに存在します。",
     languageRegionChurchesNotChecked: "この言語地域の教会は地域なしになります。アプリでは確認できません。",
     languageNameExists: "この名前の言語はすでに存在します。",

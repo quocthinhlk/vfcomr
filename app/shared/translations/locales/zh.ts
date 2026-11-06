@@ -1028,6 +1028,8 @@ const zh = {
     churchNetworkNameTooLong: "名称最多 {max} 个字符。",
     churchNetworkNotFound: "找不到该教会网络。",
     churchNetworkInUse: "无法删除此网络：仍有 {count} 个教会属于该网络。请先将它们移到其他网络。",
+    resourceHasChildren: "无法删除此资源：它有 {count} 个子资源。请先移动或删除它们。",
+    resourceFileNameReadOnly: "此处无法更改文件名；请以新名称重新上传文件。",
     languageRegionNameExists: "已存在同名的语言区域。",
     languageRegionChurchesNotChecked: "此语言区域内的教会将没有区域；应用无法检查这些教会。",
     languageNameExists: "已存在同名语言。",

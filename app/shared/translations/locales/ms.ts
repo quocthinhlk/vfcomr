@@ -1044,6 +1044,8 @@ const ms = {
     churchNetworkNameTooLong: "Nama mestilah tidak melebihi {max} aksara.",
     churchNetworkNotFound: "Rangkaian gereja tidak ditemui.",
     churchNetworkInUse: "Rangkaian ini tidak boleh dipadam: {count} gereja masih menjadi ahlinya. Pindahkan ke rangkaian lain dahulu.",
+    resourceHasChildren: "Sumber ini tidak boleh dipadam: ia mempunyai {count} sumber anak. Alihkan atau padamkannya dahulu.",
+    resourceFileNameReadOnly: "Nama fail tidak boleh ditukar di sini; muat naik semula fail dengan nama baharu.",
     languageRegionNameExists: "Wilayah bahasa dengan nama ini sudah wujud.",
     languageRegionChurchesNotChecked: "Gereja dalam wilayah bahasa ini akan tiada wilayah; aplikasi tidak dapat menyemaknya.",
     languageNameExists: "Bahasa dengan nama ini sudah wujud.",

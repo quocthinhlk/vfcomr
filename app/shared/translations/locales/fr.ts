@@ -1048,6 +1048,8 @@ const fr = {
     churchNetworkNameTooLong: "Le nom doit comporter au maximum {max} caractères.",
     churchNetworkNotFound: "Réseau d'églises introuvable.",
     churchNetworkInUse: "Ce réseau ne peut pas être supprimé : {count} église(s) en font encore partie. Déplacez-les d'abord vers un autre réseau.",
+    resourceHasChildren: "Impossible de supprimer cette ressource : elle contient {count} ressource(s) enfant(s). Déplacez-les ou supprimez-les d'abord.",
+    resourceFileNameReadOnly: "Le nom du fichier ne peut pas être modifié ici ; téléversez à nouveau le fichier sous un autre nom.",
     languageRegionNameExists: "Une région linguistique portant ce nom existe déjà.",
     languageRegionChurchesNotChecked: "Les églises de cette région linguistique n'en auront plus ; l'application ne peut pas les vérifier.",
     languageNameExists: "Une langue portant ce nom existe déjà.",
