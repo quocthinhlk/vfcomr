@@ -109,3 +109,13 @@ export const fromEditorHtml = (html: string): string => {
 /** No visible text and no image (an emptied editor still leaves `<br>`s). */
 export const isAnswerEmpty = (html: string): boolean =>
   !/<img\b/i.test(html || '') && !convertHtmlToText(html || '').trim();
+
+/**
+ * "/uploads/Church Pic Add.jpg": a space is not valid in a URL and iOS does
+ * not build such a URL, so the screenshot did not show. Encoded as %20 in
+ * src / href attributes.
+ */
+export const encodeUrlSpaces = (html: string): string =>
+  html.replace(/\b(src|href)\s*=\s*(["'])([^"']*)\2/gi, (_m, attr, q, url) =>
+    `${attr}=${q}${url.replace(/ /g, '%20')}${q}`,
+  );

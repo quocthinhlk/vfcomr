@@ -1,4 +1,4 @@
-import React, {useState, useEffect, useMemo} from 'react';
+import React, {useState, useEffect, useMemo, useRef} from 'react';
 import {View} from 'react-native';
 import ElementDropdown from './ElementDropdown';
 import {useThemedColors} from '../styles/theme';
@@ -27,19 +27,27 @@ const TimePicker: React.FC<Props> = ({value, onChange, error}) => {
   const [localHour, setLocalHour] = useState<number | undefined>(undefined);
   const [localMinute, setLocalMinute] = useState<number | undefined>(undefined);
 
+  // Set while this picker reports an incomplete time, so the null coming back
+  // does not also clear the part that is still chosen.
+  const emittedIncompleteRef = useRef(false);
+
   // Parse value string "HH:mm:ss" or "HH:mm" into hours and minutes
   useEffect(() => {
+    if (!value && emittedIncompleteRef.current) {
+      return;
+    }
     if (value && typeof value === 'string') {
       const parts = value.split(':');
       if (parts.length >= 2) {
         const h = parseInt(parts[0], 10);
         const m = parseInt(parts[1], 10);
-        if (!isNaN(h) && h >= 0 && h < 24) {
-          setLocalHour(h);
-        }
-        if (!isNaN(m) && m >= 0 && m < 60) {
-          setLocalMinute(m);
-        }
+        // An out-of-range part (the API saves e.g. "99:00:00") is shown empty
+        // instead of keeping the previous choice.
+        setLocalHour(!isNaN(h) && h >= 0 && h < 24 ? h : undefined);
+        setLocalMinute(!isNaN(m) && m >= 0 && m < 60 ? m : undefined);
+      } else {
+        setLocalHour(undefined);
+        setLocalMinute(undefined);
       }
     } else if (!value) {
       setLocalHour(undefined);
@@ -47,9 +55,13 @@ const TimePicker: React.FC<Props> = ({value, onChange, error}) => {
     }
   }, [value]);
 
-  const setTimePart = (part: 'h' | 'm', v: number) => {
-    if (part === 'h') setLocalHour(v);
-    if (part === 'm') setLocalMinute(v);
+  const setTimePart = (part: 'h' | 'm', v: number | undefined) => {
+    if (part === 'h') {
+      setLocalHour(v);
+    }
+    if (part === 'm') {
+      setLocalMinute(v);
+    }
 
     const h = part === 'h' ? v : localHour;
     const m = part === 'm' ? v : localMinute;
@@ -57,12 +69,18 @@ const TimePicker: React.FC<Props> = ({value, onChange, error}) => {
     // Only emit when both parts are selected
     if (h !== undefined && m !== undefined) {
       const timeString = `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:00`;
+      emittedIncompleteRef.current = false;
       onChange(timeString);
     } else {
       // keep external value as null when incomplete
+      emittedIncompleteRef.current = true;
       onChange(null);
     }
   };
+
+  // The dropdown's clear (×) sends null, which Number() turned into 00.
+  const toPart = (v: string | number | null) =>
+    v === null || v === undefined || v === '' ? undefined : Number(v);
 
   return (
     <View style={{flexDirection: 'row', gap: ms(8)}}>
@@ -70,7 +88,7 @@ const TimePicker: React.FC<Props> = ({value, onChange, error}) => {
         <ElementDropdown
           data={hours}
           value={localHour as any}
-          onChange={v => setTimePart('h', Number(v))}
+          onChange={v => setTimePart('h', toPart(v))}
           placeholder={t('hour') || 'Hour'}
           error={!!error}
           dropdownContainerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}
@@ -82,7 +100,7 @@ const TimePicker: React.FC<Props> = ({value, onChange, error}) => {
         <ElementDropdown
           data={minutes}
           value={localMinute as any}
-          onChange={v => setTimePart('m', Number(v))}
+          onChange={v => setTimePart('m', toPart(v))}
           placeholder={t('minute') || 'Minute'}
           error={!!error}
           dropdownContainerStyle={{backgroundColor: C.inputBg, borderColor: C.inputBorder} as any}

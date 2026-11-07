@@ -1,4 +1,4 @@
-import React, {useMemo, useRef} from 'react';
+import React, {createContext, useContext, useMemo, useRef} from 'react';
 import {StyleSheet, View} from 'react-native';
 import {RichEditor, RichToolbar, actions} from 'react-native-pell-rich-editor';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -16,7 +16,7 @@ type Props = {
 };
 
 // Formatting the web FAQ editor also produces; no image upload or raw HTML.
-const TOOLBAR_ACTIONS = [
+export const TOOLBAR_ACTIONS = [
   actions.setBold,
   actions.setItalic,
   actions.setUnderline,
@@ -26,6 +26,16 @@ const TOOLBAR_ACTIONS = [
   actions.undo,
   actions.redo,
 ];
+
+/**
+ * While the answer is being typed, the form shows a second toolbar right above
+ * the keyboard: on a long answer the editor's own toolbar had scrolled off
+ * screen, so formatting meant closing the keyboard and scrolling back up.
+ */
+export const DockedToolbarContext = createContext<{
+  setDockedEditor: (editor: React.RefObject<RichEditor | null> | null) => void;
+  dockedEditor: React.RefObject<RichEditor | null> | null;
+} | null>(null);
 
 /**
  * Rich text field for the FAQ answer: edits the HTML in place, so lists,
@@ -41,6 +51,8 @@ export const FAQRichTextEditor: React.FC<Props> = ({
   const C = useThemedColors();
   const T = useUiTokens();
   const editorRef = useRef<RichEditor>(null);
+  const dock = useContext(DockedToolbarContext);
+  const docked = dock?.dockedEditor === editorRef;
   // Only the first value matters: RichEditor owns the content after mount.
   const initialContent = useRef(toEditorHtml(initialHtml)).current;
 
@@ -65,10 +77,17 @@ export const FAQRichTextEditor: React.FC<Props> = ({
       ]}>
       <RichToolbar
         editor={editorRef}
+        // While the copy above the keyboard shows, this one is hidden (its
+        // space kept, so the text does not jump): two toolbars looked doubled.
+        pointerEvents={docked ? 'none' : 'auto'}
         actions={TOOLBAR_ACTIONS}
         iconTint={C.textSecondary}
         selectedIconTint={C.textPrimary}
-        style={[styles.toolbar, {backgroundColor: C.inputBg, borderBottomColor: C.inputBorder}]}
+        style={[
+          styles.toolbar,
+          {backgroundColor: C.inputBg, borderBottomColor: C.inputBorder},
+          docked && styles.hidden,
+        ]}
       />
       <RichEditor
         ref={editorRef}
@@ -79,6 +98,8 @@ export const FAQRichTextEditor: React.FC<Props> = ({
         initialHeight={hs(180)}
         useContainer
         pasteAsPlainText
+        onFocus={() => dock?.setDockedEditor(editorRef)}
+        onBlur={() => dock?.setDockedEditor(null)}
       />
     </View>
   );
@@ -92,6 +113,9 @@ const styles = StyleSheet.create({
   },
   toolbar: {
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  hidden: {
+    opacity: 0,
   },
 });
 

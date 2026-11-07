@@ -17,7 +17,9 @@ export type DataKey =
   | 'countries'
   | 'eventTypes'
   | 'languages'
-  | 'languageRegions';
+  | 'languageRegions'
+  | 'faqs'
+  | 'worshipServices';
 
 export function markDataChanged(key: DataKey) {
   dataVersions.set(key, (dataVersions.get(key) ?? 0) + 1);

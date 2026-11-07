@@ -4,6 +4,14 @@ import {useNavigation, useRoute} from '@react-navigation/native';
 import {returnAfterEdit} from '../../../shared/utils/returnToList';
 import {updateFAQ, getFAQById} from '../services/faq.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {
+  getApiErrorMessage,
+  getApiValidationErrors,
+} from '../../../shared/utils/apiErrorHandler';
+import {buildFaqTags, faqFieldErrors, FAQField, tagNames} from '../utils/faq.utils';
+
 import {useSuperAdminGuard} from '../hooks/useSuperAdminGuard';
 import {useFaqLanguageOptions} from '../hooks/useFaqLanguageOptions';
 import {ScreenContainer} from '../../../shared/components/crud';
@@ -25,8 +33,16 @@ export const EditFAQScreen: React.FC = () => {
   const [tags, setTags] = useState<string[]>(['']);
   const [submitting, setSubmitting] = useState(false);
   const [invalid, setInvalid] = useState<FAQFormInvalid>({});
-  const clearInvalid = (field: keyof FAQFormInvalid) =>
+  // The API's messages per field (e.g. a rejected language).
+  const [serverErrors, setServerErrors] = useState<Partial<Record<FAQField, string>>>({});
+  const clearInvalid = (field: keyof FAQFormInvalid) => {
     setInvalid(current => (current[field] ? {...current, [field]: false} : current));
+    setServerErrors(current => (current[field] ? {...current, [field]: undefined} : current));
+  };
+  // Counts Saves that found errors, so the form scrolls to the first one.
+  const [saveAttempt, setSaveAttempt] = useState(0);
+  // One save at a time: a fast double tap created / saved the FAQ twice.
+  const submitOnce = useSubmitOnce();
   const [loading, setLoading] = useState(true);
   const {t} = useTranslation();
 
@@ -57,8 +73,9 @@ export const EditFAQScreen: React.FC = () => {
         // Edited as HTML in the rich editor; untouched answers are saved back as-is.
         setAnswer(faq.answer || '');
         setLanguageId(faq.language_id || null);
-        if (faq.tags && faq.tags.length > 0) {
-          setTags(faq.tags.map(tag => tag.tag_name || ''));
+        if (tagNames(faq.tags).length > 0) {
+          // Old FAQs carry an empty tag: not shown as an empty field.
+          setTags(tagNames(faq.tags));
         } else {
           setTags(['']);
         }
@@ -100,15 +117,34 @@ export const EditFAQScreen: React.FC = () => {
     setTags(newTags);
   };
 
-  const onSave = async () => {
-    if (!faqId || loadError) return;
+  // Field errors from the API (POST says question_header, PATCH
+  // QuestionHeader) go under the field; anything else as an alert with the
+  // API's message (was a fixed English text).
+  const handleSaveError = (e: unknown) => {
+    const fields = faqFieldErrors(getApiValidationErrors(e));
+    if (Object.keys(fields).length) {
+      setServerErrors(fields);
+      setInvalid(current => ({
+        ...current,
+        ...Object.fromEntries(Object.keys(fields).map(k => [k, true])),
+      }));
+      setSaveAttempt(n => n + 1);
+      return;
+    }
+    Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
+  };
+
+  const onSave = submitOnce(async () => {
+    if (!faqId || loadError) {return;}
     const nextInvalid = validateFAQForm({questionHeader, answer, languageId});
     setInvalid(nextInvalid);
     if (hasFAQFormErrors(nextInvalid) || !languageId) {
+      setSaveAttempt(n => n + 1);
       return;
     }
 
-    const validTags = tags.filter(tag => tag.trim()).map(tag => ({tag_name: tag.trim()}));
+    // Trimmed, without empty or repeated tags ("qa" and "QA" were both saved).
+    const validTags = buildFaqTags(tags);
 
     try {
       setSubmitting(true);
@@ -118,14 +154,15 @@ export const EditFAQScreen: React.FC = () => {
         language_id: languageId,
         tags: validTags,
       });
+      markDataChanged('faqs');
       Alert.alert(t('success') || 'Success', `${t('edit') || 'Edit'} ${t('faq') || 'FAQ'} ${t('success') || 'success'}`);
       returnAfterEdit(navigation);
     } catch (e: any) {
-      Alert.alert(t('error') || 'Error', e?.message || 'Failed to update FAQ');
+      handleSaveError(e);
     } finally {
       setSubmitting(false);
     }
-  };
+  });
 
   const title = `${t('edit') || 'Edit'} ${t('faq') || 'FAQ'}`;
 
@@ -169,6 +206,8 @@ export const EditFAQScreen: React.FC = () => {
           onSave={onSave}
           onCancel={() => navigation.goBack()}
           invalid={invalid}
+          serverErrors={serverErrors}
+          saveAttempt={saveAttempt}
           onClearInvalid={clearInvalid}
         />
       </FAQFormScroll>

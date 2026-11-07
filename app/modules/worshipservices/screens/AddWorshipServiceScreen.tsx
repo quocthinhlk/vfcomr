@@ -1,12 +1,21 @@
-import React, {useState, useEffect} from 'react';
+import React, {useEffect, useRef, useState} from 'react';
 import {Alert} from 'react-native';
 import {useNavigation} from '@react-navigation/native';
 import {createWorshipService} from '../services/worshipService.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
 import {ScreenContainer} from '../../../shared/components/crud';
 import {WorshipServiceForm} from '../components/WorshipServiceForm';
+import {
+  buildWorshipServicePayload,
+  dayOptions,
+  validateWorshipService,
+  WorshipServiceErrors,
+} from '../utils/worshipService.utils';
 
 export const AddWorshipServiceScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -14,46 +23,45 @@ export const AddWorshipServiceScreen: React.FC = () => {
   const [dayName, setDayName] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<WorshipServiceErrors>({});
   const [churchId, setChurchId] = useState<number | null>(null);
   const [churchName, setChurchName] = useState<string>('');
   const {t} = useTranslation();
+  // A fast double tap on Save created the service twice.
+  const submitOnce = useSubmitOnce();
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
 
-  const clearInvalid = (key: string) =>
-    setInvalid(prev => ({...prev, [key]: false}));
-
-  const dayNameOptions = [
-    {label: 'Sunday', value: 'Sunday'},
-    {label: 'Monday', value: 'Monday'},
-    {label: 'Tuesday', value: 'Tuesday'},
-    {label: 'Wednesday', value: 'Wednesday'},
-    {label: 'Thursday', value: 'Thursday'},
-    {label: 'Friday', value: 'Friday'},
-    {label: 'Saturday', value: 'Saturday'},
-  ];
+  const clearError = (key: keyof WorshipServiceErrors) =>
+    setErrors(prev => (prev[key] ? {...prev, [key]: undefined} : prev));
 
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        if (!savedChurchId) {
-          Alert.alert(t('error') || 'Error', 'Church ID not found');
+        const id = savedChurchId ? parseInt(savedChurchId, 10) : NaN;
+        if (Number.isNaN(id)) {
+          Alert.alert(
+            t('error') || 'Error',
+            savedChurchId ? t('invalidChurchId') : t('churchIdNotFound'),
+          );
           navigation.goBack();
           return;
         }
-        const id = parseInt(savedChurchId, 10);
-        if (isNaN(id)) {
-          Alert.alert(t('error') || 'Error', 'Invalid Church ID');
-          navigation.goBack();
+        if (!mounted) {
           return;
         }
         setChurchId(id);
-        // Fetch church name
         const res = await api.get(`churches/${id}`);
         const churchData = res?.data?.data;
         if (churchData?.name && mounted) {
-          setChurchName(churchData.name);
+          setChurchName(String(churchData.name).trim());
         }
       } catch (e) {
         console.error('Error fetching church info:', e);
@@ -62,46 +70,52 @@ export const AddWorshipServiceScreen: React.FC = () => {
     return () => {
       mounted = false;
     };
-  }, [navigation, t]);
+    // Once on open (t changing with the language must not run it again).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  const onSave = async () => {
+  const onSave = submitOnce(async () => {
     if (!churchId) {
       Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
       return;
     }
-
-    const newInvalid: Record<string, boolean> = {};
-    newInvalid.name = !name.trim();
-    newInvalid.dayName = !dayName;
-    newInvalid.time = !time;
-
-    setInvalid(newInvalid);
-
-    if (newInvalid.name || newInvalid.dayName || newInvalid.time) {
+    const values = {name, dayName, time};
+    const local = validateWorshipService(values, t);
+    setErrors(local);
+    if (Object.keys(local).length) {
       return;
     }
 
     try {
       setSubmitting(true);
-      await createWorshipService(churchId, {
-        name: name.trim(),
-        day_name: dayName as string,
-        time: time as string,
-      });
+      await createWorshipService(churchId, buildWorshipServicePayload(values));
+      markDataChanged('worshipServices');
       Alert.alert(
         t('success') || 'Success',
         `${t('add') || 'Add'} ${t('worshipService') || 'Worship Service'} ${t('success') || 'success'}`,
       );
-      navigation.navigate('WorshipServices', {reload: true});
-    } catch (e: any) {
+      // React Navigation 7's navigate pushed a second list on top, so Back
+      // reopened the filled form.
+      const params = {reload: true};
+      const routes: {name: string}[] = navigation.getState?.()?.routes ?? [];
+      if (routes.some(r => r.name === 'WorshipServices') && navigation.popTo) {
+        navigation.popTo('WorshipServices', params);
+      } else if (navigation.replace) {
+        navigation.replace('WorshipServices', params);
+      } else {
+        navigation.navigate('WorshipServices', params);
+      }
+    } catch (e) {
       Alert.alert(
         t('error') || 'Error',
-        e?.message || t('failedToCreateWorshipService') || 'Failed to create Worship Service',
+        getApiErrorMessage(e, t) || t('failedToCreateWorshipService'),
       );
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   const title = `${t('create') || 'Create'} ${t('worshipService') || 'Worship Service'}`;
 
@@ -116,20 +130,22 @@ export const AddWorshipServiceScreen: React.FC = () => {
         name={name}
         onNameChange={text => {
           setName(text);
-          clearInvalid('name');
+          clearError('name');
         }}
         dayName={dayName}
         onDayNameChange={v => {
           setDayName(v);
-          clearInvalid('dayName');
+          clearError('dayName');
         }}
-        dayNameOptions={dayNameOptions}
+        dayNameOptions={dayOptions(t, dayName)}
         time={time}
         onTimeChange={val => {
           setTime(val);
-          clearInvalid('time');
+          if (val) {
+            clearError('time');
+          }
         }}
-        invalid={invalid}
+        errors={errors}
         submitting={submitting}
         onSave={onSave}
         onCancel={() => navigation.goBack()}

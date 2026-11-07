@@ -8,6 +8,9 @@ import {
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useSuperAdminGuard} from '../hooks/useSuperAdminGuard';
 import {returnToList} from '../../../shared/utils/returnToList';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {
   DeleteConfirmView,
   ScreenContainer,
@@ -61,19 +64,27 @@ export const DeleteFAQScreen: React.FC = () => {
     };
   }, [isAdmin, load]);
 
-  const onConfirm = async () => {
-    if (!faqId) return;
+  // One delete at a time (a double tap sent it twice).
+  const submitOnce = useSubmitOnce();
+  const onConfirm = submitOnce(async () => {
+    if (!faqId) {
+      return;
+    }
     try {
       setSubmitting(true);
       await deleteFAQ(faqId);
+      markDataChanged('faqs');
       Alert.alert(t('success') || 'Success', `${t('delete') || 'Delete'} ${t('faq') || 'FAQ'} ${t('success') || 'success'}`);
       returnToList(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete FAQ');
+      // The API's reason instead of a fixed English text.
+      Alert.alert(t('error') || 'Error', getApiErrorMessage(e, t));
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   const title = `${t('delete') || 'Delete'} ${t('faq') || 'FAQ'}`;
 

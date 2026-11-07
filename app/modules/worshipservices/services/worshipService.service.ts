@@ -1,4 +1,5 @@
 import api from '../../../config/api';
+import {logApiError} from '../../../shared/utils/apiErrorHandler';
 
 export interface WorshipServiceItem {
   id: number;
@@ -47,10 +48,10 @@ export async function createWorshipService(churchId: number, payload: CreateWors
   try {
     const response = await api.post(`/worship-services/churches/${churchId}`, payload);
     return response.data;
-  } catch (err: any) {
-    const message = err?.response?.data?.message || err?.message || 'Create Worship Service failed';
-    console.error('Create Worship Service error:', message);
-    throw new Error(message);
+  } catch (err) {
+    // Rethrown as is: getApiErrorMessage needs the response (it was a bare Error).
+    logApiError(err, 'Create Worship Service');
+    throw err;
   }
 }
 
@@ -58,10 +59,10 @@ export async function updateWorshipService(id: number, payload: UpdateWorshipSer
   try {
     const response = await api.patch(`/worship-services/${id}`, payload);
     return response.data;
-  } catch (err: any) {
-    const message = err?.response?.data?.message || err?.message || 'Update Worship Service failed';
-    console.error('Update Worship Service error:', message);
-    throw new Error(message);
+  } catch (err) {
+    // Rethrown as is: getApiErrorMessage needs the response (it was a bare Error).
+    logApiError(err, 'Update Worship Service');
+    throw err;
   }
 }
 
@@ -69,9 +70,9 @@ export async function deleteWorshipService(id: number) {
   try {
     const response = await api.delete(`/worship-services/${id}`);
     return response.data;
-  } catch (err: any) {
-    const message = err?.response?.data?.message || err?.message || 'Delete Worship Service failed';
-    console.error('Delete Worship Service error:', message);
-    throw new Error(message);
+  } catch (err) {
+    // Rethrown as is: getApiErrorMessage needs the response (it was a bare Error).
+    logApiError(err, 'Delete Worship Service');
+    throw err;
   }
 }

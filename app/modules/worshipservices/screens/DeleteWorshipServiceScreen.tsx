@@ -7,6 +7,9 @@ import {
 } from '../services/worshipService.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {returnToList} from '../../../shared/utils/returnToList';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {
   DeleteConfirmView,
   ScreenContainer,
@@ -22,6 +25,7 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
   const [loadError, setLoadError] = useState<unknown>(null);
   const mountedRef = useRef(true);
   const {t} = useTranslation();
+  const submitOnce = useSubmitOnce();
 
   // Don't ask to confirm deleting a record we couldn't load (e.g. offline).
   const load = useCallback(async () => {
@@ -33,7 +37,7 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
     try {
       const res = await getWorshipServiceById(worshipServiceId);
       if (mountedRef.current) {
-        setName(res?.data?.name || 'this worship service');
+        setName((res?.data?.name ?? '').trim() || `#${worshipServiceId}`);
       }
     } catch (e) {
       if (mountedRef.current) {
@@ -54,19 +58,27 @@ export const DeleteWorshipServiceScreen: React.FC = () => {
     };
   }, [load]);
 
-  const onConfirm = async () => {
-    if (!worshipServiceId) return;
+  const onConfirm = submitOnce(async () => {
+    if (!worshipServiceId) {
+      return;
+    }
     try {
       setSubmitting(true);
       await deleteWorshipService(worshipServiceId);
+      markDataChanged('worshipServices');
       Alert.alert(t('success') || 'Success', `${t('delete')} ${t('worshipService') || 'Worship Service'} ${t('success')}`);
       returnToList(navigation);
     } catch (e) {
-      Alert.alert(t('error') || 'Error', 'Failed to delete worship service');
+      Alert.alert(
+        t('error') || 'Error',
+        getApiErrorMessage(e, t) || t('failedToDeleteWorshipService'),
+      );
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   return (
     <ScreenContainer

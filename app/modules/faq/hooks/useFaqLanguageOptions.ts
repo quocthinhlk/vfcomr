@@ -1,12 +1,16 @@
 import {useCallback, useEffect, useRef, useState} from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
 
 type LanguageOption = {id: number; name: string};
 
+/** The languages API answers at most 100 per page. */
+const PAGE_SIZE = 100;
+
 /**
  * Language is a required FAQ field: a failed load (e.g. offline) is returned as
  * `languagesError` so the form isn't shown with an empty Language dropdown.
+ * (It used to return an empty list without error when no token was saved in
+ * AsyncStorage, e.g. with the dev test token: the FAQ could not be saved.)
  */
 export function useFaqLanguageOptions() {
   const [languageOptions, setLanguageOptions] = useState<{label: string; value: number}[]>([]);
@@ -18,23 +22,22 @@ export function useFaqLanguageOptions() {
     setLanguagesLoading(true);
     setLanguagesError(null);
     try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) {
-        return;
+      const items: LanguageOption[] = [];
+      for (let page = 1; page <= 20; page++) {
+        const res = await api.get('/languages', {params: {page, limit: PAGE_SIZE}});
+        const data = res?.data?.data;
+        items.push(...(data?.items ?? []));
+        if (!data?.has_next) {
+          break;
+        }
       }
-      const res = await api.get('/languages', {
-        params: {page: 1, limit: 100, sort_by: 'name', sort_desc: false},
-        headers: {Authorization: `Bearer ${token}`},
-      });
       if (!mountedRef.current) {
         return;
       }
-      const langItems = res?.data?.data?.items || [];
       setLanguageOptions(
-        langItems.map((lang: LanguageOption) => ({
-          label: lang.name,
-          value: lang.id,
-        })),
+        items
+          .map(lang => ({label: (lang.name ?? '').trim() || `#${lang.id}`, value: lang.id}))
+          .sort((a, b) => a.label.localeCompare(b.label)),
       );
     } catch (e) {
       if (mountedRef.current) {

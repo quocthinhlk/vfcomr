@@ -1,8 +1,9 @@
-import React, {useCallback, useEffect, useRef, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {
   ActivityIndicator,
   FlatList,
   Modal,
+  Platform,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -27,6 +28,13 @@ interface Props {
   onDone: (selected: Record<number, string>) => void;
 }
 
+const PAGE_SIZE = 50;
+
+const mergeById = (current: ChurchListItem[], more: ChurchListItem[]) => {
+  const seen = new Set(current.map(item => item.id));
+  return [...current, ...more.filter(item => !seen.has(item.id))];
+};
+
 export const ChurchMultiSelectModal: React.FC<Props> = ({
   visible,
   selected,
@@ -36,58 +44,107 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
   const C = useThemedColors();
   const {t} = useTranslation();
   const insets = useSafeAreaInsets();
-  const topInset = Math.max(insets.top, initialWindowMetrics?.insets.top ?? 0);
-  const bottomInset = Math.max(
-    insets.bottom,
-    initialWindowMetrics?.insets.bottom ?? 0,
-  );
+  // iOS: the full-screen modal starts under the status bar / home indicator.
+  // Android: the (non-translucent) modal window already sits between the
+  // status and navigation bars, so the same padding left blank bands.
+  const topInset =
+    Platform.OS === 'ios' ? Math.max(insets.top, initialWindowMetrics?.insets.top ?? 0) : 0;
+  const bottomInset =
+    Platform.OS === 'ios'
+      ? Math.max(insets.bottom, initialWindowMetrics?.insets.bottom ?? 0)
+      : 0;
   const [query, setQuery] = useState('');
   const [items, setItems] = useState<ChurchListItem[]>([]);
   const [draft, setDraft] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasNext, setHasNext] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const requestRef = useRef(0);
 
+  // Copy the selection only when the picker opens: a parent re-render passed
+  // a new `selected` object and wiped the ticks made since.
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
   useEffect(() => {
     if (visible) {
-      setDraft(selected);
+      setDraft(selectedRef.current);
       setQuery('');
     }
-  }, [selected, visible]);
+  }, [visible]);
 
-  const loadChurches = useCallback(async () => {
-    if (!visible) {
-      return;
-    }
-    const requestId = ++requestRef.current;
-    setLoading(true);
-    try {
-      const data = await getChurchesList({
-        page: 1,
-        limit: 50,
-        sort_by: 'name',
-        sort_desc: false,
-        search: query.trim() || undefined,
-        disabled: false,
-      });
-      if (requestId !== requestRef.current) {
+  /**
+   * Churches in pages of 50 (2,700+ on staging). Only the first 50 were ever
+   * loaded, so a church further down could only be found by searching.
+   */
+  const fetchPage = useCallback(
+    async (nextPage: number) => {
+      if (!visible) {
         return;
       }
-      setItems(data?.items ?? []);
-      setLoadError(null);
-    } catch (error) {
-      console.error('Error loading churches for watch list:', error);
-      if (requestId !== requestRef.current) {
-        return;
+      const requestId = ++requestRef.current;
+      if (nextPage === 1) {
+        setLoading(true);
+      } else {
+        setLoadingMore(true);
       }
-      setItems([]);
-      setLoadError(error);
-    } finally {
-      if (requestId === requestRef.current) {
-        setLoading(false);
+      try {
+        const data = await getChurchesList({
+          page: nextPage,
+          limit: PAGE_SIZE,
+          sort_by: 'name',
+          sort_desc: false,
+          search: query.trim() || undefined,
+          disabled: false,
+        });
+        if (requestId !== requestRef.current) {
+          return;
+        }
+        const rows = data?.items ?? [];
+        setItems(current => (nextPage === 1 ? rows : mergeById(current, rows)));
+        setHasNext(Boolean(data?.has_next));
+        setPage(nextPage);
+        setLoadError(null);
+      } catch (error) {
+        console.error('Error loading churches for watch list:', error);
+        if (requestId !== requestRef.current) {
+          return;
+        }
+        if (nextPage === 1) {
+          setItems([]);
+          setLoadError(error);
+        }
+      } finally {
+        if (requestId === requestRef.current) {
+          setLoading(false);
+          setLoadingMore(false);
+        }
       }
+    },
+    [query, visible],
+  );
+
+  const loadChurches = useCallback(() => fetchPage(1), [fetchPage]);
+
+  const loadMore = () => {
+    if (hasNext && !loading && !loadingMore) {
+      fetchPage(page + 1);
     }
-  }, [query, visible]);
+  };
+
+  // Ticked churches first while not searching, so the ones already in the
+  // watch list can be seen and unticked (they were often not in the first page).
+  const rows = useMemo(() => {
+    if (query.trim()) {
+      return items;
+    }
+    const pinned = Object.entries(draft).map(([id, name]) => ({id: Number(id), name}));
+    const pinnedIds = new Set(pinned.map(p => p.id));
+    return [...pinned, ...items.filter(item => !pinnedIds.has(item.id))] as ChurchListItem[];
+    // Pinned on open / search only, not on every tick (rows would jump).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [items, query, visible]);
 
   useEffect(() => {
     loadChurches();
@@ -99,7 +156,7 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
       if (next[church.id]) {
         delete next[church.id];
       } else {
-        next[church.id] = church.name;
+        next[church.id] = (church.name ?? '').trim();
       }
       return next;
     });
@@ -127,7 +184,8 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
           </Text>
           <TouchableOpacity
             onPress={() => onDone(draft)}
-            style={styles.headerButton}>
+            accessibilityRole="button"
+            style={[styles.headerButton, styles.headerButtonEnd]}>
             <Text style={[styles.headerButtonText, {color: COLORS.mainColor}]}>
               {t('done')}
             </Text>
@@ -144,15 +202,20 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
             {t('selectedChurches')}: {Object.keys(draft).length}
           </Text>
           <FlatList
-            data={items}
+            data={rows}
+            onEndReached={loadMore}
+            onEndReachedThreshold={0.4}
+            ListFooterComponent={
+              loadingMore ? <ActivityIndicator color={COLORS.mainColor} style={styles.more} /> : null
+            }
             keyExtractor={item => String(item.id)}
             keyboardShouldPersistTaps="handled"
             onRefresh={loadChurches}
-            refreshing={loading}
+            refreshing={loading && rows.length > 0}
             contentContainerStyle={styles.listContent}
             ListEmptyComponent={
               loading ? (
-                <ActivityIndicator color={COLORS.mainColor} />
+                <ActivityIndicator color={COLORS.mainColor} style={styles.more} />
               ) : loadError ? (
                 <ApiErrorState error={loadError} onRetry={loadChurches} />
               ) : (
@@ -184,7 +247,7 @@ export const ChurchMultiSelectModal: React.FC<Props> = ({
                     {checked && <Text style={styles.checkmark}>✓</Text>}
                   </View>
                   <Text style={[styles.churchName, {color: C.textPrimary}]}>
-                    {item.name}
+                    {(item.name ?? '').trim() || `#${item.id}`}
                   </Text>
                 </TouchableOpacity>
               );
@@ -210,6 +273,8 @@ const styles = StyleSheet.create({
     minWidth: ws(64),
     paddingVertical: ms(8),
   },
+  // "Done" against the right edge, mirroring "Cancel" on the left.
+  headerButtonEnd: {alignItems: 'flex-end'},
   headerButtonText: {fontSize: fs(13), fontWeight: '600'},
   title: {fontSize: fs(14), fontWeight: '700'},
   content: {flex: 1, padding: ms(16)},
@@ -236,6 +301,7 @@ const styles = StyleSheet.create({
   churchName: {flex: 1, fontSize: fs(12)},
   empty: {textAlign: 'center', marginTop: ms(30)},
   listContent: {flexGrow: 1},
+  more: {marginVertical: ms(12)},
 });
 
 export default ChurchMultiSelectModal;

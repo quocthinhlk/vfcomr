@@ -1,4 +1,4 @@
-import React from 'react';
+import React, {useRef} from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -11,10 +11,15 @@ import {Text} from '@ui-kitten/components';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, hs, ms} from '../../../shared/utils/scale';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import TimePicker from '../../../shared/components/TimePicker';
 import {FormActions, FormField} from '../../../shared/components/crud';
+import {
+  WORSHIP_SERVICE_NAME_MAX,
+  WorshipServiceErrors,
+} from '../utils/worshipService.utils';
 
 type Props = {
   /** e.g. "Create Worship Service for {church}"; hidden when empty. */
@@ -26,7 +31,7 @@ type Props = {
   dayNameOptions: {label: string; value: string}[];
   time: string | null;
   onTimeChange: (v: string | null) => void;
-  invalid: Record<string, boolean>;
+  errors: WorshipServiceErrors;
   submitting: boolean;
   onSave: () => void;
   onCancel: () => void;
@@ -42,22 +47,25 @@ export const WorshipServiceForm: React.FC<Props> = ({
   dayNameOptions,
   time,
   onTimeChange,
-  invalid,
+  errors,
   submitting,
   onSave,
   onCancel,
 }) => {
   const {t} = useTranslation();
   const C = useThemedColors();
-  const requiredMsg = t('required');
+  const scrollRef = useRef<ScrollView>(null);
+  useKeepFocusedInputVisible(scrollRef);
   return (
     <KeyboardAvoidingView
       behavior="padding"
+      // Android: the extra header height left a blank band above the keyboard.
       keyboardVerticalOffset={
-        Platform.OS === 'ios' ? hs(64) : (StatusBar.currentHeight || 0) + hs(50)
+        Platform.OS === 'ios' ? hs(64) : StatusBar.currentHeight || 0
       }
       style={styles.flex}>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled">
         {!!subtitle && (
@@ -69,11 +77,13 @@ export const WorshipServiceForm: React.FC<Props> = ({
           <FormField
             label={t('name') || 'Name'}
             required
-            error={invalid.name ? requiredMsg : undefined}>
+            error={errors.name}>
             <AppInput
               value={name}
               onChangeText={onNameChange}
-              error={!!invalid.name}
+              error={!!errors.name}
+              maxLength={WORSHIP_SERVICE_NAME_MAX}
+              returnKeyType="done"
               accessibilityLabel={`${t('name')}, ${t('required')}`}
             />
           </FormField>
@@ -81,16 +91,17 @@ export const WorshipServiceForm: React.FC<Props> = ({
           <FormField
             label={t('day') || 'Day'}
             required
-            error={invalid.dayName ? requiredMsg : undefined}>
+            error={errors.dayName}>
             <ElementDropdown
               data={dayNameOptions}
               value={dayName as any}
               onChange={v => onDayNameChange(v as string)}
-              error={!!invalid.dayName}
+              placeholder={t('selectDay') || 'Select Day'}
+              error={!!errors.dayName}
               containerStyle={
                 {
                   backgroundColor: C.inputBg,
-                  borderColor: invalid.dayName ? '#db2d2d' : C.inputBorder,
+                  borderColor: errors.dayName ? '#db2d2d' : C.inputBorder,
                 } as any
               }
             />
@@ -99,8 +110,8 @@ export const WorshipServiceForm: React.FC<Props> = ({
           <FormField
             label={t('time') || 'Time'}
             required
-            error={invalid.time ? requiredMsg : undefined}>
-            <TimePicker value={time} onChange={onTimeChange} error={!!invalid.time} />
+            error={errors.time}>
+            <TimePicker value={time} onChange={onTimeChange} error={!!errors.time} />
           </FormField>
 
           <FormActions onCancel={onCancel} onSave={onSave} submitting={submitting} />

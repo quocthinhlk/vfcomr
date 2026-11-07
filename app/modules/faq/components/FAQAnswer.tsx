@@ -4,7 +4,7 @@ import RenderHTML from 'react-native-render-html';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {fs, ms} from '../../../shared/utils/scale';
 import {COLORS} from '../../../shared/constants/colors';
-import {FAQ_ASSET_BASE_URL, isHtml, textToHtml} from '../utils/faqHtml';
+import {FAQ_ASSET_BASE_URL, encodeUrlSpaces, isHtml, textToHtml} from '../utils/faqHtml';
 
 type Props = {
   answer: string;
@@ -22,7 +22,7 @@ export const FAQAnswer: React.FC<Props> = ({answer, horizontalInset = ms(64)}) =
 
   const source = useMemo(
     () => ({
-      html: isHtml(answer) ? answer : textToHtml(answer),
+      html: encodeUrlSpaces(isHtml(answer) ? answer : textToHtml(answer)),
       baseUrl: FAQ_ASSET_BASE_URL,
     }),
     [answer],

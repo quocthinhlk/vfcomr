@@ -1,4 +1,7 @@
-import React from 'react';
+import React, {useMemo, useRef, useState} from 'react';
+import {Keyboard} from 'react-native';
+import {RichEditor, RichToolbar} from 'react-native-pell-rich-editor';
+import {useKeepFocusedInputVisible} from '../../../shared/hooks/useKeepFocusedInputVisible';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -15,9 +18,14 @@ import {COLORS} from '../../../shared/constants/colors';
 import {fs, hs, ms, rs, ws} from '../../../shared/utils/scale';
 import AppInput from '../../../shared/components/AppInput';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
-import {DeleteSvgIcon} from '../../../shared/components/icons';
+import {TrashIcon} from '../../../shared/components/icons/UiIcons';
+import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {FormActions, FormField} from '../../../shared/components/crud';
-import {FAQRichTextEditor} from './FAQRichTextEditor';
+import {
+  DockedToolbarContext,
+  FAQRichTextEditor,
+  TOOLBAR_ACTIONS,
+} from './FAQRichTextEditor';
 import {isAnswerEmpty} from '../utils/faqHtml';
 
 /**
@@ -26,20 +34,66 @@ import {isAnswerEmpty} from '../utils/faqHtml';
  */
 export const FAQFormScroll: React.FC<{children: React.ReactNode}> = ({
   children,
-}) => (
-  <KeyboardAvoidingView
-    behavior="padding"
-    keyboardVerticalOffset={
-      Platform.OS === 'ios' ? hs(64) : (StatusBar.currentHeight || 0) + hs(50)
-    }
-    style={styles.flex}>
+}) => {
+  const C = useThemedColors();
+  const [docked, setDocked] = useState<React.RefObject<RichEditor | null> | null>(null);
+  const dock = useMemo(() => ({setDockedEditor: setDocked, dockedEditor: docked}), [docked]);
+  // Hide the docked toolbar with the keyboard too (Android Back closes the
+  // keyboard without blurring the editor).
+  React.useEffect(() => {
+    const hide = Keyboard.addListener('keyboardDidHide', () => setDocked(null));
+    return () => hide.remove();
+  }, []);
+  return (
+    <DockedToolbarContext.Provider value={dock}>
+      <KeyboardAvoidingView
+        behavior="padding"
+        // Android: the keyboard's screenY counts from the top of the screen
+        // but the layout from below the status bar, so the padding fell short
+        // by the status bar and the docked toolbar sat under the keyboard.
+        // (The old status bar + 50 left a blank band.)
+        keyboardVerticalOffset={
+          Platform.OS === 'ios' ? hs(64) : StatusBar.currentHeight ?? 0
+        }
+        style={styles.flex}>
+        <FAQFormScrollView>{children}</FAQFormScrollView>
+        {docked ? (
+          <RichToolbar
+            editor={docked}
+            actions={TOOLBAR_ACTIONS}
+            iconTint={C.textSecondary}
+            selectedIconTint={C.textPrimary}
+            style={[styles.dockedToolbar, {backgroundColor: C.surface, borderTopColor: C.inputBorder}]}
+          />
+        ) : null}
+      </KeyboardAvoidingView>
+    </DockedToolbarContext.Provider>
+  );
+};
+
+/** Lets the form scroll to a field (the first invalid one on Save). */
+const FormScrollContext = React.createContext<((y: number) => void) | null>(null);
+
+const FAQFormScrollView: React.FC<{children: React.ReactNode}> = ({children}) => {
+  const scrollRef = useRef<ScrollView>(null);
+  // Android 15+ (edge-to-edge): keep the focused tag / question above the keyboard.
+  useKeepFocusedInputVisible(scrollRef);
+  const scrollTo = useMemo(
+    () => (y: number) => scrollRef.current?.scrollTo({y: Math.max(0, y - ms(12)), animated: true}),
+    [],
+  );
+  return (
+    <FormScrollContext.Provider value={scrollTo}>
     <ScrollView
+      ref={scrollRef}
       contentContainerStyle={styles.scrollContent}
-      keyboardShouldPersistTaps="handled">
+      keyboardShouldPersistTaps="handled"
+      automaticallyAdjustKeyboardInsets>
       {children}
     </ScrollView>
-  </KeyboardAvoidingView>
-);
+    </FormScrollContext.Provider>
+  );
+};
 
 /** Required fields left empty on Save (shown in red under each field). */
 export type FAQFormInvalid = {
@@ -79,6 +133,10 @@ type Props = {
   onSave: () => void;
   onCancel: () => void;
   invalid?: FAQFormInvalid;
+  /** Bumped by the screen on each Save that found errors: scroll to the first. */
+  saveAttempt?: number;
+  /** The API's own message for a field (shown instead of "Required"). */
+  serverErrors?: Partial<Record<keyof FAQFormInvalid, string>>;
   /** Called when the user edits a field, so its error can be cleared. */
   onClearInvalid?: (field: keyof FAQFormInvalid) => void;
 };
@@ -99,14 +157,36 @@ export const FAQForm: React.FC<Props> = ({
   onSave,
   onCancel,
   invalid = {},
+  serverErrors = {},
+  saveAttempt = 0,
   onClearInvalid,
 }) => {
   const {t} = useTranslation();
   const C = useThemedColors();
+  const T = useUiTokens();
+  // Save with a required field empty: scroll to the first one (the question
+  // is at the top, off screen when Save is pressed).
+  const scrollTo = React.useContext(FormScrollContext);
+  const fieldY = useRef<Partial<Record<keyof FAQFormInvalid, number>>>({});
+  const trackY = (field: keyof FAQFormInvalid) => (e: any) => {
+    fieldY.current[field] = e.nativeEvent.layout.y;
+  };
+  const firstInvalid = (['questionHeader', 'answer', 'languageId'] as const).find(
+    f => invalid[f] || serverErrors[f],
+  );
+  // Only after a Save (not while the user fixes a field).
+  React.useEffect(() => {
+    if (saveAttempt && firstInvalid && scrollTo) {
+      scrollTo(fieldY.current[firstInvalid] ?? 0);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [saveAttempt]);
+
   const requiredError = (field: keyof FAQFormInvalid) =>
-    invalid[field] ? t('required') : undefined;
+    serverErrors[field] || (invalid[field] ? t('required') : undefined);
   return (
     <View>
+      <View onLayout={trackY('questionHeader')} />
       <FormField
         label={t('question') || 'Question'}
         required
@@ -119,10 +199,17 @@ export const FAQForm: React.FC<Props> = ({
           }}
           placeholder={t('question') || 'Question'}
           error={!!invalid.questionHeader}
+          multiline
+          // One-line text on the API side: Enter is not a new line.
+          blurOnSubmit
+          returnKeyType="done"
+          maxLength={500}
+          style={styles.questionInput}
           accessibilityLabel={`${t('question')}, ${t('required')}`}
         />
       </FormField>
 
+      <View onLayout={trackY('answer')} />
       <FormField
         label={t('answer') || 'Answer'}
         required
@@ -141,6 +228,7 @@ export const FAQForm: React.FC<Props> = ({
         />
       </FormField>
 
+      <View onLayout={trackY('languageId')} />
       <FormField
         label={t('language') || 'Language'}
         required
@@ -181,8 +269,11 @@ export const FAQForm: React.FC<Props> = ({
                 onPress={() => onRemoveTag(index)}
                 accessibilityRole="button"
                 accessibilityLabel={`${t('delete')} ${t('tag')} ${index + 1}`}
-                style={[styles.removeTagButton, {backgroundColor: C.border}]}>
-                <DeleteSvgIcon width={fs(16)} height={fs(16)} />
+                hitSlop={{top: 6, bottom: 6, left: 6, right: 6}}
+                // Same outline trash as the app's other Delete actions (was a
+                // filled white icon on a grey tile).
+                style={[styles.removeTagButton, {backgroundColor: T.dangerTint}]}>
+                <TrashIcon color={T.dangerText} size={ms(18)} />
               </TouchableOpacity>
             )}
           </View>
@@ -205,6 +296,18 @@ export const FAQForm: React.FC<Props> = ({
 const styles = StyleSheet.create({
   flex: {
     flex: 1,
+  },
+  dockedToolbar: {
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
+  questionInput: {
+    // AppInput is one line high: a long question showed only its end on
+    // Android ("…w do I enter visits…").
+    height: undefined,
+    minHeight: hs(44),
+    maxHeight: hs(120),
+    paddingTop: ms(10),
+    paddingBottom: ms(10),
   },
   scrollContent: {
     paddingTop: ms(12),

@@ -7,9 +7,19 @@ import {
   getWorshipServiceById,
 } from '../services/worshipService.service';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {markDataChanged} from '../../../shared/hooks/useReloadOnReturn';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import api from '../../../config/api';
 import {ScreenContainer} from '../../../shared/components/crud';
 import {WorshipServiceForm} from '../components/WorshipServiceForm';
+import {
+  buildWorshipServicePayload,
+  canonicalDay,
+  dayOptions,
+  validateWorshipService,
+  WorshipServiceErrors,
+} from '../utils/worshipService.utils';
 
 export const EditWorshipServiceScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -19,24 +29,22 @@ export const EditWorshipServiceScreen: React.FC = () => {
   const [dayName, setDayName] = useState<string | null>(null);
   const [time, setTime] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [invalid, setInvalid] = useState<Record<string, boolean>>({});
+  const [errors, setErrors] = useState<WorshipServiceErrors>({});
   const [loading, setLoading] = useState(true);
-  const [churchId, setChurchId] = useState<number | null>(null);
   const [churchName, setChurchName] = useState<string>('');
   const {t} = useTranslation();
+  // A second tap while saving sent the PATCH twice.
+  const submitOnce = useSubmitOnce();
+  const mountedRef = useRef(true);
+  useEffect(
+    () => () => {
+      mountedRef.current = false;
+    },
+    [],
+  );
 
-  const clearInvalid = (key: string) =>
-    setInvalid(prev => ({...prev, [key]: false}));
-
-  const dayNameOptions = [
-    {label: 'Sunday', value: 'Sunday'},
-    {label: 'Monday', value: 'Monday'},
-    {label: 'Tuesday', value: 'Tuesday'},
-    {label: 'Wednesday', value: 'Wednesday'},
-    {label: 'Thursday', value: 'Thursday'},
-    {label: 'Friday', value: 'Friday'},
-    {label: 'Saturday', value: 'Saturday'},
-  ];
+  const clearError = (key: keyof WorshipServiceErrors) =>
+    setErrors(prev => (prev[key] ? {...prev, [key]: undefined} : prev));
 
   const [loadError, setLoadError] = useState<unknown>(null);
   const requestRef = useRef(0);
@@ -48,6 +56,8 @@ export const EditWorshipServiceScreen: React.FC = () => {
       setLoading(false);
       return;
     }
+    // Retry showed the error until the answer came back.
+    setLoading(true);
     try {
       const res = await getWorshipServiceById(worshipServiceId);
       if (!isCurrent()) {
@@ -56,9 +66,9 @@ export const EditWorshipServiceScreen: React.FC = () => {
       const service = res?.data;
       if (service) {
         setName(service.name || '');
-        setDayName(service.day_name || null);
+        // "monday" was not matched by the picker and showed no day.
+        setDayName(canonicalDay(service.day_name) || null);
         setTime(service.time || null);
-        setChurchId(service.church_id);
         // Fetch church name
         if (service.church_id) {
           api
@@ -66,7 +76,7 @@ export const EditWorshipServiceScreen: React.FC = () => {
             .then(churchRes => {
               const churchData = churchRes?.data?.data;
               if (churchData?.name && isCurrent()) {
-                setChurchName(churchData.name);
+                setChurchName(String(churchData.name).trim());
               }
             })
             .catch(() => {});
@@ -93,41 +103,37 @@ export const EditWorshipServiceScreen: React.FC = () => {
     };
   }, [loadService]);
 
-  const onSave = async () => {
-    if (!worshipServiceId || loadError) return;
-
-    const newInvalid: Record<string, boolean> = {};
-    newInvalid.name = !name.trim();
-    newInvalid.dayName = !dayName;
-    newInvalid.time = !time;
-
-    setInvalid(newInvalid);
-
-    if (newInvalid.name || newInvalid.dayName || newInvalid.time) {
+  const onSave = submitOnce(async () => {
+    if (!worshipServiceId || loadError) {
+      return;
+    }
+    const values = {name, dayName, time};
+    const local = validateWorshipService(values, t);
+    setErrors(local);
+    if (Object.keys(local).length) {
       return;
     }
 
     try {
       setSubmitting(true);
-      await updateWorshipService(worshipServiceId, {
-        name: name.trim(),
-        day_name: dayName as string,
-        time: time as string,
-      });
+      await updateWorshipService(worshipServiceId, buildWorshipServicePayload(values));
+      markDataChanged('worshipServices');
       Alert.alert(
         t('success') || 'Success',
         `${t('edit') || 'Edit'} ${t('worshipService') || 'Worship Service'} ${t('success') || 'success'}`,
       );
       returnAfterEdit(navigation);
-    } catch (e: any) {
+    } catch (e) {
       Alert.alert(
         t('error') || 'Error',
-        e?.message || t('failedToUpdateWorshipService') || 'Failed to update Worship Service',
+        getApiErrorMessage(e, t) || t('failedToUpdateWorshipService'),
       );
     } finally {
-      setSubmitting(false);
+      if (mountedRef.current) {
+        setSubmitting(false);
+      }
     }
-  };
+  });
 
   const title = `${t('update') || 'Update'} ${t('worshipService') || 'Worship Service'}`;
 
@@ -146,20 +152,22 @@ export const EditWorshipServiceScreen: React.FC = () => {
         name={name}
         onNameChange={text => {
           setName(text);
-          clearInvalid('name');
+          clearError('name');
         }}
         dayName={dayName}
         onDayNameChange={v => {
           setDayName(v);
-          clearInvalid('dayName');
+          clearError('dayName');
         }}
-        dayNameOptions={dayNameOptions}
+        dayNameOptions={dayOptions(t, dayName)}
         time={time}
         onTimeChange={val => {
           setTime(val);
-          clearInvalid('time');
+          if (val) {
+            clearError('time');
+          }
         }}
-        invalid={invalid}
+        errors={errors}
         submitting={submitting}
         onSave={onSave}
         onCancel={() => navigation.goBack()}

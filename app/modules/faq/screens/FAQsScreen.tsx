@@ -1,8 +1,9 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {View, FlatList, RefreshControl, StyleSheet, Platform} from 'react-native';
 import {DEFAULT_PAGE_LIMIT} from '../../../config/api';
 import {listFAQs, FAQItem} from '../services/faq.service';
-import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
   ActionItem,
@@ -31,7 +32,7 @@ export const FAQsScreen: React.FC = () => {
   // paged on the device: switching pages needs no request.
   const [items, setItems] = useState<FAQItem[]>([]);
   const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
@@ -71,14 +72,19 @@ export const FAQsScreen: React.FC = () => {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // Only the newest request may write. Before, a search typed while a
+  // request was running was dropped (the list kept the old results).
+  const requestRef = useRef(0);
   const fetchData = useCallback(
     async (reset = false) => {
+      const requestId = ++requestRef.current;
+      const isCurrent = () => requestId === requestRef.current;
+      setLoading(true);
       try {
-        if (loading) {
+        const res = await listFAQs({question_header: debouncedQuery});
+        if (!isCurrent()) {
           return;
         }
-        setLoading(true);
-        const res = await listFAQs({question_header: debouncedQuery});
         const next = res?.data ?? [];
         setItems(next);
         // New search → first page; a reload keeps the page if it still exists.
@@ -86,21 +92,27 @@ export const FAQsScreen: React.FC = () => {
         setPage(current => (reset ? 1 : Math.min(current, lastPage)));
         setLoadError(null);
       } catch (e) {
-        console.error(e);
-        setLoadError(e);
+        if (isCurrent()) {
+          console.error(e);
+          setLoadError(e);
+        }
       } finally {
-        setLoading(false);
+        if (isCurrent()) {
+          setLoading(false);
+        }
       }
     },
-    [loading, debouncedQuery],
+    [debouncedQuery],
   );
 
   const reload = useCallback(() => fetchData(), [fetchData]);
 
   useEffect(() => {
     fetchData(true);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [debouncedQuery]);
+    return () => {
+      requestRef.current += 1;
+    };
+  }, [fetchData]);
 
   const goToPage = (targetPage: number) => {
     if (targetPage < 1 || targetPage > totalPages) {
@@ -109,15 +121,12 @@ export const FAQsScreen: React.FC = () => {
     setPage(targetPage);
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        navigation.setParams({reload: undefined});
-        fetchData();
-      }
-    }, [route.params?.reload, fetchData]),
-  );
+  // Back from add / edit / delete (also an edit made from the detail screen).
+  useReloadOnReturn(() => fetchData(), {
+    dataKey: 'faqs',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -140,7 +149,7 @@ export const FAQsScreen: React.FC = () => {
     const tags = (item.tags ?? []).filter(tag => tag.tag_name);
     return (
       <EntityListCard
-        title={item.question_header}
+        title={item.question_header?.trim() || `#${item.id}`}
         trailingText={`#${item.id}`}
         onPress={() => handleView(item)}
         // Edit / delete are super-admin only, so the sheet is too.
@@ -174,6 +183,8 @@ export const FAQsScreen: React.FC = () => {
       <SearchInput
         value={searchQuery}
         onChangeText={setSearchQuery}
+        // This screen waits for typing to pause itself.
+        debounce={false}
         placeholder={t('search') || 'Search by question...'}
       />
 

@@ -1,4 +1,4 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useRef, useState} from 'react';
 import {
   View,
   FlatList,
@@ -23,6 +23,12 @@ import {MSC_FAQ_ID} from '../../../shared/constants/faq';
 import {fs, ms, rs} from '../../../shared/utils/scale';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import api from '../../../config/api';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
+import {
+  dayLabel,
+  formatServiceTime,
+  sortWorshipServices,
+} from '../utils/worshipService.utils';
 import {
   CardMeta,
   EntityListCard,
@@ -39,95 +45,124 @@ export const WorshipServicesScreen: React.FC = () => {
   const C = useThemedColors();
   const {t} = useTranslation();
   const [items, setItems] = useState<WorshipServiceItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  // True until the first answer, so "No worship services" does not flash first.
+  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
   const [actionsVisible, setActionsVisible] = useState(false);
   const [selectedService, setSelectedService] = useState<WorshipServiceItem | null>(null);
-  const [churchId, setChurchId] = useState<number | null>(null);
+  const churchIdRef = useRef<number | null>(null);
   const [churchName, setChurchName] = useState<string>('');
 
   const fetchChurchInfo = useCallback(async (id: number) => {
     try {
       const res = await api.get(`churches/${id}`);
       const churchData = res?.data?.data;
-      if (churchData?.name) {
-        setChurchName(churchData.name);
+      if (churchData?.name && churchIdRef.current === id) {
+        setChurchName(String(churchData.name).trim());
       }
     } catch (e) {
       console.error('Error fetching church info:', e);
     }
   }, []);
 
+  // Only the newest load may write (pull-to-refresh during a reload, or a
+  // reload after a change, answered out of order). The old `if (loading)`
+  // guard read a stale value and could skip the reload after an add.
+  const requestRef = useRef(0);
+  const alertedRef = useRef(false);
   const fetchData = useCallback(
-    async (reset = false) => {
-      try {
-        if (loading) {
-          return;
+    async (showSpinner = true) => {
+      const requestId = ++requestRef.current;
+      const isCurrent = () => requestId === requestRef.current;
+      const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
+      const id = savedChurchId ? parseInt(savedChurchId, 10) : NaN;
+      if (Number.isNaN(id)) {
+        if (isCurrent()) {
+          setLoading(false);
         }
-        const savedChurchId = await AsyncStorage.getItem('selectedChurchId');
-        if (!savedChurchId) {
-          Alert.alert(t('error') || 'Error', t('churchIdNotFound') || 'Church ID not found');
-          return;
+        // Once, not on every refresh.
+        if (!alertedRef.current) {
+          alertedRef.current = true;
+          Alert.alert(
+            t('error') || 'Error',
+            savedChurchId ? t('invalidChurchId') : t('churchIdNotFound'),
+          );
         }
-        const id = parseInt(savedChurchId, 10);
-        if (isNaN(id)) {
-          Alert.alert(t('error') || 'Error', t('invalidChurchId') || 'Invalid Church ID');
-          return;
-        }
-        setChurchId(id);
+        return;
+      }
+      if (!isCurrent()) {
+        return;
+      }
+      if (id !== churchIdRef.current) {
+        // Another church was picked on the dashboard: drop the old church's rows.
+        churchIdRef.current = id;
+        setItems([]);
+        setChurchName('');
+      }
+      if (showSpinner) {
         setLoading(true);
-        const res = await listWorshipServicesByChurch(id);
-        console.log('WorshipServices API Response:', res);
-        const services = res?.data ?? [];
-        console.log('WorshipServices parsed:', services);
-        setItems(services);
-        setLoadError(null);
-        await fetchChurchInfo(id);
+      }
+      try {
+        const [res] = await Promise.all([
+          listWorshipServicesByChurch(id),
+          fetchChurchInfo(id),
+        ]);
+        if (isCurrent()) {
+          setItems(sortWorshipServices(res?.data ?? []));
+          setLoadError(null);
+        }
       } catch (e) {
-        console.error('Error fetching worship services:', e);
-        // Shown as a recoverable error state in the list (not an Alert + empty list).
-        setLoadError(e);
+        if (isCurrent()) {
+          console.error('Error fetching worship services:', e);
+          // Shown as a recoverable error state in the list (not an Alert + empty list).
+          setLoadError(e);
+        }
       } finally {
-        setLoading(false);
+        if (isCurrent()) {
+          setLoading(false);
+        }
       }
     },
-    [loading, t, fetchChurchInfo],
+    [t, fetchChurchInfo],
   );
 
   const reload = useCallback(() => fetchData(true), [fetchData]);
 
   useEffect(() => {
     fetchData(true);
+    // First load only; later loads come from useReloadOnReturn / focus.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Back from detail keeps the list; reload after an add / edit / delete.
+  useReloadOnReturn(() => fetchData(false), {
+    dataKey: 'worshipServices',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
+
+  // The list follows the church picked on the dashboard; coming back after
+  // picking another one kept showing the previous church.
   useFocusEffect(
     useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        navigation.setParams({reload: undefined});
-        fetchData(true);
-      }
-    }, [route.params?.reload, fetchData]),
+      AsyncStorage.getItem('selectedChurchId').then(saved => {
+        const id = saved ? parseInt(saved, 10) : NaN;
+        if (!Number.isNaN(id) && churchIdRef.current != null && id !== churchIdRef.current) {
+          fetchData(true);
+        }
+      });
+    }, [fetchData]),
   );
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchData(true);
+    await fetchData(false);
     setRefreshing(false);
   };
 
   const handleView = (item: WorshipServiceItem) => {
     navigation.navigate('WorshipServiceDetail', {worshipServiceId: item.id});
-  };
-
-  const formatTime = (timeString: string) => {
-    if (!timeString) return '';
-    const parts = timeString.split(':');
-    if (parts.length >= 2) {
-      return `${parts[0]}:${parts[1]}`;
-    }
-    return timeString;
   };
 
   const openActions = (item: WorshipServiceItem) => {
@@ -137,12 +172,12 @@ export const WorshipServicesScreen: React.FC = () => {
 
   const renderItem = ({item}: {item: WorshipServiceItem}) => (
     <EntityListCard
-      title={item.name}
+      title={item.name?.trim() || '—'}
       trailingText={`#${item.id}`}
       onPress={() => handleView(item)}
       onMorePress={() => openActions(item)}>
       <CardMeta>
-        {item.day_name} • {formatTime(item.time)}
+        {dayLabel(item.day_name, t)} • {formatServiceTime(item.time)}
       </CardMeta>
     </EntityListCard>
   );
@@ -257,7 +292,7 @@ export const WorshipServicesScreen: React.FC = () => {
 
       <ActionSheetModal
         visible={actionsVisible}
-        title={selectedService?.name || t('worshipService') || 'Worship Service'}
+        title={selectedService?.name?.trim() || t('worshipService') || 'Worship Service'}
         onRequestClose={() => {
           setActionsVisible(false);
           setSelectedService(null);

@@ -1,7 +1,9 @@
-import React, {useCallback, useEffect, useState} from 'react';
+import React, {useCallback, useEffect, useMemo, useRef, useState} from 'react';
 import {View, FlatList, RefreshControl, StyleSheet} from 'react-native';
 import {listFAQs, FAQItem} from '../services/faq.service';
-import {useNavigation, useFocusEffect, useRoute} from '@react-navigation/native';
+import {useNavigation, useRoute} from '@react-navigation/native';
+import {useReloadOnReturn} from '../../../shared/hooks/useReloadOnReturn';
+import {useFaqLanguageOptions} from '../hooks/useFaqLanguageOptions';
 import {useThemedColors} from '../../../shared/styles/theme';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import ActionSheetModal, {
@@ -10,11 +12,8 @@ import ActionSheetModal, {
 import {ms} from '../../../shared/utils/scale';
 import ElementDropdown from '../../../shared/components/ElementDropdown';
 import api from '../../../config/api';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import SearchInput from '../../../shared/components/SearchInput';
 import {isSuperAdmin} from '../../../shared/utils/permissions';
-import {SaveButton} from '../../../shared/components/ActionButtons';
-import {formStyles} from '../../../shared/styles/form';
 import {
   EntityListCard,
   ListEmptyState,
@@ -23,11 +22,6 @@ import {
   StatusBadge,
   listContentStyle,
 } from '../../../shared/components/crud';
-
-interface LanguageOption {
-  id: number;
-  name: string;
-}
 
 export const SearchFAQScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -41,37 +35,16 @@ export const SearchFAQScreen: React.FC = () => {
   const [selectedFAQ, setSelectedFAQ] = useState<FAQItem | null>(null);
   const [selectedLanguageId, setSelectedLanguageId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
-  const [languageOptions, setLanguageOptions] = useState<{label: string; value: number}[]>([]);
-  const [languages, setLanguages] = useState<LanguageOption[]>([]);
   const [userRoleId, setUserRoleId] = useState<number | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [loadError, setLoadError] = useState<unknown>(null);
-
-  const loadLanguages = useCallback(async () => {
-    try {
-      const token = await AsyncStorage.getItem('token');
-      if (!token) return;
-      const res = await api.get('/languages', {
-        params: {page: 1, limit: 100, sort_by: 'name', sort_desc: false},
-        headers: {Authorization: `Bearer ${token}`},
-      });
-      const langItems = res?.data?.data?.items || [];
-      setLanguages(langItems);
-      setLanguageOptions([
-        {label: t('all') || 'All Languages', value: 0},
-        ...langItems.map((lang: LanguageOption) => ({
-          label: lang.name,
-          value: lang.id,
-        })),
-      ]);
-    } catch (e) {
-      console.error('Error loading languages:', e);
-    }
-  }, [t]);
-
-  useEffect(() => {
-    loadLanguages();
-  }, [loadLanguages]);
+  // Shared loader: it used to need a token saved in AsyncStorage and gave an
+  // empty Language list otherwise (e.g. with the dev test token).
+  const {languageOptions: langs} = useFaqLanguageOptions();
+  const languageOptions = useMemo(
+    () => [{label: t('all') || 'All Languages', value: 0}, ...langs],
+    [langs, t],
+  );
 
   // Fetch user role to check permissions
   useEffect(() => {
@@ -88,62 +61,65 @@ export const SearchFAQScreen: React.FC = () => {
     })();
   }, []);
 
+  // Only the newest search may write: answers arriving out of order showed
+  // the results of an older search.
+  const requestRef = useRef(0);
   const performSearch = useCallback(async () => {
-    // Only search if there's a search query or language selected
-    if (!searchQuery.trim() && (!selectedLanguageId || selectedLanguageId === 0)) {
+    const requestId = ++requestRef.current;
+    const isCurrent = () => requestId === requestRef.current;
+    // Search needs a question text or a language (the API filters by both).
+    if (!searchQuery.trim() && !selectedLanguageId) {
       setItems([]);
       setHasSearched(false);
       setLoadError(null);
+      setLoading(false);
       return;
     }
-
     try {
       setLoading(true);
       setHasSearched(true);
       const res = await listFAQs({
-        language_id:
-          selectedLanguageId && selectedLanguageId > 0 ? selectedLanguageId : undefined,
+        language_id: selectedLanguageId || undefined,
         question_header: searchQuery,
       });
-      setItems(res?.data ?? []);
-      setLoadError(null);
+      if (isCurrent()) {
+        setItems(res?.data ?? []);
+        setLoadError(null);
+      }
     } catch (e) {
-      console.error(e);
-      setItems([]);
-      // A failed search shows a recoverable error, not "No data found".
-      setLoadError(e);
+      if (isCurrent()) {
+        console.error(e);
+        setItems([]);
+        // A failed search shows a recoverable error, not "No data found".
+        setLoadError(e);
+      }
     } finally {
-      setLoading(false);
+      if (isCurrent()) {
+        setLoading(false);
+      }
     }
   }, [searchQuery, selectedLanguageId]);
 
-  // Auto search when search query is cleared (becomes empty)
+  // Search as the user types or picks a language, after a short pause (as the
+  // web does). Before, only a cleared field re-searched by itself.
   useEffect(() => {
-    // Only auto-search if user has already searched before (hasSearched is true)
-    // and search query becomes empty, but language is still selected
-    if (hasSearched && !searchQuery.trim() && selectedLanguageId && selectedLanguageId > 0) {
-      const timeoutId = setTimeout(() => {
-        performSearch();
-      }, 300); // Debounce 300ms
-      return () => clearTimeout(timeoutId);
-    }
-    // If search query is empty and no language selected, clear results
-    else if (hasSearched && !searchQuery.trim() && (!selectedLanguageId || selectedLanguageId === 0)) {
-      setItems([]);
-      setHasSearched(false);
-      setLoadError(null);
-    }
-  }, [searchQuery, hasSearched, selectedLanguageId, performSearch]);
+    const timer = setTimeout(performSearch, 400);
+    return () => clearTimeout(timer);
+  }, [performSearch]);
 
-  useFocusEffect(
-    useCallback(() => {
-      const shouldReload = route.params?.reload;
-      if (shouldReload) {
-        navigation.setParams({reload: undefined});
-        performSearch();
-      }
-    }, [route.params?.reload, performSearch]),
+  useEffect(
+    () => () => {
+      requestRef.current += 1;
+    },
+    [],
   );
+
+  // Back from edit / delete: search again so the change shows.
+  useReloadOnReturn(performSearch, {
+    dataKey: 'faqs',
+    reload: route.params?.reload,
+    clearReload: () => navigation.setParams({reload: undefined}),
+  });
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -166,7 +142,7 @@ export const SearchFAQScreen: React.FC = () => {
     const tags = (item.tags ?? []).filter(tag => tag.tag_name);
     return (
       <EntityListCard
-        title={item.question_header}
+        title={item.question_header?.trim() || `#${item.id}`}
         trailingText={`#${item.id}`}
         onPress={() => handleView(item)}
         // Edit / delete are super-admin only, so the sheet is too.
@@ -193,8 +169,9 @@ export const SearchFAQScreen: React.FC = () => {
           <SearchInput
             value={searchQuery}
             onChangeText={setSearchQuery}
+            // The screen waits for typing to pause itself.
+            debounce={false}
             placeholder={t('search') || 'Search by question...'}
-            onSubmitEditing={performSearch}
           />
         </View>
         <View style={styles.filterRow}>
@@ -212,13 +189,6 @@ export const SearchFAQScreen: React.FC = () => {
                 borderColor: C.inputBorder,
               } as any
             }
-          />
-        </View>
-        <View style={formStyles.buttonRow}>
-          <SaveButton
-            label={t('search') || 'Search'}
-            onPress={performSearch}
-            disabled={loading}
           />
         </View>
       </View>
@@ -243,10 +213,7 @@ export const SearchFAQScreen: React.FC = () => {
               </ListLoadState>
             ) : (
               <ListEmptyState
-                title={
-                  t('enterSearchCriteria') ||
-                  'Enter search criteria and click Search'
-                }
+                title={t('faqSearchHint')}
               />
             )
           ) : null

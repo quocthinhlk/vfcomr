@@ -8,9 +8,10 @@ import {
   View,
 } from 'react-native';
 import {useNavigation, useRoute} from '@react-navigation/native';
-import {SaveButton} from '../../../shared/components/ActionButtons';
 import AppInput from '../../../shared/components/AppInput';
-import {FormField, ScreenContainer} from '../../../shared/components/crud';
+import {FormActions, FormField, ScreenContainer} from '../../../shared/components/crud';
+import {useSubmitOnce} from '../../../shared/hooks/useSubmitOnce';
+import {getApiErrorMessage} from '../../../shared/utils/apiErrorHandler';
 import {useUiTokens} from '../../../shared/styles/uiTokens';
 import {useTranslation} from '../../../shared/hooks/useTranslation';
 import {useThemedColors} from '../../../shared/styles/theme';
@@ -42,6 +43,8 @@ export const WatchListFormScreen: React.FC = () => {
   const [loading, setLoading] = useState(Boolean(watchListId));
   const [saving, setSaving] = useState(false);
   const [nameError, setNameError] = useState(false);
+  // One save at a time: a fast double tap created the watch list twice.
+  const submitOnce = useSubmitOnce();
 
   const [loadError, setLoadError] = useState<unknown>(null);
 
@@ -90,15 +93,17 @@ export const WatchListFormScreen: React.FC = () => {
     return t('sortByName');
   };
 
-  const save = async () => {
+  const save = submitOnce(async () => {
     if (!name.trim()) {
       setNameError(true);
       return;
     }
     setSaving(true);
     try {
+      // PATCH replaces the whole watch list (a missing field is cleared), so
+      // every field is always sent.
       const payload = {
-        name: name.trim(),
+        name: name.trim().replace(/\s+/g, ' '),
         sort_by: sortBy,
         sortlist: sortList.trim(),
         church_ids: Object.keys(churches).map(Number),
@@ -107,18 +112,16 @@ export const WatchListFormScreen: React.FC = () => {
         ? await updateWatchList(watchListId, payload)
         : await createWatchList(payload);
       markDataChanged('watchLists');
-      Alert.alert(t('success'), response.message, [
-        {text: t('done'), onPress: () => navigation.goBack()},
-      ]);
+      // Back to the list at once (it reloads); the form used to stay open
+      // behind an alert until "Done" was tapped.
+      navigation.goBack();
+      Alert.alert(t('success'), response?.message || t('success'));
     } catch (error) {
-      Alert.alert(
-        t('error'),
-        error instanceof Error ? error.message : t('saveFailed'),
-      );
+      Alert.alert(t('error'), getApiErrorMessage(error, t) || t('saveFailed'));
     } finally {
       setSaving(false);
     }
-  };
+  });
 
   return (
     <ScreenContainer
@@ -142,6 +145,7 @@ export const WatchListFormScreen: React.FC = () => {
               }}
               placeholder={t('watchListName')}
               error={nameError}
+              maxLength={255}
             />
           </FormField>
 
@@ -206,7 +210,7 @@ export const WatchListFormScreen: React.FC = () => {
                 {backgroundColor: C.surface, borderColor: C.surfaceBorder},
               ]}>
               <Text style={[styles.churchName, {color: C.textPrimary}]}>
-                {churchName}
+                {churchName.trim() || `#${id}`}
               </Text>
               <TouchableOpacity
                 onPress={() =>
@@ -224,12 +228,14 @@ export const WatchListFormScreen: React.FC = () => {
             </View>
           ))}
 
-          <SaveButton
-            label={saving ? t('saving') : t('save')}
-            onPress={save}
-            disabled={saving}
-            style={styles.saveButton}
-          />
+          <View style={styles.saveButton}>
+            {/* Cancel / Save like the app's other forms (there was no Cancel). */}
+            <FormActions
+              onCancel={() => navigation.goBack()}
+              onSave={save}
+              submitting={saving}
+            />
+          </View>
       <ChurchMultiSelectModal
         visible={pickerVisible}
         selected={churches}

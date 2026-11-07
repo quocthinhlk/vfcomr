@@ -12,6 +12,7 @@ import {
   ListEmptyState,
   ScreenContainer,
 } from '../../../shared/components/crud';
+import {dayLabel, formatServiceTime} from '../utils/worshipService.utils';
 
 export const WorshipServiceDetailScreen: React.FC = () => {
   const navigation = useNavigation<any>();
@@ -20,17 +21,6 @@ export const WorshipServiceDetailScreen: React.FC = () => {
   const [service, setService] = useState<WorshipServiceItem | null>(null);
   const [loading, setLoading] = useState(true);
   const {t} = useTranslation();
-
-  const formatTime = (timeString: string) => {
-    if (!timeString) {
-      return '—';
-    }
-    const parts = timeString.split(':');
-    if (parts.length >= 2) {
-      return `${parts[0]}:${parts[1]}`;
-    }
-    return timeString;
-  };
 
   const formatCreated = (iso: string) => {
     if (!iso) {
@@ -114,16 +104,16 @@ export const WorshipServiceDetailScreen: React.FC = () => {
         <ListEmptyState title={t('noDataFound') || 'No data found'} />
       ) : (
         <>
-          <DetailCard title={service.name}>
-            <DetailRow label={t('day') || 'Day'} value={service.day_name || '—'} />
-            <DetailRow label={t('time') || 'Time'} value={formatTime(service.time)} />
+          <DetailCard title={service.name?.trim() || `#${service.id}`}>
+            <DetailRow label={t('day') || 'Day'} value={dayLabel(service.day_name, t) || '—'} />
+            <DetailRow label={t('time') || 'Time'} value={formatServiceTime(service.time) || '—'} />
             <DetailRow
               label={t('created') || 'Created'}
               value={formatCreated(service.created)}
             />
           </DetailCard>
           <DetailActions
-            itemName={service.name}
+            itemName={service.name?.trim() || `#${service.id}`}
             onEdit={handleEdit}
             onDelete={handleDelete}
           />
